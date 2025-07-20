@@ -8,6 +8,7 @@ import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -35,6 +36,24 @@ class ApiControllerAdvice {
         val type = e.requiredType?.simpleName ?: "unknown"
         val value = e.value ?: "null"
         val message = "요청 파라미터 '$name' (타입: $type)의 값 '$value'이(가) 잘못되었습니다."
+        return failureResponse(errorType = ErrorType.BAD_REQUEST, errorMessage = message)
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleValidationException(e: MethodArgumentNotValidException): ResponseEntity<ApiResponse<*>> {
+        val message = e.bindingResult.fieldErrors.joinToString(", ") { fieldError ->
+            val field = fieldError.field
+            val rejectedValue = fieldError.rejectedValue ?: "null"
+            val defaultMessage = fieldError.defaultMessage
+            val code = fieldError.code
+
+            when (code) {
+                "Pattern" -> "요청 파라미터 '$field'의 값 '$rejectedValue'이(가) 잘못되었습니다. ($defaultMessage)"
+                "Min" -> "요청 파라미터 '$field'의 값 '$rejectedValue'이(가) 잘못되었습니다. ($defaultMessage)"
+                else -> "요청 파라미터 '$field'의 값 '$rejectedValue'이(가) 잘못되었습니다. ($defaultMessage)"
+            }
+        }
+
         return failureResponse(errorType = ErrorType.BAD_REQUEST, errorMessage = message)
     }
 
