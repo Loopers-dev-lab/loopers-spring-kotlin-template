@@ -18,7 +18,7 @@ class PointServiceIntegrationTest @Autowired constructor(
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
     }
-    
+
     @DisplayName("조회")
     @Nested
     inner class Get {
