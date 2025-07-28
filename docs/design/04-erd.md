@@ -9,10 +9,10 @@ erDiagram
 
     USER {
         BIGINT id
-        STRING user_name
-        STRING birth_date
-        STRING email
-        STRING gender
+        VARCHAR user_name
+        VARCHAR birth_date
+        VARCHAR email
+        VARCHAR gender
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
@@ -33,8 +33,8 @@ erDiagram
 
     BRAND {
         BIGINT id
-        STRING name
-        STRING description
+        VARCHAR name
+        VARCHAR description
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
@@ -49,7 +49,7 @@ erDiagram
     PRODUCT {
         BIGINT id
         BIGINT brand_id
-        STRING name
+        VARCHAR name
         INT price
         DATETIME created_at
         DATETIME updated_at
@@ -60,7 +60,7 @@ erDiagram
         BIGINT id
         BIGINT product_id
         BIGINT sku_id
-        STRING name
+        VARCHAR name
         INT additional_price
         DATETIME created_at
         DATETIME updated_at
@@ -70,7 +70,7 @@ erDiagram
     SKU {
         BIGINT id
         BIGINT brand_id
-        STRING code
+        VARCHAR code
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
@@ -90,7 +90,7 @@ erDiagram
         BIGINT id
         BIGINT user_id
         BIGINT target_id
-        STRING type
+        VARCHAR type
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
@@ -116,7 +116,7 @@ erDiagram
         BIGINT user_id
         INT original_price
         INT total_price
-        STRING status
+        VARCHAR status
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
@@ -127,7 +127,7 @@ erDiagram
         BIGINT order_id
         BIGINT product_option_id
         INT quantity
-        STRING type
+        VARCHAR type
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
@@ -137,9 +137,9 @@ erDiagram
     PAYMENT {
         BIGINT id
         BIGINT order_id
-        STRING method
+        VARCHAR method
         INT price
-        STRING status
+        VARCHAR status
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
