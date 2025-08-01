@@ -21,7 +21,7 @@ class LikeCountResult {
                     likeCount.id,
                     likeCount.target.targetId,
                     likeCount.target.type,
-                    likeCount.count,
+                    likeCount.count.value,
                     likeCount.createdAt,
                     likeCount.updatedAt,
                 )

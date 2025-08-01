@@ -3,7 +3,7 @@ package com.loopers.domain.point
 import com.loopers.domain.BaseEntity
 import com.loopers.domain.point.validation.PointValidator
 import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType.CONFLICT
+import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
@@ -34,8 +34,8 @@ class Point protected constructor(
     }
 
     fun use(useAmount: Int) {
-        if (amount.value > useAmount) {
-            throw CoreException(CONFLICT, "포인트가 부족합니다. 차감금액: $useAmount, 보유금액: $amount")
+        if (amount.value < useAmount) {
+            throw CoreException(ErrorType.POINT_NOT_ENOUGH, "포인트가 부족합니다. 차감금액: $useAmount, 보유금액: $amount")
         }
         amount = amount.minus(useAmount)
     }

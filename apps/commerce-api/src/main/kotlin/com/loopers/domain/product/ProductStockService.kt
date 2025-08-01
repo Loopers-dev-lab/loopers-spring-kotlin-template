@@ -12,15 +12,14 @@ class ProductStockService(
         return productStockRepository.findAll(productOptionIds)
     }
 
-    fun decreaseStock(command: ProductStockCommand.DecreaseStocks) {
+    fun decreaseStock(command: ProductStockCommand.DecreaseStocks): List<ProductStock> {
         val decreaseMap = command.decreaseStocks.associateBy { it.productOptionId }
 
         val productStocks = findAll(decreaseMap.keys.toList())
         productStocks.forEach { productStock ->
-            val quantity = decreaseMap[productStock.productOptionId]?.quantity
-                ?: throw IllegalArgumentException("감소 수량이 존재하지 않습니다. optionId=${productStock.productOptionId}")
-
+            val quantity = decreaseMap[productStock.productOptionId]!!.quantity
             productStock.deduct(quantity)
         }
+        return productStocks
     }
 }

@@ -50,7 +50,7 @@ class LikeFacade(
 
         return likeService.add(command).let {
             if (it.isNew) {
-                likeCountService.getLikeCount(command.targetId, command.type).increase()
+                likeCountService.getLikeCount(command.targetId, command.type).count.increase()
             }
             LikeDetail.from(it.like)
         }
@@ -63,7 +63,7 @@ class LikeFacade(
         // TODO: 상품 존재 확인
 
         val likeCount = likeCountService.getLikeCount(command.targetId, command.type)
-        likeCount.increase()
+        likeCount.count.increase()
         return likeService.remove(command)
     }
 }

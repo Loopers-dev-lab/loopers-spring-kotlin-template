@@ -5,9 +5,18 @@ import com.loopers.domain.order.vo.OrderItemQuantity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 
 @Entity
-@Table(name = "order_item")
+@Table(
+    name = "order_item",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_order_item_order_product_option",
+            columnNames = ["order_id", "product_option_id"],
+        ),
+    ],
+)
 class OrderItem protected constructor(
     orderId: Long,
     productOptionId: Long,

@@ -13,7 +13,8 @@ import java.math.BigDecimal
 class ProductOption protected constructor(
     productId: Long,
     skuId: Long,
-    type: ProductOptionType,
+    color: String,
+    size: String,
     displayName: ProductOptionDisplayName,
     additionalPrice: ProductOptionAdditionalPrice,
 ) : BaseEntity() {
@@ -25,8 +26,12 @@ class ProductOption protected constructor(
     var skuId: Long = skuId
         protected set
 
-    @Column(name = "type", nullable = false)
-    var type: ProductOptionType = type
+    @Column(name = "color", nullable = false)
+    var color: String = color
+        protected set
+
+    @Column(name = "size", nullable = false)
+    var size: String = size
         protected set
 
     @Column(name = "display_name", nullable = false)
@@ -37,23 +42,20 @@ class ProductOption protected constructor(
     var additionalPrice: ProductOptionAdditionalPrice = additionalPrice
         protected set
 
-    enum class ProductOptionType {
-        COLOR,
-        SIZE,
-    }
-
     companion object {
         fun create(
             productId: Long,
             skuId: Long,
-            type: ProductOptionType,
+            color: String,
+            size: String,
             displayName: String,
             additionalPrice: BigDecimal,
         ): ProductOption {
             return ProductOption(
                 productId,
                 skuId,
-                type,
+                color,
+                size,
                 ProductOptionDisplayName(displayName),
                 ProductOptionAdditionalPrice(additionalPrice),
             )

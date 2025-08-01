@@ -42,8 +42,8 @@ class ProductRepositoryImpl(
             ProductSortCondition.CREATED_AT_ASC -> product.createdAt.asc()
             ProductSortCondition.PRICE_DESC -> product.price.desc()
             ProductSortCondition.PRICE_ASC -> product.price.asc()
-            ProductSortCondition.LIKES_DESC -> likeCount.count.desc()
-            ProductSortCondition.LIKES_ASC -> likeCount.count.asc()
+            ProductSortCondition.LIKES_DESC -> likeCount.count.value.desc()
+            ProductSortCondition.LIKES_ASC -> likeCount.count.value.asc()
         }
 
         val results = queryFactory

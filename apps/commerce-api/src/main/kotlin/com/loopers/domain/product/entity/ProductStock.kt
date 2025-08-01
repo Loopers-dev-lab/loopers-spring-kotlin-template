@@ -5,6 +5,7 @@ import com.loopers.domain.product.vo.ProductStockQuantity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
+import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
 
@@ -18,19 +19,19 @@ class ProductStock protected constructor(
     var productOptionId: Long = productOptionId
         protected set
 
-    @Column(name = "quantity", nullable = false)
-    var quantity: ProductStockQuantity = quantity
+    @Embedded
+    var stockQuantity: ProductStockQuantity = quantity
         protected set
 
     fun validateEnoughQuantity(requested: Int) {
-        if (quantity.value < requested) {
-            throw CoreException(ErrorType.CONFLICT, "재고가 부족합니다.")
+        if (stockQuantity.quantity < requested) {
+            throw CoreException(ErrorType.PRODUCT_STOCK_NOT_ENOUGH, "재고가 부족합니다.")
         }
     }
 
-    fun deduct(requested: Int) {
-        validateEnoughQuantity(requested)
-        quantity = quantity.decrease(requested)
+    fun deduct(amount: Int) {
+        validateEnoughQuantity(amount)
+        stockQuantity = stockQuantity.decrease(amount)
     }
 
     companion object {

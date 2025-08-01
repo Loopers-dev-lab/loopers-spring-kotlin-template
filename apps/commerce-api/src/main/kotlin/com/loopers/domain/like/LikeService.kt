@@ -5,6 +5,8 @@ import com.loopers.domain.like.dto.criteria.LikeCriteria
 import com.loopers.domain.like.dto.info.LikeInfo.Add
 import com.loopers.domain.like.entity.Like
 import com.loopers.domain.like.vo.LikeTarget.Type
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import org.springframework.data.domain.Page
 import org.springframework.stereotype.Component
 
@@ -12,6 +14,14 @@ import org.springframework.stereotype.Component
 class LikeService(
     private val likeRepository: LikeRepository,
 ) {
+    fun get(userId: Long, targetId: Long, targetType: Type): Like {
+        return likeRepository.find(userId, targetId, targetType)
+            ?: throw CoreException(
+                ErrorType.NOT_FOUND,
+                "[userId = $userId, targetId = $targetId, targetType = $targetType] 좋아요를 찾을 수 없습니다.",
+            )
+    }
+
     fun find(userId: Long, targetId: Long, targetType: Type): Like? {
         return likeRepository.find(userId, targetId, targetType)
     }

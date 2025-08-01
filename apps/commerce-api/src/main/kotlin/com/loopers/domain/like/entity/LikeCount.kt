@@ -1,9 +1,9 @@
 package com.loopers.domain.like.entity
 
 import com.loopers.domain.BaseEntity
+import com.loopers.domain.like.vo.LikeCountValue
 import com.loopers.domain.like.vo.LikeTarget
 import com.loopers.domain.like.vo.LikeTarget.Type
-import jakarta.persistence.Column
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
@@ -21,27 +21,19 @@ import jakarta.persistence.UniqueConstraint
 )
 class LikeCount protected constructor(
     target: LikeTarget,
-    count: Long,
+    count: LikeCountValue,
 ) : BaseEntity() {
     @Embedded
     var target: LikeTarget = target
         protected set
 
-    @Column(name = "count", nullable = false)
-    var count: Long = count
+    @Embedded
+    var count: LikeCountValue = count
         protected set
-
-    fun increase() {
-        count++
-    }
-
-    fun decrease() {
-        count--
-    }
 
     companion object {
         fun create(targetId: Long, type: Type, count: Long): LikeCount {
-            return LikeCount(LikeTarget.create(type, targetId), count)
+            return LikeCount(LikeTarget.create(type, targetId), LikeCountValue(count))
         }
     }
 }

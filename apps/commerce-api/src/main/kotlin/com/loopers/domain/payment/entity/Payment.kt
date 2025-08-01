@@ -2,6 +2,8 @@ package com.loopers.domain.payment.entity
 
 import com.loopers.domain.BaseEntity
 import com.loopers.domain.payment.vo.PaymentPrice
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -35,10 +37,16 @@ class Payment protected constructor(
         protected set
 
     fun success() {
+        if (status != Status.REQUESTED) {
+            throw CoreException(ErrorType.CONFLICT, "결제 요청 상태일 때만 주문을 성공 처리할 수 있습니다.")
+        }
         status = Status.SUCCESS
     }
 
     fun failure() {
+        if (status != Status.REQUESTED) {
+            throw CoreException(ErrorType.CONFLICT, "결제 요청 상태일 때만 주문을 실패 처리할 수 있습니다.")
+        }
         status = Status.FAILED
     }
 

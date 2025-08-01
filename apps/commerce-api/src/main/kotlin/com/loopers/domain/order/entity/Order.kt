@@ -3,6 +3,8 @@ package com.loopers.domain.order.entity
 import com.loopers.domain.BaseEntity
 import com.loopers.domain.order.vo.OrderFinalPrice
 import com.loopers.domain.order.vo.OrderOriginalPrice
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -43,14 +45,23 @@ class Order protected constructor(
     }
 
     fun paymentRequest() {
+        if (status != Status.ORDER_REQUEST) {
+            throw CoreException(ErrorType.CONFLICT, "ORDER_REQUEST 상태에서만 결제 요청이 가능합니다.")
+        }
         status = Status.PAYMENT_REQUEST
     }
 
     fun success() {
+        if (status != Status.PAYMENT_REQUEST) {
+            throw CoreException(ErrorType.CONFLICT, "결제 요청 상태에서만 주문 성공이 가능합니다.")
+        }
         status = Status.ORDER_SUCCESS
     }
 
-    fun failed() {
+    fun failure() {
+        if (status != Status.PAYMENT_REQUEST) {
+            throw CoreException(ErrorType.CONFLICT, "결제 요청 상태에서만 주문 실패가 가능합니다.")
+        }
         status = Status.ORDER_FAIL
     }
 

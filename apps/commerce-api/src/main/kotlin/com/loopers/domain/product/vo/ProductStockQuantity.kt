@@ -1,16 +1,19 @@
 package com.loopers.domain.product.vo
 
 import com.loopers.domain.product.policy.ProductStockValidator
+import jakarta.persistence.Column
+import jakarta.persistence.Embeddable
 
-@JvmInline
-value class ProductStockQuantity(
-    val value: Int,
+@Embeddable
+data class ProductStockQuantity(
+    @Column(name = "quantity", nullable = false)
+    val quantity: Int,
 ) {
     init {
-        ProductStockValidator.validateQuantity(value)
+        ProductStockValidator.validateQuantity(quantity)
     }
 
     fun decrease(amount: Int): ProductStockQuantity {
-        return ProductStockQuantity(value - amount)
+        return ProductStockQuantity(quantity - amount)
     }
 }

@@ -12,7 +12,7 @@ class BrandService(
 ) {
     fun get(id: Long): Brand {
         return brandRepository.find(id)
-            ?: throw CoreException(errorType = ErrorType.NOT_FOUND, customMessage = "[id = $id] 예시를 찾을 수 없습니다.")
+            ?: throw CoreException(errorType = ErrorType.NOT_FOUND, customMessage = "[id = $id] 브랜드를 찾을 수 없습니다.")
     }
 
     fun findAll(ids: List<Long>): List<Brand> {
