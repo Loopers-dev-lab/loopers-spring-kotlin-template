@@ -2,7 +2,6 @@ package com.loopers.domain.payment.dto.command
 
 import com.loopers.domain.payment.entity.Payment
 import com.loopers.domain.payment.entity.Payment.Method
-import com.loopers.domain.payment.entity.Payment.Status
 import java.math.BigDecimal
 
 class PaymentCommand {
