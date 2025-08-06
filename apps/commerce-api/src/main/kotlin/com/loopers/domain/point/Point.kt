@@ -7,6 +7,7 @@ import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
+import java.math.BigDecimal
 
 @Entity
 @Table(name = "point")
@@ -24,36 +25,40 @@ class Point protected constructor(
         protected set
 
     companion object {
-        fun create(userId: Long, amount: Int): Point {
+        fun create(userId: Long, amount: BigDecimal): Point {
             return Point(userId, Amount(amount))
         }
     }
 
-    fun charge(chargeAmount: Int) {
+    fun charge(chargeAmount: BigDecimal) {
         amount = amount.plus(chargeAmount)
     }
 
-    fun use(useAmount: Int) {
+    fun validatePoint(useAmount: BigDecimal) {
         if (amount.value < useAmount) {
             throw CoreException(ErrorType.POINT_NOT_ENOUGH, "포인트가 부족합니다. 차감금액: $useAmount, 보유금액: $amount")
         }
+    }
+
+    fun use(useAmount: BigDecimal) {
+        validatePoint(useAmount)
         amount = amount.minus(useAmount)
     }
 
     @JvmInline
     value class Amount(
-        val value: Int,
+        val value: BigDecimal,
     ) {
         init {
             PointValidator.validateMinAmount(value)
         }
 
-        operator fun plus(amount: Int): Amount {
-            return Amount(value + amount)
+        operator fun plus(amount: BigDecimal): Amount {
+            return Amount(value.plus(amount))
         }
 
-        operator fun minus(amount: Int): Amount {
-            return Amount(value - amount)
+        operator fun minus(amount: BigDecimal): Amount {
+            return Amount(value.minus(amount))
         }
     }
 }

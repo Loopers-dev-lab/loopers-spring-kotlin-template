@@ -60,14 +60,6 @@ class Payment protected constructor(
         failedAt = ZonedDateTime.now()
     }
 
-    fun isRequestable(): Boolean = status == Status.REQUESTED
-
-    fun validateRequestable() {
-        if (!isRequestable()) {
-            throw CoreException(ErrorType.BAD_REQUEST, "결제를 요청할 수 없는 상태입니다.")
-        }
-    }
-
     enum class Method {
         POINT,
     }

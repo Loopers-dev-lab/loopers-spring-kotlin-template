@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import java.math.BigDecimal
 
 @SpringBootTest
 class PointFacadeIntegrationTest @Autowired constructor(
@@ -38,7 +39,7 @@ class PointFacadeIntegrationTest @Autowired constructor(
 
             // then
             assertThat(result).isNotNull()
-            assertThat(result?.amount).isEqualTo(0)
+            assertThat(result?.amount).isEqualTo(BigDecimal.valueOf(0))
         }
     }
 
@@ -49,7 +50,7 @@ class PointFacadeIntegrationTest @Autowired constructor(
         fun `존재하지_않는 유저 ID 로 충전을 시도한 경우, 실패한다`() {
             // when & then
             val exception = assertThrows<CoreException> {
-                pointFacade.charge(PointInfo.Charge.of("invalid", 1000))
+                pointFacade.charge(PointInfo.Charge.of("invalid", BigDecimal(1000)))
             }
 
             // then

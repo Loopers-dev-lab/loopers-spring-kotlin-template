@@ -6,6 +6,7 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Component
 class PointFacade(
@@ -15,7 +16,7 @@ class PointFacade(
 
     fun getMe(userId: Long): PointInfo? {
         val point = pointService.getMe(userId)
-            ?: return PointInfo.of(userId, 0)
+            ?: return PointInfo.of(userId, BigDecimal(0))
         return PointInfo.from(point)
     }
 

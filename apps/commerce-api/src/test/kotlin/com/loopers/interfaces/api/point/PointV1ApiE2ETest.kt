@@ -17,6 +17,7 @@ import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
+import java.math.BigDecimal
 import kotlin.test.assertNotNull
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -55,7 +56,7 @@ class PointV1ApiE2ETest @Autowired constructor(
             assertAll(
                 { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
                 { assertThat(response.body?.data?.userId).isEqualTo(point.userId) },
-                { assertThat(response.body?.data?.amount).isEqualTo(point.amount.value) },
+                { assertThat(response.body?.data?.amount).isEqualByComparingTo(point.amount.value) },
             )
         }
 
@@ -87,7 +88,7 @@ class PointV1ApiE2ETest @Autowired constructor(
 
             val point = PointV1ApiE2EFixture.savePoint(pointRepository)
 
-            val requestBody = PointV1Dto.ChargeRequest(1000)
+            val requestBody = PointV1Dto.ChargeRequest(BigDecimal(1000))
 
             val headers = PointV1ApiE2EFixture.getHeaders(user.userName.value)
 
@@ -98,19 +99,19 @@ class PointV1ApiE2ETest @Autowired constructor(
             val response = testRestTemplate.exchange(ENDPOINT_CHARGE, HttpMethod.POST, requestEntity, responseType)
 
             // then
-            val totalAmount = point.amount.value + requestBody.amount
+            val totalAmount = point.amount.value.plus(requestBody.amount)
             assertAll(
                 { assert(response.statusCode.is2xxSuccessful) },
                 { assertNotNull(response.body?.data) },
                 { assertThat(response.body?.data?.userId).isEqualTo(point.userId) },
-                { assertThat(response.body?.data?.amount).isEqualTo(totalAmount) },
+                { assertThat(response.body?.data?.amount).isEqualByComparingTo(totalAmount) },
             )
         }
 
         @Test
         fun `존재하지 않는 유저로 요청할 경우, 404 Not Found 응답을 반환한다`() {
             // given
-            val requestBody = PointV1Dto.ChargeRequest(1000)
+            val requestBody = PointV1Dto.ChargeRequest(BigDecimal(1000))
 
             val headers = PointV1ApiE2EFixture.getHeaders("invalid")
 

@@ -34,26 +34,24 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         @Test
         fun `결제를 요청하면 저장된다`() {
             // given
-            val command = PaymentCommand.Request(1L, POINT, BigDecimal("1"))
+            val create = PaymentCommand.Request(1L, POINT).toEntity(BigDecimal("1000"))
 
             // when
-            val payment = paymentService.request(command)
+            val payment = paymentService.request(create)
 
             // then
-            assertThat(payment.orderId).isEqualTo(command.orderId)
-            assertThat(payment.paymentMethod).isEqualTo(command.paymentMethod)
-            assertThat(payment.paymentPrice.value).isEqualByComparingTo(command.paymentPrice)
+            assertThat(payment.orderId).isEqualTo(create.orderId)
+            assertThat(payment.paymentMethod).isEqualTo(create.paymentMethod)
+            assertThat(payment.paymentPrice.value).isEqualByComparingTo(create.paymentPrice.value)
             assertThat(payment.status).isEqualTo(REQUESTED)
         }
 
         @Test
         fun `0보다 작은 금액을 결제 요청하면 예외가 발생한다`() {
-            // given
-            val command = PaymentCommand.Request(1L, POINT, BigDecimal("-1"))
-
             // expect
             assertThrows<CoreException> {
-                paymentService.request(command)
+                val create = PaymentCommand.Request(1L, POINT).toEntity(BigDecimal("-1"))
+                paymentService.request(create)
             }
         }
     }

@@ -23,11 +23,16 @@ class ProductStock protected constructor(
     var quantity: ProductStockQuantity = stockQuantity
         protected set
 
-    fun deduct(amount: Int) {
+    fun validateDeduct(amount: Int) {
         if (quantity.value < amount) {
             throw CoreException(ErrorType.PRODUCT_STOCK_NOT_ENOUGH, "재고가 부족합니다.")
         }
+    }
+
+    fun deduct(amount: Int): Int {
+        validateDeduct(amount)
         quantity = quantity.decrease(amount)
+        return quantity.value
     }
 
     companion object {

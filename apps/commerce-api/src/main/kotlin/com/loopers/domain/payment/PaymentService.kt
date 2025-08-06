@@ -1,6 +1,5 @@
 package com.loopers.domain.payment
 
-import com.loopers.domain.payment.dto.command.PaymentCommand
 import com.loopers.domain.payment.entity.Payment
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -15,7 +14,7 @@ class PaymentService(
             ?: throw CoreException(errorType = ErrorType.NOT_FOUND, customMessage = "[id = $id] 주문을 찾을 수 없습니다.")
     }
 
-    fun request(command: PaymentCommand.Request): Payment {
-        return paymentRepository.save(command.toEntity())
+    fun request(payment: Payment): Payment {
+        return paymentRepository.save(payment)
     }
 }

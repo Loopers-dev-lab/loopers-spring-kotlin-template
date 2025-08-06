@@ -4,6 +4,7 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Transactional(readOnly = true)
 @Component
@@ -23,7 +24,7 @@ class PointService(
     }
 
     @Transactional
-    fun charge(userId: Long, amount: Int): Point {
+    fun charge(userId: Long, amount: BigDecimal): Point {
         return pointRepository.findByUserId(userId)
             ?.apply { charge(amount) }
             ?: pointRepository.save(Point.create(userId, amount))

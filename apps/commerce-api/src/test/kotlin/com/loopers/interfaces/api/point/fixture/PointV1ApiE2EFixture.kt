@@ -8,6 +8,7 @@ import com.loopers.infrastructure.point.PointJpaRepository
 import com.loopers.infrastructure.user.UserJpaRepository
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import java.math.BigDecimal
 
 object PointV1ApiE2EFixture {
     fun getHeaders(): HttpHeaders {
@@ -43,7 +44,7 @@ object PointV1ApiE2EFixture {
     fun savePoint(
         pointRepository: PointJpaRepository,
         userId: Long = 1L,
-        amount: Int = 1000,
+        amount: BigDecimal = BigDecimal(1000),
     ): Point {
         return pointRepository.save(
             Point.create(

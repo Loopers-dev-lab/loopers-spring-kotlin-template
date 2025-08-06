@@ -8,15 +8,14 @@ class PaymentCommand {
     data class Request(
         val orderId: Long,
         val paymentMethod: Method,
-        val paymentPrice: BigDecimal,
     ) {
-        fun toEntity(): Payment {
+        fun toEntity(paymentPrice: BigDecimal): Payment {
             return Payment.create(orderId, paymentMethod, paymentPrice, Payment.Status.REQUESTED)
         }
     }
 
     data class Process(
-        val paymentId: Long,
         val orderId: Long,
+        val paymentId: Long,
     )
 }

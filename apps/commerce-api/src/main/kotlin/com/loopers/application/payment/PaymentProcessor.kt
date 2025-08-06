@@ -13,13 +13,12 @@ import com.loopers.domain.product.ProductOptionService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductStockService
 import com.loopers.domain.product.dto.command.ProductStockCommand
-import com.loopers.domain.product.entity.ProductOption
+import com.loopers.domain.product.dto.result.ProductStockResult
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
 
 @Component
 class PaymentProcessor(
@@ -35,31 +34,25 @@ class PaymentProcessor(
 ) {
     @Transactional
     fun process(command: PaymentCommand.Process) {
+        val order = orderService.get(command.orderId)
         val payment = paymentService.get(command.paymentId)
-        payment.validateRequestable()
 
-        val order = orderService.get(payment.orderId)
+        val orderItems = orderItemService.findAll(order.id)
 
-        runCatching {
-            processPayment(order, payment)
-        }.getOrElse {
-            processFailure(order.id, payment.id, resolveFailureReason(it))
-            throw it
+        try {
+            processPayment(order, payment, orderItems)
+        } catch (e: Exception) {
+            processFailure(order.id, payment.id, resolveFailureReason(e))
+            throw e
         }
     }
 
-    private fun processPayment(
-        order: Order,
-        payment: Payment,
-    ) {
-        val orderItems = orderItemService.findAll(order.id)
-        decreaseStocks(orderItems)
-
-        val productOptions = loadProductOptions(orderItems)
-        val totalPrice = calculateTotalPrice(orderItems, productOptions)
+    private fun processPayment(order: Order, payment: Payment, orderItems: List<OrderItem>) {
+        val decreaseStocks = getDecreaseStocks(orderItems)
+        productStockService.decreaseStocks(decreaseStocks.toCommand())
 
         val point = pointService.get(order.userId)
-        point.use(totalPrice.intValueExact())
+        point.use(payment.paymentPrice.value)
 
         payment.success()
         order.success()
@@ -70,36 +63,13 @@ class PaymentProcessor(
         orderStateService.orderFailure(orderId, reason)
     }
 
-    private fun loadProductOptions(orderItems: List<OrderItem>): List<ProductOption> {
-        val productOptionIds = orderItems.map { it.productOptionId }
-        return productOptionService.findAll(productOptionIds)
-    }
-
-    private fun decreaseStocks(orderItems: List<OrderItem>) {
-        val command = ProductStockCommand.DecreaseStocks(
+    private fun getDecreaseStocks(orderItems: List<OrderItem>): ProductStockResult.DecreaseStocks {
+        val command = ProductStockCommand.GetDecreaseStock(
             orderItems.map {
-                ProductStockCommand.DecreaseStocks.DecreaseStock(it.productOptionId, it.quantity.value)
+                ProductStockCommand.GetDecreaseStock.DecreaseStock(it.productOptionId, it.quantity.value)
             },
         )
-        productStockService.decreaseStock(command)
-    }
-
-    private fun calculateTotalPrice(
-        orderItems: List<OrderItem>,
-        productOptions: List<ProductOption>,
-    ): BigDecimal {
-        val optionMap = productOptions.associateBy { it.id }
-        val productIds = productOptions.map { it.productId }.distinct()
-        val productMap = productService.findAll(productIds).associateBy { it.id }
-
-        return orderItems.sumOf { item ->
-            val option = optionMap[item.productOptionId]
-                ?: throw CoreException(ErrorType.NOT_FOUND, "상품 옵션을 찾을 수 없습니다.")
-            val product = productMap[option.productId]
-                ?: throw CoreException(ErrorType.NOT_FOUND, "상품 정보를 찾을 수 없습니다.")
-
-            item.calculatePrice(product.price.value, option.additionalPrice.value)
-        }
+        return productStockService.getDecreaseStock(command)
     }
 
     private fun resolveFailureReason(e: Throwable): String {

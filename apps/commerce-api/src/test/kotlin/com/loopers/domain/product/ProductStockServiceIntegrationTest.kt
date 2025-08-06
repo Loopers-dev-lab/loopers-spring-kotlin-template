@@ -27,30 +27,26 @@ class ProductStockServiceIntegrationTest @Autowired constructor(
 
     @Nested
     @DisplayName("재고 차감")
-    inner class DecreaseStock {
+    open inner class DecreaseStock {
 
         @Test
-        fun `정상적으로 재고를 차감한다`() {
+        open fun `정상적으로 재고를 차감한다`() {
             // given
             val stock = productStockRepository.save(ProductStock.create(1L, 10))
-            val command = ProductStockCommand.DecreaseStocks(
-                listOf(ProductStockCommand.DecreaseStocks.DecreaseStock(stock.productOptionId, 3)),
-            )
+            val command = ProductStockCommand.DecreaseStock(stock, 3)
 
             // when
-            val decreaseStocks = productStockService.decreaseStock(command)
+            val decreaseStock = productStockService.decreaseStock(command)
 
             // then
-            assertThat(decreaseStocks.first().quantity.value).isEqualTo(7)
+            assertThat(decreaseStock).isEqualTo(7)
         }
 
         @Test
         fun `재고 수량이 부족한 경우 예외가 발생한다`() {
             // given
             val stock = productStockRepository.save(ProductStock.create(1L, 2))
-            val command = ProductStockCommand.DecreaseStocks(
-                listOf(ProductStockCommand.DecreaseStocks.DecreaseStock(stock.productOptionId, 5)),
-            )
+            val command = ProductStockCommand.DecreaseStock(stock, 5)
 
             // when & then
             assertThrows<CoreException> {
