@@ -11,6 +11,7 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 import java.math.BigDecimal
+import java.time.ZonedDateTime
 
 @Entity
 @Table(name = "orders")
@@ -37,6 +38,13 @@ class Order protected constructor(
     var status: Status = status
         protected set
 
+    @Column(name = "reason")
+    var reason: String? = null
+
+    @Column(name = "failed_at")
+    var failedAt: ZonedDateTime? = null
+        protected set
+
     enum class Status {
         ORDER_REQUEST,
         PAYMENT_REQUEST,
@@ -58,11 +66,13 @@ class Order protected constructor(
         status = Status.ORDER_SUCCESS
     }
 
-    fun failure() {
+    fun failure(reason: String) {
         if (status != Status.PAYMENT_REQUEST) {
             throw CoreException(ErrorType.CONFLICT, "결제 요청 상태에서만 주문 실패가 가능합니다.")
         }
         status = Status.ORDER_FAIL
+        this.reason = reason
+        failedAt = ZonedDateTime.now()
     }
 
     companion object {

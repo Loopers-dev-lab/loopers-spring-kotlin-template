@@ -7,13 +7,13 @@ import jakarta.persistence.Embeddable
 @Embeddable
 data class ProductStockQuantity(
     @Column(name = "quantity", nullable = false)
-    val quantity: Int,
+    val value: Int,
 ) {
     init {
-        ProductStockValidator.validateQuantity(quantity)
+        ProductStockValidator.validateQuantity(value)
     }
 
     fun decrease(amount: Int): ProductStockQuantity {
-        return ProductStockQuantity(quantity - amount)
+        return ProductStockQuantity(value - amount)
     }
 }

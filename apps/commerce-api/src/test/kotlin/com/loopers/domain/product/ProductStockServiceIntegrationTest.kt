@@ -41,7 +41,7 @@ class ProductStockServiceIntegrationTest @Autowired constructor(
             val decreaseStocks = productStockService.decreaseStock(command)
 
             // then
-            assertThat(decreaseStocks.first().stockQuantity.quantity).isEqualTo(7)
+            assertThat(decreaseStocks.first().quantity.value).isEqualTo(7)
         }
 
         @Test

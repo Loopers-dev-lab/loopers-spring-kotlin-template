@@ -10,8 +10,8 @@ class PaymentStateService(
     private val paymentService: PaymentService,
 ) {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun paymentFailure(paymentId: Long) {
+    fun paymentFailure(paymentId: Long, reason: String) {
         val payment = paymentService.get(paymentId)
-        payment.failure()
+        payment.failure(reason)
     }
 }

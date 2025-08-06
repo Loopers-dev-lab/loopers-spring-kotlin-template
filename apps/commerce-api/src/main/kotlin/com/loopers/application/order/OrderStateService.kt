@@ -10,8 +10,8 @@ class OrderStateService(
     private val orderService: OrderService,
 ) {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun orderFailure(orderId: Long) {
+    fun orderFailure(orderId: Long, reason: String) {
         val order = orderService.get(orderId)
-        order.failure()
+        order.failure(reason)
     }
 }

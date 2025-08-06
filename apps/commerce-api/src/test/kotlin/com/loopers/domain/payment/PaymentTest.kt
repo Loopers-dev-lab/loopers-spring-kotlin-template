@@ -42,7 +42,7 @@ class PaymentTest {
         val payment = Payment.create(1L, POINT, BigDecimal("1"), REQUESTED)
 
         // when
-        payment.failure()
+        payment.failure("failReason")
 
         // then
         assertThat(payment.status).isEqualTo(FAILED)
@@ -74,7 +74,7 @@ class PaymentTest {
         val payment = Payment.create(1L, POINT, BigDecimal("1"), REQUESTED)
 
         // when
-        payment.failure()
+        payment.failure("failReason")
 
         // then
         assertThat(payment.status).isEqualTo(FAILED)
@@ -98,7 +98,7 @@ class PaymentTest {
 
         // expect
         assertThrows<CoreException> {
-            payment.failure()
+            payment.failure("failReason")
         }
     }
 }

@@ -46,7 +46,7 @@ class OrderTest {
     fun `PAYMENT_REQUEST 상태일 때 주문을 실패 처리할 수 있다`() {
         val order = Order.create(1L, BigDecimal("10000"), BigDecimal("10000"), PAYMENT_REQUEST)
 
-        order.failure()
+        order.failure("failReason")
 
         assertThat(order.status).isEqualTo(Order.Status.ORDER_FAIL)
     }
@@ -78,7 +78,7 @@ class OrderTest {
         val order = Order.create(1L, BigDecimal("10000"), BigDecimal("10000"), ORDER_SUCCESS)
 
         val exception = assertThrows<CoreException> {
-            order.failure()
+            order.failure("failReason")
         }
 
         assertThat(exception.errorType).isEqualTo(ErrorType.CONFLICT)

@@ -5,6 +5,7 @@ import com.loopers.domain.order.OrderItemService
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.dto.command.OrderCommand
 import com.loopers.domain.order.dto.command.OrderItemCommand.Register.Item
+import com.loopers.domain.order.entity.Order
 import com.loopers.domain.order.entity.Order.Status.PAYMENT_REQUEST
 import com.loopers.domain.payment.dto.command.PaymentCommand
 import com.loopers.domain.payment.entity.Payment
@@ -12,6 +13,8 @@ import com.loopers.domain.point.Point
 import com.loopers.domain.product.entity.Product
 import com.loopers.domain.product.entity.ProductOption
 import com.loopers.domain.product.entity.ProductStock
+import com.loopers.infrastructure.order.OrderJpaRepository
+import com.loopers.infrastructure.payment.PaymentJpaRepository
 import com.loopers.infrastructure.point.PointJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
 import com.loopers.infrastructure.product.ProductOptionJpaRepository
@@ -39,6 +42,8 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
     private val productStockRepository: ProductStockJpaRepository,
     private val productRepository: ProductJpaRepository,
     private val pointRepository: PointJpaRepository,
+    private val paymentRepository: PaymentJpaRepository,
+    private val orderRepository: OrderJpaRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
 
@@ -168,6 +173,149 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             }
 
             assertThat(exception.errorType).isEqualTo(ErrorType.PRODUCT_STOCK_NOT_ENOUGH)
+        }
+
+        @Test
+        fun `포인트가 부족하면 결제와 주문은 실패 상태가 되고, 포인트는 차감되지 않는다`() {
+            // given
+            val userId = 1L
+
+            val point = pointRepository.save(Point.create(userId, 100))
+
+            val product = productRepository.save(
+                Product.create(1L, "상품", "설명", BigDecimal("1000")),
+            )
+
+            val option = productOptionRepository.save(
+                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
+            )
+
+            val productStock = productStockRepository.save(ProductStock.create(option.id, 10))
+
+            val orderCommand = OrderCommand.RequestOrder(
+                userId,
+                BigDecimal("1000"),
+                BigDecimal("1000"),
+                PAYMENT_REQUEST,
+                listOf(Item(option.id, 1)),
+            )
+
+            val order = orderService.request(orderCommand)
+            orderItemService.register(orderCommand.toItemCommand(order.id))
+
+            val payment = paymentService.request(
+                PaymentCommand.Request(order.id, Payment.Method.POINT, BigDecimal("1000")),
+            )
+
+            // when
+            assertThrows<CoreException> {
+                paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
+            }
+
+            // then
+            val reloadedPoint = pointRepository.findById(point.id).get()
+            val reloadedPayment = paymentRepository.findById(payment.id).get()
+            val reloadedOrder = orderRepository.findById(order.id).get()
+
+            assertThat(reloadedPoint.amount.value).isEqualTo(100)
+            assertThat(reloadedPayment.status).isEqualTo(Payment.Status.FAILED)
+            assertThat(reloadedOrder.status).isEqualTo(Order.Status.ORDER_FAIL)
+        }
+
+        @Test
+        fun `재고가 부족하면 결제와 주문은 실패 상태가 되고, 재고는 차감되지 않는다`() {
+            // given
+            val userId = 1L
+
+            val point = pointRepository.save(Point.create(userId, 2000))
+
+            val product = productRepository.save(
+                Product.create(1L, "상품", "설명", BigDecimal("1000")),
+            )
+
+            val option = productOptionRepository.save(
+                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
+            )
+
+            val productStock = productStockRepository.save(ProductStock.create(option.id, 0))
+
+            val orderCommand = OrderCommand.RequestOrder(
+                userId,
+                BigDecimal("1000"),
+                BigDecimal("1000"),
+                PAYMENT_REQUEST,
+                listOf(Item(option.id, 1)),
+            )
+
+            val order = orderService.request(orderCommand)
+            orderItemService.register(orderCommand.toItemCommand(order.id))
+
+            val payment = paymentService.request(
+                PaymentCommand.Request(order.id, Payment.Method.POINT, BigDecimal("1000")),
+            )
+
+            // when
+            assertThrows<CoreException> {
+                paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
+            }
+
+            // then
+            val reloadedStock = productStockRepository.findById(productStock.id).get()
+            val reloadedPayment = paymentRepository.findById(payment.id).get()
+            val reloadedOrder = orderRepository.findById(order.id).get()
+
+            assertThat(reloadedStock.quantity.value).isEqualTo(0)
+            assertThat(reloadedPayment.status).isEqualTo(Payment.Status.FAILED)
+            assertThat(reloadedOrder.status).isEqualTo(Order.Status.ORDER_FAIL)
+        }
+
+        @Test
+        fun `결제가 성공하면 재고, 포인트가 차감되고 주문과 결제 상태가 SUCCESS로 변경된다`() {
+            // given
+            val userId = 1L
+
+            val point = pointRepository.save(Point.create(userId, 10000))
+
+            val product = productRepository.save(
+                Product.create(1L, "상품", "설명", BigDecimal("1000")),
+            )
+
+            val option = productOptionRepository.save(
+                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
+            )
+
+            val stock = productStockRepository.save(
+                ProductStock.create(option.id, 10),
+            )
+
+            val orderCommand = OrderCommand.RequestOrder(
+                userId,
+                BigDecimal("1000"),
+                BigDecimal("1000"),
+                Order.Status.PAYMENT_REQUEST,
+                listOf(Item(option.id, 1)),
+            )
+
+            val order = orderService.request(orderCommand)
+            orderItemService.register(orderCommand.toItemCommand(order.id))
+
+            val payment = paymentService.request(
+                PaymentCommand.Request(order.id, Payment.Method.POINT, BigDecimal("1000")),
+            )
+
+            // when
+            paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
+
+            // then
+            val reloadedPayment = paymentRepository.findById(payment.id).get()
+            val reloadedOrder = orderRepository.findById(order.id).get()
+            val reloadedPoint = pointRepository.findById(point.id).get()
+            val reloadedStock = productStockRepository.findById(stock.id).get()
+
+            assertThat(reloadedPayment.status).isEqualTo(Payment.Status.SUCCESS)
+            assertThat(reloadedOrder.status).isEqualTo(Order.Status.ORDER_SUCCESS)
+            assertThat(reloadedPoint.amount.value).isEqualTo(10000 - 2000)
+            assertThat(reloadedStock.quantity.value).isEqualTo(9)
         }
     }
 }

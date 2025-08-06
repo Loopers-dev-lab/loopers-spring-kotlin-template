@@ -13,25 +13,21 @@ import jakarta.persistence.Table
 @Table(name = "product_stock")
 class ProductStock protected constructor(
     productOptionId: Long,
-    quantity: ProductStockQuantity,
+    stockQuantity: ProductStockQuantity,
 ) : BaseEntity() {
     @Column(name = "product_option_id", nullable = false)
     var productOptionId: Long = productOptionId
         protected set
 
     @Embedded
-    var stockQuantity: ProductStockQuantity = quantity
+    var quantity: ProductStockQuantity = stockQuantity
         protected set
 
-    fun validateEnoughQuantity(requested: Int) {
-        if (stockQuantity.quantity < requested) {
+    fun deduct(amount: Int) {
+        if (quantity.value < amount) {
             throw CoreException(ErrorType.PRODUCT_STOCK_NOT_ENOUGH, "재고가 부족합니다.")
         }
-    }
-
-    fun deduct(amount: Int) {
-        validateEnoughQuantity(amount)
-        stockQuantity = stockQuantity.decrease(amount)
+        quantity = quantity.decrease(amount)
     }
 
     companion object {

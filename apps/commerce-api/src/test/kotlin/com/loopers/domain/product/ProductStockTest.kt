@@ -15,7 +15,7 @@ class ProductStockTest {
 
         // then
         assertThat(productStock.productOptionId).isEqualTo(1L)
-        assertThat(productStock.stockQuantity.quantity).isEqualTo(10)
+        assertThat(productStock.quantity.value).isEqualTo(10)
     }
 
     @Test
@@ -35,7 +35,7 @@ class ProductStockTest {
         productStock.deduct(3)
 
         // then
-        assertThat(productStock.stockQuantity.quantity).isEqualTo(7)
+        assertThat(productStock.quantity.value).isEqualTo(7)
     }
 
     @Test
