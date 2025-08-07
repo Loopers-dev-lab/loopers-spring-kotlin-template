@@ -16,6 +16,11 @@ class LikeCountService(
             ?: throw CoreException(ErrorType.NOT_FOUND, "[targetId = $targetId, targetType = $type] 좋아요 수를 찾을 수 없습니다.")
     }
 
+    fun getLikeCountWithLock(targetId: Long, type: Type): LikeCount {
+        return likeCountRepository.findCountWithLockByTargetIdAndType(targetId, type)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "[targetId = $targetId, targetType = $type] 좋아요 수를 찾을 수 없습니다.")
+    }
+
     fun getLikeCounts(targetIds: List<Long>, type: Type): List<LikeCount> {
         return likeCountRepository.findAllCountByTargetIdAndType(targetIds, type)
     }

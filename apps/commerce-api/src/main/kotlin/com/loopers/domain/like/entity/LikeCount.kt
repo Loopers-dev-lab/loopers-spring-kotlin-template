@@ -31,6 +31,14 @@ class LikeCount protected constructor(
     var count: LikeCountValue = count
         protected set
 
+    fun increase() {
+        this.count = this.count.increase()
+    }
+
+    fun decrease() {
+        this.count = this.count.decrease()
+    }
+
     companion object {
         fun create(targetId: Long, type: Type, count: Long): LikeCount {
             return LikeCount(LikeTarget.create(type, targetId), LikeCountValue(count))

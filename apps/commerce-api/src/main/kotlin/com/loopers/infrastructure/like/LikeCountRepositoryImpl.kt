@@ -16,6 +16,13 @@ class LikeCountRepositoryImpl(
         return userCountJpaRepository.findByTarget_TargetIdAndTarget_Type(targetId, type)
     }
 
+    override fun findCountWithLockByTargetIdAndType(
+        targetId: Long,
+        type: Type,
+    ): LikeCount? {
+        return userCountJpaRepository.findCountWithLockByTargetIdAndType(targetId, type)
+    }
+
     override fun findAllCountByTargetIdAndType(
         targetIds: List<Long>,
         type: Type,

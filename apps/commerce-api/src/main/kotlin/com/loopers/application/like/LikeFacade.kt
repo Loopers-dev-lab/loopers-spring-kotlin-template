@@ -13,6 +13,7 @@ import com.loopers.domain.like.dto.result.LikeResult.LikeDetail
 import com.loopers.domain.like.dto.result.LikeWithResult.PageWithProductDetails
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.dto.result.ProductResult
+import com.loopers.domain.user.UserService
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional
 class LikeFacade(
     private val likeService: LikeService,
     private val likeCountService: LikeCountService,
+    private val userService: UserService,
     private val productService: ProductService,
     private val brandService: BrandService,
 ) {
@@ -44,13 +46,12 @@ class LikeFacade(
 
     @Transactional
     fun addLike(command: AddLike): LikeDetail {
-        // TODO: 유저 존재 확인
-
-        // TODO: 상품 존재 확인
+        productService.get(command.targetId)
 
         return likeService.add(command).let {
             if (it.isNew) {
-                likeCountService.getLikeCount(command.targetId, command.type).count.increase()
+                val likeCount = likeCountService.getLikeCountWithLock(command.targetId, command.type)
+                likeCount.increase()
             }
             LikeDetail.from(it.like)
         }
@@ -58,12 +59,9 @@ class LikeFacade(
 
     @Transactional
     fun removeLike(command: RemoveLike) {
-        // TODO: 유저 존재 확인
+        productService.get(command.targetId)
 
-        // TODO: 상품 존재 확인
-
-        val likeCount = likeCountService.getLikeCount(command.targetId, command.type)
-        likeCount.count.increase()
-        return likeService.remove(command)
+        val likeCount = likeCountService.getLikeCountWithLock(command.targetId, command.type)
+        likeCount.decrease()
     }
 }
