@@ -9,8 +9,6 @@ import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.dto.command.PaymentCommand
 import com.loopers.domain.payment.entity.Payment
 import com.loopers.domain.point.PointService
-import com.loopers.domain.product.ProductOptionService
-import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductStockService
 import com.loopers.domain.product.dto.command.ProductStockCommand
 import com.loopers.domain.product.dto.result.ProductStockResult
@@ -25,8 +23,6 @@ class PaymentProcessor(
     private val paymentService: PaymentService,
     private val orderService: OrderService,
     private val orderItemService: OrderItemService,
-    private val productService: ProductService,
-    private val productOptionService: ProductOptionService,
     private val productStockService: ProductStockService,
     private val pointService: PointService,
     private val paymentStateService: PaymentStateService,

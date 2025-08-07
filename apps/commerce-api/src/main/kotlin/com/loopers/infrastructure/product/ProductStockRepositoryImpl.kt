@@ -17,6 +17,10 @@ class ProductStockRepositoryImpl(
         return productStockJpaRepository.findAllById(productOptionIds)
     }
 
+    override fun findAllWithLock(productOptionIds: List<Long>): List<ProductStock> {
+        return productStockJpaRepository.findAllWithLock(productOptionIds)
+    }
+
     override fun save(productStock: ProductStock): ProductStock {
         return productStockJpaRepository.save(productStock)
     }

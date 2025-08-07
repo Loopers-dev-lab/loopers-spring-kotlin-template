@@ -7,5 +7,7 @@ interface ProductStockRepository {
 
     fun findAll(productOptionIds: List<Long>): List<ProductStock>
 
+    fun findAllWithLock(productOptionIds: List<Long>): List<ProductStock>
+
     fun save(productStock: ProductStock): ProductStock
 }

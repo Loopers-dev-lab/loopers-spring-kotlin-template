@@ -7,6 +7,7 @@ import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
+import jakarta.persistence.Version
 import java.math.BigDecimal
 
 @Entity
@@ -23,6 +24,10 @@ class Point protected constructor(
     @Column(name = "amount", nullable = false)
     var amount: Amount = amount
         protected set
+
+    @Version
+    @Column(name = "version", nullable = false)
+    var version: Long? = null
 
     companion object {
         fun create(userId: Long, amount: BigDecimal): Point {

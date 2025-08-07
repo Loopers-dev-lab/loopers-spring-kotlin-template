@@ -32,6 +32,8 @@ import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import java.math.BigDecimal
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 
 @SpringBootTest
 class PaymentProcessorIntegrationTest @Autowired constructor(
@@ -320,33 +322,95 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
         }
     }
 
-    /*@DisplayName("결제 동시성")
+    @DisplayName("결제 동시성")
     @Nested
     inner class Concurrency {
 
         @Test
-        fun `동시에 여러 결제를 요청해도 재고와 포인트가 정상적으로 차감된다`() {
+        fun `동일한 유저가 하나의 결제를 동시에 요청해도 재고와 포인트가 한번만 처리되어야 한다`() {
             // given
             val userId = 1L
+            val chargePoint = 10000
+            val productPrice = 1000
+            val productOptionPrice = 1000
+            val totalPrice = productPrice + productOptionPrice
+            val productStock = 10
 
-            val point = pointRepository.save(Point.create(userId, BigDecimal("100000"))) // 충분한 포인트
-            val product = productRepository.save(Product.create(1L, "상품", "설명", BigDecimal("1000")))
+            val point = pointRepository.save(Point.create(userId, BigDecimal(chargePoint)))
+            val product = productRepository.save(Product.create(1L, "상품", "설명", BigDecimal(productPrice)))
             val option = productOptionRepository.save(
-                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000"))
+                ProductOption.create(product.id, 1L, "BLACK", "M", "노출용이름", BigDecimal(productOptionPrice)),
             )
-            val stock = productStockRepository.save(ProductStock.create(option.id, 10)) // 재고 10개
+            val stock = productStockRepository.save(ProductStock.create(option.id, productStock))
 
-            val numberOfThreads = 5
-            val latch = CountDownLatch(numberOfThreads)
-            val executor = Executors.newFixedThreadPool(numberOfThreads)
+            val threadCount = 5
+            val latch = CountDownLatch(threadCount)
+            val executor = Executors.newFixedThreadPool(threadCount)
 
-            repeat(numberOfThreads) {
+            val orderCommand = OrderCommand.RequestOrder(
+                userId,
+                BigDecimal(totalPrice),
+                BigDecimal(totalPrice),
+                PAYMENT_REQUEST,
+                listOf(Item(option.id, 1)),
+            )
+
+            val order = orderService.request(orderCommand)
+            orderItemService.register(orderCommand.toItemCommand(order.id))
+
+            val payment = paymentService.request(
+                PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal(totalPrice)),
+            )
+
+            var failCount = 0
+            repeat(threadCount) {
+                executor.submit {
+                    try {
+                        paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
+                    } catch (e: Exception) {
+                        failCount++
+                    } finally {
+                        latch.countDown()
+                    }
+                }
+            }
+
+            latch.await()
+
+            // then
+            val reloadedStock = productStockRepository.findById(stock.id).get()
+            val reloadedPoint = pointRepository.findById(point.id).get()
+
+            assertThat(reloadedStock.quantity.value).isEqualTo(productStock - 1)
+            assertThat(reloadedPoint.amount.value).isEqualByComparingTo(BigDecimal(chargePoint - totalPrice))
+            assertThat(failCount).isEqualTo(threadCount - 1)
+        }
+
+        @Test
+        fun `동일한 유저가 서로 다른 주문을 동시에 수행해도 포인트가 정상적으로 차감되어야 한다`() {
+            // given
+            val userId = 1L
+            val chargePoint = 100000
+            val productPrice = 1000
+            val productOptionPrice = 1000
+            val totalPrice = productPrice + productOptionPrice
+            val orderCount = 10
+
+            pointRepository.save(Point.create(userId, BigDecimal(chargePoint)))
+            val product = productRepository.save(Product.create(1L, "상품", "설명", BigDecimal(productPrice)))
+            val option = productOptionRepository.save(ProductOption.create(product.id, 1L, "BLACK", "M", "옵션", BigDecimal(productOptionPrice)))
+            productStockRepository.save(ProductStock.create(option.id, orderCount)) // 재고는 충분하게
+
+            val latch = CountDownLatch(orderCount)
+            val executor = Executors.newFixedThreadPool(orderCount)
+
+            repeat(orderCount) {
                 executor.submit {
                     try {
                         val orderCommand = OrderCommand.RequestOrder(
                             userId,
-                            BigDecimal("1000"),
-                            BigDecimal("1000"),
+                            BigDecimal(totalPrice),
+                            BigDecimal(totalPrice),
                             PAYMENT_REQUEST,
                             listOf(Item(option.id, 1)),
                         )
@@ -355,32 +419,76 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                         orderItemService.register(orderCommand.toItemCommand(order.id))
 
                         val payment = paymentService.request(
-                            PaymentCommand.Request(order.id, Payment.Method.POINT, BigDecimal("2000"))
+                            PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal(totalPrice)),
                         )
 
                         paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
                     } catch (e: Exception) {
-                        println("실패: ${e.message}")
                     } finally {
                         latch.countDown()
                     }
                 }
             }
 
-            // wait for all
+            latch.await()
+
+            // then
+            val point = pointRepository.findByUserId(userId)!!
+            val successPaymentCount = paymentRepository.findAll().count { it.status == Payment.Status.SUCCESS }
+            assertThat(point.amount.value).isEqualByComparingTo(BigDecimal(chargePoint - (successPaymentCount * totalPrice)))
+        }
+
+        @Test
+        fun `동일한 상품에 대해 여러 주문이 동시에 요청되어도 재고가 정상적으로 차감되어야 한다`() {
+            // given
+            val userId = 1L
+            val chargePoint = 100000
+            val productPrice = 1000
+            val productOptionPrice = 1000
+            val totalPrice = productPrice + productOptionPrice
+            val productStock = 3
+            val orderCount = 10
+
+            pointRepository.save(Point.create(userId, BigDecimal(chargePoint)))
+            val product = productRepository.save(Product.create(1L, "상품", "설명", BigDecimal(productPrice)))
+            val option = productOptionRepository.save(ProductOption.create(product.id, 1L, "BLACK", "M", "옵션", BigDecimal(productOptionPrice)))
+            val stock = productStockRepository.save(ProductStock.create(option.id, productStock))
+
+            val latch = CountDownLatch(orderCount)
+            val executor = Executors.newFixedThreadPool(orderCount)
+
+            repeat(orderCount) {
+                executor.submit {
+                    try {
+                        val orderCommand = OrderCommand.RequestOrder(
+                            userId,
+                            BigDecimal(totalPrice),
+                            BigDecimal(totalPrice),
+                            PAYMENT_REQUEST,
+                            listOf(Item(option.id, 1)),
+                        )
+
+                        val order = orderService.request(orderCommand)
+                        orderItemService.register(orderCommand.toItemCommand(order.id))
+
+                        val payment = paymentService.request(
+                            PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal(totalPrice)),
+                        )
+
+                        paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
+                    } catch (e: Exception) {
+                    } finally {
+                        latch.countDown()
+                    }
+                }
+            }
+
             latch.await()
 
             // then
             val reloadedStock = productStockRepository.findById(stock.id).get()
-            val reloadedPoint = pointRepository.findById(point.id).get()
-            val successPayments = paymentRepository.findAll().filter { it.status == Payment.Status.SUCCESS }
-            val failedPayments = paymentRepository.findAll().filter { it.status == Payment.Status.FAILED }
-
-            println("성공: ${successPayments.size}, 실패: ${failedPayments.size}")
-
-            assertThat(reloadedStock.quantity.value).isEqualTo(10 - successPayments.size)
-            assertThat(reloadedPoint.amount.value).isEqualTo(100_000 - (successPayments.size * 2000))
-            assertThat(successPayments.size + failedPayments.size).isEqualTo(numberOfThreads)
+            val successPaymentCount = paymentRepository.findAll().count { it.status == Payment.Status.SUCCESS }
+            assertThat(reloadedStock.quantity.value).isEqualTo(productStock - successPaymentCount)
         }
-    }*/
+    }
 }

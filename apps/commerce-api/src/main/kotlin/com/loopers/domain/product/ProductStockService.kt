@@ -12,7 +12,7 @@ class ProductStockService(
 ) {
     fun getDecreaseStock(command: ProductStockCommand.GetDecreaseStock): ProductStockResult.DecreaseStocks {
         val decreaseMap = command.decreaseStocks.associateBy { it.productOptionId }
-        val stocks = productStockRepository.findAll(decreaseMap.keys.toList())
+        val stocks = productStockRepository.findAllWithLock(decreaseMap.keys.toList())
 
         return ProductStockResult.DecreaseStocks(
             stocks.map { stock ->
