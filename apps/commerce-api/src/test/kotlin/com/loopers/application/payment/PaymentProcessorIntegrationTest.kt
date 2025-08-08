@@ -1,15 +1,13 @@
-package com.loopers.domain.payment
+package com.loopers.application.payment
 
-import com.loopers.application.payment.PaymentProcessor
 import com.loopers.domain.order.OrderItemService
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.dto.command.OrderCommand
-import com.loopers.domain.order.dto.command.OrderItemCommand.Register.Item
+import com.loopers.domain.order.dto.command.OrderItemCommand
 import com.loopers.domain.order.entity.Order
-import com.loopers.domain.order.entity.Order.Status.PAYMENT_REQUEST
+import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.dto.command.PaymentCommand
 import com.loopers.domain.payment.entity.Payment
-import com.loopers.domain.payment.entity.Payment.Method.POINT
 import com.loopers.domain.point.Point
 import com.loopers.domain.product.entity.Product
 import com.loopers.domain.product.entity.ProductOption
@@ -23,7 +21,7 @@ import com.loopers.infrastructure.product.ProductStockJpaRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.utils.DatabaseCleanUp
-import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -64,33 +62,33 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             // given
             val userId = 1L
 
-            val point = pointRepository.save(Point.create(userId, BigDecimal("10000")))
+            val point = pointRepository.save(Point.Companion.create(userId, BigDecimal("10000")))
 
             val product = productRepository.save(
-                Product.create(1L, "상품", "설명", BigDecimal("1000")),
+                Product.Companion.create(1L, "상품", "설명", BigDecimal("1000")),
             )
 
             val option = productOptionRepository.save(
-                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
+                ProductOption.Companion.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
             )
 
             val productStock = productStockRepository.save(
-                ProductStock.create(option.id, 10),
+                ProductStock.Companion.create(option.id, 10),
             )
 
             val orderCommand = OrderCommand.RequestOrder(
                 userId,
                 BigDecimal("1000"),
                 BigDecimal("1000"),
-                PAYMENT_REQUEST,
-                listOf(Item(option.id, 1)),
+                Order.Status.PAYMENT_REQUEST,
+                listOf(OrderItemCommand.Register.Item(option.id, 1)),
             )
 
             val order = orderService.request(orderCommand)
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
             )
 
             // when
@@ -99,37 +97,37 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             // then
             val updatedPayment = paymentService.get(payment.id)
 
-            assertThat(updatedPayment.status).isEqualTo(Payment.Status.SUCCESS)
+            Assertions.assertThat(updatedPayment.status).isEqualTo(Payment.Status.SUCCESS)
         }
 
         @Test
         fun `포인트가 부족하면 POINT_NOT_ENOUGH 예외가 발생한다`() {
             // given
             val userId = 1L
-            pointRepository.save(Point.create(userId, BigDecimal("500")))
+            pointRepository.save(Point.Companion.create(userId, BigDecimal("500")))
 
             val product = productRepository.save(
-                Product.create(1L, "상품", "설명", BigDecimal("1000")),
+                Product.Companion.create(1L, "상품", "설명", BigDecimal("1000")),
             )
 
             val option = productOptionRepository.save(
-                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
+                ProductOption.Companion.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
             )
 
-            productStockRepository.save(ProductStock.create(option.id, 10))
+            productStockRepository.save(ProductStock.Companion.create(option.id, 10))
 
             val orderCommand = OrderCommand.RequestOrder(
                 userId,
                 BigDecimal("1000"),
                 BigDecimal("1000"),
-                PAYMENT_REQUEST,
-                listOf(Item(option.id, 1)),
+                Order.Status.PAYMENT_REQUEST,
+                listOf(OrderItemCommand.Register.Item(option.id, 1)),
             )
             val order = orderService.request(orderCommand)
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
             )
 
             // expect
@@ -137,37 +135,37 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                 paymentProcessor.process(PaymentCommand.Process(order.id, payment.id))
             }
 
-            assertThat(exception.errorType).isEqualTo(ErrorType.POINT_NOT_ENOUGH)
+            Assertions.assertThat(exception.errorType).isEqualTo(ErrorType.POINT_NOT_ENOUGH)
         }
 
         @Test
         fun `재고가 부족하면 STOCK_NOT_ENOUGH 예외가 발생한다`() {
             // given
             val userId = 1L
-            pointRepository.save(Point.create(userId, BigDecimal("10000")))
+            pointRepository.save(Point.Companion.create(userId, BigDecimal("10000")))
 
             val product = productRepository.save(
-                Product.create(1L, "상품", "설명", BigDecimal("1000")),
+                Product.Companion.create(1L, "상품", "설명", BigDecimal("1000")),
             )
 
             val option = productOptionRepository.save(
-                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
+                ProductOption.Companion.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
             )
 
-            productStockRepository.save(ProductStock.create(option.id, 0))
+            productStockRepository.save(ProductStock.Companion.create(option.id, 0))
 
             val orderCommand = OrderCommand.RequestOrder(
                 userId,
                 BigDecimal("1000"),
                 BigDecimal("1000"),
-                PAYMENT_REQUEST,
-                listOf(Item(option.id, 1)),
+                Order.Status.PAYMENT_REQUEST,
+                listOf(OrderItemCommand.Register.Item(option.id, 1)),
             )
             val order = orderService.request(orderCommand)
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
             )
 
             // expect
@@ -175,7 +173,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                 paymentProcessor.process(PaymentCommand.Process(order.id, payment.id))
             }
 
-            assertThat(exception.errorType).isEqualTo(ErrorType.PRODUCT_STOCK_NOT_ENOUGH)
+            Assertions.assertThat(exception.errorType).isEqualTo(ErrorType.PRODUCT_STOCK_NOT_ENOUGH)
         }
 
         @Test
@@ -183,31 +181,31 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             // given
             val userId = 1L
 
-            val point = pointRepository.save(Point.create(userId, BigDecimal("100")))
+            val point = pointRepository.save(Point.Companion.create(userId, BigDecimal("100")))
 
             val product = productRepository.save(
-                Product.create(1L, "상품", "설명", BigDecimal("1000")),
+                Product.Companion.create(1L, "상품", "설명", BigDecimal("1000")),
             )
 
             val option = productOptionRepository.save(
-                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
+                ProductOption.Companion.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
             )
 
-            val productStock = productStockRepository.save(ProductStock.create(option.id, 10))
+            val productStock = productStockRepository.save(ProductStock.Companion.create(option.id, 10))
 
             val orderCommand = OrderCommand.RequestOrder(
                 userId,
                 BigDecimal("1000"),
                 BigDecimal("1000"),
-                PAYMENT_REQUEST,
-                listOf(Item(option.id, 1)),
+                Order.Status.PAYMENT_REQUEST,
+                listOf(OrderItemCommand.Register.Item(option.id, 1)),
             )
 
             val order = orderService.request(orderCommand)
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
             )
 
             // when
@@ -220,9 +218,9 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             val reloadedPayment = paymentRepository.findById(payment.id).get()
             val reloadedOrder = orderRepository.findById(order.id).get()
 
-            assertThat(reloadedPoint.amount.value).isEqualByComparingTo(BigDecimal(100))
-            assertThat(reloadedPayment.status).isEqualTo(Payment.Status.FAILED)
-            assertThat(reloadedOrder.status).isEqualTo(Order.Status.ORDER_FAIL)
+            Assertions.assertThat(reloadedPoint.amount.value).isEqualByComparingTo(BigDecimal(100))
+            Assertions.assertThat(reloadedPayment.status).isEqualTo(Payment.Status.FAILED)
+            Assertions.assertThat(reloadedOrder.status).isEqualTo(Order.Status.ORDER_FAIL)
         }
 
         @Test
@@ -230,31 +228,31 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             // given
             val userId = 1L
 
-            val point = pointRepository.save(Point.create(userId, BigDecimal("2000")))
+            val point = pointRepository.save(Point.Companion.create(userId, BigDecimal("2000")))
 
             val product = productRepository.save(
-                Product.create(1L, "상품", "설명", BigDecimal("1000")),
+                Product.Companion.create(1L, "상품", "설명", BigDecimal("1000")),
             )
 
             val option = productOptionRepository.save(
-                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
+                ProductOption.Companion.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
             )
 
-            val productStock = productStockRepository.save(ProductStock.create(option.id, 0))
+            val productStock = productStockRepository.save(ProductStock.Companion.create(option.id, 0))
 
             val orderCommand = OrderCommand.RequestOrder(
                 userId,
                 BigDecimal("1000"),
                 BigDecimal("1000"),
-                PAYMENT_REQUEST,
-                listOf(Item(option.id, 1)),
+                Order.Status.PAYMENT_REQUEST,
+                listOf(OrderItemCommand.Register.Item(option.id, 1)),
             )
 
             val order = orderService.request(orderCommand)
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
             )
 
             // when
@@ -267,9 +265,9 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             val reloadedPayment = paymentRepository.findById(payment.id).get()
             val reloadedOrder = orderRepository.findById(order.id).get()
 
-            assertThat(reloadedStock.quantity.value).isEqualTo(0)
-            assertThat(reloadedPayment.status).isEqualTo(Payment.Status.FAILED)
-            assertThat(reloadedOrder.status).isEqualTo(Order.Status.ORDER_FAIL)
+            Assertions.assertThat(reloadedStock.quantity.value).isEqualTo(0)
+            Assertions.assertThat(reloadedPayment.status).isEqualTo(Payment.Status.FAILED)
+            Assertions.assertThat(reloadedOrder.status).isEqualTo(Order.Status.ORDER_FAIL)
         }
 
         @Test
@@ -277,33 +275,33 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             // given
             val userId = 1L
 
-            val point = pointRepository.save(Point.create(userId, BigDecimal("10000")))
+            val point = pointRepository.save(Point.Companion.create(userId, BigDecimal("10000")))
 
             val product = productRepository.save(
-                Product.create(1L, "상품", "설명", BigDecimal("1000")),
+                Product.Companion.create(1L, "상품", "설명", BigDecimal("1000")),
             )
 
             val option = productOptionRepository.save(
-                ProductOption.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
+                ProductOption.Companion.create(product.id, 1L, "화이트", "M", "노출용이름", BigDecimal("1000")),
             )
 
             val stock = productStockRepository.save(
-                ProductStock.create(option.id, 10),
+                ProductStock.Companion.create(option.id, 10),
             )
 
             val orderCommand = OrderCommand.RequestOrder(
                 userId,
                 BigDecimal("1000"),
                 BigDecimal("1000"),
-                PAYMENT_REQUEST,
-                listOf(Item(option.id, 1)),
+                Order.Status.PAYMENT_REQUEST,
+                listOf(OrderItemCommand.Register.Item(option.id, 1)),
             )
 
             val order = orderService.request(orderCommand)
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal("2000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("2000")),
             )
 
             // when
@@ -315,10 +313,10 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             val reloadedPoint = pointRepository.findById(point.id).get()
             val reloadedStock = productStockRepository.findById(stock.id).get()
 
-            assertThat(reloadedPayment.status).isEqualTo(Payment.Status.SUCCESS)
-            assertThat(reloadedOrder.status).isEqualTo(Order.Status.ORDER_SUCCESS)
-            assertThat(reloadedPoint.amount.value).isEqualByComparingTo(BigDecimal(10000 - 2000))
-            assertThat(reloadedStock.quantity.value).isEqualTo(9)
+            Assertions.assertThat(reloadedPayment.status).isEqualTo(Payment.Status.SUCCESS)
+            Assertions.assertThat(reloadedOrder.status).isEqualTo(Order.Status.ORDER_SUCCESS)
+            Assertions.assertThat(reloadedPoint.amount.value).isEqualByComparingTo(BigDecimal(10000 - 2000))
+            Assertions.assertThat(reloadedStock.quantity.value).isEqualTo(9)
         }
     }
 
@@ -336,12 +334,12 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             val totalPrice = productPrice + productOptionPrice
             val productStock = 10
 
-            val point = pointRepository.save(Point.create(userId, BigDecimal(chargePoint)))
-            val product = productRepository.save(Product.create(1L, "상품", "설명", BigDecimal(productPrice)))
+            val point = pointRepository.save(Point.Companion.create(userId, BigDecimal(chargePoint)))
+            val product = productRepository.save(Product.Companion.create(1L, "상품", "설명", BigDecimal(productPrice)))
             val option = productOptionRepository.save(
-                ProductOption.create(product.id, 1L, "BLACK", "M", "노출용이름", BigDecimal(productOptionPrice)),
+                ProductOption.Companion.create(product.id, 1L, "BLACK", "M", "노출용이름", BigDecimal(productOptionPrice)),
             )
-            val stock = productStockRepository.save(ProductStock.create(option.id, productStock))
+            val stock = productStockRepository.save(ProductStock.Companion.create(option.id, productStock))
 
             val threadCount = 5
             val latch = CountDownLatch(threadCount)
@@ -351,15 +349,15 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                 userId,
                 BigDecimal(totalPrice),
                 BigDecimal(totalPrice),
-                PAYMENT_REQUEST,
-                listOf(Item(option.id, 1)),
+                Order.Status.PAYMENT_REQUEST,
+                listOf(OrderItemCommand.Register.Item(option.id, 1)),
             )
 
             val order = orderService.request(orderCommand)
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal(totalPrice)),
+                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal(totalPrice)),
             )
 
             var failCount = 0
@@ -381,9 +379,9 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             val reloadedStock = productStockRepository.findById(stock.id).get()
             val reloadedPoint = pointRepository.findById(point.id).get()
 
-            assertThat(reloadedStock.quantity.value).isEqualTo(productStock - 1)
-            assertThat(reloadedPoint.amount.value).isEqualByComparingTo(BigDecimal(chargePoint - totalPrice))
-            assertThat(failCount).isEqualTo(threadCount - 1)
+            Assertions.assertThat(reloadedStock.quantity.value).isEqualTo(productStock - 1)
+            Assertions.assertThat(reloadedPoint.amount.value).isEqualByComparingTo(BigDecimal(chargePoint - totalPrice))
+            Assertions.assertThat(failCount).isEqualTo(threadCount - 1)
         }
 
         @Test
@@ -396,10 +394,19 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             val totalPrice = productPrice + productOptionPrice
             val orderCount = 10
 
-            pointRepository.save(Point.create(userId, BigDecimal(chargePoint)))
-            val product = productRepository.save(Product.create(1L, "상품", "설명", BigDecimal(productPrice)))
-            val option = productOptionRepository.save(ProductOption.create(product.id, 1L, "BLACK", "M", "옵션", BigDecimal(productOptionPrice)))
-            productStockRepository.save(ProductStock.create(option.id, orderCount)) // 재고는 충분하게
+            pointRepository.save(Point.Companion.create(userId, BigDecimal(chargePoint)))
+            val product = productRepository.save(Product.Companion.create(1L, "상품", "설명", BigDecimal(productPrice)))
+            val option = productOptionRepository.save(
+                ProductOption.Companion.create(
+                    product.id,
+                    1L,
+                    "BLACK",
+                    "M",
+                    "옵션",
+                    BigDecimal(productOptionPrice),
+                ),
+            )
+            productStockRepository.save(ProductStock.Companion.create(option.id, orderCount)) // 재고는 충분하게
 
             val latch = CountDownLatch(orderCount)
             val executor = Executors.newFixedThreadPool(orderCount)
@@ -411,15 +418,15 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                             userId,
                             BigDecimal(totalPrice),
                             BigDecimal(totalPrice),
-                            PAYMENT_REQUEST,
-                            listOf(Item(option.id, 1)),
+                            Order.Status.PAYMENT_REQUEST,
+                            listOf(OrderItemCommand.Register.Item(option.id, 1)),
                         )
 
                         val order = orderService.request(orderCommand)
                         orderItemService.register(orderCommand.toItemCommand(order.id))
 
                         val payment = paymentService.request(
-                            PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal(totalPrice)),
+                            PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal(totalPrice)),
                         )
 
                         paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
@@ -435,7 +442,8 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             // then
             val point = pointRepository.findByUserId(userId)!!
             val successPaymentCount = paymentRepository.findAll().count { it.status == Payment.Status.SUCCESS }
-            assertThat(point.amount.value).isEqualByComparingTo(BigDecimal(chargePoint - (successPaymentCount * totalPrice)))
+            Assertions.assertThat(point.amount.value)
+                .isEqualByComparingTo(BigDecimal(chargePoint - (successPaymentCount * totalPrice)))
         }
 
         @Test
@@ -449,10 +457,19 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             val productStock = 3
             val orderCount = 10
 
-            pointRepository.save(Point.create(userId, BigDecimal(chargePoint)))
-            val product = productRepository.save(Product.create(1L, "상품", "설명", BigDecimal(productPrice)))
-            val option = productOptionRepository.save(ProductOption.create(product.id, 1L, "BLACK", "M", "옵션", BigDecimal(productOptionPrice)))
-            val stock = productStockRepository.save(ProductStock.create(option.id, productStock))
+            pointRepository.save(Point.Companion.create(userId, BigDecimal(chargePoint)))
+            val product = productRepository.save(Product.Companion.create(1L, "상품", "설명", BigDecimal(productPrice)))
+            val option = productOptionRepository.save(
+                ProductOption.Companion.create(
+                    product.id,
+                    1L,
+                    "BLACK",
+                    "M",
+                    "옵션",
+                    BigDecimal(productOptionPrice),
+                ),
+            )
+            val stock = productStockRepository.save(ProductStock.Companion.create(option.id, productStock))
 
             val latch = CountDownLatch(orderCount)
             val executor = Executors.newFixedThreadPool(orderCount)
@@ -464,15 +481,15 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                             userId,
                             BigDecimal(totalPrice),
                             BigDecimal(totalPrice),
-                            PAYMENT_REQUEST,
-                            listOf(Item(option.id, 1)),
+                            Order.Status.PAYMENT_REQUEST,
+                            listOf(OrderItemCommand.Register.Item(option.id, 1)),
                         )
 
                         val order = orderService.request(orderCommand)
                         orderItemService.register(orderCommand.toItemCommand(order.id))
 
                         val payment = paymentService.request(
-                            PaymentCommand.Request(order.id, POINT).toEntity(BigDecimal(totalPrice)),
+                            PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal(totalPrice)),
                         )
 
                         paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
@@ -488,7 +505,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             // then
             val reloadedStock = productStockRepository.findById(stock.id).get()
             val successPaymentCount = paymentRepository.findAll().count { it.status == Payment.Status.SUCCESS }
-            assertThat(reloadedStock.quantity.value).isEqualTo(productStock - successPaymentCount)
+            Assertions.assertThat(reloadedStock.quantity.value).isEqualTo(productStock - successPaymentCount)
         }
     }
 }
