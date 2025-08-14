@@ -7,6 +7,7 @@ import com.loopers.domain.product.dto.criteria.ProductCriteria
 import com.loopers.domain.product.dto.criteria.ProductCriteria.FindAll.ProductSortCondition
 import com.loopers.domain.product.entity.Product
 import com.loopers.domain.product.entity.QProduct
+import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
@@ -37,24 +38,39 @@ class ProductRepositoryImpl(
         val offset = pageable.offset
         val limit = pageable.pageSize.toLong()
 
-        val sortSpecifier = when (sort) {
-            ProductSortCondition.LATEST, ProductSortCondition.CREATED_AT_DESC -> product.createdAt.desc()
-            ProductSortCondition.CREATED_AT_ASC -> product.createdAt.asc()
-            ProductSortCondition.PRICE_DESC -> product.price.desc()
-            ProductSortCondition.PRICE_ASC -> product.price.asc()
-            ProductSortCondition.LIKES_DESC -> likeCount.count.value.desc()
-            ProductSortCondition.LIKES_ASC -> likeCount.count.value.asc()
+        // 정렬 안정성 확보: 각 정렬 조건에 product.id를 서브 정렬로 추가
+        val sortSpecifiers: List<OrderSpecifier<*>> = when (sort) {
+            ProductSortCondition.LATEST,
+            ProductSortCondition.CREATED_AT_DESC,
+            ->
+                listOf(product.createdAt.desc(), product.id.desc())
+
+            ProductSortCondition.CREATED_AT_ASC ->
+                listOf(product.createdAt.asc(), product.id.asc())
+
+            ProductSortCondition.PRICE_DESC ->
+                listOf(product.price.desc(), product.id.desc())
+
+            ProductSortCondition.PRICE_ASC ->
+                listOf(product.price.asc(), product.id.asc())
+
+            ProductSortCondition.LIKES_DESC ->
+                listOf(likeCount.count.value.desc(), likeCount.target.targetId.desc())
+
+            ProductSortCondition.LIKES_ASC ->
+                listOf(likeCount.count.value.asc(), likeCount.target.targetId.asc())
         }
 
         val results = queryFactory
             .select(product)
             .from(product)
-            .leftJoin(likeCount)
+            .innerJoin(likeCount)
             .on(
                 likeCount.target.targetId.eq(product.id)
                     .and(likeCount.target.type.eq(PRODUCT)),
             )
-            .orderBy(sortSpecifier)
+            .where(product.deletedAt.isNull)
+            .orderBy(*sortSpecifiers.toTypedArray())
             .offset(offset)
             .limit(limit)
             .fetch()
@@ -62,12 +78,14 @@ class ProductRepositoryImpl(
         val totalCount = queryFactory
             .select(product.count())
             .from(product)
-            .leftJoin(likeCount)
+            .innerJoin(likeCount)
             .on(
                 likeCount.target.targetId.eq(product.id)
                     .and(likeCount.target.type.eq(PRODUCT)),
             )
+            .where(product.deletedAt.isNull)
             .fetchOne() ?: 0L
+
         return PageImpl(results, pageable, totalCount)
     }
 

@@ -26,7 +26,7 @@ class Point protected constructor(
         protected set
 
     @Version
-    @Column(name = "version", nullable = false)
+    @Column(name = "version", nullable = false, columnDefinition = "INT DEFAULT 0")
     var version: Long? = null
 
     companion object {
