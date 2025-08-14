@@ -2,6 +2,7 @@ version: '3'
 services:
   mysql:
     image: mysql:8.0
+    container_name: loopers-mysql
     ports:
       - "3306:3306"
     environment:
@@ -16,7 +17,7 @@ services:
 
   redis-master:
     image: redis:7.0
-    container_name: redis-master
+    container_name: loopers-redis-master
     ports:
       - "6379:6379"
     volumes:
@@ -36,7 +37,7 @@ services:
 
   redis-readonly:
     image: redis:7.0
-    container_name: redis-readonly
+    container_name: loopers-redis-readonly
     depends_on:
       redis-master:
         condition: service_healthy
