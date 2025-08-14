@@ -78,11 +78,6 @@ class ProductRepositoryImpl(
         val totalCount = queryFactory
             .select(product.count())
             .from(product)
-            .innerJoin(likeCount)
-            .on(
-                likeCount.target.targetId.eq(product.id)
-                    .and(likeCount.target.type.eq(PRODUCT)),
-            )
             .where(product.deletedAt.isNull)
             .fetchOne() ?: 0L
 
