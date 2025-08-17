@@ -33,7 +33,7 @@ class ProductFacade(
     }
 
     fun getProducts(criteria: ProductCriteria.FindAll): PageWithBrandDetails {
-        val productPage = productService.findAll(criteria)
+        val productPage = productService.findAllCached(criteria)
         val productDetails = ProductResult.ProductPageDetails.from(productPage)
 
         val brandIds = criteria.brandIds.takeIf { it.isNotEmpty() }

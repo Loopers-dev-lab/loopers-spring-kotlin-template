@@ -1,0 +1,13 @@
+services:
+  k6:
+    image: grafana/k6:latest
+    container_name: k6
+    networks: [monitoring]
+    volumes:
+      - ./k6/out:/out
+      - ./k6/product-index.js:/product-index.js:ro
+    command: ["run","--out","influxdb=http://influxdb:8086/k6", "/product-index.js"]
+
+networks:
+  monitoring:
+    external: true

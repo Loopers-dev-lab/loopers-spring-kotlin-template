@@ -14,4 +14,11 @@ class ProductCommand {
             return Product.create(brandId, name, description, price)
         }
     }
+
+    data class UpdateProduct(
+        val productId: Long,
+        val name: String,
+        val description: String,
+        val price: BigDecimal,
+    )
 }

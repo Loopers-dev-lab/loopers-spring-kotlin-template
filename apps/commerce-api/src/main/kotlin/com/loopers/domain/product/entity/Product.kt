@@ -8,6 +8,7 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
 import java.math.BigDecimal
+import java.time.ZonedDateTime
 
 @Entity
 @Table(name = "product")
@@ -32,6 +33,13 @@ class Product protected constructor(
     @Column(name = "price", nullable = false)
     var price: ProductPrice = price
         protected set
+
+    fun update(name: String, description: String, price: BigDecimal) {
+        this.name = ProductName(name)
+        this.description = ProductDescription(description)
+        this.price = ProductPrice(price)
+        this.updatedAt = ZonedDateTime.now()
+    }
 
     companion object {
         fun create(brandId: Long, name: String, description: String, price: BigDecimal): Product {

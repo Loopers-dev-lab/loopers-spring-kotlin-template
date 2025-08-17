@@ -1,18 +1,58 @@
-version: '3'
+networks:
+  monitoring:
+    external: true
+
+volumes:
+  grafana-data:
+  prometheus-data:
+  influxdb-data:
+
 services:
+  influxdb:
+    image: influxdb:1.8
+    container_name: loopers-influxdb
+    ports:
+      - "8086:8086"
+    networks: [monitoring]
+    environment:
+      - INFLUXDB_DB=k6
+      - INFLUXDB_HTTP_FLUX_ENABLED=false
+    volumes:
+      - influxdb-data:/var/lib/influxdb
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8086/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   prometheus:
     image: prom/prometheus
+    container_name: loopers-prometheus
     ports:
       - "9090:9090"
+    networks: [monitoring]
     volumes:
+      - prometheus-data:/prometheus
       - ./grafana/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      influxdb:
+        condition: service_healthy
 
   grafana:
     image: grafana/grafana
+    container_name: loopers-grafana
     ports:
       - "3000:3000"
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks: [monitoring]
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
