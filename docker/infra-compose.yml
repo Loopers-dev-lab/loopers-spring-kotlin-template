@@ -2,7 +2,7 @@ version: '3'
 services:
   mysql:
     image: mysql:8.0
-    container_name: loopers-mysql
+    container_name: loopers-mysql-main
     ports:
       - "3306:3306"
     environment:
