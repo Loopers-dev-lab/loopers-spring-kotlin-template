@@ -24,16 +24,16 @@ class PaymentFacade(
     private val productService: ProductService,
 ) {
     @Transactional
-    fun processPayment(command: PaymentCommand.Process) {
-        paymentProcessor.process(command)
-    }
-
-    @Transactional
     fun requestPayment(command: PaymentCommand.Request): PaymentResult.PaymentDetail {
         val orderItems = orderItemService.findAll(command.orderId)
         val productOptions = loadProductOptions(orderItems)
         val paymentPrice = calculateTotalPrice(orderItems, productOptions)
         return PaymentResult.PaymentDetail.from(paymentService.request(command.toEntity(paymentPrice)))
+    }
+
+    @Transactional
+    fun processPayment(command: PaymentCommand.Process) {
+        paymentProcessor.process(command)
     }
 
     private fun loadProductOptions(orderItems: List<OrderItem>): List<ProductOption> {
