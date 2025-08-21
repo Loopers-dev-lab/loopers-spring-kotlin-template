@@ -6,7 +6,6 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.entity.Order
 import com.loopers.domain.order.entity.OrderItem
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.dto.command.PaymentCommand
 import com.loopers.domain.payment.entity.Payment
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductStockService
@@ -16,6 +15,7 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Component
@@ -28,10 +28,10 @@ class PaymentProcessor(
     private val paymentStateService: PaymentStateService,
     private val orderStateService: OrderStateService,
 ) {
-    @Transactional
-    fun process(command: PaymentCommand.Process) {
-        val order = orderService.get(command.orderId)
-        val payment = paymentService.get(command.paymentId)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun process(id: Long) {
+        val payment = paymentService.get(id)
+        val order = orderService.get(payment.orderId)
 
         val orderItems = orderItemService.findAll(order.id)
 

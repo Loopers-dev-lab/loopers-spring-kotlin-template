@@ -92,7 +92,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             )
 
             // when
-            paymentProcessor.process(PaymentCommand.Process(order.id, payment.id))
+            paymentProcessor.process(payment.id)
 
             // then
             val updatedPayment = paymentService.get(payment.id)
@@ -132,7 +132,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
 
             // expect
             val exception = assertThrows<CoreException> {
-                paymentProcessor.process(PaymentCommand.Process(order.id, payment.id))
+                paymentProcessor.process(payment.id)
             }
 
             Assertions.assertThat(exception.errorType).isEqualTo(ErrorType.POINT_NOT_ENOUGH)
@@ -170,7 +170,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
 
             // expect
             val exception = assertThrows<CoreException> {
-                paymentProcessor.process(PaymentCommand.Process(order.id, payment.id))
+                paymentProcessor.process(payment.id)
             }
 
             Assertions.assertThat(exception.errorType).isEqualTo(ErrorType.PRODUCT_STOCK_NOT_ENOUGH)
@@ -210,7 +210,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
 
             // when
             assertThrows<CoreException> {
-                paymentProcessor.process(PaymentCommand.Process(order.id, payment.id))
+                paymentProcessor.process(payment.id)
             }
 
             // then
@@ -257,7 +257,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
 
             // when
             assertThrows<CoreException> {
-                paymentProcessor.process(PaymentCommand.Process(order.id, payment.id))
+                paymentProcessor.process(payment.id)
             }
 
             // then
@@ -305,7 +305,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             )
 
             // when
-            paymentProcessor.process(PaymentCommand.Process(order.id, payment.id))
+            paymentProcessor.process(payment.id)
 
             // then
             val reloadedPayment = paymentRepository.findById(payment.id).get()
@@ -364,7 +364,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             repeat(threadCount) {
                 executor.submit {
                     try {
-                        paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
+                        paymentProcessor.process(payment.id)
                     } catch (e: Exception) {
                         failCount++
                     } finally {
@@ -429,7 +429,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                             PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal(totalPrice)),
                         )
 
-                        paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
+                        paymentProcessor.process(payment.id)
                     } catch (e: Exception) {
                     } finally {
                         latch.countDown()
@@ -492,7 +492,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                             PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal(totalPrice)),
                         )
 
-                        paymentProcessor.process(PaymentCommand.Process(payment.id, order.id))
+                        paymentProcessor.process(payment.id)
                     } catch (e: Exception) {
                     } finally {
                         latch.countDown()

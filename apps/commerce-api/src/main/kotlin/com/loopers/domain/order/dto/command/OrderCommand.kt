@@ -20,5 +20,11 @@ class OrderCommand {
         fun toItemCommand(orderId: Long): OrderItemCommand.Register {
             return OrderItemCommand.Register(orderId, items)
         }
+
+        companion object {
+            fun of(userId: Long, originalPrice: BigDecimal, finalPrice: BigDecimal, items: List<Item>): RequestOrder {
+                return RequestOrder(userId, originalPrice, finalPrice, Status.ORDER_REQUEST, items)
+            }
+        }
     }
 }

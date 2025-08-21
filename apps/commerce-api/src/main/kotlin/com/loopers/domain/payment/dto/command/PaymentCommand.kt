@@ -12,10 +12,11 @@ class PaymentCommand {
         fun toEntity(paymentPrice: BigDecimal): Payment {
             return Payment.create(orderId, paymentMethod, paymentPrice, Payment.Status.REQUESTED)
         }
-    }
 
-    data class Process(
-        val orderId: Long,
-        val paymentId: Long,
-    )
+        companion object {
+            fun of(orderId: Long, paymentMethod: Method): Request {
+                return Request(orderId, paymentMethod)
+            }
+        }
+    }
 }

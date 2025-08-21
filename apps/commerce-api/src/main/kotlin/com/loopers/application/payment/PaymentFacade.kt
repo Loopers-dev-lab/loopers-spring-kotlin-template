@@ -32,8 +32,9 @@ class PaymentFacade(
     }
 
     @Transactional
-    fun processPayment(command: PaymentCommand.Process) {
-        paymentProcessor.process(command)
+    fun processPayment(id: Long) {
+        // TODO: 해당 유저의 결제 요청이 맞는지 체크
+        paymentProcessor.process(id)
     }
 
     private fun loadProductOptions(orderItems: List<OrderItem>): List<ProductOption> {
