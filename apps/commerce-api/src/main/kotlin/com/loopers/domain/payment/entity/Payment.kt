@@ -44,16 +44,23 @@ class Payment protected constructor(
     var failedAt: ZonedDateTime? = null
         protected set
 
-    fun success() {
+    fun pending() {
         if (status != Status.REQUESTED) {
-            throw CoreException(ErrorType.CONFLICT, "결제 요청 상태일 때만 주문을 성공 처리할 수 있습니다.")
+            throw CoreException(ErrorType.CONFLICT, "결제 요청 상태일 때만 주문을 보류 처리할 수 있습니다.")
+        }
+        status = Status.PENDING
+    }
+
+    fun success() {
+        if (status != Status.PENDING) {
+            throw CoreException(ErrorType.CONFLICT, "결제 보류 상태일 때만 주문을 성공 처리할 수 있습니다.")
         }
         status = Status.SUCCESS
     }
 
     fun failure(reason: String) {
-        if (status != Status.REQUESTED) {
-            throw CoreException(ErrorType.CONFLICT, "결제 요청 상태일 때만 주문을 실패 처리할 수 있습니다.")
+        if (status != Status.PENDING) {
+            throw CoreException(ErrorType.CONFLICT, "결제 보류 상태일 때만 주문을 실패 처리할 수 있습니다.")
         }
         status = Status.FAILED
         this.reason = reason
@@ -62,9 +69,11 @@ class Payment protected constructor(
 
     enum class Method {
         POINT,
+        CREDIT_CARD,
     }
     enum class Status {
         REQUESTED,
+        PENDING,
         SUCCESS,
         FAILED,
     }

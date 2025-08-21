@@ -44,6 +44,8 @@ class PaymentProcessor(
     }
 
     private fun processPayment(order: Order, payment: Payment, orderItems: List<OrderItem>) {
+        paymentStateService.paymentPending(payment.id)
+
         val decreaseStocks = getDecreaseStocks(orderItems)
         productStockService.decreaseStocks(decreaseStocks.toCommand())
 
