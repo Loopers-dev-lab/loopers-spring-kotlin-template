@@ -1,10 +1,12 @@
 package com.loopers.application.payment
 
 import com.loopers.domain.order.OrderItemService
+import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.entity.OrderItem
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.dto.command.PaymentCommand
 import com.loopers.domain.payment.dto.result.PaymentResult
+import com.loopers.domain.payment.type.TransactionStatus
 import com.loopers.domain.product.ProductOptionService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.entity.ProductOption
@@ -19,6 +21,7 @@ import java.math.BigDecimal
 class PaymentFacade(
     private val paymentProcessor: PaymentProcessor,
     private val paymentService: PaymentService,
+    private val orderService: OrderService,
     private val orderItemService: OrderItemService,
     private val productOptionService: ProductOptionService,
     private val productService: ProductService,
@@ -28,13 +31,29 @@ class PaymentFacade(
         val orderItems = orderItemService.findAll(command.orderId)
         val productOptions = loadProductOptions(orderItems)
         val paymentPrice = calculateTotalPrice(orderItems, productOptions)
-        return PaymentResult.PaymentDetail.from(paymentService.request(command.toEntity(paymentPrice)))
+        val payment = paymentService.request(command.toEntity(paymentPrice))
+        val order = orderService.get(payment.id)
+        order.paymentRequest()
+        return PaymentResult.PaymentDetail.from(payment)
     }
 
     @Transactional
     fun processPayment(id: Long) {
         // TODO: 해당 유저의 결제 요청이 맞는지 체크
         paymentProcessor.process(id)
+    }
+
+    @Transactional
+    fun processPaymentWebhook(command: PaymentCommand.PaymentWebhook) {
+        val payment = paymentService.get(command.transactionKey)
+        val order = orderService.get(payment.orderId)
+        if (command.status == TransactionStatus.SUCCESS) {
+            payment.success()
+            order.success()
+        } else if (command.status == TransactionStatus.FAILED) {
+            payment.failure(command.reason)
+            order.failure(command.reason)
+        }
     }
 
     private fun loadProductOptions(orderItems: List<OrderItem>): List<ProductOption> {

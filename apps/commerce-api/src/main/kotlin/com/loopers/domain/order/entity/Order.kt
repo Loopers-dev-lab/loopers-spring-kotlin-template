@@ -66,7 +66,7 @@ class Order protected constructor(
         status = Status.ORDER_SUCCESS
     }
 
-    fun failure(reason: String) {
+    fun failure(reason: String?) {
         if (status != Status.PAYMENT_REQUEST) {
             throw CoreException(ErrorType.CONFLICT, "결제 요청 상태에서만 주문 실패가 가능합니다.")
         }

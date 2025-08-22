@@ -13,4 +13,6 @@ interface PaymentV1ApiSpec {
     fun requestPayment(request: PaymentV1Dto.PaymentRequest): ApiResponse<PaymentV1Dto.PaymentResponse>
 
     fun processPayment(id: Long)
+
+    fun processPaymentWebhook(request: PaymentV1Dto.WebhookRequest)
 }

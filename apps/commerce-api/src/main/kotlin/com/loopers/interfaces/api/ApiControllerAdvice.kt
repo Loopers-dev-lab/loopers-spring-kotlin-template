@@ -32,6 +32,7 @@ class ApiControllerAdvice {
 
     @ExceptionHandler
     fun handleBadRequest(e: MethodArgumentTypeMismatchException): ResponseEntity<ApiResponse<*>> {
+        log.warn("MethodArgumentTypeMismatchException : {}", e.message, e)
         val name = e.name
         val type = e.requiredType?.simpleName ?: "unknown"
         val value = e.value ?: "null"
@@ -41,6 +42,7 @@ class ApiControllerAdvice {
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationException(e: MethodArgumentNotValidException): ResponseEntity<ApiResponse<*>> {
+        log.warn("MethodArgumentNotValidException : {}", e.message, e)
         val message = e.bindingResult.fieldErrors.joinToString(", ") { fieldError ->
             val field = fieldError.field
             val rejectedValue = fieldError.rejectedValue ?: "null"
@@ -59,6 +61,7 @@ class ApiControllerAdvice {
 
     @ExceptionHandler
     fun handleBadRequest(e: MissingServletRequestParameterException): ResponseEntity<ApiResponse<*>> {
+        log.warn("MissingServletRequestParameterException : {}", e.message, e)
         val name = e.parameterName
         val type = e.parameterType
         val message = "필수 요청 파라미터 '$name' (타입: $type)가 누락되었습니다."
@@ -67,6 +70,7 @@ class ApiControllerAdvice {
 
     @ExceptionHandler
     fun handleBadRequest(e: HttpMessageNotReadableException): ResponseEntity<ApiResponse<*>> {
+        log.warn("HttpMessageNotReadableException : {}", e.message, e)
         val errorMessage = when (val rootCause = e.rootCause) {
             is InvalidFormatException -> {
                 val fieldName = rootCause.path.joinToString(".") { it.fieldName ?: "?" }
@@ -105,6 +109,7 @@ class ApiControllerAdvice {
 
     @ExceptionHandler
     fun handleBadRequest(e: ServerWebInputException): ResponseEntity<ApiResponse<*>> {
+        log.warn("ServerWebInputException : {}", e.message, e)
         fun extractMissingParameter(message: String): String {
             val regex = "'(.+?)'".toRegex()
             return regex.find(message)?.groupValues?.get(1) ?: ""
@@ -120,6 +125,7 @@ class ApiControllerAdvice {
 
     @ExceptionHandler
     fun handleNotFound(e: NoResourceFoundException): ResponseEntity<ApiResponse<*>> {
+        log.warn("NoResourceFoundException : {}", e.message, e)
         return failureResponse(errorType = ErrorType.NOT_FOUND)
     }
 

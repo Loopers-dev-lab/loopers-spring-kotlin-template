@@ -18,6 +18,12 @@ dependencies {
     // querydsl
     kapt("com.querydsl:querydsl-apt::jakarta")
 
+    // feign client
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+
+    // resilience4j
+    implementation("io.github.resilience4j:resilience4j-spring-boot3")
+
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))
     testImplementation(testFixtures(project(":modules:redis")))

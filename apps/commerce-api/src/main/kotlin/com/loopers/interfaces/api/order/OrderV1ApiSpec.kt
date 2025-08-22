@@ -11,7 +11,7 @@ interface OrderV1ApiSpec {
         summary = "주문 요청",
         description = "주문을 요청 합니다.",
     )
-    fun request(
+    fun requestOrder(
         @Schema(name = "주문 요청 정보", description = "주문 요청 정보")
         request: OrderV1Dto.OrderRequest,
     ): ApiResponse<OrderV1Dto.OrderResponse>

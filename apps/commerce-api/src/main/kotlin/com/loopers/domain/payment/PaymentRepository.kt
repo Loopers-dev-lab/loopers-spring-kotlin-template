@@ -5,5 +5,7 @@ import com.loopers.domain.payment.entity.Payment
 interface PaymentRepository {
     fun find(id: Long): Payment?
 
+    fun find(transactionKey: String): Payment?
+
     fun save(payment: Payment): Payment
 }

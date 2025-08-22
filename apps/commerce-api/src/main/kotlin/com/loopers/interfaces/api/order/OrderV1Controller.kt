@@ -15,8 +15,8 @@ class OrderV1Controller(
     private val orderFacade: OrderFacade,
 ) : OrderV1ApiSpec {
     @Authenticated
-    @PostMapping("request")
-    override fun request(
+    @PostMapping("")
+    override fun requestOrder(
         @Valid @RequestBody request: OrderV1Dto.OrderRequest,
     ): ApiResponse<OrderV1Dto.OrderResponse> {
         return orderFacade.requestOrder(request.toRequestOrder())

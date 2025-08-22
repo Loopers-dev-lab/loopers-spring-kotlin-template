@@ -13,6 +13,10 @@ class PaymentRepositoryImpl(
         return paymentJpaRepository.findByIdOrNull(id)
     }
 
+    override fun find(transactionKey: String): Payment? {
+        return paymentJpaRepository.findByTransactionKey(transactionKey)
+    }
+
     override fun save(payment: Payment): Payment {
         return paymentJpaRepository.save(payment)
     }

@@ -88,7 +88,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT, "KB", "1111-2222-3333-4444").toEntity(BigDecimal("1000")),
             )
 
             // when
@@ -127,7 +127,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT, "KB", "1111-2222-3333-4444").toEntity(BigDecimal("1000")),
             )
 
             // expect
@@ -165,7 +165,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT, "KB", "1111-2222-3333-4444").toEntity(BigDecimal("1000")),
             )
 
             // expect
@@ -205,7 +205,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT, "KB", "1111-2222-3333-4444").toEntity(BigDecimal("1000")),
             )
 
             // when
@@ -252,7 +252,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("1000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT, "KB", "1111-2222-3333-4444").toEntity(BigDecimal("1000")),
             )
 
             // when
@@ -301,7 +301,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal("2000")),
+                PaymentCommand.Request(order.id, Payment.Method.POINT, "KB", "1111-2222-3333-4444").toEntity(BigDecimal("2000")),
             )
 
             // when
@@ -357,7 +357,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
             orderItemService.register(orderCommand.toItemCommand(order.id))
 
             val payment = paymentService.request(
-                PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal(totalPrice)),
+                PaymentCommand.Request(order.id, Payment.Method.POINT, "KB", "1111-2222-3333-4444").toEntity(BigDecimal(totalPrice)),
             )
 
             var failCount = 0
@@ -426,7 +426,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                         orderItemService.register(orderCommand.toItemCommand(order.id))
 
                         val payment = paymentService.request(
-                            PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal(totalPrice)),
+                            PaymentCommand.Request(order.id, Payment.Method.POINT, "KB", "1111-2222-3333-4444").toEntity(BigDecimal(totalPrice)),
                         )
 
                         paymentProcessor.process(payment.id)
@@ -489,7 +489,7 @@ class PaymentProcessorIntegrationTest @Autowired constructor(
                         orderItemService.register(orderCommand.toItemCommand(order.id))
 
                         val payment = paymentService.request(
-                            PaymentCommand.Request(order.id, Payment.Method.POINT).toEntity(BigDecimal(totalPrice)),
+                            PaymentCommand.Request(order.id, Payment.Method.POINT, "KB", "1111-2222-3333-4444").toEntity(BigDecimal(totalPrice)),
                         )
 
                         paymentProcessor.process(payment.id)

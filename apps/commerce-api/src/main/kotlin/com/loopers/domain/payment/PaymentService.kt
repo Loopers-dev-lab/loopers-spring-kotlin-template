@@ -11,7 +11,15 @@ class PaymentService(
 ) {
     fun get(id: Long): Payment {
         return paymentRepository.find(id)
-            ?: throw CoreException(errorType = ErrorType.NOT_FOUND, customMessage = "[id = $id] 주문을 찾을 수 없습니다.")
+            ?: throw CoreException(errorType = ErrorType.NOT_FOUND, customMessage = "[id = $id] 결제를 찾을 수 없습니다.")
+    }
+
+    fun get(transactionKey: String): Payment {
+        return paymentRepository.find(transactionKey)
+            ?: throw CoreException(
+                errorType = ErrorType.NOT_FOUND,
+                customMessage = "[transactionKey = $transactionKey] 결제를 찾을 수 없습니다.",
+            )
     }
 
     fun request(payment: Payment): Payment {

@@ -10,15 +10,9 @@ class PaymentStateService(
     private val paymentService: PaymentService,
 ) {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun paymentSuccess(paymentId: Long) {
+    fun paymentProcessing(paymentId: Long) {
         val payment = paymentService.get(paymentId)
-        payment.success()
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun paymentPending(paymentId: Long) {
-        val payment = paymentService.get(paymentId)
-        payment.pending()
+        payment.processing()
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

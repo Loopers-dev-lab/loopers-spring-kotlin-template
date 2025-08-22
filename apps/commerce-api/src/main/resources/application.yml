@@ -23,6 +23,38 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  datasource:
+    hikari:
+      connection-timeout: 3000       # 커넥션 풀에서 커넥션 얻는 최대 대기 시간
+      validation-timeout: 2000       # 커넥션 유효성 검사 제한 시간
+
+resilience4j:
+  retry:
+    instances:
+      payment:
+        maxAttempts: 3
+        waitDuration: 300ms
+        retryExceptions:
+          - feign.FeignException.FeignServerException
+          - feign.RetryableException
+        ignoreExceptions:
+          - feign.FeignException.FeignClientException
+  circuitbreaker:
+    instances:
+      pg:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        failureRateThreshold: 50
+        slowCallDurationThreshold: 2s
+        slowCallRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        recordExceptions:
+          - feign.FeignException.FeignServerException
+          - feign.RetryableException
+          - java.util.concurrent.TimeoutException
+        ignoreExceptions:
+          - feign.FeignException.FeignClientException
 
 springdoc:
   use-fqn: true
