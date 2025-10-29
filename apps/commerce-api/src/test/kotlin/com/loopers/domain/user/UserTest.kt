@@ -16,7 +16,7 @@ class UserTest {
         @Test
         fun failsToCreateUser_whenUserIdFormatIsInvalid() {
             // arrange
-            val invalidUserId = "invalid_user!"
+            val invalidUserId = "invalid_id"
 
             // act
             val exception = assertThrows<CoreException> {
