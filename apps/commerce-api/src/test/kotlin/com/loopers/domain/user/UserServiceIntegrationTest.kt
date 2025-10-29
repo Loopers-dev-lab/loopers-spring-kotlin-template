@@ -11,11 +11,12 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.TestConstructor
 
 @SpringBootTest
-class UserServiceIntegrationTest @Autowired constructor(
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+class UserServiceIntegrationTest(
     private val userService: UserService,
     private val userJpaRepository: UserJpaRepository,
     private val databaseCleanUp: DatabaseCleanUp,

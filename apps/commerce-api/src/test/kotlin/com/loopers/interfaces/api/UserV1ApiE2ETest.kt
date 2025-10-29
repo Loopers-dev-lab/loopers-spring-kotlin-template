@@ -11,7 +11,6 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.ParameterizedTypeReference
@@ -19,9 +18,11 @@ import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
+import org.springframework.test.context.TestConstructor
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class UserV1ApiE2ETest @Autowired constructor(
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+class UserV1ApiE2ETest(
     private val testRestTemplate: TestRestTemplate,
     private val userJpaRepository: UserJpaRepository,
     private val databaseCleanUp: DatabaseCleanUp,
