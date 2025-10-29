@@ -9,10 +9,10 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.TestConstructor
+import java.time.LocalDate
 
 @SpringBootTest
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
@@ -29,7 +29,7 @@ class UserServiceIntegrationTest(
     @DisplayName("회원 가입시,")
     @Nested
     inner class RegisterUser {
-        @DisplayName("User 저장이 수행된다.")
+        @DisplayName("회원 정보가 저장 된다.")
         @Test
         fun savesUser_whenRegisteringUser() {
             // arrange
@@ -45,13 +45,14 @@ class UserServiceIntegrationTest(
 
             // assert
             val savedUser = userJpaRepository.findByUserId(userId)
-            assertAll(
-                { assertThat(savedUser).isNotNull() },
-                { assertThat(savedUser?.userId).isEqualTo(userId) },
-                { assertThat(savedUser?.email).isEqualTo("test@example.com") },
-                { assertThat(savedUser?.birthDate).isEqualTo("1990-01-01") },
-                { assertThat(savedUser?.gender).isEqualTo(Gender.MALE) },
-            )
+            assertThat(savedUser).isNotNull
+                .extracting("userId", "email", "birthDate", "gender")
+                .containsExactly(
+                    "testuser",
+                    "test@example.com",
+                    LocalDate.parse("1990-01-01"),
+                    Gender.MALE,
+                )
         }
 
         @DisplayName("이미 가입된 ID로 회원가입 시도 시, 실패한다.")
@@ -104,12 +105,13 @@ class UserServiceIntegrationTest(
             val result = userService.getUserByUserId(userId)
 
             // assert
-            assertAll(
-                { assertThat(result).isNotNull() },
-                { assertThat(result?.id).isEqualTo(savedUser.id) },
-                { assertThat(result?.userId).isEqualTo(userId) },
-                { assertThat(result?.email).isEqualTo("test@example.com") },
-            )
+            assertThat(result).isNotNull
+                .extracting("id", "userId", "email")
+                .containsExactly(
+                    savedUser.id,
+                    userId,
+                    "test@example.com",
+                )
         }
 
         @DisplayName("해당 ID의 회원이 존재하지 않을 경우, null이 반환된다.")
@@ -147,10 +149,8 @@ class UserServiceIntegrationTest(
             val result = userService.getPointByUserId(userId)
 
             // assert
-            assertAll(
-                { assertThat(result).isNotNull() },
-                { assertThat(result).isEqualTo(0L) },
-            )
+            assertThat(result).isNotNull
+                .isEqualTo(0L)
         }
 
         @DisplayName("해당 ID의 회원이 존재하지 않을 경우, null이 반환된다.")
