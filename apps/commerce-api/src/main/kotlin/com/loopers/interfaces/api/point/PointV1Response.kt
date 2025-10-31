@@ -14,4 +14,16 @@ class PointV1Response {
             }
         }
     }
+
+    data class GetBalance(
+        val balance: Int,
+    ) {
+        companion object {
+            fun from(info: PointV1Info.GetBalance): GetBalance {
+                return GetBalance(
+                    balance = info.balance,
+                )
+            }
+        }
+    }
 }

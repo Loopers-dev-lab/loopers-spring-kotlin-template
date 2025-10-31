@@ -22,4 +22,9 @@ class PointService(
         pointWallet.addTransaction(transaction)
         return pointWalletRepository.save(pointWallet)
     }
+
+    fun getPointWalletBy(userId: Long): PointWallet? {
+        val user = userRepository.findById(userId) ?: return null
+        return pointWalletRepository.getByUserId(userId)
+    }
 }

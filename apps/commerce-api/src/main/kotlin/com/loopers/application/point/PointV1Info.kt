@@ -14,4 +14,16 @@ class PointV1Info {
             }
         }
     }
+
+    data class GetBalance(
+        val balance: Int,
+    ) {
+        companion object {
+            fun from(amount: Money): GetBalance {
+                return GetBalance(
+                    balance = amount.amount.toInt(),
+                )
+            }
+        }
+    }
 }

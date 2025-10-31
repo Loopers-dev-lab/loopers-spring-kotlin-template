@@ -22,4 +22,18 @@ interface PointV1ApiSpec {
         userId: Long,
         request: PointV1Request.Charge,
     ): ApiResponse<PointV1Response.Charge>
+
+    @Operation(
+        summary = "포인트 잔액 조회",
+        description = "포인트 잔액 조회를 합니다.",
+    )
+    fun getPointBalance(
+        @Parameter(
+            name = "X-USER-ID",
+            description = "요청자의 유저 id",
+            required = true,
+            `in` = ParameterIn.HEADER,
+        )
+        userId: Long,
+    ): ApiResponse<PointV1Response.GetBalance>
 }

@@ -34,11 +34,82 @@ class PointV1ApiE2ETest @Autowired constructor(
 
     companion object {
         private val ENDPOINT_CHARGE: () -> String = { "/api/v1/points/charge" }
+        private val ENDPOINT_GET_BALANCE: () -> String = { "/api/v1/points/balance" }
     }
 
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
+    }
+
+    @DisplayName("GET /api/v1/points/balance")
+    @Nested
+    inner class GetBalance {
+        var user: User? = null
+
+        @BeforeEach
+        fun setUp() {
+            val mockUser = Instancio.of(User::class.java)
+                .ignore(KSelect.field(User::id))
+                .set(KSelect.field(User::username), "김준형")
+                .set(KSelect.field(User::birth), LocalDate.of(1994, 9, 23))
+                .set(KSelect.field(User::email), "toong@toong.io")
+                .set(KSelect.field(User::gender), Gender.MALE)
+                .create()
+            user = userRepository.save(mockUser)
+        }
+
+        @DisplayName("존재하는 유저로 잔액 조회를 하는 경우 보유 총량을 확인할 수 있다.")
+        @Test
+        fun returnBalance_whenValidUserIdIsProvided() {
+            // given
+            val existUser = user!!
+
+            // when
+            val requestUrl = ENDPOINT_GET_BALANCE()
+            val responseType = object : ParameterizedTypeReference<ApiResponse<PointV1Response.GetBalance>>() {}
+            val headers = HttpHeaders().apply {
+                contentType = MediaType.APPLICATION_JSON
+                set("X-USER-ID", existUser.id.toString())
+            }
+            val httpEntity = HttpEntity(null, headers)
+            val response = testRestTemplate.exchange(
+                requestUrl,
+                HttpMethod.GET,
+                httpEntity,
+                responseType,
+            )
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
+                { assertThat(response.body?.data?.balance).isEqualTo(0) },
+            )
+        }
+
+        @DisplayName("user id값이 포함되지 않는 경우 400 Bad Request 응답을 반환한다")
+        @Test
+        fun throwBadRequest_whenUserIdIsNotProvided() {
+            // when
+            val requestUrl = ENDPOINT_GET_BALANCE()
+            val responseType = object : ParameterizedTypeReference<ApiResponse<PointV1Response.GetBalance>>() {}
+            val headers = HttpHeaders().apply {
+                contentType = MediaType.APPLICATION_JSON
+            }
+            val httpEntity = HttpEntity(null, headers)
+            val response = testRestTemplate.exchange(
+                requestUrl,
+                HttpMethod.GET,
+                httpEntity,
+                responseType,
+            )
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode.is4xxClientError).isTrue() },
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST) },
+            )
+        }
     }
 
     @DisplayName("POST /api/v1/points/charge")
