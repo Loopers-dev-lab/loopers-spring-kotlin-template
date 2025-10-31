@@ -2,6 +2,7 @@ package com.loopers.domain.user
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import jakarta.validation.ConstraintViolationException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -23,6 +24,15 @@ class UserService(
 
         val user = User.signUp(command.username, command.birth, command.email, command.gender)
 
-        return userRepository.save(user)
+        return runCatching {
+            userRepository.save(user)
+        }.getOrElse { exception ->
+            when (exception) {
+                is ConstraintViolationException ->
+                    throw CoreException(ErrorType.BAD_REQUEST, exception.message)
+
+                else -> throw exception
+            }
+        }
     }
 }
