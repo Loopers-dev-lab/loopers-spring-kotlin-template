@@ -24,4 +24,8 @@ class UserService(
     fun getUserByUserId(userId: String): User? {
         return userRepository.findByUserId(userId)
     }
+
+    fun getPointByUserId(userId: String): Int? {
+        return userRepository.findByUserId(userId)?.point
+    }
 }

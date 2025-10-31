@@ -5,9 +5,11 @@ import com.loopers.domain.user.Gender
 import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -30,6 +32,16 @@ class UserV1Controller(
     ): ApiResponse<UserV1Dto.UserResponse> {
         return userFacade.getUser(userId)
             .let { UserV1Dto.UserResponse.from(it) }
+            .let { ApiResponse.success(it) }
+    }
+
+    @GetMapping("/point")
+    override fun getPoint(
+        @RequestHeader("X-USER-ID", required = false) userId: String?,
+    ): ApiResponse<Int> {
+        if (userId.isNullOrBlank()) throw CoreException(ErrorType.BAD_REQUEST)
+
+        return userFacade.getPoint(userId)
             .let { ApiResponse.success(it) }
     }
 }

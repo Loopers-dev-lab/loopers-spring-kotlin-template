@@ -26,6 +26,8 @@ class User(
     var gender: Gender = gender
         protected set
 
+    var point: Int = 0
+
     init {
         if (!validateUserId(userId)) throw CoreException(ErrorType.BAD_REQUEST, "invalid user id")
 

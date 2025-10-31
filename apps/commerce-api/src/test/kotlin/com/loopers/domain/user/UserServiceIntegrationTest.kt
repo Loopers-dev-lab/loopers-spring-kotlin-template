@@ -92,4 +92,37 @@ class UserServiceIntegrationTest @Autowired constructor(
             assertThat(result).isNull()
         }
     }
+
+    @DisplayName("포인트 조회시, ")
+    @Nested
+    inner class GetPoint {
+        @DisplayName("해당 ID의 회원이 존재할 경우, 보유 포인트가 반환된다.")
+        @Test
+        fun getPoint_whenUserExists() {
+            // arrange
+            val user = userJpaRepository.save(User(userId = "testId", email = "test@test.com", birth = "2025-10-25", gender = Gender.OTHER))
+
+            // act
+            val result = userService.getPointByUserId(user.userId)
+
+            // assert
+            assertAll(
+                { assertThat(result).isNotNull() },
+                { assertThat(result).isEqualTo(0) },
+            )
+        }
+
+        @DisplayName("해당 ID의 회원이 존재하지 않을 경우, Null이 반환된다.")
+        @Test
+        fun returnNull_whenUserIdNotExists() {
+            // arrange
+            val userId = "testId"
+
+            // act
+            val result = userService.getPointByUserId(userId)
+
+            // assert
+            assertThat(result).isNull()
+        }
+    }
 }

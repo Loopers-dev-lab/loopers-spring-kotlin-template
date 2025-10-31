@@ -20,4 +20,9 @@ class UserFacade(
             ?.let { UserInfo.from(it) }
             ?: throw CoreException(ErrorType.NOT_FOUND, "User not found")
     }
+
+    fun getPoint(userId: String): Int {
+        return service.getPointByUserId(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "User not found")
+    }
 }

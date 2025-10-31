@@ -21,4 +21,13 @@ interface UserV1ApiSpec {
         @Schema(name = "회원 ID", description = "조회할 회원의 ID")
         userId: String,
     ): ApiResponse<UserV1Dto.UserResponse>
+
+    @Operation(
+        summary = "회원 포인트 조회",
+        description = "ID로 회원 포인트를 조회합니다.",
+    )
+    fun getPoint(
+        @Schema(name = "회원 ID", description = "조회할 회원의 ID")
+        userId: String?,
+    ): ApiResponse<Int>
 }

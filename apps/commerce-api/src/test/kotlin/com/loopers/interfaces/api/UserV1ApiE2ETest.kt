@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.HttpEntity
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 
@@ -27,7 +28,8 @@ class UserV1ApiE2ETest @Autowired constructor(
 ) {
     companion object {
         private const val ENDPOINT_REGISTER = "/api/v1/users/register"
-        private val ENDPOINT_GET: (String) -> String = { userId: String -> "/api/v1/users/$userId" }
+        private val ENDPOINT_GETUSER: (String) -> String = { userId: String -> "/api/v1/users/$userId" }
+        private const val ENDPOINT_GETPOINT = "/api/v1/users/point"
     }
 
     @AfterEach
@@ -97,7 +99,7 @@ class UserV1ApiE2ETest @Autowired constructor(
 
             // act
             val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
-            val res = testRestTemplate.exchange(ENDPOINT_GET(user.userId), HttpMethod.GET, HttpEntity<Any>(Unit), responseType)
+            val res = testRestTemplate.exchange(ENDPOINT_GETUSER(user.userId), HttpMethod.GET, HttpEntity<Any>(Unit), responseType)
 
             // assert
             assertAll(
@@ -117,12 +119,51 @@ class UserV1ApiE2ETest @Autowired constructor(
 
             // act
             val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
-            val res = testRestTemplate.exchange(ENDPOINT_GET(userId), HttpMethod.GET, HttpEntity<Any>(Unit), responseType)
+            val res = testRestTemplate.exchange(ENDPOINT_GETUSER(userId), HttpMethod.GET, HttpEntity<Any>(Unit), responseType)
 
             // assert
             assertAll(
                 { assertThat(res.statusCode.is4xxClientError).isTrue },
                 { assertThat(res.statusCode).isEqualTo(HttpStatus.NOT_FOUND) },
+            )
+        }
+    }
+
+    @DisplayName("POST /api/v1/point/{userId}")
+    @Nested
+    inner class GetPoint {
+        @DisplayName("존재하는 회원의 ID를 주면, 보유 포인트를 응답으로 반환한다.")
+        @Test
+        fun returnsUserInfo_whenUserIdExists() {
+            // arrange
+            val user = userJpaRepository.save(User(userId = "testId", email = "test@test.com", birth = "2025-10-25", gender = Gender.OTHER))
+            val headers = HttpHeaders()
+            headers.set("X-USER-ID", user.userId)
+            // act
+            val responseType = object : ParameterizedTypeReference<ApiResponse<Int>>() {}
+            val res = testRestTemplate.exchange(ENDPOINT_GETPOINT, HttpMethod.GET, HttpEntity<Any>(Unit, headers), responseType)
+
+            // assert
+            assertAll(
+                { assertThat(res.statusCode.is2xxSuccessful).isTrue() },
+                { assertThat(res.body?.data).isNotNull() },
+                { assertThat(res.body?.data).isEqualTo(0) },
+            )
+        }
+
+        @DisplayName("X-USER_ID 헤더가 없을 경우, 400 Bad Request 응답을 반환한다.")
+        @Test
+        fun throwsBadRequest_whenUserIdHeaderNotExists() {
+            // arrange
+
+            // act
+            val responseType = object : ParameterizedTypeReference<ApiResponse<Int>>() {}
+            val res = testRestTemplate.exchange(ENDPOINT_GETPOINT, HttpMethod.GET, HttpEntity<Any>(Unit), responseType)
+
+            // assert
+            assertAll(
+                { assertThat(res.statusCode.is4xxClientError).isTrue },
+                { assertThat(res.statusCode).isEqualTo(HttpStatus.BAD_REQUEST) },
             )
         }
     }
