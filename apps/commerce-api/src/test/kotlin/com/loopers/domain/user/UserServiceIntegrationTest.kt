@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import java.time.LocalDate
 
 @SpringBootTest
 class UserServiceIntegrationTest @Autowired constructor(
@@ -28,6 +29,52 @@ class UserServiceIntegrationTest @Autowired constructor(
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
+    }
+
+    @DisplayName("유저 상세 조회 통합테스트")
+    @Nested
+    inner class Get {
+        val correctBirth: LocalDate = LocalDate.of(2000, 1, 1)
+        val correctEmail = "toong@toong.io"
+        val correctGender = Gender.MALE
+
+        @DisplayName("해당 ID 의 회원이 존재할 경우, 회원 정보가 반환된다.")
+        @Test
+        fun returnUserInfo_whenAlreadyExistIdIsProvided() {
+            // given
+            val existingUsername = "testUsername"
+            val existingUser = Instancio.of(User::class.java)
+                .ignore(KSelect.field(User::id))
+                .set(KSelect.field(User::username), existingUsername)
+                .set(KSelect.field(User::birth), correctBirth)
+                .set(KSelect.field(User::email), correctEmail)
+                .set(KSelect.field(User::gender), correctGender)
+                .create()
+            val savedUser = userRepository.save(existingUser)
+
+            // when
+            val userInfo = userService.findUserBy(savedUser.id)
+
+            // then
+            assertAll(
+                { assertThat(userInfo?.id).isEqualTo(savedUser.id) },
+                { assertThat(userInfo?.username).isEqualTo(existingUsername) },
+                { assertThat(userInfo?.birth).isEqualTo(correctBirth) },
+                { assertThat(userInfo?.email).isEqualTo(correctEmail) },
+                { assertThat(userInfo?.gender).isEqualTo(correctGender) },
+            )
+        }
+
+        @DisplayName("해당 ID 의 회원이 존재하지 않을 경우, null 이 반환된다.")
+        @Test
+        fun returnNull_whenNotExistIdIsProvided() {
+            // when
+            val notExistId = 999L
+            val user = userService.findUserBy(notExistId)
+
+            // then
+            assertThat(user).isNull()
+        }
     }
 
     @DisplayName("회원가입 통합테스트")

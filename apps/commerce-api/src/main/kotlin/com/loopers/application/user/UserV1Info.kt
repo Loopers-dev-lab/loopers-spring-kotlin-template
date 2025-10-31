@@ -22,4 +22,22 @@ class UserV1Info {
             )
         }
     }
+
+    data class GetById(
+        val id: Long,
+        val username: String,
+        val gender: Gender,
+        val birth: LocalDate,
+        val email: String,
+    ) {
+        companion object {
+            fun from(user: User): GetById = GetById(
+                id = user.id,
+                birth = user.birth,
+                email = user.email,
+                gender = user.gender,
+                username = user.username,
+            )
+        }
+    }
 }

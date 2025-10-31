@@ -9,6 +9,11 @@ import org.springframework.transaction.annotation.Transactional
 class UserService(
     private val userRepository: UserRepository,
 ) {
+    @Transactional(readOnly = true)
+    fun findUserBy(id: Long): User? {
+        return userRepository.findById(id)
+    }
+
     @Transactional
     fun signUp(command: UserCommand.SignUp): User {
         val existsByUsername = userRepository.existsBy(command.username)
