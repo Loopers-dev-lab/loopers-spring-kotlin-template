@@ -25,4 +25,8 @@ class UserFacade(
         return service.getPointByUserId(userId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "User not found")
     }
+
+    fun chargePoint(userId: String, amount: Int): Int {
+        return service.chargePointByUserId(userId, amount)
+    }
 }

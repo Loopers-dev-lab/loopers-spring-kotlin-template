@@ -30,6 +30,7 @@ class UserV1ApiE2ETest @Autowired constructor(
         private const val ENDPOINT_REGISTER = "/api/v1/users/register"
         private val ENDPOINT_GETUSER: (String) -> String = { userId: String -> "/api/v1/users/$userId" }
         private const val ENDPOINT_GETPOINT = "/api/v1/users/point"
+        private const val ENDPOINT_CHARGEPOINT = "/api/v1/users/chargePoint"
     }
 
     @AfterEach
@@ -164,6 +165,51 @@ class UserV1ApiE2ETest @Autowired constructor(
             assertAll(
                 { assertThat(res.statusCode.is4xxClientError).isTrue },
                 { assertThat(res.statusCode).isEqualTo(HttpStatus.BAD_REQUEST) },
+            )
+        }
+    }
+
+    @DisplayName("POST /api/v1/users/chargePoint")
+    @Nested
+    inner class ChargePoint {
+        @DisplayName("존재하는 유저가 1000원을 충전할 경우, 충전된 보유 총량을 응답으로 반환한다.")
+        @Test
+        fun returnsUserPoint_whenUserExists() {
+            // arrange
+            val user = userJpaRepository.save(User(userId = "testId", email = "test@test.com", birth = "2025-10-25", gender = Gender.OTHER))
+            val req = UserV1Dto.ChargePointRequest(
+                userId = user.userId,
+                amount = 1000,
+            )
+
+            // act
+            val responseType = object : ParameterizedTypeReference<ApiResponse<Int>>() {}
+            val res = testRestTemplate.exchange(ENDPOINT_CHARGEPOINT, HttpMethod.POST, HttpEntity(req), responseType)
+
+            // assert
+            assertAll(
+                { assertThat(res.statusCode.is2xxSuccessful).isTrue() },
+                { assertThat(res.body?.data).isEqualTo(1000) },
+            )
+        }
+
+        @DisplayName("존재하지 않는 유저로 요청할 경우, 404 Not Found 응답을 반환한다.")
+        @Test
+        fun throwNotFound_whenUserNotExists() {
+            // arrange
+            val req = UserV1Dto.ChargePointRequest(
+                userId = "testId",
+                amount = 1000,
+            )
+
+            // act
+            val responseType = object : ParameterizedTypeReference<ApiResponse<Int>>() {}
+            val res = testRestTemplate.exchange(ENDPOINT_CHARGEPOINT, HttpMethod.POST, HttpEntity(req), responseType)
+
+            // assert
+            assertAll(
+                { assertThat(res.statusCode.is4xxClientError).isTrue },
+                { assertThat(res.statusCode).isEqualTo(HttpStatus.NOT_FOUND) },
             )
         }
     }

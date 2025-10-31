@@ -125,4 +125,23 @@ class UserServiceIntegrationTest @Autowired constructor(
             assertThat(result).isNull()
         }
     }
+
+    @DisplayName("포인트 충전시, ")
+    @Nested
+    inner class ChargePoint {
+        @DisplayName("해당 ID의 회원이 존재하지 않을 경우, Null이 반환된다.")
+        @Test
+        fun returnNull_whenUserNotExists() {
+            // arrange
+            val userId = "testId"
+
+            // act
+            val exception = assertThrows<CoreException> {
+                userService.chargePointByUserId(userId, 50)
+            }
+
+            // assert
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+        }
+    }
 }

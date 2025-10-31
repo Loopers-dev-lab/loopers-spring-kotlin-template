@@ -57,4 +57,23 @@ class UserTest {
             assertThat(result.errorType).isEqualTo(ErrorType.BAD_REQUEST)
         }
     }
+
+    @DisplayName("유저를 생성할 때, ")
+    @Nested
+    inner class ChargePoint {
+        @DisplayName("0 이하의 정수로 포인트를 충전 시, BAD_REQUEST 예외가 발생한다.")
+        @Test
+        fun throwsBadRequestException_whenPointIsInvalid() {
+            // arrange
+            val user = User(userId = "testId", email = "test@test.com", birth = "2025-10-25", gender = Gender.OTHER)
+
+            // act
+            val result = assertThrows<CoreException> {
+                user.chargePoint(0)
+            }
+
+            // assert
+            assertThat(result.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+        }
+    }
 }

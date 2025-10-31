@@ -30,4 +30,10 @@ interface UserV1ApiSpec {
         @Schema(name = "회원 ID", description = "조회할 회원의 ID")
         userId: String?,
     ): ApiResponse<Int>
+
+    @Operation(
+        summary = "회원 포인트 충전",
+        description = "ID와 포인트로 회원 포인트를 충전합니다.",
+    )
+    fun chargePoint(req: UserV1Dto.ChargePointRequest): ApiResponse<Int>
 }

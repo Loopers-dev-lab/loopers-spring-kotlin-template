@@ -17,4 +17,5 @@ class UserV1Dto {
             }
         }
     }
+    data class ChargePointRequest(val userId: String, val amount: Int)
 }

@@ -28,4 +28,12 @@ class UserService(
     fun getPointByUserId(userId: String): Int? {
         return userRepository.findByUserId(userId)?.point
     }
+
+    fun chargePointByUserId(userId: String, point: Int): Int {
+        val user = userRepository.findByUserId(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "user not found")
+
+        user.chargePoint(point)
+        return user.point
+    }
 }

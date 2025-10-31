@@ -44,4 +44,10 @@ class UserV1Controller(
         return userFacade.getPoint(userId)
             .let { ApiResponse.success(it) }
     }
+
+    @PostMapping("/chargePoint")
+    override fun chargePoint(@RequestBody req: UserV1Dto.ChargePointRequest): ApiResponse<Int> {
+        return userFacade.chargePoint(req.userId, req.amount)
+            .let { ApiResponse.success(it) }
+    }
 }

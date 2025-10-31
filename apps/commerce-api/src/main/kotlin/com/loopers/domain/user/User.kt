@@ -35,6 +35,14 @@ class User(
 
         if (!validateBirth(birth)) throw CoreException(ErrorType.BAD_REQUEST, "invalid birth")
     }
+
+    fun chargePoint(point: Int): Int {
+        if (point <= 0) throw CoreException(ErrorType.BAD_REQUEST, "invalid point")
+
+        this.point += point
+        return this.point
+    }
+
     companion object {
         private fun validateUserId(userId: String): Boolean {
             val userIdValidator = Regex("^[A-Za-z0-9]{1,10}$")
