@@ -51,9 +51,14 @@ spring.config.activate.on-profile: test
 
 spring:
   jpa:
-    show-sql: true
+    show-sql: false
     hibernate:
       ddl-auto: create
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG  # 쿼리 출력
+    org.hibernate.orm.jdbc.bind: TRACE  # 바인딩 파라미터 출력
 
 datasource:
   mysql-jpa:
