@@ -8,6 +8,8 @@ import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -27,6 +29,30 @@ class ApiControllerAdvice {
     fun handle(e: CoreException): ResponseEntity<ApiResponse<*>> {
         log.warn("CoreException : {}", e.customMessage ?: e.message, e)
         return failureResponse(errorType = e.errorType, errorMessage = e.customMessage)
+    }
+
+    @ExceptionHandler
+    fun handleMethodArgumentNotValid(e: MethodArgumentNotValidException): ResponseEntity<ApiResponse<*>> {
+        val fieldErrors = e.bindingResult.fieldErrors
+        val errorMessage = fieldErrors.joinToString(", ") { error ->
+            "${error.field}: ${error.defaultMessage}"
+        }
+
+        log.warn("Validation failed: {}", errorMessage)
+        return failureResponse(
+            errorType = ErrorType.BAD_REQUEST,
+            errorMessage = errorMessage
+        )
+    }
+
+    @ExceptionHandler
+    fun handleMissingRequestHeader(e: MissingRequestHeaderException): ResponseEntity<ApiResponse<*>> {
+        val errorMessage = e.message
+        log.warn("MissingRequestHeaderException: {}", errorMessage)
+        return failureResponse(
+            errorType = ErrorType.BAD_REQUEST,
+            errorMessage = errorMessage
+        )
     }
 
     @ExceptionHandler
