@@ -21,6 +21,10 @@ class PointWallet(
     }
 
     fun addTransaction(transaction: PointTransaction) {
+        if (transaction.userId != userId) {
+            throw CoreException(ErrorType.BAD_REQUEST, "id가 $userId 와 ${transaction.userId} 가 달라 충전이 불가능합니다.")
+        }
+
         txs.add(transaction)
     }
 
