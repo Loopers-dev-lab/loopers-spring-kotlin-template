@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -53,6 +54,42 @@ class UserServiceIntegrationTest @Autowired constructor(
 
             // assert
             assertThat(exception.errorType).isEqualTo(ErrorType.CONFLICT)
+        }
+    }
+
+    @DisplayName("회원 정보 조회시, ")
+    @Nested
+    inner class GetUser {
+        @DisplayName("해당 ID의 회원이 존재할 경우, 회원 정보가 반환된다.")
+        @Test
+        fun getUser_whenUserIdExists() {
+            // arrange
+            val user = userJpaRepository.save(User(userId = "testId", email = "test@test.com", birth = "2025-10-25", gender = Gender.OTHER))
+
+            // act
+            val result = userService.getUserByUserId(user.userId)
+
+            // assert
+            assertAll(
+                { assertThat(result).isNotNull() },
+                { assertThat(result?.userId).isEqualTo(user.userId) },
+                { assertThat(result?.email).isEqualTo(user.email) },
+                { assertThat(result?.birth).isEqualTo(user.birth) },
+                { assertThat(result?.gender).isEqualTo(user.gender) },
+            )
+        }
+
+        @DisplayName("해당 ID의 회원이 존재하지 않을 경우, Null이 반환된다.")
+        @Test
+        fun returnNull_whenUserIdNotExists() {
+            // arrange
+            val userId = "testId"
+
+            // act
+            val result = userService.getUserByUserId(userId)
+
+            // assert
+            assertThat(result).isNull()
         }
     }
 }

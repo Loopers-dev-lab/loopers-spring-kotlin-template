@@ -5,4 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface UserJpaRepository : JpaRepository<User, Long> {
     fun existsByUserId(userId: String): Boolean
+    fun findByUserId(userId: String): User?
 }

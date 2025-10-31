@@ -20,4 +20,8 @@ class UserService(
 
         return userRepository.save(User(userId, email, birth, gender))
     }
+
+    fun getUserByUserId(userId: String): User? {
+        return userRepository.findByUserId(userId)
+    }
 }

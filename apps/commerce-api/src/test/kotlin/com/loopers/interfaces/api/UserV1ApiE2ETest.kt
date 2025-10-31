@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api
 
 import com.loopers.domain.user.Gender
+import com.loopers.domain.user.User
 import com.loopers.infrastructure.user.UserJpaRepository
 import com.loopers.interfaces.api.user.UserV1Dto
 import com.loopers.utils.DatabaseCleanUp
@@ -26,6 +27,7 @@ class UserV1ApiE2ETest @Autowired constructor(
 ) {
     companion object {
         private const val ENDPOINT_REGISTER = "/api/v1/users/register"
+        private val ENDPOINT_GET: (String) -> String = { userId: String -> "/api/v1/users/$userId" }
     }
 
     @AfterEach
@@ -48,7 +50,7 @@ class UserV1ApiE2ETest @Autowired constructor(
             )
 
             // act
-            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Dto.RegisterUserResponse>>() {}
+            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
             val res = testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST, HttpEntity(req), responseType)
 
             // assert
@@ -73,13 +75,54 @@ class UserV1ApiE2ETest @Autowired constructor(
             )
 
             // act
-            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Dto.RegisterUserResponse>>() {}
+            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
             val res = testRestTemplate.exchange(ENDPOINT_REGISTER, HttpMethod.POST, HttpEntity(req), responseType)
 
             // assert
             assertAll(
                 { assertThat(res.statusCode.is4xxClientError).isTrue },
                 { assertThat(res.statusCode).isEqualTo(HttpStatus.BAD_REQUEST) },
+            )
+        }
+    }
+
+    @DisplayName("POST /api/v1/users/{userId}")
+    @Nested
+    inner class GetUser {
+        @DisplayName("존재하는 회원의 ID를 주면, 생성된 유저 정보를 응답으로 반환한다.")
+        @Test
+        fun returnsUserInfo_whenUserIdExists() {
+            // arrange
+            val user = userJpaRepository.save(User(userId = "testId", email = "test@test.com", birth = "2025-10-25", gender = Gender.OTHER))
+
+            // act
+            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
+            val res = testRestTemplate.exchange(ENDPOINT_GET(user.userId), HttpMethod.GET, HttpEntity<Any>(Unit), responseType)
+
+            // assert
+            assertAll(
+                { assertThat(res.statusCode.is2xxSuccessful).isTrue() },
+                { assertThat(res.body?.data?.userId).isEqualTo(user.userId) },
+                { assertThat(res.body?.data?.email).isEqualTo(user.email) },
+                { assertThat(res.body?.data?.birth).isEqualTo(user.birth) },
+                { assertThat(res.body?.data?.gender).isEqualTo(user.gender) },
+            )
+        }
+
+        @DisplayName("존재하지 않는 ID로 조회할 경우, 404 Not Found 응답을 반환한다.")
+        @Test
+        fun throwsNotFound_whenUserIdNotExists() {
+            // arrange
+            val userId = "testId"
+
+            // act
+            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>>() {}
+            val res = testRestTemplate.exchange(ENDPOINT_GET(userId), HttpMethod.GET, HttpEntity<Any>(Unit), responseType)
+
+            // assert
+            assertAll(
+                { assertThat(res.statusCode.is4xxClientError).isTrue },
+                { assertThat(res.statusCode).isEqualTo(HttpStatus.NOT_FOUND) },
             )
         }
     }
