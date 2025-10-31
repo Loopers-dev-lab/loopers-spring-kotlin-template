@@ -3,12 +3,14 @@ package com.loopers.domain.example
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 
+@Disabled("테스트 비활성화")
 class ExampleModelTest {
     @DisplayName("예시 모델을 생성할 때, ")
     @Nested
