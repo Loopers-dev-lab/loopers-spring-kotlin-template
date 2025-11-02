@@ -300,11 +300,56 @@ erDiagram
    - `orders.user_id`: 사용자별 주문 조회
    - `orders.ordered_at DESC`: 최신 주문순 정렬
 
+## 데이터 정합성
+
 ### 유니크 제약
 
 1. `users.email`: 이메일 중복 방지
 2. `brands.name`: 브랜드 이름 중복 방지
 3. `likes(user_id, product_id)`: 중복 좋아요 방지
+
+### 외래키 제약
+
+- **CASCADE**: 부모 삭제 시 자식도 함께 삭제
+  - `stocks.product_id` → `products.id`
+  - `likes.user_id` → `users.id`
+  - `likes.product_id` → `products.id`
+  - `order_items.order_id` → `orders.id`
+  - `points.user_id` → `users.id`
+- **RESTRICT**: 자식이 존재하면 부모 삭제 불가
+  - `products.brand_id` → `brands.id`
+  - `orders.user_id` → `users.id`
+  - `order_items.product_id` → `products.id`
+
+### 트랜잭션 범위
+
+- 주문 생성 시 다음을 하나의 트랜잭션으로 처리:
+  - 1. `orders` 테이블에 주문 저장
+  - 2. `order_items` 테이블에 주문 항목 저장
+  - 3. `stocks` 테이블에서 재고 차감
+  - 4. `points` 테이블에서 포인트 차감
+
+## 동시성 제어
+
+### 낙관적 락 (Optimistic Lock)
+
+- `stocks.version`: 재고 차감 시 동시성 제어
+- `points.version`: 포인트 차감 시 동시성 제어
+
+동작 방식
+
+```sql
+-- 재고 차감 예시
+UPDATE stocks
+SET quantity = quantity - :quantity,
+    version = version + 1,
+    updated_at = CURRENT_TIMESTAMP
+WHERE product_id = :productId
+  AND version = :currentVersion
+  AND quantity >= :quantity;
+```
+
+버전이 일치하지 않으면 업데이트 실패 → 재시도 또는 예외 처리
 
 ## 확장 고려 사항
 
