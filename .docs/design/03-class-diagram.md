@@ -361,6 +361,103 @@ enum class OrderStatus {
 - 단방향 기본, 양방향 최소화
 - 필요한 방향으로만 참조
 
+## 상태 다이어그램
+
+### Order 상태 전이
+
+주문(Order)의 생명주기 동안 상태가 어떻게 변화하는지 표현합니다.
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: 주문 생성
+
+    PENDING --> CONFIRMED: 결제 완료
+    PENDING --> CANCELLED: 결제 실패/주문 취소
+
+    CONFIRMED --> SHIPPED: 배송 시작
+    CONFIRMED --> CANCELLED: 주문 취소
+
+    SHIPPED --> DELIVERED: 배송 완료
+    SHIPPED --> CANCELLED: 배송 취소 (예외적)
+
+    DELIVERED --> [*]: 최종 상태
+    CANCELLED --> [*]: 최종 상태
+
+    note right of PENDING
+        초기 상태
+        - 주문 생성됨
+        - 재고 임시 확보
+        - 결제 대기 중
+    end note
+
+    note right of CONFIRMED
+        결제 확인 상태
+        - 결제 완료
+        - 재고 확정 차감
+        - 배송 준비
+    end note
+
+    note right of SHIPPED
+        배송 중 상태
+        - 배송 시작
+        - 배송 중
+    end note
+
+    note right of DELIVERED
+        완료 상태
+        - 배송 완료
+        - 주문 종료
+    end note
+
+    note right of CANCELLED
+        취소 상태
+        - 주문 취소
+        - 재고 복구
+        - 포인트 환불
+    end note
+```
+
+### 상태 전이 조건 및 액션
+
+| 현재 상태 | 이벤트 | 다음 상태 | 액션 |
+|---------|--------|---------|------|
+| - | 주문 생성 요청 | PENDING | • 재고 확인 및 임시 예약<br>• 주문 생성<br>• 결제 대기 |
+| PENDING | 결제 완료 | CONFIRMED | • 포인트 차감<br>• 재고 확정 차감<br>• 배송 준비 시작 |
+| PENDING | 결제 실패 | CANCELLED | • 임시 예약 재고 해제<br>• 주문 취소 처리 |
+| PENDING | 주문 취소 요청 | CANCELLED | • 임시 예약 재고 해제<br>• 주문 취소 처리 |
+| CONFIRMED | 배송 시작 | SHIPPED | • 배송 정보 등록<br>• 배송 상태 추적 시작 |
+| CONFIRMED | 주문 취소 요청 | CANCELLED | • 재고 복구<br>• 포인트 환불<br>• 주문 취소 처리 |
+| SHIPPED | 배송 완료 | DELIVERED | • 배송 완료 확인<br>• 주문 완료 처리 |
+| SHIPPED | 배송 취소 (예외) | CANCELLED | • 재고 복구<br>• 포인트 환불<br>• 배송 취소 처리 |
+
+### 상태별 허용 동작
+
+| 상태 | 조회 | 취소 | 수정 | 배송 추적 |
+|-----|-----|-----|-----|----------|
+| PENDING | ✅ | ✅ | ✅ | ❌ |
+| CONFIRMED | ✅ | ✅ | ❌ | ❌ |
+| SHIPPED | ✅ | ⚠️ (제한적) | ❌ | ✅ |
+| DELIVERED | ✅ | ❌ | ❌ | ✅ |
+| CANCELLED | ✅ | ❌ | ❌ | ❌ |
+
+### 비즈니스 규칙
+
+1. **PENDING → CONFIRMED**
+   - 포인트 잔액이 충분해야 함
+   - 재고가 충분해야 함 (이중 체크)
+   - 주문 생성 후 일정 시간 내에 결제해야 함 (타임아웃)
+
+2. **CONFIRMED → CANCELLED**
+   - 배송 시작 전까지만 취소 가능
+   - 취소 시 재고 복구 및 포인트 환불 보장
+
+3. **SHIPPED → CANCELLED**
+   - 예외적인 경우만 허용 (배송 사고 등)
+   - 관리자 승인 필요
+
+4. **최종 상태**
+   - DELIVERED, CANCELLED은 최종 상태로 더 이상 변경 불가
+
 ## 패키지 구조
 
 ```txt
