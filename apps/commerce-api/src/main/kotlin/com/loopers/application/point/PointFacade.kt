@@ -18,10 +18,8 @@ class PointFacade(private val pointService: PointService, private val userServic
     }
 
     fun charge(loginId: String, amount: Long): PointInfo {
-        val user = userService.getUser(loginId)
-        require(user != null) {
-            throw CoreException(ErrorType.NOT_FOUND, "존재하지 않는 사용자입니다.")
-        }
+        val user = userService.getUser(loginId) ?: throw CoreException(ErrorType.NOT_FOUND, "존재하지 않는 사용자입니다.")
+
         val point = pointService.charge(user.id, amount)
 
         return PointInfo.from(point.balance)
