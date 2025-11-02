@@ -13,11 +13,10 @@ import org.mockito.Mockito
 import org.mockito.Mockito.times
 import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.test.util.ReflectionTestUtils
 import kotlin.test.Test
 
-class UserServiceTest @Autowired constructor(
+class UserServiceTest(
     private val userService: UserService,
     private val userRepository: UserRepository,
     private val databaseCleanUp: DatabaseCleanUp,

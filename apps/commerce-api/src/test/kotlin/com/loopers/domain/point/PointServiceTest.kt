@@ -12,9 +12,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.springframework.beans.factory.annotation.Autowired
 
-class PointServiceTest @Autowired constructor(
+class PointServiceTest(
     private val pointService: PointService,
     private val userRepository: UserJpaRepository,
     private val databaseCleanUp: DatabaseCleanUp,
@@ -67,7 +66,7 @@ class PointServiceTest @Autowired constructor(
         @Test
         fun chargePoint_whenExistsUser() {
             // arrange
-            val user = UserFixture.create(gender = "FEMALE")
+            val user = UserFixture.create()
             userRepository.save(user)
 
             val pointModel = PointFixture.create(userId = user.id, balance = 100L)
@@ -90,6 +89,23 @@ class PointServiceTest @Autowired constructor(
             }
 
             assertThat(exception.message).isEqualTo("존재하지 않는 유저입니다.")
+        }
+
+        @DisplayName("존재하는 유저 ID 로 충전량을 음수로 충전할 경우, 실패한다")
+        @Test
+        fun chargePointFails_whenAmountIsNotPositive() {
+            // arrange
+            val user = UserFixture.create()
+            userRepository.save(user)
+
+            val pointModel = PointFixture.create(userId = user.id, balance = 100L)
+            pointRepository.save(pointModel)
+
+            // act
+            val exception = assertThrows<IllegalArgumentException> {
+                pointService.charge(user.id, -10L)
+            }
+            assertThat(exception.message).isEqualTo("충전 금액은 0보다 커야 합니다.")
         }
     }
 }
