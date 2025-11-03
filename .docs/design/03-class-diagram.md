@@ -466,6 +466,67 @@ stateDiagram-v2
 4. **최종 상태**
    - DELIVERED, CANCELLED은 최종 상태로 더 이상 변경 불가
 
+## Facade 인터페이스 설계
+
+Bounded Context 간 협력을 위한 공개 인터페이스입니다.
+
+### ProductFacade
+
+Product BC의 공개 인터페이스로, 다른 BC가 상품 및 재고 관련 기능에 접근할 때 사용합니다.
+
+```kotlin
+interface ProductFacade {
+    // 상품 조회
+    fun getById(productId: Long): Product
+    fun existsById(productId: Long): Boolean
+
+    // 재고 관리 (Stock은 Product BC의 일부)
+    fun checkStock(productId: Long, quantity: Int): Boolean
+    fun decreaseStock(productId: Long, quantity: Int)
+    fun increaseStock(productId: Long, quantity: Int)
+}
+```
+
+- **사용처**: LikeService (상품 존재 확인), OrderService (상품 조회 및 재고 관리)
+- **구현**: ProductFacadeImpl (ProductService와 StockService를 내부적으로 사용)
+
+### LikeFacade
+
+Like BC의 공개 인터페이스로, 다른 BC가 좋아요 정보에 접근할 때 사용합니다.
+
+```kotlin
+interface LikeFacade {
+    // 좋아요 수 조회
+    fun countByProductId(productId: Long): Long
+    fun countByUserId(userId: Long): Long
+
+    // 좋아요 여부 확인
+    fun existsByUserIdAndProductId(userId: Long, productId: Long): Boolean
+}
+```
+
+- **사용처**: ProductService (좋아요 수 집계)
+- **구현**: LikeFacadeImpl (LikeRepository를 내부적으로 사용)
+
+### PointFacade
+
+Point BC의 공개 인터페이스로, 다른 BC가 포인트 관련 기능에 접근할 때 사용합니다.
+
+```kotlin
+interface PointFacade {
+    // 포인트 조회
+    fun getBalance(userId: Long): Money
+
+    // 포인트 확인 및 차감
+    fun checkBalance(userId: Long, amount: Money): Boolean
+    fun deductPoints(userId: Long, amount: Money)
+    fun chargePoints(userId: Long, amount: Money)
+}
+```
+
+- **사용처**: OrderService (포인트 확인 및 차감)
+- **구현**: PointFacadeImpl (PointService를 내부적으로 사용)
+
 ## 패키지 구조
 
 ```txt
@@ -479,14 +540,41 @@ domain/
 │   ├── Product.kt
 │   ├── Price.kt
 │   ├── Stock.kt
-│   └── Currency.kt
+│   ├── Currency.kt
+│   └── ProductFacade.kt          # 공개 인터페이스
 ├── like/
-│   └── Like.kt
+│   ├── Like.kt
+│   └── LikeFacade.kt              # 공개 인터페이스
 ├── order/
 │   ├── Order.kt
 │   ├── OrderItem.kt
 │   ├── OrderStatus.kt
 │   └── Money.kt
 └── point/
-    └── Point.kt
+    ├── Point.kt
+    └── PointFacade.kt             # 공개 인터페이스
 ```
+
+### Bounded Context 간 의존성
+
+```mermaid
+graph LR
+    ProductBC[Product BC]
+    LikeBC[Like BC]
+    OrderBC[Order BC]
+    PointBC[Point BC]
+
+    ProductBC -->|LikeFacade| LikeBC
+    LikeBC -->|ProductFacade| ProductBC
+    OrderBC -->|ProductFacade| ProductBC
+    OrderBC -->|PointFacade| PointBC
+
+    style ProductBC fill:#e1f5ff
+    style LikeBC fill:#fff4e1
+    style OrderBC fill:#e8f5e9
+    style PointBC fill:#f3e5f5
+```
+
+- **Product BC** ↔ **Like BC**: 양방향 협력 (Facade를 통해)
+- **Order BC** → **Product BC**: 단방향 협력 (재고 차감)
+- **Order BC** → **Point BC**: 단방향 협력 (포인트 차감)

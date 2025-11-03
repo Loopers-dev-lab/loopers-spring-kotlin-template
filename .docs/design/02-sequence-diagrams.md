@@ -18,20 +18,19 @@ sequenceDiagram
     participant User
     participant ProductController
     participant ProductService
-    participant ProductReader
-    participant LikeRepository
+    participant LikeFacade
     participant ProductRepository
 
     User->>ProductController: GET /products?brandId=1&sort=likes_desc&page=0&size=20
     ProductController->>ProductService: getProducts(brandId, sort, page, size)
 
-    ProductService->>ProductReader: findProducts(brandId, sort, page, size)
-    ProductReader->>ProductRepository: findByBrandIdWithPaging(brandId, sort, pageable)
-    ProductRepository-->>ProductReader: List<Product>
+    ProductService->>ProductRepository: findByBrandIdWithPaging(brandId, sort, pageable)
+    ProductRepository-->>ProductService: List<Product>
 
     loop 각 상품에 대해
-        ProductService->>LikeRepository: countByProductId(productId)
-        LikeRepository-->>ProductService: likeCount
+        ProductService->>LikeFacade: countByProductId(productId)
+        Note over LikeFacade: Like BC의 공개 인터페이스
+        LikeFacade-->>ProductService: likeCount
     end
 
     ProductService-->>ProductController: ProductListResponse (with likeCount)
@@ -41,11 +40,10 @@ sequenceDiagram
 - **주요 책임**
   - `ProductController`: 요청 검증 및 응답 변환
   - `ProductService`: 비즈니스 로직 조율 (상품 조회 + 좋아요 수 집계)
-  - `ProductReader`: 상품 조회 전용 인터페이스
+  - `LikeFacade`: Like BC의 공개 인터페이스 (좋아요 조회 기능 제공)
   - `ProductRepository`: 데이터 접근
-  - `LikeRepository`: 좋아요 데이터 접근
 - **설계 포인트**
-  - 읽기 전용 작업은 Reader 인터페이스 활용
+  - **Bounded Context 분리**: ProductService는 Like BC의 내부 구현(LikeRepository)에 직접 접근하지 않고, 공개 인터페이스인 LikeFacade를 통해 협력
   - 좋아요 수는 별도 집계 (N+1 문제 고려 필요)
 
 ## 2. 상품 좋아요 등록
@@ -58,7 +56,7 @@ sequenceDiagram
     participant User
     participant LikeController
     participant LikeService
-    participant ProductReader
+    participant ProductFacade
     participant LikeRepository
 
     User->>LikeController: POST /like/products/{productId}
@@ -66,14 +64,15 @@ sequenceDiagram
 
     LikeController->>LikeService: addLike(userId, productId)
 
-    LikeService->>ProductReader: getById(productId)
+    LikeService->>ProductFacade: getById(productId)
+    Note over ProductFacade: Product BC의 공개 인터페이스
     alt 상품이 존재하지 않음
-        ProductReader-->>LikeService: ProductNotFoundException
+        ProductFacade-->>LikeService: ProductNotFoundException
         LikeService-->>LikeController: 404 Error
         LikeController-->>User: 404 Not Found
     end
 
-    ProductReader-->>LikeService: Product
+    ProductFacade-->>LikeService: Product
 
     LikeService->>LikeRepository: existsByUserIdAndProductId(userId, productId)
     LikeRepository-->>LikeService: boolean
@@ -92,9 +91,10 @@ sequenceDiagram
 - **주요 책임**
   - `LikeController`: 사용자 인증 및 요청 처리
   - `LikeService`: 좋아요 비즈니스 로직 (멱등성 보장)
-  - `ProductReader`: 상품 존재 여부 확인
+  - `ProductFacade`: Product BC의 공개 인터페이스 (상품 조회 기능 제공)
   - `LikeRepository`: 좋아요 데이터 접근
 - **설계 포인트**
+  - **Bounded Context 분리**: LikeService는 Product BC의 공개 인터페이스인 ProductFacade를 통해 상품 정보에 접근
   - 멱등성 보장: 이미 좋아요한 경우 중복 저장하지 않음
   - 상품 존재 여부 사전 검증
 
@@ -108,7 +108,7 @@ sequenceDiagram
     participant User
     participant LikeController
     participant LikeService
-    participant ProductReader
+    participant ProductFacade
     participant LikeRepository
 
     User->>LikeController: DELETE /like/products/{productId}
@@ -116,14 +116,15 @@ sequenceDiagram
 
     LikeController->>LikeService: removeLike(userId, productId)
 
-    LikeService->>ProductReader: getById(productId)
+    LikeService->>ProductFacade: getById(productId)
+    Note over ProductFacade: Product BC의 공개 인터페이스
     alt 상품이 존재하지 않음
-        ProductReader-->>LikeService: ProductNotFoundException
+        ProductFacade-->>LikeService: ProductNotFoundException
         LikeService-->>LikeController: 404 Error
         LikeController-->>User: 404 Not Found
     end
 
-    ProductReader-->>LikeService: Product
+    ProductFacade-->>LikeService: Product
 
     LikeService->>LikeRepository: findByUserIdAndProductId(userId, productId)
     LikeRepository-->>LikeService: Optional<Like>
@@ -142,9 +143,10 @@ sequenceDiagram
 - **주요 책임**
   - `LikeController`: 사용자 인증 및 요청 처리
   - `LikeService`: 좋아요 비즈니스 로직 (멱등성 보장)
-  - `ProductReader`: 상품 존재 여부 확인
+  - `ProductFacade`: Product BC의 공개 인터페이스 (상품 조회 기능 제공)
   - `LikeRepository`: 좋아요 데이터 접근
 - **설계 포인트**
+  - **Bounded Context 분리**: LikeService는 Product BC의 공개 인터페이스인 ProductFacade를 통해 상품 정보에 접근
   - 멱등성 보장: 이미 취소된 경우에도 에러 없이 성공 응답
   - 상품 존재 여부 사전 검증
 
@@ -158,9 +160,8 @@ sequenceDiagram
     participant User
     participant OrderController
     participant OrderService
-    participant ProductReader
-    participant StockService
-    participant PointService
+    participant ProductFacade
+    participant PointFacade
     participant OrderRepository
     participant ExternalOrderSystem
 
@@ -172,17 +173,18 @@ sequenceDiagram
     OrderService->>OrderService: 주문 요청 검증 (항목 개수, 수량)
 
     loop 각 주문 항목
-        OrderService->>ProductReader: getById(productId)
+        OrderService->>ProductFacade: getById(productId)
+        Note over ProductFacade: Product BC의 공개 인터페이스
         alt 상품이 존재하지 않음
-            ProductReader-->>OrderService: ProductNotFoundException
+            ProductFacade-->>OrderService: ProductNotFoundException
             OrderService-->>OrderController: 404 Error
             OrderController-->>User: 404 Not Found
         end
-        ProductReader-->>OrderService: Product
+        ProductFacade-->>OrderService: Product
 
-        OrderService->>StockService: checkStock(productId, quantity)
+        OrderService->>ProductFacade: checkStock(productId, quantity)
         alt 재고 부족
-            StockService-->>OrderService: InsufficientStockException
+            ProductFacade-->>OrderService: InsufficientStockException
             OrderService-->>OrderController: 400 Error (재고 부족)
             OrderController-->>User: 400 Bad Request
         end
@@ -190,9 +192,10 @@ sequenceDiagram
 
     OrderService->>OrderService: 총 주문 금액 계산
 
-    OrderService->>PointService: checkBalance(userId, totalAmount)
+    OrderService->>PointFacade: checkBalance(userId, totalAmount)
+    Note over PointFacade: Point BC의 공개 인터페이스
     alt 포인트 부족
-        PointService-->>OrderService: InsufficientPointException
+        PointFacade-->>OrderService: InsufficientPointException
         OrderService-->>OrderController: 400 Error (포인트 부족)
         OrderController-->>User: 400 Bad Request
     end
@@ -203,10 +206,10 @@ sequenceDiagram
     OrderRepository-->>OrderService: Order
 
     loop 각 주문 항목
-        OrderService->>StockService: decreaseStock(productId, quantity)
+        OrderService->>ProductFacade: decreaseStock(productId, quantity)
     end
 
-    OrderService->>PointService: deductPoints(userId, totalAmount)
+    OrderService->>PointFacade: deductPoints(userId, totalAmount)
 
     Note over OrderService: 트랜잭션 커밋
 
@@ -220,12 +223,13 @@ sequenceDiagram
 - **주요 책임**
   - `OrderController`: 요청 검증 및 응답 변환
   - `OrderService`: 주문 비즈니스 로직 조율 (검증, 트랜잭션 관리)
-  - `ProductReader`: 상품 정보 조회
-  - `StockService`: 재고 확인 및 차감
-  - `PointService`: 포인트 확인 및 차감
+  - `ProductFacade`: Product BC의 공개 인터페이스 (상품 조회, 재고 확인 및 차감)
+  - `PointFacade`: Point BC의 공개 인터페이스 (포인트 확인 및 차감)
   - `OrderRepository`: 주문 데이터 저장
   - `ExternalOrderSystem`: 외부 시스템 연동 (Mock 가능)
 - **설계 포인트**
+  - **Bounded Context 분리**: OrderService는 Product BC와 Point BC의 공개 인터페이스(Facade)를 통해서만 협력
+  - **Stock은 Product BC의 일부**: 재고 관련 작업도 ProductFacade를 통해 처리
   - 트랜잭션 범위: 주문 저장, 재고 차감, 포인트 차감
   - 사전 검증: 상품 존재, 재고 확인, 포인트 확인
   - 외부 시스템 연동은 트랜잭션 외부에서 처리 (또는 비동기)
