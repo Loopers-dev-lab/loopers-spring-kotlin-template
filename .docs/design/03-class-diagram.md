@@ -70,6 +70,10 @@ classDiagram
     class OrderItem {
         +Long id
         +Product product
+        +String productName
+        +Long brandId
+        +String brandName
+        +String brandDescription
         +int quantity
         +Price priceAtOrder
         +calculateItemAmount() Money
@@ -234,19 +238,23 @@ classDiagram
 
 - **책임**
   - 주문 내 개별 상품 정보 관리
-  - 주문 시점의 가격 보존
+  - 주문 시점의 상품 및 브랜드 정보 스냅샷 보존
 - **속성**
   - `id`: 주문 항목 고유 식별자
-  - `product`: 주문한 상품
+  - `product`: 주문한 상품 (참조용)
+  - `productName`: 주문 시점의 상품명 (스냅샷)
+  - `brandId`: 주문 시점의 브랜드 ID (스냅샷)
+  - `brandName`: 주문 시점의 브랜드명 (스냅샷)
+  - `brandDescription`: 주문 시점의 브랜드 설명 (스냅샷)
   - `quantity`: 주문 수량
-  - `priceAtOrder`: 주문 시점의 가격 (불변)
+  - `priceAtOrder`: 주문 시점의 가격 (스냅샷)
 - **메서드**
   - `calculateItemAmount()`: 항목별 금액 계산 (가격 × 수량)
 - **설계 포인트**
   - Entity (식별자 존재)
   - Order의 일부 (독립적으로 존재 불가)
   - Product와 N:1 관계
-  - 주문 시점의 가격을 저장 (상품 가격 변경에 영향받지 않음)
+  - 주문 시점의 상품명, 브랜드 정보(ID, 이름, 설명), 가격을 스냅샷으로 저장 (상품/브랜드 정보 변경에 영향받지 않음)
 
 ### 9. Money (금액) - Value Object
 

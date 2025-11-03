@@ -57,6 +57,10 @@ erDiagram
         bigint id PK
         bigint order_id FK
         bigint product_id FK
+        varchar product_name
+        bigint brand_id
+        varchar brand_name
+        text brand_description
         int quantity
         decimal price_at_order
         varchar currency
@@ -215,15 +219,19 @@ erDiagram
 
 ### 7. order_items (주문 항목)
 
-주문에 포함된 상품 정보를 저장
+주문에 포함된 상품 정보를 저장 (주문 시점의 상품 및 브랜드 정보 스냅샷)
 
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, AUTO_INCREMENT | 주문 항목 고유 식별자 |
 | order_id | BIGINT | NOT NULL, FK | 주문 식별자 |
-| product_id | BIGINT | NOT NULL, FK | 상품 식별자 |
+| product_id | BIGINT | NOT NULL, FK | 상품 식별자 (참조용) |
+| product_name | VARCHAR(200) | NOT NULL | 주문 시점의 상품명 (스냅샷) |
+| brand_id | BIGINT | NOT NULL | 주문 시점의 브랜드 ID (스냅샷) |
+| brand_name | VARCHAR(100) | NOT NULL | 주문 시점의 브랜드명 (스냅샷) |
+| brand_description | TEXT | NULL | 주문 시점의 브랜드 설명 (스냅샷) |
 | quantity | INT | NOT NULL | 주문 수량 |
-| price_at_order | DECIMAL(15,2) | NOT NULL | 주문 시점의 가격 |
+| price_at_order | DECIMAL(15,2) | NOT NULL | 주문 시점의 가격 (스냅샷) |
 | currency | VARCHAR(3) | NOT NULL, DEFAULT 'KRW' | 통화 단위 |
 
 - **인덱스**
@@ -238,7 +246,8 @@ erDiagram
 - **설계 포인트**
   - 주문 삭제 시 항목도 함께 삭제 (CASCADE)
   - 상품 삭제 시 항목 삭제 방지 (RESTRICT) - 주문 이력 보존
-  - 주문 시점의 가격을 저장하여 가격 변경에 영향받지 않음
+  - 주문 시점의 상품명, 브랜드 정보(ID, 이름, 설명), 가격을 스냅샷으로 저장하여 상품/브랜드 정보 변경에 영향받지 않음
+  - product_id는 참조용으로 유지하되, 실제 표시는 스냅샷 데이터 사용
 
 ### 8. points (포인트)
 
@@ -466,6 +475,10 @@ CREATE TABLE order_items (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
+    product_name VARCHAR(200) NOT NULL,
+    brand_id BIGINT NOT NULL,
+    brand_name VARCHAR(100) NOT NULL,
+    brand_description TEXT,
     quantity INT NOT NULL CHECK (quantity > 0),
     price_at_order DECIMAL(15,2) NOT NULL,
     currency VARCHAR(3) NOT NULL DEFAULT 'KRW',
