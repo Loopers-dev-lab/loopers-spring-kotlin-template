@@ -34,7 +34,6 @@ erDiagram
     stocks {
         bigint product_id PK, FK
         int quantity
-        int version
         timestamp updated_at
     }
 
@@ -67,7 +66,6 @@ erDiagram
         bigint user_id PK, FK
         decimal balance
         varchar currency
-        int version
         timestamp updated_at
     }
 
@@ -153,7 +151,6 @@ erDiagram
 | --- | --- | --- | --- |
 | product_id | BIGINT | PK, FK | 상품 식별자 |
 | quantity | INT | NOT NULL, DEFAULT 0 | 재고 수량 |
-| version | INT | NOT NULL, DEFAULT 0 | 낙관적 락 버전 |
 | updated_at | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 최근 갱신 일시 |
 
 - **인덱스**
@@ -164,7 +161,7 @@ erDiagram
   - CHECK: `quantity >= 0` (재고는 음수 불가)
 - **설계 포인트**
   - product_id를 PK로 사용 (1:1 관계)
-  - version 컬럼으로 낙관적 락 구현 (동시성 제어)
+  - 비관적 락(SELECT FOR UPDATE)으로 동시성 제어
   - 상품 삭제 시 재고도 함께 삭제 (CASCADE)
 
 ### 5. likes (좋아요)
@@ -252,7 +249,6 @@ erDiagram
 | user_id | BIGINT | PK, FK | 사용자 식별자 |
 | balance | DECIMAL(15,2) | NOT NULL, DEFAULT 0 | 보유 포인트 |
 | currency | VARCHAR(3) | NOT NULL, DEFAULT 'KRW' | 통화 단위 |
-| version | INT | NOT NULL, DEFAULT 0 | 낙관적 락 버전 |
 | updated_at | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 최근 갱신 일시 |
 
 - **인덱스**
@@ -263,7 +259,7 @@ erDiagram
   - CHECK: `balance >= 0` (포인트는 음수 불가)
 - **설계 포인트**
   - user_id를 PK로 사용 (1:1 관계)
-  - version 컬럼으로 낙관적 락 구현 (동시성 제어)
+  - 비관적 락(SELECT FOR UPDATE)으로 동시성 제어
   - 사용자 삭제 시 포인트도 함께 삭제 (CASCADE)
 
 ## 관계 정리
@@ -331,25 +327,50 @@ erDiagram
 
 ## 동시성 제어
 
-### 낙관적 락 (Optimistic Lock)
+### 비관적 락 (Pessimistic Lock)
 
-- `stocks.version`: 재고 차감 시 동시성 제어
-- `points.version`: 포인트 차감 시 동시성 제어
+- `stocks`: 재고 차감 시 비관적 락으로 동시성 제어
+- `points`: 포인트 차감 시 비관적 락으로 동시성 제어
 
 동작 방식
 
 ```sql
--- 재고 차감 예시
+-- 재고 차감 예시 (트랜잭션 내에서 실행)
+-- 1. 재고 조회 및 락 획득
+SELECT product_id, quantity
+FROM stocks
+WHERE product_id = :productId
+FOR UPDATE;
+
+-- 2. 재고 차감
 UPDATE stocks
 SET quantity = quantity - :quantity,
-    version = version + 1,
     updated_at = CURRENT_TIMESTAMP
 WHERE product_id = :productId
-  AND version = :currentVersion
   AND quantity >= :quantity;
 ```
 
-버전이 일치하지 않으면 업데이트 실패 → 재시도 또는 예외 처리
+```sql
+-- 포인트 차감 예시 (트랜잭션 내에서 실행)
+-- 1. 포인트 조회 및 락 획득
+SELECT user_id, balance
+FROM points
+WHERE user_id = :userId
+FOR UPDATE;
+
+-- 2. 포인트 차감
+UPDATE points
+SET balance = balance - :amount,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = :userId
+  AND balance >= :amount;
+```
+
+**특징**:
+- 트랜잭션이 커밋될 때까지 해당 행에 대한 쓰기 락 유지
+- 다른 트랜잭션은 락이 해제될 때까지 대기
+- 충돌 가능성이 높은 경우 데이터 정합성 보장에 유리
+- 데드락 발생 가능성이 있으므로 트랜잭션 범위를 최소화해야 함
 
 ## 확장 고려 사항
 
@@ -409,7 +430,6 @@ CREATE TABLE products (
 CREATE TABLE stocks (
     product_id BIGINT PRIMARY KEY,
     quantity INT NOT NULL DEFAULT 0 CHECK (quantity >= 0),
-    version INT NOT NULL DEFAULT 0,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
@@ -460,7 +480,6 @@ CREATE TABLE points (
     user_id BIGINT PRIMARY KEY,
     balance DECIMAL(15,2) NOT NULL DEFAULT 0 CHECK (balance >= 0),
     currency VARCHAR(3) NOT NULL DEFAULT 'KRW',
-    version INT NOT NULL DEFAULT 0,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
