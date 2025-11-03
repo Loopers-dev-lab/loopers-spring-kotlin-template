@@ -185,17 +185,22 @@ classDiagram
 - **책임**
   - 상품 재고 관리
   - 재고 증감 로직
+  - 재고 정합성 보장
 - **속성**
   - `productId`: 상품 식별자
   - `quantity`: 재고 수량
 - **메서드**
-  - `decrease(int)`: 재고 감소
+  - `decrease(int)`: 재고 감소 (재고 부족 시 예외 발생)
   - `increase(int)`: 재고 증가
   - `isAvailable(int)`: 재고 확인
 - **설계 포인트**
   - Entity (productId로 식별)
   - Product와 1:1 관계
-  - 동시성 제어 필요 (비관적 락 사용)
+  - **동시성 제어**: 비관적 락(`SELECT FOR UPDATE`) 사용
+    - 여러 사용자의 동시 주문 시 재고 정합성 확보
+    - `decrease()` 메서드 호출 시 DB 행 잠금
+    - 트랜잭션 내에서 재고 확인과 차감을 원자적으로 수행
+  - **TOCTOU 방지**: 사전 검증(`isAvailable`)과 실제 차감(`decrease`)을 트랜잭션 내에서 처리
 
 ### 6. Like (좋아요)
 
@@ -482,13 +487,17 @@ interface ProductFacade {
 
     // 재고 관리 (Stock은 Product BC의 일부)
     fun checkStock(productId: Long, quantity: Int): Boolean
-    fun decreaseStock(productId: Long, quantity: Int)
+    fun decreaseStock(productId: Long, quantity: Int)  // 비관적 락 사용
     fun increaseStock(productId: Long, quantity: Int)
 }
 ```
 
 - **사용처**: LikeService (상품 존재 확인), OrderService (상품 조회 및 재고 관리)
 - **구현**: ProductFacadeImpl (ProductService와 StockService를 내부적으로 사용)
+- **동시성 제어**:
+  - `checkStock()`: 트랜잭션 전 빠른 검증 (락 없음)
+  - `decreaseStock()`: 트랜잭션 내에서 비관적 락으로 재고 확인 및 차감을 원자적으로 수행
+  - TOCTOU 갭은 decreaseStock의 비관적 락으로 해결
 
 ### LikeFacade
 
