@@ -8,16 +8,13 @@ import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.server.ServerWebInputException
 import org.springframework.web.servlet.resource.NoResourceFoundException
-import kotlin.collections.joinToString
-import kotlin.jvm.java
-import kotlin.text.isNotEmpty
-import kotlin.text.toRegex
 
 @RestControllerAdvice
 class ApiControllerAdvice {
@@ -102,6 +99,14 @@ class ApiControllerAdvice {
     @ExceptionHandler
     fun handleNotFound(e: NoResourceFoundException): ResponseEntity<ApiResponse<*>> {
         return failureResponse(errorType = ErrorType.NOT_FOUND)
+    }
+
+    @ExceptionHandler
+    fun handleMissingHeader(e: MissingRequestHeaderException): ResponseEntity<ApiResponse<*>> {
+        val headerName = e.headerName
+        val parameterType = e.parameter.parameterType.simpleName
+        val message = "필수 헤더 '$headerName' (타입: $parameterType)가 누락되었습니다."
+        return failureResponse(errorType = ErrorType.BAD_REQUEST, errorMessage = message)
     }
 
     @ExceptionHandler
