@@ -12,11 +12,11 @@ classDiagram
     }
     class ProductTotalSignal {
         -Long id
-        -Long ProductId
+        -Long productId
         -Long likeCount
-        +incrementLikeCount()
-        +decrmentLikeCount()
-        +getLikeCount(productId)
+        +incrementLikeCount(long productId)
+        +decrmentLikeCount(long productId)
+        +getLikeCount(long productId)
     }
 
     class Brand {
@@ -36,6 +36,7 @@ classDiagram
         -Long id
         -TimeStamp birthDate
         -String email
+        -String gender
     }
 
     class Point {

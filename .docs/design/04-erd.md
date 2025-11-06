@@ -25,12 +25,19 @@ erDiagram
     likes {
         bigint ref_member_id "PK, FK"
         bigint ref_product_id "PK, FK"
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
     }
     users {
         bigint id PK
         varchar loginId
         varchar email
+        varchar gender
         timestamp birthdate
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
     }
     points {
         bigint id PK
@@ -42,6 +49,8 @@ erDiagram
         bigint ref_user_id FK
         bigint total_price
         varchar status
+        timestamp created_at
+        timestamp updated_at
     }
     orderItems {
         bigint id PK

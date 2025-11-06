@@ -1,4 +1,4 @@
-### 시퀀스 다이어그램 최소 2개 이상 ( 머메이드 기반 작성 권장 )
+### 시퀀스 다이어그램
 
 ## 주문 요청
 
@@ -20,7 +20,7 @@ sequenceDiagram
         OrderController -->> User: 400 Bad Request
     end
 
-    OrderFacade ->> ProductService: checkStocks(productId, quantity)
+    OrderFacade ->> ProductService: decreaseStocks(productId, quantity)
     alt 재고 부족
         ProductService -->> OrderController: 재고 부족 예외 발생
         OrderController -->> User: 400 Bad Request
