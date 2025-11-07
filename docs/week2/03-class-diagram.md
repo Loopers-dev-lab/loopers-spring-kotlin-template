@@ -56,3 +56,23 @@
 - Order와 OrderItem은 하나의 애그리게이트 (강한 일관성)
 - Payment는 독립적인 애그리게이트
 - PaymentManager가 결제 프로세스 전체를 조율
+
+---
+
+## 4. Points 도메인
+
+![point](https://i.imgur.com/y2eAyVc.png)
+
+**주요 구조:**
+
+- **PointAccount**: 포인트 잔액 관리 엔티티. 증가/감소 행위 포함
+- **PointHistory**: 포인트 거래 이력 엔티티. referenceId로 충전/결제 추적
+- **PointAccountManager**: 포인트 충전(charge) 및 결제(pay) 시 PointAccount와 PointHistory를 함께 조율하는 도메인 서비스
+- **PointType**: 포인트 거래 타입 열거형
+
+**설계 의도:**
+
+- PointAccount와 PointHistory는 각각 독립적인 애그리게이트
+- PointAccountManager가 두 애그리게이트를 조율하여 일관성 보장
+- PointHistory의 referenceId로 충전ID나 결제ID 추적 가능
+- PointHistory는 생성 후 수정 불가 (감사 추적)

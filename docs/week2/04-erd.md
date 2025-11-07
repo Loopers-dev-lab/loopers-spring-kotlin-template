@@ -6,7 +6,7 @@
 
 ## 1. ERD 다이어그램
 
-![img_4.png](https://i.imgur.com/2Huf8qW.png)
+![img_4.png](https://i.imgur.com/TTCD1uh.png)
 
 **관계 표기:**
 
@@ -192,6 +192,51 @@
 - PK: payment_id
 - UK: order_id
 - IDX: user_id (사용자별 결제 이력 조회용)
+
+---
+
+### 2.4 Points 도메인
+
+#### point_accounts (포인트 계좌)
+
+| 컬럼명              | 타입            | 제약                 | 설명                  |
+|------------------|---------------|--------------------|---------------------|
+| point_account_id | BIGINT        | PK, AUTO_INCREMENT | 포인트 계좌 ID           |
+| user_id          | BIGINT        | NOT NULL, UNIQUE   | 사용자 ID (참조)         |
+| balance          | DECIMAL(15,2) | NOT NULL           | 포인트 잔액              |
+| created_at       | TIMESTAMP     | NOT NULL           | 생성 시각               |
+| updated_at       | TIMESTAMP     | NOT NULL           | 수정 시각               |
+| deleted_at       | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete) |
+
+**인덱스:**
+
+- PK: point_account_id
+- UK: user_id
+
+**제약:**
+
+- balance >= 0 (CHECK)
+
+---
+
+#### point_histories (포인트 이력)
+
+| 컬럼명           | 타입            | 제약                 | 설명                       |
+|---------------|---------------|--------------------|--------------------------|
+| history_id    | BIGINT        | PK, AUTO_INCREMENT | 포인트 이력 ID                |
+| user_id       | BIGINT        | NOT NULL           | 사용자 ID (참조)              |
+| reference_id  | VARCHAR(100)  | NULL               | 참조 ID (충전ID, 결제ID 등)     |
+| type          | VARCHAR(20)   | NOT NULL           | 포인트 타입 (CHARGE, PAYMENT) |
+| amount        | DECIMAL(15,2) | NOT NULL           | 거래 금액                    |
+| balance_after | DECIMAL(15,2) | NOT NULL           | 거래 후 잔액                  |
+| created_at    | TIMESTAMP     | NOT NULL           | 생성 시각                    |
+| updated_at    | TIMESTAMP     | NOT NULL           | 수정 시각                    |
+| deleted_at    | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete)      |
+
+**인덱스:**
+
+- PK: history_id
+- IDX: user_id,created_at  (사용자별 이력 조회용)
 
 ---
 
