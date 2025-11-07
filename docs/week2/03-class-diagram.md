@@ -40,7 +40,7 @@
 
 ## 3. Orders 도메인
 
-![img_5.png](https://i.imgur.com/0ENqus2.png)
+![img_5.png](https://i.imgur.com/4XGVtOe.png)
 
 **주요 구조:**
 

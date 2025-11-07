@@ -99,6 +99,10 @@
 - IDX: user_id (내가 좋아요한 목록 조회용)
 - IDX: product_id (상품별 좋아요 조회용)
 
+**특이사항:**
+
+- 좋아요 취소에 대해 하드 딜리트로 처리
+
 ---
 
 #### product_like_counts (상품 좋아요 수)
@@ -116,14 +120,11 @@
 
 - PK: product_like_count_id
 - UK: product_id
+- IDX: (count DESC)
 
 **제약:**
 
 - count >= 0 (CHECK)
-
-**특이사항:**
-
-- 좋아요 취소에 대해 하드 딜리트로 처리
 
 ---
 
@@ -168,24 +169,25 @@
 
 - PK: order_item_id
 - FK: order_id → orders(order_id) ON DELETE CASCADE
-- IDX: product_id (상품별 주문 이력 조회용)
 
 ---
 
 #### payments (결제)
 
-| 컬럼명          | 타입            | 제약                 | 설명                  |
-|--------------|---------------|--------------------|---------------------|
-| payment_id   | BIGINT        | PK, AUTO_INCREMENT | 결제 ID               |
-| order_id     | BIGINT        | NOT NULL, UNIQUE   | 주문 ID (참조)          |
-| user_id      | BIGINT        | NOT NULL           | 사용자 ID (참조)         |
-| total_amount | DECIMAL(15,2) | NOT NULL           | 총 주문 금액             |
-| used_point   | DECIMAL(15,2) | NOT NULL           | 사용 포인트              |
-| paid_amount  | DECIMAL(15,2) | NOT NULL           | 실제 결제 금액            |
-| status       | VARCHAR(20)   | NOT NULL           | 결제 상태 (READY, PAID) |
-| created_at   | TIMESTAMP     | NOT NULL           | 생성 시각               |
-| updated_at   | TIMESTAMP     | NOT NULL           | 수정 시각               |
-| deleted_at   | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete) |
+| 컬럼명                  | 타입            | 제약                 | 설명                  |
+|----------------------|---------------|--------------------|---------------------|
+| payment_id           | BIGINT        | PK, AUTO_INCREMENT | 결제 ID               |
+| order_id             | BIGINT        | NOT NULL, UNIQUE   | 주문 ID (참조)          |
+| user_id              | BIGINT        | NOT NULL           | 사용자 ID (참조)         |
+| total_amount         | DECIMAL(15,2) | NOT NULL           | 총 주문 금액             |
+| used_point           | DECIMAL(15,2) | NOT NULL           | 사용 포인트              |
+| paid_amount          | DECIMAL(15,2) | NOT NULL           | 실제 결제 금액            |
+| status               | VARCHAR(20)   | NOT NULL           | 결제 상태 (READY, PAID) |
+| external_payment_key | VARCHAR(200)  | NULL               | PG사 결제 키            |
+| approve_code         | VARCHAR(50)   | NULL               | 카드 승인번호             |
+| created_at           | TIMESTAMP     | NOT NULL           | 생성 시각               |
+| updated_at           | TIMESTAMP     | NOT NULL           | 수정 시각               |
+| deleted_at           | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete) |
 
 **인덱스:**
 
@@ -265,7 +267,7 @@
 ### 3.5 성능 최적화
 
 - **product_like_counts**: 좋아요 수 집계 테이블로 조회 성능 향상
-- **인덱스**: 자주 조회되는 컬럼에 인덱스 설정 (created_at, user_id, status 등)
+- **인덱스**: 자주 조회되는 컬럼에 인덱스 설정 (created_at, user_id)
 
 ### 3.6 확장성
 
