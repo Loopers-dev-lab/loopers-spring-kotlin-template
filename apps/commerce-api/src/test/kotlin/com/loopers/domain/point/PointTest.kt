@@ -1,5 +1,6 @@
 package com.loopers.domain.point
 
+import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.params.ParameterizedTest
@@ -15,6 +16,26 @@ class PointTest {
             createPoint(amount = amount)
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("충전 금액은 0보다 커야 합니다.")
+    }
+
+    @Test
+    fun `이미 양수로 충전되어 있는 포인트에 음수로 충전을 시도하면 실패한다`() {
+        assertThatThrownBy {
+            val createPoint = createPoint(amount = 200L)
+            createPoint.charge(-100)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("충전 금액은 0보다 커야 합니다.")
+    }
+
+    @Test
+    fun `여러 번 연속으로 포인트 충전에 성공한다`() {
+        val point = createPoint(amount = 100L)
+
+        point.charge(200L)
+        point.charge(300L)
+        point.charge(400L)
+
+        assertThat(point.amount.value).isEqualTo(1000L)
     }
 
     @Test
