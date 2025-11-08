@@ -10,18 +10,19 @@ data class ProductListInfo(
     val price: BigDecimal,
     val currency: String,
     val brand: BrandInfo,
-    val likeCount: Long
+    val likeCount: Long,
 ) {
     companion object {
-        fun from(product: Product, likeCount: Long): ProductListInfo {
-            return ProductListInfo(
-                id = product.id,
-                name = product.name,
-                price = product.price.amount,
-                currency = product.price.currency.name,
-                brand = BrandInfo.from(product.brand),
-                likeCount = likeCount
-            )
-        }
+        fun from(
+            product: Product,
+            likeCount: Long,
+        ): ProductListInfo = ProductListInfo(
+            id = product.id,
+            name = product.name,
+            price = product.price.amount,
+            currency = product.price.currency.name,
+            brand = BrandInfo.from(product.brand),
+            likeCount = likeCount,
+        )
     }
 }

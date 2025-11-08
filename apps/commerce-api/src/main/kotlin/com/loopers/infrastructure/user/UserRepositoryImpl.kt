@@ -7,17 +7,13 @@ import org.springframework.stereotype.Component
 
 @Component
 class UserRepositoryImpl(
-    private val userJpaRepository: UserJpaRepository
+    private val userJpaRepository: UserJpaRepository,
 ) : UserRepository {
-    override fun findById(id: Long): User? {
-        return userJpaRepository.findByIdOrNull(id)
-    }
+    override fun findById(id: Long): User? = userJpaRepository.findByIdOrNull(id)
 
-    override fun save(user: User): User {
-        return userJpaRepository.save(user)
-    }
+    override fun save(user: User): User = userJpaRepository.save(user)
 
-    override fun existsByEmail(email: String): Boolean {
-        return userJpaRepository.existsByEmail(email)
-    }
+    override fun existsByEmail(
+        email: String,
+    ): Boolean = userJpaRepository.existsByEmail(email)
 }

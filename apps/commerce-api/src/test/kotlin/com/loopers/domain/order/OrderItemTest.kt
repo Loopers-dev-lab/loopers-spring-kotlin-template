@@ -28,7 +28,7 @@ class OrderItemTest {
             brandName = brandName,
             brandDescription = brandDescription,
             quantity = quantity,
-            priceAtOrder = priceAtOrder
+            priceAtOrder = priceAtOrder,
         )
 
         // then
@@ -50,7 +50,7 @@ class OrderItemTest {
                 brandName = "나이키",
                 brandDescription = null,
                 quantity = 0,
-                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW)
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
             )
         }.isInstanceOf(CoreException::class.java)
             .hasMessageContaining("수량")
@@ -66,7 +66,7 @@ class OrderItemTest {
             brandName = "나이키",
             brandDescription = null,
             quantity = 3,
-            priceAtOrder = Price(BigDecimal("100000"), Currency.KRW)
+            priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
         )
 
         // when

@@ -4,7 +4,12 @@ import com.loopers.domain.BaseEntity
 import com.loopers.domain.product.Price
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import jakarta.persistence.*
+import jakarta.persistence.AttributeOverride
+import jakarta.persistence.AttributeOverrides
+import jakarta.persistence.Column
+import jakarta.persistence.Embedded
+import jakarta.persistence.Entity
+import jakarta.persistence.Table
 
 @Entity
 @Table(name = "order_items")
@@ -26,7 +31,7 @@ class OrderItem(
 
     quantity: Int,
 
-    priceAtOrder: Price
+    priceAtOrder: Price,
 ) : BaseEntity() {
     @Column(nullable = false)
     var quantity: Int = quantity
@@ -35,7 +40,7 @@ class OrderItem(
     @Embedded
     @AttributeOverrides(
         AttributeOverride(name = "amount", column = Column(name = "price_at_order", nullable = false, precision = 15, scale = 2)),
-        AttributeOverride(name = "currency", column = Column(name = "currency", nullable = false, length = 3))
+        AttributeOverride(name = "currency", column = Column(name = "currency", nullable = false, length = 3)),
     )
     var priceAtOrder: Price = priceAtOrder
         protected set

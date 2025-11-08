@@ -20,7 +20,7 @@ class UserTest {
             name = name,
             email = email,
             gender = gender,
-            birthDate = birthDate
+            birthDate = birthDate,
         )
 
         // then
@@ -37,7 +37,7 @@ class UserTest {
                 name = "",
                 email = "hong@example.com",
                 gender = Gender.MALE,
-                birthDate = LocalDate.of(1990, 1, 1)
+                birthDate = LocalDate.of(1990, 1, 1),
             )
         }.isInstanceOf(CoreException::class.java)
             .hasMessageContaining("이름")
@@ -50,7 +50,7 @@ class UserTest {
                 name = "홍길동",
                 email = "",
                 gender = Gender.MALE,
-                birthDate = LocalDate.of(1990, 1, 1)
+                birthDate = LocalDate.of(1990, 1, 1),
             )
         }.isInstanceOf(CoreException::class.java)
             .hasMessageContaining("이메일")
@@ -63,7 +63,7 @@ class UserTest {
                 name = "홍길동",
                 email = "hong@example.com",
                 gender = Gender.MALE,
-                birthDate = LocalDate.now().plusDays(1)
+                birthDate = LocalDate.now().plusDays(1),
             )
         }.isInstanceOf(CoreException::class.java)
             .hasMessageContaining("생년월일")

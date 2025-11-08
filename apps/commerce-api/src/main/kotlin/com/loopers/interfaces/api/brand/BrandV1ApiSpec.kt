@@ -9,10 +9,10 @@ import io.swagger.v3.oas.annotations.tags.Tag
 interface BrandV1ApiSpec {
     @Operation(
         summary = "브랜드 조회",
-        description = "브랜드 ID로 브랜드 정보를 조회합니다."
+        description = "브랜드 ID로 브랜드 정보를 조회합니다.",
     )
     fun getBrand(
         @Schema(description = "브랜드 ID")
-        brandId: Long
+        brandId: Long,
     ): ApiResponse<BrandV1Dto.BrandResponse>
 }

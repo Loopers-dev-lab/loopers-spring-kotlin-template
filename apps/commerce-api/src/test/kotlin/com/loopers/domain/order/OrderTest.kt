@@ -21,7 +21,7 @@ class OrderTest {
                 brandName = "나이키",
                 brandDescription = null,
                 quantity = 2,
-                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW)
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
             ),
             OrderItem(
                 productId = 101L,
@@ -30,8 +30,8 @@ class OrderTest {
                 brandName = "나이키",
                 brandDescription = null,
                 quantity = 1,
-                priceAtOrder = Price(BigDecimal("50000"), Currency.KRW)
-            )
+                priceAtOrder = Price(BigDecimal("50000"), Currency.KRW),
+            ),
         )
 
         // when
@@ -62,7 +62,7 @@ class OrderTest {
                 brandName = "나이키",
                 brandDescription = null,
                 quantity = 2,
-                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW)
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
             ),
             OrderItem(
                 productId = 101L,
@@ -71,8 +71,8 @@ class OrderTest {
                 brandName = "나이키",
                 brandDescription = null,
                 quantity = 1,
-                priceAtOrder = Price(BigDecimal("50000"), Currency.KRW)
-            )
+                priceAtOrder = Price(BigDecimal("50000"), Currency.KRW),
+            ),
         )
         val order = Order(userId = 1L, items = items)
 
@@ -95,8 +95,8 @@ class OrderTest {
                 brandName = "나이키",
                 brandDescription = null,
                 quantity = 1,
-                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW)
-            )
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
         )
         val order = Order(userId = userId, items = items)
 
@@ -116,8 +116,8 @@ class OrderTest {
                 brandName = "나이키",
                 brandDescription = null,
                 quantity = 1,
-                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW)
-            )
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
         )
         val order = Order(userId = 1L, items = items)
 

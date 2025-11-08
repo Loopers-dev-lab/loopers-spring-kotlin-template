@@ -4,7 +4,12 @@ import com.loopers.domain.brand.Brand
 import com.loopers.domain.brand.BrandRepository
 import com.loopers.domain.point.Point
 import com.loopers.domain.point.PointRepository
-import com.loopers.domain.product.*
+import com.loopers.domain.product.Currency
+import com.loopers.domain.product.Price
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.domain.user.Gender
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserRepository
@@ -55,14 +60,14 @@ class OrderServiceIntegrationTest {
             name = "홍길동",
             email = "hong@example.com",
             gender = Gender.MALE,
-            birthDate = LocalDate.of(1990, 1, 1)
+            birthDate = LocalDate.of(1990, 1, 1),
         )
         user = userRepository.save(user)
 
         // 포인트 생성
         val point = Point(
             userId = user.id,
-            balance = Money(BigDecimal("1000000"), Currency.KRW)
+            balance = Money(BigDecimal("1000000"), Currency.KRW),
         )
         pointRepository.save(point)
 
@@ -74,14 +79,14 @@ class OrderServiceIntegrationTest {
         product1 = Product(
             name = "통합테스트상품1",
             price = Price(BigDecimal("100000"), Currency.KRW),
-            brand = brand
+            brand = brand,
         )
         product1 = productRepository.save(product1)
 
         product2 = Product(
             name = "통합테스트상품2",
             price = Price(BigDecimal("50000"), Currency.KRW),
-            brand = brand
+            brand = brand,
         )
         product2 = productRepository.save(product2)
 
@@ -95,7 +100,7 @@ class OrderServiceIntegrationTest {
         // given
         val orderItemRequests = listOf(
             OrderItemRequest(productId = product1.id, quantity = 2),
-            OrderItemRequest(productId = product2.id, quantity = 1)
+            OrderItemRequest(productId = product2.id, quantity = 1),
         )
 
         // when
@@ -120,7 +125,8 @@ class OrderServiceIntegrationTest {
     fun `재고가 부족하면 주문이 실패하고 트랜잭션이 롤백된다`() {
         // given
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = product1.id, quantity = 101) // 재고 부족
+            // 재고 부족
+            OrderItemRequest(productId = product1.id, quantity = 101),
         )
 
         val initialPoint = pointRepository.findByUserId(user.id)!!.balance.amount
@@ -149,7 +155,8 @@ class OrderServiceIntegrationTest {
         pointRepository.save(point)
 
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = product1.id, quantity = 1) // 100,000원
+            // 100,000원
+            OrderItemRequest(productId = product1.id, quantity = 1),
         )
 
         // when & then
@@ -167,7 +174,7 @@ class OrderServiceIntegrationTest {
     fun `주문 항목에 상품 스냅샷이 저장된다`() {
         // given
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = product1.id, quantity = 1)
+            OrderItemRequest(productId = product1.id, quantity = 1),
         )
 
         // when

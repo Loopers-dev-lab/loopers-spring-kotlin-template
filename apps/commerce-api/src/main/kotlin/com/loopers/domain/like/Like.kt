@@ -10,13 +10,13 @@ import jakarta.persistence.UniqueConstraint
 @Table(
     name = "likes",
     uniqueConstraints = [
-        UniqueConstraint(name = "uk_user_product", columnNames = ["user_id", "product_id"])
-    ]
+        UniqueConstraint(name = "uk_user_product", columnNames = ["user_id", "product_id"]),
+    ],
 )
 class Like(
     @Column(name = "user_id", nullable = false)
     val userId: Long,
 
     @Column(name = "product_id", nullable = false)
-    val productId: Long
+    val productId: Long,
 ) : BaseEntity()

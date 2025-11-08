@@ -12,7 +12,7 @@ import java.math.BigDecimal
 data class Money(
     val amount: BigDecimal,
     @Enumerated(EnumType.STRING)
-    val currency: Currency = Currency.KRW
+    val currency: Currency = Currency.KRW,
 ) {
     init {
         require(amount >= BigDecimal.ZERO) {
@@ -34,9 +34,7 @@ data class Money(
         return Money(this.amount - other.amount, this.currency)
     }
 
-    fun multiply(multiplier: Int): Money {
-        return Money(this.amount * BigDecimal(multiplier), this.currency)
-    }
+    fun multiply(multiplier: Int): Money = Money(this.amount * BigDecimal(multiplier), this.currency)
 
     fun isGreaterThanOrEqual(other: Money): Boolean {
         require(this.currency == other.currency) {

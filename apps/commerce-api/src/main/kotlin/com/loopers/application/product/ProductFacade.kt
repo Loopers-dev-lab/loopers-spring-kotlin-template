@@ -15,7 +15,7 @@ class ProductFacade(
     private val productRepository: ProductRepository,
     private val stockRepository: StockRepository,
     private val likeRepository: LikeRepository,
-    private val productQueryService: ProductQueryService
+    private val productQueryService: ProductQueryService,
 ) {
     fun getProducts(brandId: Long?, sort: String, pageable: Pageable): Page<ProductListInfo> {
         val productsWithLikeCount = productQueryService.findProducts(brandId, sort, pageable)

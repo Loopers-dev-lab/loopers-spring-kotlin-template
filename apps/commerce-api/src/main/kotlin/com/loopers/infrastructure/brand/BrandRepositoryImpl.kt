@@ -7,17 +7,11 @@ import org.springframework.stereotype.Component
 
 @Component
 class BrandRepositoryImpl(
-    private val brandJpaRepository: BrandJpaRepository
+    private val brandJpaRepository: BrandJpaRepository,
 ) : BrandRepository {
-    override fun findById(id: Long): Brand? {
-        return brandJpaRepository.findByIdOrNull(id)
-    }
+    override fun findById(id: Long): Brand? = brandJpaRepository.findByIdOrNull(id)
 
-    override fun save(brand: Brand): Brand {
-        return brandJpaRepository.save(brand)
-    }
+    override fun save(brand: Brand): Brand = brandJpaRepository.save(brand)
 
-    override fun existsById(id: Long): Boolean {
-        return brandJpaRepository.existsById(id)
-    }
+    override fun existsById(id: Long): Boolean = brandJpaRepository.existsById(id)
 }

@@ -4,7 +4,20 @@ import com.loopers.domain.BaseEntity
 import com.loopers.domain.product.Currency
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import jakarta.persistence.*
+import jakarta.persistence.AttributeOverride
+import jakarta.persistence.AttributeOverrides
+import jakarta.persistence.CascadeType
+import jakarta.persistence.Column
+import jakarta.persistence.ConstraintMode
+import jakarta.persistence.Embedded
+import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
+import jakarta.persistence.FetchType
+import jakarta.persistence.ForeignKey
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.OneToMany
+import jakarta.persistence.Table
 import java.math.BigDecimal
 
 @Entity
@@ -13,7 +26,7 @@ class Order(
     @Column(name = "user_id", nullable = false)
     val userId: Long,
 
-    items: List<OrderItem>
+    items: List<OrderItem>,
 ) : BaseEntity() {
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
@@ -22,7 +35,7 @@ class Order(
     @Embedded
     @AttributeOverrides(
         AttributeOverride(name = "amount", column = Column(name = "total_amount", nullable = false, precision = 15, scale = 2)),
-        AttributeOverride(name = "currency", column = Column(name = "currency", nullable = false, length = 3))
+        AttributeOverride(name = "currency", column = Column(name = "currency", nullable = false, length = 3)),
     )
     var totalAmount: Money = calculateTotalAmount()
         protected set
@@ -52,9 +65,7 @@ class Order(
         return Money(amount = totalAmount, currency = firstCurrency)
     }
 
-    fun isOwnedBy(userId: Long): Boolean {
-        return this.userId == userId
-    }
+    fun isOwnedBy(userId: Long): Boolean = this.userId == userId
 
     fun cancel() {
         this.status = OrderStatus.CANCELLED

@@ -1,6 +1,5 @@
 package com.loopers.infrastructure.product
 
-import com.loopers.domain.like.Like
 import com.loopers.domain.product.Product
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -10,7 +9,8 @@ import org.springframework.data.jpa.repository.Query
 interface ProductJpaRepository : JpaRepository<Product, Long> {
     fun findByBrandId(brandId: Long, pageable: Pageable): Page<Product>
 
-    @Query("""
+    @Query(
+        """
         SELECT p FROM Product p
         LEFT JOIN Like l ON l.productId = p.id
         GROUP BY p
@@ -18,10 +18,12 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
     """,
     countQuery = """
         SELECT COUNT(DISTINCT p) FROM Product p
-    """)
+    """,
+    )
     fun findAllOrderByLikeCount(pageable: Pageable): Page<Product>
 
-    @Query("""
+    @Query(
+        """
         SELECT p FROM Product p
         LEFT JOIN Like l ON l.productId = p.id
         WHERE p.brand.id = :brandId
@@ -31,6 +33,7 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
     countQuery = """
         SELECT COUNT(DISTINCT p) FROM Product p
         WHERE p.brand.id = :brandId
-    """)
+    """,
+    )
     fun findByBrandIdOrderByLikeCount(brandId: Long, pageable: Pageable): Page<Product>
 }

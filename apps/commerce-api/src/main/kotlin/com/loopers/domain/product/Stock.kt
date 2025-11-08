@@ -2,7 +2,12 @@ package com.loopers.domain.product
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import jakarta.persistence.*
+import jakarta.persistence.Column
+import jakarta.persistence.Entity
+import jakarta.persistence.Id
+import jakarta.persistence.PrePersist
+import jakarta.persistence.PreUpdate
+import jakarta.persistence.Table
 import java.time.ZonedDateTime
 
 @Entity
@@ -12,7 +17,7 @@ class Stock(
     @Column(name = "product_id")
     val productId: Long,
 
-    quantity: Int
+    quantity: Int,
 ) {
     @Column(nullable = false)
     var quantity: Int = quantity
@@ -56,7 +61,5 @@ class Stock(
         this.quantity += amount
     }
 
-    fun isAvailable(amount: Int): Boolean {
-        return this.quantity >= amount
-    }
+    fun isAvailable(amount: Int): Boolean = this.quantity >= amount
 }

@@ -11,13 +11,13 @@ import org.springframework.stereotype.Component
 @Component
 class OrderFacade(
     private val orderService: OrderService,
-    private val orderRepository: OrderRepository
+    private val orderRepository: OrderRepository,
 ) {
     fun createOrder(userId: Long, request: OrderCreateRequest): OrderCreateInfo {
         val orderItemRequests = request.items.map {
             com.loopers.domain.order.OrderItemRequest(
                 productId = it.productId,
-                quantity = it.quantity
+                quantity = it.quantity,
             )
         }
         val order = orderService.createOrder(userId, orderItemRequests)

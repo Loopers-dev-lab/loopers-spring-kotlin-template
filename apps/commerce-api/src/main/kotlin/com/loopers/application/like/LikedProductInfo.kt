@@ -12,18 +12,19 @@ data class LikedProductInfo(
     val price: BigDecimal,
     val currency: String,
     val brand: BrandInfo,
-    val likedAt: ZonedDateTime
+    val likedAt: ZonedDateTime,
 ) {
     companion object {
-        fun from(like: Like, product: Product): LikedProductInfo {
-            return LikedProductInfo(
-                productId = product.id,
-                productName = product.name,
-                price = product.price.amount,
-                currency = product.price.currency.name,
-                brand = BrandInfo.from(product.brand),
-                likedAt = like.createdAt
-            )
-        }
+        fun from(
+            like: Like,
+            product: Product,
+        ): LikedProductInfo = LikedProductInfo(
+            productId = product.id,
+            productName = product.name,
+            price = product.price.amount,
+            currency = product.price.currency.name,
+            brand = BrandInfo.from(product.brand),
+            likedAt = like.createdAt,
+        )
     }
 }

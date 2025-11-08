@@ -2,7 +2,14 @@ package com.loopers.application.product
 
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.like.LikeRepository
-import com.loopers.domain.product.*
+import com.loopers.domain.product.Currency
+import com.loopers.domain.product.Price
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductQueryService
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.ProductWithLikeCount
+import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.error.CoreException
 import io.mockk.every
 import io.mockk.mockk
@@ -23,14 +30,14 @@ class ProductFacadeTest {
         productRepository,
         stockRepository,
         likeRepository,
-        productQueryService
+        productQueryService,
     )
 
     private fun createTestProduct(id: Long, name: String, price: BigDecimal, brand: Brand): Product {
         return Product(
             name = name,
             price = Price(price, Currency.KRW),
-            brand = brand
+            brand = brand,
         ).apply {
             val idField = Product::class.java.superclass.getDeclaredField("id")
             idField.isAccessible = true
@@ -54,7 +61,7 @@ class ProductFacadeTest {
         val pageable = PageRequest.of(0, 20)
 
         val productsWithLikeCount = PageImpl(
-            listOf(ProductWithLikeCount(product, 10L))
+            listOf(ProductWithLikeCount(product, 10L)),
         )
 
         every {

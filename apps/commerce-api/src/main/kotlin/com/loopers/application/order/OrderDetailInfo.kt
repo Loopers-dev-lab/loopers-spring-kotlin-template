@@ -12,7 +12,7 @@ data class OrderDetailInfo(
     val currency: String,
     val status: String,
     val items: List<OrderItemInfo>,
-    val orderedAt: ZonedDateTime
+    val orderedAt: ZonedDateTime,
 ) {
     companion object {
         fun from(order: Order): OrderDetailInfo {
@@ -24,7 +24,7 @@ data class OrderDetailInfo(
                 currency = totalAmount.currency.name,
                 status = order.status.name,
                 items = order.items.map { OrderItemInfo.from(it) },
-                orderedAt = order.createdAt
+                orderedAt = order.createdAt,
             )
         }
     }
@@ -37,19 +37,17 @@ data class OrderItemInfo(
     val brandName: String,
     val quantity: Int,
     val priceAtOrder: BigDecimal,
-    val currency: String
+    val currency: String,
 ) {
     companion object {
-        fun from(orderItem: OrderItem): OrderItemInfo {
-            return OrderItemInfo(
-                productId = orderItem.productId,
-                productName = orderItem.productName,
-                brandId = orderItem.brandId,
-                brandName = orderItem.brandName,
-                quantity = orderItem.quantity,
-                priceAtOrder = orderItem.priceAtOrder.amount,
-                currency = orderItem.priceAtOrder.currency.name
-            )
-        }
+        fun from(orderItem: OrderItem): OrderItemInfo = OrderItemInfo(
+            productId = orderItem.productId,
+            productName = orderItem.productName,
+            brandId = orderItem.brandId,
+            brandName = orderItem.brandName,
+            quantity = orderItem.quantity,
+            priceAtOrder = orderItem.priceAtOrder.amount,
+            currency = orderItem.priceAtOrder.currency.name,
+        )
     }
 }

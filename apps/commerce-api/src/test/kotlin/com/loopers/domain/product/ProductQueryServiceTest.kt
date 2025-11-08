@@ -19,7 +19,7 @@ class ProductQueryServiceTest {
         return Product(
             name = name,
             price = Price(price, Currency.KRW),
-            brand = brand
+            brand = brand,
         ).apply {
             // Reflection으로 id 설정
             val idField = Product::class.java.superclass.getDeclaredField("id")

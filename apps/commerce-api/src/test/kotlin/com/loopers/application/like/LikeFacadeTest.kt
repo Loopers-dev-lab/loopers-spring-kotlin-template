@@ -4,7 +4,10 @@ import com.loopers.domain.brand.Brand
 import com.loopers.domain.like.Like
 import com.loopers.domain.like.LikeRepository
 import com.loopers.domain.like.LikeService
-import com.loopers.domain.product.*
+import com.loopers.domain.product.Currency
+import com.loopers.domain.product.Price
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -22,14 +25,14 @@ class LikeFacadeTest {
     private val likeFacade = LikeFacade(
         likeService,
         likeRepository,
-        productRepository
+        productRepository,
     )
 
     private fun createTestProduct(id: Long, name: String, price: BigDecimal, brand: Brand): Product {
         return Product(
             name = name,
             price = Price(price, Currency.KRW),
-            brand = brand
+            brand = brand,
         ).apply {
             val idField = Product::class.java.superclass.getDeclaredField("id")
             idField.isAccessible = true

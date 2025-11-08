@@ -11,7 +11,7 @@ import java.math.BigDecimal
 data class Price(
     val amount: BigDecimal,
     @Enumerated(EnumType.STRING)
-    val currency: Currency = Currency.KRW
+    val currency: Currency = Currency.KRW,
 ) : Comparable<Price> {
     init {
         require(amount >= BigDecimal.ZERO) {
@@ -26,9 +26,7 @@ data class Price(
         return Price(this.amount + other.amount, this.currency)
     }
 
-    fun multiply(multiplier: Int): Price {
-        return Price(this.amount * BigDecimal(multiplier), this.currency)
-    }
+    fun multiply(multiplier: Int): Price = Price(this.amount * BigDecimal(multiplier), this.currency)
 
     override fun compareTo(other: Price): Int {
         require(this.currency == other.currency) {

@@ -44,7 +44,7 @@ class ProductTest {
         val product = Product(
             name = "운동화",
             price = Price(BigDecimal("100000"), Currency.KRW),
-            brand = brand
+            brand = brand,
         )
         val newPrice = Price(BigDecimal("150000"), Currency.KRW)
 
@@ -63,7 +63,7 @@ class ProductTest {
         val product = Product(
             name = "운동화",
             price = Price(BigDecimal("100000"), Currency.KRW),
-            brand = brand
+            brand = brand,
         )
 
         // when
@@ -80,7 +80,7 @@ class ProductTest {
         val product = Product(
             name = "운동화",
             price = Price(BigDecimal("100000"), Currency.KRW),
-            brand = brand
+            brand = brand,
         )
 
         // when & then

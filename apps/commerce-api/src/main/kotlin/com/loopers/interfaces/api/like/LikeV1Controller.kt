@@ -16,12 +16,12 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/v1")
 class LikeV1Controller(
-    private val likeFacade: LikeFacade
+    private val likeFacade: LikeFacade,
 ) : LikeV1ApiSpec {
     @PostMapping("/products/{productId}/likes")
     override fun addLike(
         @RequestHeader("X-USER-ID") userId: Long,
-        @PathVariable(value = "productId") productId: Long
+        @PathVariable(value = "productId") productId: Long,
     ): ApiResponse<Unit> {
         likeFacade.addLike(userId, productId)
         return ApiResponse.success(Unit)
@@ -30,7 +30,7 @@ class LikeV1Controller(
     @DeleteMapping("/products/{productId}/likes")
     override fun removeLike(
         @RequestHeader("X-USER-ID") userId: Long,
-        @PathVariable(value = "productId") productId: Long
+        @PathVariable(value = "productId") productId: Long,
     ): ApiResponse<Unit> {
         likeFacade.removeLike(userId, productId)
         return ApiResponse.success(Unit)
@@ -40,7 +40,7 @@ class LikeV1Controller(
     override fun getLikedProducts(
         @RequestHeader("X-USER-ID") userId: Long,
         @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "20") size: Int
+        @RequestParam(defaultValue = "20") size: Int,
     ): ApiResponse<Page<LikeV1Dto.LikedProductResponse>> {
         val pageable = PageRequest.of(page, size)
         return likeFacade.getLikedProducts(userId, pageable)

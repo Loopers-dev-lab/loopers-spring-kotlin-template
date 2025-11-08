@@ -32,8 +32,8 @@ class OrderFacadeTest {
                 brandName = "나이키",
                 brandDescription = null,
                 quantity = 2,
-                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW)
-            )
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
         )
         return Order(userId = userId, items = items).apply {
             val idField = Order::class.java.superclass.getDeclaredField("id")
@@ -48,8 +48,8 @@ class OrderFacadeTest {
         val userId = 1L
         val request = OrderCreateRequest(
             items = listOf(
-                OrderItemRequest(productId = 100L, quantity = 2)
-            )
+                OrderItemRequest(productId = 100L, quantity = 2),
+            ),
         )
         val order = createTestOrder(1L, userId)
 

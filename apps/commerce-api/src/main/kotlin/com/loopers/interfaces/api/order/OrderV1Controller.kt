@@ -16,12 +16,12 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/v1/orders")
 class OrderV1Controller(
-    private val orderFacade: OrderFacade
+    private val orderFacade: OrderFacade,
 ) : OrderV1ApiSpec {
     @PostMapping
     override fun createOrder(
         @RequestHeader("X-USER-ID") userId: Long,
-        @RequestBody request: OrderV1Dto.OrderCreateRequest
+        @RequestBody request: OrderV1Dto.OrderCreateRequest,
     ): ApiResponse<OrderV1Dto.OrderCreateResponse> {
         val appRequest = request.toApplicationRequest()
         return orderFacade.createOrder(userId, appRequest)
@@ -33,7 +33,7 @@ class OrderV1Controller(
     override fun getOrders(
         @RequestHeader("X-USER-ID") userId: Long,
         @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "20") size: Int
+        @RequestParam(defaultValue = "20") size: Int,
     ): ApiResponse<Page<OrderV1Dto.OrderListResponse>> {
         val pageable = PageRequest.of(page, size)
         return orderFacade.getOrders(userId, pageable)
@@ -44,10 +44,8 @@ class OrderV1Controller(
     @GetMapping("/{orderId}")
     override fun getOrderDetail(
         @RequestHeader("X-USER-ID") userId: Long,
-        @PathVariable(value = "orderId") orderId: Long
-    ): ApiResponse<OrderV1Dto.OrderDetailResponse> {
-        return orderFacade.getOrderDetail(userId, orderId)
+        @PathVariable(value = "orderId") orderId: Long,
+    ): ApiResponse<OrderV1Dto.OrderDetailResponse> = orderFacade.getOrderDetail(userId, orderId)
             .let { OrderV1Dto.OrderDetailResponse.from(it) }
             .let { ApiResponse.success(it) }
-    }
 }

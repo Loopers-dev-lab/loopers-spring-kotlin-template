@@ -48,7 +48,7 @@ class LikeServiceIntegrationTest {
             name = "홍길동",
             email = "like-test@example.com",
             gender = Gender.MALE,
-            birthDate = LocalDate.of(1990, 1, 1)
+            birthDate = LocalDate.of(1990, 1, 1),
         )
         user = userRepository.save(user)
 
@@ -60,7 +60,7 @@ class LikeServiceIntegrationTest {
         product = Product(
             name = "좋아요테스트상품",
             price = Price(BigDecimal("100000"), Currency.KRW),
-            brand = savedBrand
+            brand = savedBrand,
         )
         product = productRepository.save(product)
     }
@@ -138,7 +138,7 @@ class LikeServiceIntegrationTest {
             name = "김철수",
             email = "like-test2@example.com",
             gender = Gender.MALE,
-            birthDate = LocalDate.of(1995, 5, 5)
+            birthDate = LocalDate.of(1995, 5, 5),
         )
         val savedUser2 = userRepository.save(user2)
 

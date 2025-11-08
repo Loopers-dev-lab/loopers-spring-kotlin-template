@@ -11,27 +11,27 @@ class LikeV1Dto {
         val price: BigDecimal,
         val currency: String,
         val brand: BrandSummary,
-        val likedAt: ZonedDateTime
+        val likedAt: ZonedDateTime,
     ) {
         companion object {
-            fun from(info: LikedProductInfo): LikedProductResponse {
-                return LikedProductResponse(
-                    productId = info.productId,
-                    productName = info.productName,
-                    price = info.price,
-                    currency = info.currency,
-                    brand = BrandSummary(
-                        id = info.brand.id,
-                        name = info.brand.name
-                    ),
-                    likedAt = info.likedAt
-                )
-            }
+            fun from(
+                info: LikedProductInfo,
+            ): LikedProductResponse = LikedProductResponse(
+                productId = info.productId,
+                productName = info.productName,
+                price = info.price,
+                currency = info.currency,
+                brand = BrandSummary(
+                    id = info.brand.id,
+                    name = info.brand.name,
+                ),
+                likedAt = info.likedAt,
+            )
         }
     }
 
     data class BrandSummary(
         val id: Long,
-        val name: String
+        val name: String,
     )
 }

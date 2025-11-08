@@ -13,14 +13,14 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/v1/products")
 class ProductV1Controller(
-    private val productFacade: ProductFacade
+    private val productFacade: ProductFacade,
 ) : ProductV1ApiSpec {
     @GetMapping
     override fun getProducts(
         @RequestParam(required = false) brandId: Long?,
         @RequestParam(defaultValue = "latest") sort: String,
         @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "20") size: Int
+        @RequestParam(defaultValue = "20") size: Int,
     ): ApiResponse<Page<ProductV1Dto.ProductListResponse>> {
         val pageable = PageRequest.of(page, size)
         return productFacade.getProducts(brandId, sort, pageable)
@@ -30,10 +30,8 @@ class ProductV1Controller(
 
     @GetMapping("/{productId}")
     override fun getProductDetail(
-        @PathVariable(value = "productId") productId: Long
-    ): ApiResponse<ProductV1Dto.ProductDetailResponse> {
-        return productFacade.getProductDetail(productId)
+        @PathVariable(value = "productId") productId: Long,
+    ): ApiResponse<ProductV1Dto.ProductDetailResponse> = productFacade.getProductDetail(productId)
             .let { ProductV1Dto.ProductDetailResponse.from(it) }
             .let { ApiResponse.success(it) }
-    }
 }

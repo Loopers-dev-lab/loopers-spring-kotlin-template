@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component
 class LikeFacade(
     private val likeService: LikeService,
     private val likeRepository: LikeRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
 ) {
     fun addLike(userId: Long, productId: Long) {
         likeService.addLike(userId, productId)

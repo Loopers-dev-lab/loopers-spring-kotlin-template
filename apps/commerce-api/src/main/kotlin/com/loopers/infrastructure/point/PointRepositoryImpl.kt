@@ -6,17 +6,15 @@ import org.springframework.stereotype.Component
 
 @Component
 class PointRepositoryImpl(
-    private val pointJpaRepository: PointJpaRepository
+    private val pointJpaRepository: PointJpaRepository,
 ) : PointRepository {
-    override fun findByUserId(userId: Long): Point? {
-        return pointJpaRepository.findByUserId(userId)
-    }
+    override fun findByUserId(
+        userId: Long,
+    ): Point? = pointJpaRepository.findByUserId(userId)
 
-    override fun findByUserIdWithLock(userId: Long): Point? {
-        return pointJpaRepository.findByUserIdWithLock(userId)
-    }
+    override fun findByUserIdWithLock(
+        userId: Long,
+    ): Point? = pointJpaRepository.findByUserIdWithLock(userId)
 
-    override fun save(point: Point): Point {
-        return pointJpaRepository.save(point)
-    }
+    override fun save(point: Point): Point = pointJpaRepository.save(point)
 }

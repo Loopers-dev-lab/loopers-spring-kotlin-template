@@ -36,40 +36,41 @@ class OrderService(
         return savedOrder
     }
 
-    private fun validateAndCreateOrderItems(orderItemRequests: List<OrderItemRequest>): List<OrderItem> {
-        return orderItemRequests.map { request ->
-            val product = productRepository.findById(request.productId)
-                ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: ${request.productId}")
+    private fun validateAndCreateOrderItems(
+        orderItemRequests: List<OrderItemRequest>,
+    ): List<OrderItem> = orderItemRequests.map { request ->
+        val product = productRepository.findById(request.productId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: ${request.productId}")
 
-            val stock = stockRepository.findByProductId(request.productId)
-                ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: ${request.productId}")
+        val stock = stockRepository.findByProductId(request.productId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: ${request.productId}")
 
-            validateStockAvailability(stock, product.name, request.quantity)
+        validateStockAvailability(stock, product.name, request.quantity)
 
-            createOrderItemSnapshot(product, request.quantity)
-        }
+        createOrderItemSnapshot(product, request.quantity)
     }
 
     private fun validateStockAvailability(stock: Stock, productName: String, requestedQuantity: Int) {
         if (!stock.isAvailable(requestedQuantity)) {
             throw CoreException(
                 ErrorType.BAD_REQUEST,
-                "재고 부족: 상품 ${productName}, 현재 재고 ${stock.quantity}, 요청 수량 ${requestedQuantity}",
+                "재고 부족: 상품 $productName, 현재 재고 ${stock.quantity}, 요청 수량 $requestedQuantity",
             )
         }
     }
 
-    private fun createOrderItemSnapshot(product: Product, quantity: Int): OrderItem {
-        return OrderItem(
-            productId = product.id,
-            productName = product.name,
-            brandId = product.brand.id,
-            brandName = product.brand.name,
-            brandDescription = product.brand.description,
-            quantity = quantity,
-            priceAtOrder = product.price,
-        )
-    }
+    private fun createOrderItemSnapshot(
+        product: Product,
+        quantity: Int,
+    ): OrderItem = OrderItem(
+        productId = product.id,
+        productName = product.name,
+        brandId = product.brand.id,
+        brandName = product.brand.name,
+        brandDescription = product.brand.description,
+        quantity = quantity,
+        priceAtOrder = product.price,
+    )
 
     private fun validateUserPoint(userId: Long, totalAmount: Money) {
         val point = pointRepository.findByUserId(userId)

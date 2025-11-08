@@ -2,7 +2,12 @@ package com.loopers.domain.order
 
 import com.loopers.domain.point.Point
 import com.loopers.domain.point.PointRepository
-import com.loopers.domain.product.*
+import com.loopers.domain.product.Currency
+import com.loopers.domain.product.Price
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.error.CoreException
 import io.mockk.every
 import io.mockk.mockk
@@ -22,7 +27,7 @@ class OrderServiceTest {
         orderRepository,
         productRepository,
         stockRepository,
-        pointRepository
+        pointRepository,
     )
 
     private fun createTestProduct(id: Long, name: String, price: BigDecimal): Product {
@@ -33,7 +38,7 @@ class OrderServiceTest {
                 every { this@mockk.id } returns 1L
                 every { this@mockk.name } returns "Test Brand"
                 every { this@mockk.description } returns "Test Description"
-            }
+            },
         ).apply {
             // Reflection으로 id 설정
             val idField = Product::class.java.superclass.getDeclaredField("id")
@@ -51,7 +56,7 @@ class OrderServiceTest {
         val point = Point(userId = userId, balance = Money(BigDecimal("500000"), Currency.KRW))
 
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = 100L, quantity = 2)
+            OrderItemRequest(productId = 100L, quantity = 2),
         )
 
         every { productRepository.findById(100L) } returns product
@@ -80,7 +85,7 @@ class OrderServiceTest {
         // given
         val userId = 1L
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = 999L, quantity = 1)
+            OrderItemRequest(productId = 999L, quantity = 1),
         )
 
         every { productRepository.findById(999L) } returns null
@@ -100,7 +105,7 @@ class OrderServiceTest {
         val stock = Stock(productId = 100L, quantity = 5)
 
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = 100L, quantity = 10)
+            OrderItemRequest(productId = 100L, quantity = 10),
         )
 
         every { productRepository.findById(100L) } returns product
@@ -122,7 +127,8 @@ class OrderServiceTest {
         val point = Point(userId = userId, balance = Money(BigDecimal("50000"), Currency.KRW))
 
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = 100L, quantity = 2) // 총 200,000원
+            // 총 200,000원
+            OrderItemRequest(productId = 100L, quantity = 2),
         )
 
         every { productRepository.findById(100L) } returns product
@@ -143,7 +149,7 @@ class OrderServiceTest {
         val product = createTestProduct(100L, "운동화", BigDecimal("100000"))
 
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = 100L, quantity = 1)
+            OrderItemRequest(productId = 100L, quantity = 1),
         )
 
         every { productRepository.findById(100L) } returns product
@@ -164,7 +170,7 @@ class OrderServiceTest {
         val stock = Stock(productId = 100L, quantity = 100)
 
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = 100L, quantity = 1)
+            OrderItemRequest(productId = 100L, quantity = 1),
         )
 
         every { productRepository.findById(100L) } returns product
@@ -190,7 +196,7 @@ class OrderServiceTest {
 
         val orderItemRequests = listOf(
             OrderItemRequest(productId = 100L, quantity = 1),
-            OrderItemRequest(productId = 101L, quantity = 2)
+            OrderItemRequest(productId = 101L, quantity = 2),
         )
 
         every { productRepository.findById(100L) } returns product1

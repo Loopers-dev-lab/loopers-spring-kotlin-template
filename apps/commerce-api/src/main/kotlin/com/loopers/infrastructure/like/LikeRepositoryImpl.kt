@@ -8,25 +8,25 @@ import org.springframework.stereotype.Component
 
 @Component
 class LikeRepositoryImpl(
-    private val likeJpaRepository: LikeJpaRepository
+    private val likeJpaRepository: LikeJpaRepository,
 ) : LikeRepository {
-    override fun existsByUserIdAndProductId(userId: Long, productId: Long): Boolean {
-        return likeJpaRepository.existsByUserIdAndProductId(userId, productId)
-    }
+    override fun existsByUserIdAndProductId(
+        userId: Long,
+        productId: Long,
+    ): Boolean = likeJpaRepository.existsByUserIdAndProductId(userId, productId)
 
-    override fun countByProductId(productId: Long): Long {
-        return likeJpaRepository.countByProductId(productId)
-    }
+    override fun countByProductId(
+        productId: Long,
+    ): Long = likeJpaRepository.countByProductId(productId)
 
-    override fun save(like: Like): Like {
-        return likeJpaRepository.save(like)
-    }
+    override fun save(like: Like): Like = likeJpaRepository.save(like)
 
     override fun deleteByUserIdAndProductId(userId: Long, productId: Long) {
         likeJpaRepository.deleteByUserIdAndProductId(userId, productId)
     }
 
-    override fun findByUserId(userId: Long, pageable: Pageable): Page<Like> {
-        return likeJpaRepository.findByUserId(userId, pageable)
-    }
+    override fun findByUserId(
+        userId: Long,
+        pageable: Pageable,
+    ): Page<Like> = likeJpaRepository.findByUserId(userId, pageable)
 }

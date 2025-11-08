@@ -8,7 +8,7 @@ data class OrderCreateInfo(
     val userId: Long,
     val totalAmount: BigDecimal,
     val currency: String,
-    val status: String
+    val status: String,
 ) {
     companion object {
         fun from(order: Order): OrderCreateInfo {
@@ -18,7 +18,7 @@ data class OrderCreateInfo(
                 userId = order.userId,
                 totalAmount = totalAmount.amount,
                 currency = totalAmount.currency.name,
-                status = order.status.name
+                status = order.status.name,
             )
         }
     }

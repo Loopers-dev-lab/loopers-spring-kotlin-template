@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service
 @Service
 class LikeService(
     private val likeRepository: LikeRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
 ) {
     fun addLike(userId: Long, productId: Long) {
         if (!productRepository.existsById(productId)) {

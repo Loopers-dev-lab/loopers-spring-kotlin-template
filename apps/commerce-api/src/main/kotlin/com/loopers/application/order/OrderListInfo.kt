@@ -9,7 +9,7 @@ data class OrderListInfo(
     val totalAmount: BigDecimal,
     val currency: String,
     val status: String,
-    val orderedAt: ZonedDateTime
+    val orderedAt: ZonedDateTime,
 ) {
     companion object {
         fun from(order: Order): OrderListInfo {
@@ -19,7 +19,7 @@ data class OrderListInfo(
                 totalAmount = totalAmount.amount,
                 currency = totalAmount.currency.name,
                 status = order.status.name,
-                orderedAt = order.createdAt
+                orderedAt = order.createdAt,
             )
         }
     }

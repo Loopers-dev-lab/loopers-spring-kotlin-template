@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class BrandFacade(
-    private val brandRepository: BrandRepository
+    private val brandRepository: BrandRepository,
 ) {
     fun getBrand(brandId: Long): BrandInfo {
         val brand = brandRepository.findById(brandId)
