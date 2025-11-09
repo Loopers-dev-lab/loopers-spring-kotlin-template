@@ -50,8 +50,7 @@ class ProductQueryServiceTest {
         val pageable = PageRequest.of(0, 20)
 
         every { productRepository.findAll(null, "latest", pageable) } returns products
-        every { likeRepository.countByProductId(100L) } returns 10L
-        every { likeRepository.countByProductId(101L) } returns 5L
+        every { likeRepository.countByProductIdIn(listOf(100L, 101L)) } returns mapOf(100L to 10L, 101L to 5L)
 
         // when
         val result = productQueryService.findProducts(null, "latest", pageable)
@@ -75,7 +74,7 @@ class ProductQueryServiceTest {
         val brandId = 1L
 
         every { productRepository.findAll(brandId, "latest", pageable) } returns products
-        every { likeRepository.countByProductId(100L) } returns 3L
+        every { likeRepository.countByProductIdIn(listOf(100L)) } returns mapOf(100L to 3L)
 
         // when
         val result = productQueryService.findProducts(brandId, "latest", pageable)
@@ -97,8 +96,7 @@ class ProductQueryServiceTest {
         val pageable = PageRequest.of(0, 20)
 
         every { productRepository.findAll(null, "price", pageable) } returns products
-        every { likeRepository.countByProductId(100L) } returns 5L
-        every { likeRepository.countByProductId(101L) } returns 10L
+        every { likeRepository.countByProductIdIn(listOf(100L, 101L)) } returns mapOf(100L to 5L, 101L to 10L)
 
         // when
         val result = productQueryService.findProducts(null, "price", pageable)
@@ -119,7 +117,7 @@ class ProductQueryServiceTest {
         val pageable = PageRequest.of(0, 20)
 
         every { productRepository.findAll(null, "latest", pageable) } returns products
-        every { likeRepository.countByProductId(100L) } returns 0L
+        every { likeRepository.countByProductIdIn(listOf(100L)) } returns emptyMap()
 
         // when
         val result = productQueryService.findProducts(null, "latest", pageable)

@@ -121,4 +121,55 @@ class LikeQueryServiceIntegrationTest {
         assertThat(result.totalElements).isEqualTo(3)
         assertThat(result.totalPages).isEqualTo(2)
     }
+
+    @Test
+    fun `여러 상품의 좋아요 수를 배치로 조회할 수 있다`() {
+        // given
+        val user2 = User(
+            name = "김철수",
+            email = "batch-test@example.com",
+            gender = Gender.MALE,
+            birthDate = LocalDate.of(1995, 5, 5),
+        )
+        userRepository.save(user2)
+
+        // 상품1: 2개 좋아요, 상품2: 1개 좋아요, 상품3: 0개 좋아요
+        likeRepository.save(Like(userId = user.id, productId = products[0].id))
+        likeRepository.save(Like(userId = user2.id, productId = products[0].id))
+        likeRepository.save(Like(userId = user.id, productId = products[1].id))
+
+        val productIds = products.map { it.id }
+
+        // when
+        val likeCountMap = likeRepository.countByProductIdIn(productIds)
+
+        // then
+        assertThat(likeCountMap[products[0].id]).isEqualTo(2L)
+        assertThat(likeCountMap[products[1].id]).isEqualTo(1L)
+        assertThat(likeCountMap[products[2].id]).isNull() // 좋아요가 없으면 map에 포함되지 않음
+    }
+
+    @Test
+    fun `좋아요가 없는 상품들만 조회하면 빈 맵을 반환한다`() {
+        // given
+        val productIds = products.map { it.id }
+
+        // when
+        val likeCountMap = likeRepository.countByProductIdIn(productIds)
+
+        // then
+        assertThat(likeCountMap).isEmpty()
+    }
+
+    @Test
+    fun `빈 리스트로 배치 조회하면 빈 맵을 반환한다`() {
+        // given
+        val emptyProductIds = emptyList<Long>()
+
+        // when
+        val likeCountMap = likeRepository.countByProductIdIn(emptyProductIds)
+
+        // then
+        assertThat(likeCountMap).isEmpty()
+    }
 }

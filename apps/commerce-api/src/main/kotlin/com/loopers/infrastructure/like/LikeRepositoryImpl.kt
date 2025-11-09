@@ -19,6 +19,10 @@ class LikeRepositoryImpl(
         productId: Long,
     ): Long = likeJpaRepository.countByProductId(productId)
 
+    override fun countByProductIdIn(productIds: List<Long>): Map<Long, Long> =
+        likeJpaRepository.countByProductIdInGrouped(productIds)
+            .associate { it.getProductId() to it.getLikeCount() }
+
     override fun save(like: Like): Like = likeJpaRepository.save(like)
 
     override fun deleteByUserIdAndProductId(userId: Long, productId: Long) {

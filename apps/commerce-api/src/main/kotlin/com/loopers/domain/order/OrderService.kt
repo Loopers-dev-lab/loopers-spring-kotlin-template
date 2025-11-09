@@ -7,6 +7,7 @@ import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 
 data class OrderItemRequest(
@@ -21,6 +22,7 @@ class OrderService(
     private val stockRepository: StockRepository,
     private val pointRepository: PointRepository,
 ) {
+    @Transactional
     fun createOrder(userId: Long, orderItemRequests: List<OrderItemRequest>): Order {
         val orderItems = validateAndCreateOrderItems(orderItemRequests)
         val order = Order(userId = userId, items = orderItems)

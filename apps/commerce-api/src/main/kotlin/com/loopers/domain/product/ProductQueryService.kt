@@ -26,9 +26,11 @@ class ProductQueryService(
 ) {
     fun findProducts(brandId: Long?, sort: String, pageable: Pageable): Page<ProductWithLikeCount> {
         val products = productRepository.findAll(brandId, sort, pageable)
+        val productIds = products.content.map { it.id }
+        val likeCountMap = likeRepository.countByProductIdIn(productIds)
 
         return products.map { product ->
-            val likeCount = likeRepository.countByProductId(product.id)
+            val likeCount = likeCountMap[product.id] ?: 0L
             ProductWithLikeCount(product, likeCount)
         }
     }
