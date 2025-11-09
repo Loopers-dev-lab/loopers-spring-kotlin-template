@@ -2,7 +2,7 @@ package com.loopers.application.order
 
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderItem
-import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.order.OrderQueryService
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
@@ -19,9 +19,9 @@ import java.math.BigDecimal
 
 class OrderFacadeTest {
     private val orderService: OrderService = mockk()
-    private val orderRepository: OrderRepository = mockk()
+    private val orderQueryService: OrderQueryService = mockk()
 
-    private val orderFacade = OrderFacade(orderService, orderRepository)
+    private val orderFacade = OrderFacade(orderService, orderQueryService)
 
     private fun createTestOrder(orderId: Long, userId: Long): Order {
         val items = listOf(
@@ -71,7 +71,7 @@ class OrderFacadeTest {
         val pageable = PageRequest.of(0, 20)
         val order = createTestOrder(1L, userId)
 
-        every { orderRepository.findByUserId(userId, pageable) } returns PageImpl(listOf(order))
+        every { orderQueryService.getOrders(userId, pageable) } returns PageImpl(listOf(order))
 
         // when
         val result = orderFacade.getOrders(userId, pageable)
@@ -88,7 +88,7 @@ class OrderFacadeTest {
         val orderId = 1L
         val order = createTestOrder(orderId, userId)
 
-        every { orderRepository.findById(orderId) } returns order
+        every { orderQueryService.getOrderDetail(userId, orderId) } returns order
 
         // when
         val result = orderFacade.getOrderDetail(userId, orderId)
@@ -105,7 +105,10 @@ class OrderFacadeTest {
         val userId = 1L
         val orderId = 999L
 
-        every { orderRepository.findById(orderId) } returns null
+        every { orderQueryService.getOrderDetail(userId, orderId) } throws CoreException(
+            com.loopers.support.error.ErrorType.NOT_FOUND,
+            "주문을 찾을 수 없습니다: $orderId",
+        )
 
         // when & then
         assertThatThrownBy {
@@ -120,9 +123,11 @@ class OrderFacadeTest {
         val userId = 1L
         val otherUserId = 2L
         val orderId = 1L
-        val order = createTestOrder(orderId, otherUserId)
 
-        every { orderRepository.findById(orderId) } returns order
+        every { orderQueryService.getOrderDetail(userId, orderId) } throws CoreException(
+            com.loopers.support.error.ErrorType.FORBIDDEN,
+            "다른 사용자의 주문입니다",
+        )
 
         // when & then
         assertThatThrownBy {

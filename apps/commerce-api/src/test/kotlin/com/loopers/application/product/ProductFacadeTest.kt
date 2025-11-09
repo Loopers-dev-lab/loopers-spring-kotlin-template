@@ -1,15 +1,13 @@
 package com.loopers.application.product
 
 import com.loopers.domain.brand.Brand
-import com.loopers.domain.like.LikeRepository
 import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
 import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductDetailData
 import com.loopers.domain.product.ProductQueryService
-import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductWithLikeCount
 import com.loopers.domain.product.Stock
-import com.loopers.domain.product.StockRepository
 import com.loopers.support.error.CoreException
 import io.mockk.every
 import io.mockk.mockk
@@ -21,15 +19,9 @@ import org.springframework.data.domain.PageRequest
 import java.math.BigDecimal
 
 class ProductFacadeTest {
-    private val productRepository: ProductRepository = mockk()
-    private val stockRepository: StockRepository = mockk()
-    private val likeRepository: LikeRepository = mockk()
     private val productQueryService: ProductQueryService = mockk()
 
     private val productFacade = ProductFacade(
-        productRepository,
-        stockRepository,
-        likeRepository,
         productQueryService,
     )
 
@@ -86,9 +78,8 @@ class ProductFacadeTest {
         val product = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
         val stock = Stock(productId = 100L, quantity = 50)
 
-        every { productRepository.findById(100L) } returns product
-        every { stockRepository.findByProductId(100L) } returns stock
-        every { likeRepository.countByProductId(100L) } returns 10L
+        val productDetailData = ProductDetailData(product, stock, 10L)
+        every { productQueryService.getProductDetail(100L) } returns productDetailData
 
         // when
         val result = productFacade.getProductDetail(100L)
@@ -104,7 +95,10 @@ class ProductFacadeTest {
     @Test
     fun `존재하지 않는 상품 조회 시 예외가 발생한다`() {
         // given
-        every { productRepository.findById(999L) } returns null
+        every { productQueryService.getProductDetail(999L) } throws CoreException(
+            com.loopers.support.error.ErrorType.NOT_FOUND,
+            "상품을 찾을 수 없습니다: 999",
+        )
 
         // when & then
         assertThatThrownBy {
@@ -116,11 +110,10 @@ class ProductFacadeTest {
     @Test
     fun `재고 정보가 없는 상품 조회 시 예외가 발생한다`() {
         // given
-        val brand = createTestBrand(1L, "나이키")
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
-
-        every { productRepository.findById(100L) } returns product
-        every { stockRepository.findByProductId(100L) } returns null
+        every { productQueryService.getProductDetail(100L) } throws CoreException(
+            com.loopers.support.error.ErrorType.NOT_FOUND,
+            "재고 정보를 찾을 수 없습니다: 100",
+        )
 
         // when & then
         assertThatThrownBy {

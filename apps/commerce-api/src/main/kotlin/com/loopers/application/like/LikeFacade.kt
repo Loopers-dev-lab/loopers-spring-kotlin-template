@@ -1,8 +1,7 @@
 package com.loopers.application.like
 
-import com.loopers.domain.like.LikeRepository
+import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.like.LikeService
-import com.loopers.domain.product.ProductRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -10,8 +9,7 @@ import org.springframework.stereotype.Component
 @Component
 class LikeFacade(
     private val likeService: LikeService,
-    private val likeRepository: LikeRepository,
-    private val productRepository: ProductRepository,
+    private val likeQueryService: LikeQueryService,
 ) {
     fun addLike(userId: Long, productId: Long) {
         likeService.addLike(userId, productId)
@@ -22,10 +20,7 @@ class LikeFacade(
     }
 
     fun getLikedProducts(userId: Long, pageable: Pageable): Page<LikedProductInfo> {
-        val likes = likeRepository.findByUserId(userId, pageable)
-        return likes.map { like ->
-            val product = productRepository.findById(like.productId)!!
-            LikedProductInfo.from(like, product)
-        }
+        val likedProducts = likeQueryService.getLikedProducts(userId, pageable)
+        return likedProducts.map { LikedProductInfo.from(it.like, it.product) }
     }
 }

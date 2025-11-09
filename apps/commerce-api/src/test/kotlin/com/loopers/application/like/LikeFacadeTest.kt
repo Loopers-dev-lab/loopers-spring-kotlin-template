@@ -2,12 +2,12 @@ package com.loopers.application.like
 
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.like.Like
-import com.loopers.domain.like.LikeRepository
+import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.like.LikeService
+import com.loopers.domain.like.LikedProductData
 import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
 import com.loopers.domain.product.Product
-import com.loopers.domain.product.ProductRepository
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -19,13 +19,11 @@ import java.math.BigDecimal
 
 class LikeFacadeTest {
     private val likeService: LikeService = mockk(relaxed = true)
-    private val likeRepository: LikeRepository = mockk()
-    private val productRepository: ProductRepository = mockk()
+    private val likeQueryService: LikeQueryService = mockk()
 
     private val likeFacade = LikeFacade(
         likeService,
-        likeRepository,
-        productRepository,
+        likeQueryService,
     )
 
     private fun createTestProduct(id: Long, name: String, price: BigDecimal, brand: Brand): Product {
@@ -91,8 +89,8 @@ class LikeFacadeTest {
         val like = createTestLike(userId, product.id)
         val pageable = PageRequest.of(0, 20)
 
-        every { likeRepository.findByUserId(userId, pageable) } returns PageImpl(listOf(like))
-        every { productRepository.findById(100L) } returns product
+        val likedProductData = LikedProductData(like, product)
+        every { likeQueryService.getLikedProducts(userId, pageable) } returns PageImpl(listOf(likedProductData))
 
         // when
         val result = likeFacade.getLikedProducts(userId, pageable)
