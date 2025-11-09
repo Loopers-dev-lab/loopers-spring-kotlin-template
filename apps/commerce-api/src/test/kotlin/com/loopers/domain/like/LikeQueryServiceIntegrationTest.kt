@@ -1,0 +1,141 @@
+package com.loopers.domain.like
+
+import com.loopers.domain.brand.Brand
+import com.loopers.domain.brand.BrandRepository
+import com.loopers.domain.product.Currency
+import com.loopers.domain.product.Price
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.user.Gender
+import com.loopers.domain.user.User
+import com.loopers.domain.user.UserRepository
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.data.domain.PageRequest
+import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
+import java.time.LocalDate
+
+@SpringBootTest
+@Transactional
+class LikeQueryServiceIntegrationTest {
+    @Autowired
+    private lateinit var likeQueryService: LikeQueryService
+
+    @Autowired
+    private lateinit var likeRepository: LikeRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var brandRepository: BrandRepository
+
+    @Autowired
+    private lateinit var productRepository: ProductRepository
+
+    private lateinit var user: User
+    private lateinit var brand: Brand
+    private lateinit var products: List<Product>
+
+    @BeforeEach
+    fun setUp() {
+        // 사용자 생성
+        user = User(
+            name = "홍길동",
+            email = "like-query-test@example.com",
+            gender = Gender.MALE,
+            birthDate = LocalDate.of(1990, 1, 1),
+        )
+        user = userRepository.save(user)
+
+        // 브랜드 생성
+        brand = Brand(name = "테스트브랜드", description = "테스트용 브랜드")
+        brand = brandRepository.save(brand)
+
+        // 상품 3개 생성
+        products = listOf(
+            Product(
+                name = "상품1",
+                price = Price(BigDecimal("10000"), Currency.KRW),
+                brand = brand,
+            ),
+            Product(
+                name = "상품2",
+                price = Price(BigDecimal("20000"), Currency.KRW),
+                brand = brand,
+            ),
+            Product(
+                name = "상품3",
+                price = Price(BigDecimal("30000"), Currency.KRW),
+                brand = brand,
+            ),
+        ).map { productRepository.save(it) }
+    }
+
+    @Test
+    fun `좋아요한 상품 목록을 조회할 수 있다`() {
+        // given
+        products.forEach { product ->
+            likeRepository.save(Like(userId = user.id, productId = product.id))
+        }
+        val pageable = PageRequest.of(0, 20)
+
+        // when
+        val result = likeQueryService.getLikedProducts(user.id, pageable)
+
+        // then
+        assertThat(result.content).hasSize(3)
+        assertThat(result.content.map { it.product.name }).containsExactlyInAnyOrder("상품1", "상품2", "상품3")
+        assertThat(result.content.map { it.like.userId }).allMatch { it == user.id }
+    }
+
+    @Test
+    fun `좋아요한 상품이 없으면 빈 목록을 반환한다`() {
+        // given
+        val pageable = PageRequest.of(0, 20)
+
+        // when
+        val result = likeQueryService.getLikedProducts(user.id, pageable)
+
+        // then
+        assertThat(result.content).isEmpty()
+    }
+
+    @Test
+    fun `좋아요한 상품이 삭제된 경우 예외가 발생한다`() {
+        // given
+        val like = likeRepository.save(Like(userId = user.id, productId = 99999L))
+        val pageable = PageRequest.of(0, 20)
+
+        // when & then
+        assertThatThrownBy {
+            likeQueryService.getLikedProducts(user.id, pageable)
+        }.isInstanceOf(CoreException::class.java)
+            .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND)
+            .hasMessage("상품을 찾을 수 없습니다")
+    }
+
+    @Test
+    fun `페이징 처리가 정상적으로 동작한다`() {
+        // given
+        products.forEach { product ->
+            likeRepository.save(Like(userId = user.id, productId = product.id))
+        }
+        val pageable = PageRequest.of(0, 2)
+
+        // when
+        val result = likeQueryService.getLikedProducts(user.id, pageable)
+
+        // then
+        assertThat(result.content).hasSize(2)
+        assertThat(result.totalElements).isEqualTo(3)
+        assertThat(result.totalPages).isEqualTo(2)
+    }
+}
