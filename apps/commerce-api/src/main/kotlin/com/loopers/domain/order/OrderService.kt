@@ -7,8 +7,8 @@ import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 data class OrderItemRequest(
     val productId: Long,
