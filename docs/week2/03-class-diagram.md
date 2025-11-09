@@ -25,9 +25,9 @@
         - Long id
         - Long quantity
         - Long productId
-        + checkStock(quantity) boolean
-        + increaseStock(quantity) void
-        + decreaseStock(quantity) void
+        + check(quantity) boolean
+        + increase(quantity) void
+        + decrease(quantity) void
     }
 
     class Order {
@@ -57,7 +57,6 @@
         - Long productId
         - Long orderId
         + create() OrderDetail
-        + calculateProductAmount() Long
     }
 
     class ProductLike {
@@ -73,23 +72,9 @@
         - Long userId
         + charge(amount) void
         + deduct(amount) void
-        + checkSufficient(amount) boolean
+        + check(amount) boolean
     }
 
-    class PointHistory {
-        - Long id
-        - Long amount
-        - PointTransactionType type
-        - Long userId
-        - Long orderId
-    }
-
-    class PointTransactionType {
-        <<enumeration>>
-        CHARGE
-        USE
-        REFUND
-    }
     User "1" --> "N" Order: 주문
     User "1" --> "1" Point: 보유
     Brand "1" --> "N" Product: 소속
@@ -98,8 +83,6 @@
     Product "1" --> "N" OrderDetail: 포함됨
     Order "1" --> "N" OrderDetail: 주문 상품
     Order --> OrderStatus: 상태
-    Point "1" --> "N" PointHistory: 이력
-    PointHistory --> PointTransactionType: 거래 유형
 
 ```
 

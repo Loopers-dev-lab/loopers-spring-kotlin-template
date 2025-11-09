@@ -76,8 +76,6 @@ erDiagram
         bigint ref_product_id FK "상품 ID (PRODUCT 참조)"
         bigint ref_user_id FK "사용자 ID (USER 참조)"
         timestamp created_at "생성일시"
-        timestamp updated_at "수정일시"
-        timestamp deleted_at "삭제일시"
     }
 
 %% 포인트
@@ -85,18 +83,6 @@ erDiagram
         bigint id PK "포인트 기본키"
         bigint amount "현재 보유 포인트 잔액"
         bigint ref_user_id FK "사용자 ID (USER 참조)"
-        timestamp created_at "생성일시"
-        timestamp updated_at "수정일시"
-        timestamp deleted_at "삭제일시"
-    }
-
-%% 포인트 거래 이력
-    POINT_HISTORY {
-        bigint id PK "포인트 거래 내역 기본키"
-        bigint amount "거래 금액"
-        varchar type "거래 유형 (CHARGE, USE, REFUND)"
-        bigint ref_user_id FK "사용자 ID (USER 참조)"
-        bigint ref_order_id FK "관련 주문 ID (nullable)"
         timestamp created_at "생성일시"
         timestamp updated_at "수정일시"
         timestamp deleted_at "삭제일시"
@@ -110,7 +96,6 @@ erDiagram
     PRODUCT ||--o{ PRODUCT_LIKE: "좋아요"
     PRODUCT ||--o{ ORDER_DETAIL: "포함됨"
     ORDER ||--|{ ORDER_DETAIL: "주문 상품"
-    POINT ||--o{ POINT_HISTORY: "이력"
 ```
 
 # 🗂️ 테이블별 인덱스 & 제약조건
@@ -236,11 +221,3 @@ erDiagram
 - `idx_point_user_id` (`user_id`)
 
 ---
-
-## POINT_HISTORY
-
-**제약조건**
-
-- PRIMARY KEY: `id`
-- FOREIGN KEY: `user_id` → `USER(id)`
-- FOREIGN KEY: `order_id` → `ORDER(id)` (nullable)
