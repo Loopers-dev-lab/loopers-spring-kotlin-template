@@ -10,11 +10,6 @@ import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-data class OrderItemRequest(
-    val productId: Long,
-    val quantity: Int,
-)
-
 @Service
 class OrderService(
     private val orderRepository: OrderRepository,
@@ -23,8 +18,8 @@ class OrderService(
     private val pointRepository: PointRepository,
 ) {
     @Transactional
-    fun createOrder(userId: Long, orderItemRequests: List<OrderItemRequest>): Order {
-        val orderItems = validateAndCreateOrderItems(orderItemRequests)
+    fun createOrder(userId: Long, commands: List<CreateOrderItemCommand>): Order {
+        val orderItems = validateAndCreateOrderItems(commands)
         val order = Order(userId = userId, items = orderItems)
         val totalAmount = order.calculateTotalAmount()
 
@@ -32,24 +27,24 @@ class OrderService(
 
         val savedOrder = orderRepository.save(order)
 
-        deductStocks(orderItemRequests)
+        deductStocks(commands)
         deductUserPoint(userId, totalAmount)
 
         return savedOrder
     }
 
     private fun validateAndCreateOrderItems(
-        orderItemRequests: List<OrderItemRequest>,
-    ): List<OrderItem> = orderItemRequests.map { request ->
-        val product = productRepository.findById(request.productId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: ${request.productId}")
+        commands: List<CreateOrderItemCommand>,
+    ): List<OrderItem> = commands.map { command ->
+        val product = productRepository.findById(command.productId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: ${command.productId}")
 
-        val stock = stockRepository.findByProductId(request.productId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: ${request.productId}")
+        val stock = stockRepository.findByProductId(command.productId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: ${command.productId}")
 
-        validateStockAvailability(stock, product.name, request.quantity)
+        validateStockAvailability(stock, product.name, command.quantity)
 
-        createOrderItemSnapshot(product, request.quantity)
+        createOrderItemSnapshot(product, command.quantity)
     }
 
     private fun validateStockAvailability(stock: Stock, productName: String, requestedQuantity: Int) {
@@ -86,11 +81,11 @@ class OrderService(
         }
     }
 
-    private fun deductStocks(orderItemRequests: List<OrderItemRequest>) {
-        orderItemRequests.forEach { request ->
-            val stock = stockRepository.findByProductIdWithLock(request.productId)
-                ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: ${request.productId}")
-            stock.decrease(request.quantity)
+    private fun deductStocks(commands: List<CreateOrderItemCommand>) {
+        commands.sortedBy { it.productId }.forEach { command ->
+            val stock = stockRepository.findByProductIdWithLock(command.productId)
+                ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: ${command.productId}")
+            stock.decrease(command.quantity)
             stockRepository.save(stock)
         }
     }

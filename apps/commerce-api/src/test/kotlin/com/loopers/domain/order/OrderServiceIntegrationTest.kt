@@ -99,8 +99,8 @@ class OrderServiceIntegrationTest {
     fun `정상적으로 주문을 생성하고 재고와 포인트가 차감된다`() {
         // given
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = product1.id, quantity = 2),
-            OrderItemRequest(productId = product2.id, quantity = 1),
+            CreateOrderItemCommand(productId = product1.id, quantity = 2),
+            CreateOrderItemCommand(productId = product2.id, quantity = 1),
         )
 
         // when
@@ -126,7 +126,7 @@ class OrderServiceIntegrationTest {
         // given
         val orderItemRequests = listOf(
             // 재고 부족
-            OrderItemRequest(productId = product1.id, quantity = 101),
+            CreateOrderItemCommand(productId = product1.id, quantity = 101),
         )
 
         val initialPoint = pointRepository.findByUserId(user.id)!!.balance.amount
@@ -156,7 +156,7 @@ class OrderServiceIntegrationTest {
 
         val orderItemRequests = listOf(
             // 100,000원
-            OrderItemRequest(productId = product1.id, quantity = 1),
+            CreateOrderItemCommand(productId = product1.id, quantity = 1),
         )
 
         // when & then
@@ -174,7 +174,7 @@ class OrderServiceIntegrationTest {
     fun `주문 항목에 상품 스냅샷이 저장된다`() {
         // given
         val orderItemRequests = listOf(
-            OrderItemRequest(productId = product1.id, quantity = 1),
+            CreateOrderItemCommand(productId = product1.id, quantity = 1),
         )
 
         // when

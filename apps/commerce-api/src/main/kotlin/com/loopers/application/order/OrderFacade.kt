@@ -12,13 +12,13 @@ class OrderFacade(
     private val orderQueryService: OrderQueryService,
 ) {
     fun createOrder(userId: Long, request: OrderCreateRequest): OrderCreateInfo {
-        val orderItemRequests = request.items.map {
-            com.loopers.domain.order.OrderItemRequest(
+        val commands = request.items.map {
+            com.loopers.domain.order.CreateOrderItemCommand(
                 productId = it.productId,
                 quantity = it.quantity,
             )
         }
-        val order = orderService.createOrder(userId, orderItemRequests)
+        val order = orderService.createOrder(userId, commands)
         return OrderCreateInfo.from(order)
     }
 
