@@ -2,8 +2,6 @@ package com.loopers.domain.like
 
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductRepository
-import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.support.PageableExecutionUtils
@@ -25,9 +23,9 @@ class LikeQueryService(
         val products = productRepository.findAllById(productIds)
         val productMap = products.associateBy { it.id }
         val likedProductDataList = likes.content.map { like ->
-            val product = productMap[like.productId]
-                ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다")
-            LikedProductData(like, product)
+            productMap[like.productId]?.let { product ->
+                LikedProductData(like, product)
+            }
         }
         return PageableExecutionUtils.getPage(likedProductDataList, pageable) { likes.totalElements }
     }

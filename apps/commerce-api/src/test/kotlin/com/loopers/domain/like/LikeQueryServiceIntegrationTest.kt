@@ -9,10 +9,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.user.Gender
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserRepository
-import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -106,20 +103,6 @@ class LikeQueryServiceIntegrationTest {
 
         // then
         assertThat(result.content).isEmpty()
-    }
-
-    @Test
-    fun `좋아요한 상품이 삭제된 경우 예외가 발생한다`() {
-        // given
-        val like = likeRepository.save(Like(userId = user.id, productId = 99999L))
-        val pageable = PageRequest.of(0, 20)
-
-        // when & then
-        assertThatThrownBy {
-            likeQueryService.getLikedProducts(user.id, pageable)
-        }.isInstanceOf(CoreException::class.java)
-            .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND)
-            .hasMessage("상품을 찾을 수 없습니다")
     }
 
     @Test

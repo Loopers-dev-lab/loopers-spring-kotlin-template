@@ -31,7 +31,11 @@ data class Money(
         if (this.currency != other.currency) {
             throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 금액은 뺄 수 없습니다.")
         }
-        return Money(this.amount - other.amount, this.currency)
+        val result = this.amount - other.amount
+        if (result < BigDecimal.ZERO) {
+            throw CoreException(ErrorType.BAD_REQUEST, "차감 결과가 음수가 될 수 없습니다.")
+        }
+        return Money(result, this.currency)
     }
 
     fun multiply(multiplier: Int): Money = Money(this.amount * BigDecimal(multiplier), this.currency)
