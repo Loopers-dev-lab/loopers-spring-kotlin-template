@@ -42,6 +42,9 @@ class User(
         if (email.isBlank()) {
             throw CoreException(ErrorType.BAD_REQUEST, "이메일은 비어있을 수 없습니다.")
         }
+        if (!email.matches(Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$"))) {
+            throw CoreException(ErrorType.BAD_REQUEST, "올바른 이메일 형식이 아닙니다.")
+        }
         if (birthDate.isAfter(LocalDate.now())) {
             throw CoreException(ErrorType.BAD_REQUEST, "생년월일은 미래일 수 없습니다.")
         }

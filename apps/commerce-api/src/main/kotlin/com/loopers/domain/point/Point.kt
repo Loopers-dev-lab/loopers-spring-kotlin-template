@@ -12,6 +12,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
+import java.math.BigDecimal
 import java.time.ZonedDateTime
 
 @Entity
@@ -47,10 +48,16 @@ class Point(
     }
 
     fun charge(amount: Money) {
+        if (amount.amount <= BigDecimal.ZERO) {
+            throw CoreException(ErrorType.BAD_REQUEST, "충전 금액은 0보다 커야 합니다.")
+        }
         this.balance = this.balance.add(amount)
     }
 
     fun deduct(amount: Money) {
+        if (amount.amount <= BigDecimal.ZERO) {
+            throw CoreException(ErrorType.BAD_REQUEST, "차감 금액은 0보다 커야 합니다.")
+        }
         if (!canDeduct(amount)) {
             throw CoreException(ErrorType.BAD_REQUEST, "포인트 부족: 현재 잔액 ${balance.amount}, 차감 요청 ${amount.amount}")
         }

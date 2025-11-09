@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.order
 
 import com.loopers.application.order.OrderFacade
 import com.loopers.interfaces.api.ApiResponse
+import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.web.bind.annotation.GetMapping
@@ -21,7 +22,7 @@ class OrderV1Controller(
     @PostMapping
     override fun createOrder(
         @RequestHeader("X-USER-ID") userId: Long,
-        @RequestBody request: OrderV1Dto.OrderCreateRequest,
+        @RequestBody @Valid request: OrderV1Dto.OrderCreateRequest,
     ): ApiResponse<OrderV1Dto.OrderCreateResponse> {
         val appRequest = request.toApplicationRequest()
         return orderFacade.createOrder(userId, appRequest)
@@ -46,6 +47,6 @@ class OrderV1Controller(
         @RequestHeader("X-USER-ID") userId: Long,
         @PathVariable(value = "orderId") orderId: Long,
     ): ApiResponse<OrderV1Dto.OrderDetailResponse> = orderFacade.getOrderDetail(userId, orderId)
-            .let { OrderV1Dto.OrderDetailResponse.from(it) }
-            .let { ApiResponse.success(it) }
+        .let { OrderV1Dto.OrderDetailResponse.from(it) }
+        .let { ApiResponse.success(it) }
 }

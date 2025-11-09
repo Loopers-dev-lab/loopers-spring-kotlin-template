@@ -57,6 +57,9 @@ class Order(
         }
 
         val firstCurrency = items.first().priceAtOrder.currency
+        if (items.any { it.priceAtOrder.currency != firstCurrency }) {
+            throw CoreException(ErrorType.BAD_REQUEST, "모든 주문 항목은 동일한 통화를 사용해야 합니다.")
+        }
         val totalAmount = items.fold(BigDecimal.ZERO) { acc, item ->
             acc + item.calculateItemAmount().amount
         }
