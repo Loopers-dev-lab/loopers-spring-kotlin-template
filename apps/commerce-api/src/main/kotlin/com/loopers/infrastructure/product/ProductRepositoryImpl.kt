@@ -24,18 +24,36 @@ class ProductRepositoryImpl(
         brandId != null && sort == "likeCount" -> {
             productJpaRepository.findByBrandIdOrderByLikeCount(brandId, pageable)
         }
+
         brandId != null && sort == "price" -> {
             productJpaRepository.findByBrandId(brandId, pageable.withSort(Sort.by("price.amount").ascending()))
         }
+
+        brandId != null && sort == "latest" -> {
+            productJpaRepository.findByBrandId(
+                brandId,
+                pageable.withSort(Sort.by(Sort.Order.desc("createdAt"))),
+            )
+        }
+
         brandId != null -> {
             productJpaRepository.findByBrandId(brandId, pageable)
         }
+
         sort == "likeCount" -> {
             productJpaRepository.findAllOrderByLikeCount(pageable)
         }
+
         sort == "price" -> {
             productJpaRepository.findAll(pageable.withSort(Sort.by("price.amount").ascending()))
         }
+
+        sort == "latest" -> {
+            productJpaRepository.findAll(
+                pageable.withSort(Sort.by(Sort.Order.desc("createdAt"))),
+            )
+        }
+
         else -> {
             productJpaRepository.findAll(pageable)
         }
