@@ -8,13 +8,11 @@ import jakarta.persistence.AttributeOverride
 import jakarta.persistence.AttributeOverrides
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
-import jakarta.persistence.ConstraintMode
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
-import jakarta.persistence.ForeignKey
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
@@ -29,8 +27,11 @@ class Order(
     items: List<OrderItem>,
 ) : BaseEntity() {
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
-    val items: MutableList<OrderItem> = items.toMutableList()
+    @JoinColumn(name = "order_id", nullable = false)
+    private val _items: MutableList<OrderItem> = items.toMutableList()
+
+    val items: List<OrderItem>
+        get() = _items.toList()
 
     @Embedded
     @AttributeOverrides(

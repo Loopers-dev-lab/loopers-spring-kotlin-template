@@ -33,17 +33,18 @@ class OrderItem(
 
     priceAtOrder: Price,
 ) : BaseEntity() {
-    @Column(nullable = false)
-    var quantity: Int = quantity
-        protected set
+    @Column(nullable = false, updatable = false)
+    val quantity: Int = quantity
 
     @Embedded
     @AttributeOverrides(
-        AttributeOverride(name = "amount", column = Column(name = "price_at_order", nullable = false, precision = 15, scale = 2)),
-        AttributeOverride(name = "currency", column = Column(name = "currency", nullable = false, length = 3)),
+        AttributeOverride(
+            name = "amount",
+            column = Column(name = "price_at_order", nullable = false, precision = 15, scale = 2, updatable = false),
+        ),
+        AttributeOverride(name = "currency", column = Column(name = "currency", nullable = false, length = 3, updatable = false)),
     )
-    var priceAtOrder: Price = priceAtOrder
-        protected set
+    val priceAtOrder: Price = priceAtOrder
 
     init {
         if (quantity <= 0) {
