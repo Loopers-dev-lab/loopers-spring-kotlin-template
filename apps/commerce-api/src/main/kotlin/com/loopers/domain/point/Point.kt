@@ -33,7 +33,7 @@ class Point(
         protected set
 
     @Column(name = "updated_at", nullable = false)
-    var updatedAt: ZonedDateTime = ZonedDateTime.now()
+    lateinit var updatedAt: ZonedDateTime
         protected set
 
     @PrePersist
