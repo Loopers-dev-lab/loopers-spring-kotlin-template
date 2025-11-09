@@ -21,6 +21,10 @@ data class Amount(
         return Amount(this.value + other.value)
     }
 
+    operator fun minus(other: Amount): Amount {
+        return Amount(this.value - other.value)
+    }
+
     companion object {
         private const val ERROR_MESSAGE_NOT_POSITIVE = "충전 금액은 0보다 커야 합니다."
     }
