@@ -127,4 +127,123 @@ class OrderTest {
         // then
         assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
     }
+
+    @Test
+    fun `확정된 주문은 취소할 수 없다`() {
+        // given
+        val items = listOf(
+            OrderItem(
+                productId = 100L,
+                productName = "운동화",
+                brandId = 1L,
+                brandName = "나이키",
+                brandDescription = null,
+                quantity = 1,
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
+        )
+        val order = Order(userId = 1L, items = items)
+        order.confirm() // 먼저 확정
+
+        // when & then
+        assertThatThrownBy {
+            order.cancel()
+        }.isInstanceOf(CoreException::class.java)
+            .hasMessageContaining("확정된 주문은 취소할 수 없습니다")
+    }
+
+    @Test
+    fun `이미 취소된 주문은 다시 취소할 수 없다`() {
+        // given
+        val items = listOf(
+            OrderItem(
+                productId = 100L,
+                productName = "운동화",
+                brandId = 1L,
+                brandName = "나이키",
+                brandDescription = null,
+                quantity = 1,
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
+        )
+        val order = Order(userId = 1L, items = items)
+        order.cancel() // 먼저 취소
+
+        // when & then
+        assertThatThrownBy {
+            order.cancel()
+        }.isInstanceOf(CoreException::class.java)
+            .hasMessageContaining("이미 취소된 주문입니다")
+    }
+
+    @Test
+    fun `주문을 확정할 수 있다`() {
+        // given
+        val items = listOf(
+            OrderItem(
+                productId = 100L,
+                productName = "운동화",
+                brandId = 1L,
+                brandName = "나이키",
+                brandDescription = null,
+                quantity = 1,
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
+        )
+        val order = Order(userId = 1L, items = items)
+
+        // when
+        order.confirm()
+
+        // then
+        assertThat(order.status).isEqualTo(OrderStatus.CONFIRMED)
+    }
+
+    @Test
+    fun `이미 확정된 주문은 다시 확정할 수 없다`() {
+        // given
+        val items = listOf(
+            OrderItem(
+                productId = 100L,
+                productName = "운동화",
+                brandId = 1L,
+                brandName = "나이키",
+                brandDescription = null,
+                quantity = 1,
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
+        )
+        val order = Order(userId = 1L, items = items)
+        order.confirm() // 먼저 확정
+
+        // when & then
+        assertThatThrownBy {
+            order.confirm()
+        }.isInstanceOf(CoreException::class.java)
+            .hasMessageContaining("이미 확정된 주문입니다")
+    }
+
+    @Test
+    fun `취소된 주문은 확정할 수 없다`() {
+        // given
+        val items = listOf(
+            OrderItem(
+                productId = 100L,
+                productName = "운동화",
+                brandId = 1L,
+                brandName = "나이키",
+                brandDescription = null,
+                quantity = 1,
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
+        )
+        val order = Order(userId = 1L, items = items)
+        order.cancel() // 먼저 취소
+
+        // when & then
+        assertThatThrownBy {
+            order.confirm()
+        }.isInstanceOf(CoreException::class.java)
+            .hasMessageContaining("취소된 주문은 확정할 수 없습니다")
+    }
 }

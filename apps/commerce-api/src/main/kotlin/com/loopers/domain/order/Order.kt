@@ -49,7 +49,6 @@ class Order(
         if (items.isEmpty()) {
             throw CoreException(ErrorType.BAD_REQUEST, "주문 항목은 최소 1개 이상이어야 합니다.")
         }
-        this.totalAmount = calculateTotalAmount()
     }
 
     fun calculateTotalAmount(): Money {
@@ -68,10 +67,22 @@ class Order(
     fun isOwnedBy(userId: Long): Boolean = this.userId == userId
 
     fun cancel() {
+        if (status == OrderStatus.CONFIRMED) {
+            throw CoreException(ErrorType.BAD_REQUEST, "이미 확정된 주문은 취소할 수 없습니다.")
+        }
+        if (status == OrderStatus.CANCELLED) {
+            throw CoreException(ErrorType.BAD_REQUEST, "이미 취소된 주문입니다.")
+        }
         this.status = OrderStatus.CANCELLED
     }
 
     fun confirm() {
+        if (status == OrderStatus.CANCELLED) {
+            throw CoreException(ErrorType.BAD_REQUEST, "취소된 주문은 확정할 수 없습니다.")
+        }
+        if (status == OrderStatus.CONFIRMED) {
+            throw CoreException(ErrorType.BAD_REQUEST, "이미 확정된 주문입니다.")
+        }
         this.status = OrderStatus.CONFIRMED
     }
 }
