@@ -79,27 +79,29 @@ class LikeQueryServiceIntegrationTest {
     @Test
     fun `좋아요한 상품 목록을 조회할 수 있다`() {
         // given
+        val userId = requireNotNull(user.id) { "user.id must not be null" }
         products.forEach { product ->
-            likeRepository.save(Like(userId = user.id, productId = product.id))
+            likeRepository.save(Like(userId = userId, productId = product.id))
         }
         val pageable = PageRequest.of(0, 20)
 
         // when
-        val result = likeQueryService.getLikedProducts(user.id, pageable)
+        val result = likeQueryService.getLikedProducts(userId, pageable)
 
         // then
         assertThat(result.content).hasSize(3)
         assertThat(result.content.map { it.product.name }).containsExactlyInAnyOrder("상품1", "상품2", "상품3")
-        assertThat(result.content.map { it.like.userId }).allMatch { it == user.id }
+        assertThat(result.content.map { it.like.userId }).allMatch { it == userId }
     }
 
     @Test
     fun `좋아요한 상품이 없으면 빈 목록을 반환한다`() {
         // given
+        val userId = requireNotNull(user.id) { "user.id must not be null" }
         val pageable = PageRequest.of(0, 20)
 
         // when
-        val result = likeQueryService.getLikedProducts(user.id, pageable)
+        val result = likeQueryService.getLikedProducts(userId, pageable)
 
         // then
         assertThat(result.content).isEmpty()
@@ -108,13 +110,14 @@ class LikeQueryServiceIntegrationTest {
     @Test
     fun `페이징 처리가 정상적으로 동작한다`() {
         // given
+        val userId = requireNotNull(user.id) { "user.id must not be null" }
         products.forEach { product ->
             likeRepository.save(Like(userId = user.id, productId = product.id))
         }
         val pageable = PageRequest.of(0, 2)
 
         // when
-        val result = likeQueryService.getLikedProducts(user.id, pageable)
+        val result = likeQueryService.getLikedProducts(userId, pageable)
 
         // then
         assertThat(result.content).hasSize(2)
@@ -133,29 +136,35 @@ class LikeQueryServiceIntegrationTest {
         )
         userRepository.save(user2)
 
-        // 상품1: 2개 좋아요, 상품2: 1개 좋아요, 상품3: 0개 좋아요
-        likeRepository.save(Like(userId = user.id, productId = products[0].id))
-        likeRepository.save(Like(userId = user2.id, productId = products[0].id))
-        likeRepository.save(Like(userId = user.id, productId = products[1].id))
+        val userId = requireNotNull(user.id) { "user.id must not be null" }
+        val user2Id = requireNotNull(user2.id) { "user2.id must not be null" }
+        val product0Id = requireNotNull(products[0].id) { "products[0].id must not be null" }
+        val product1Id = requireNotNull(products[1].id) { "products[1].id must not be null" }
+        val product2Id = requireNotNull(products[2].id) { "products[2].id must not be null" }
 
-        val productIds = products.map { it.id }
+        // 상품1: 2개 좋아요, 상품2: 1개 좋아요, 상품3: 0개 좋아요
+        likeRepository.save(Like(userId = userId, productId = product0Id))
+        likeRepository.save(Like(userId = user2Id, productId = product0Id))
+        likeRepository.save(Like(userId = userId, productId = product1Id))
+
+        val productIds = listOf(product0Id, product1Id, product2Id)
 
         // when
-        val likeCountMap = likeRepository.countByProductIdIn(productIds)
+        val likeCountMap = likeQueryService.countByProductIdIn(productIds)
 
         // then
-        assertThat(likeCountMap[products[0].id]).isEqualTo(2L)
-        assertThat(likeCountMap[products[1].id]).isEqualTo(1L)
-        assertThat(likeCountMap[products[2].id]).isNull() // 좋아요가 없으면 map에 포함되지 않음
+        assertThat(likeCountMap[product0Id]).isEqualTo(2L)
+        assertThat(likeCountMap[product1Id]).isEqualTo(1L)
+        assertThat(likeCountMap[product2Id]).isNull() // 좋아요가 없으면 map에 포함되지 않음
     }
 
     @Test
     fun `좋아요가 없는 상품들만 조회하면 빈 맵을 반환한다`() {
         // given
-        val productIds = products.map { it.id }
+        val productIds = products.map { requireNotNull(it.id) { "product.id must not be null" } }
 
         // when
-        val likeCountMap = likeRepository.countByProductIdIn(productIds)
+        val likeCountMap = likeQueryService.countByProductIdIn(productIds)
 
         // then
         assertThat(likeCountMap).isEmpty()
@@ -167,7 +176,7 @@ class LikeQueryServiceIntegrationTest {
         val emptyProductIds = emptyList<Long>()
 
         // when
-        val likeCountMap = likeRepository.countByProductIdIn(emptyProductIds)
+        val likeCountMap = likeQueryService.countByProductIdIn(emptyProductIds)
 
         // then
         assertThat(likeCountMap).isEmpty()

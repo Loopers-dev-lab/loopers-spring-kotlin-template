@@ -29,4 +29,8 @@ class LikeQueryService(
         }
         return PageableExecutionUtils.getPage(likedProductDataList, pageable) { likes.totalElements }
     }
+
+    fun countByProductIdIn(productIds: List<Long>): Map<Long, Long> {
+        return likeRepository.countByProductIdIn(productIds)
+    }
 }
