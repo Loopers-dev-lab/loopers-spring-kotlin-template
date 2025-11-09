@@ -46,7 +46,7 @@ class OrderItem(
         protected set
 
     init {
-        require(quantity > 0) {
+        if (quantity <= 0) {
             throw CoreException(ErrorType.BAD_REQUEST, "주문 수량은 1개 이상이어야 합니다.")
         }
     }

@@ -46,7 +46,7 @@ class Order(
         protected set
 
     init {
-        require(items.isNotEmpty()) {
+        if (items.isEmpty()) {
             throw CoreException(ErrorType.BAD_REQUEST, "주문 항목은 최소 1개 이상이어야 합니다.")
         }
         this.totalAmount = calculateTotalAmount()

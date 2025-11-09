@@ -36,13 +36,13 @@ class User(
         protected set
 
     init {
-        require(name.isNotBlank()) {
+        if (name.isBlank()) {
             throw CoreException(ErrorType.BAD_REQUEST, "이름은 비어있을 수 없습니다.")
         }
-        require(email.isNotBlank()) {
+        if (email.isBlank()) {
             throw CoreException(ErrorType.BAD_REQUEST, "이메일은 비어있을 수 없습니다.")
         }
-        require(!birthDate.isAfter(LocalDate.now())) {
+        if (birthDate.isAfter(LocalDate.now())) {
             throw CoreException(ErrorType.BAD_REQUEST, "생년월일은 미래일 수 없습니다.")
         }
     }

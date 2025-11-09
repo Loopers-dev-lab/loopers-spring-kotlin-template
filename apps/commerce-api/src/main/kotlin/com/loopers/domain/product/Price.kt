@@ -14,13 +14,13 @@ data class Price(
     val currency: Currency = Currency.KRW,
 ) : Comparable<Price> {
     init {
-        require(amount >= BigDecimal.ZERO) {
+        if (amount < BigDecimal.ZERO) {
             throw CoreException(ErrorType.BAD_REQUEST, "금액은 0 이상이어야 합니다.")
         }
     }
 
     fun add(other: Price): Price {
-        require(this.currency == other.currency) {
+        if (this.currency != other.currency) {
             throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 가격은 더할 수 없습니다.")
         }
         return Price(this.amount + other.amount, this.currency)
@@ -29,7 +29,7 @@ data class Price(
     fun multiply(multiplier: Int): Price = Price(this.amount * BigDecimal(multiplier), this.currency)
 
     override fun compareTo(other: Price): Int {
-        require(this.currency == other.currency) {
+        if (this.currency != other.currency) {
             throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 가격은 비교할 수 없습니다.")
         }
         return this.amount.compareTo(other.amount)

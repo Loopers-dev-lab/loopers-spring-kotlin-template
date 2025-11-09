@@ -28,7 +28,7 @@ class Stock(
         protected set
 
     init {
-        require(quantity >= 0) {
+        if (quantity < 0) {
             throw CoreException(ErrorType.BAD_REQUEST, "재고는 0 이상이어야 합니다.")
         }
     }
@@ -45,17 +45,17 @@ class Stock(
     }
 
     fun decrease(amount: Int) {
-        require(amount > 0) {
+        if (amount <= 0) {
             throw CoreException(ErrorType.BAD_REQUEST, "감소량은 0보다 커야 합니다.")
         }
-        require(this.quantity >= amount) {
+        if (this.quantity < amount) {
             throw CoreException(ErrorType.BAD_REQUEST, "재고 부족: 현재 재고 $quantity, 요청 수량 $amount")
         }
         this.quantity -= amount
     }
 
     fun increase(amount: Int) {
-        require(amount > 0) {
+        if (amount <= 0) {
             throw CoreException(ErrorType.BAD_REQUEST, "증가량은 0보다 커야 합니다.")
         }
         this.quantity += amount

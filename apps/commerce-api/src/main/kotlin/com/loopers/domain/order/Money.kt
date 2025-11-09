@@ -15,20 +15,20 @@ data class Money(
     val currency: Currency = Currency.KRW,
 ) {
     init {
-        require(amount >= BigDecimal.ZERO) {
+        if (amount < BigDecimal.ZERO) {
             throw CoreException(ErrorType.BAD_REQUEST, "금액은 0 이상이어야 합니다.")
         }
     }
 
     fun add(other: Money): Money {
-        require(this.currency == other.currency) {
+        if (this.currency != other.currency) {
             throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 금액은 더할 수 없습니다.")
         }
         return Money(this.amount + other.amount, this.currency)
     }
 
     fun subtract(other: Money): Money {
-        require(this.currency == other.currency) {
+        if (this.currency != other.currency) {
             throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 금액은 뺄 수 없습니다.")
         }
         return Money(this.amount - other.amount, this.currency)
@@ -37,7 +37,7 @@ data class Money(
     fun multiply(multiplier: Int): Money = Money(this.amount * BigDecimal(multiplier), this.currency)
 
     fun isGreaterThanOrEqual(other: Money): Boolean {
-        require(this.currency == other.currency) {
+        if (this.currency != other.currency) {
             throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 금액은 비교할 수 없습니다.")
         }
         return this.amount >= other.amount

@@ -41,7 +41,7 @@ class Product(
         protected set
 
     init {
-        require(name.isNotBlank()) {
+        if (name.isBlank()) {
             throw CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.")
         }
     }
@@ -51,7 +51,7 @@ class Product(
     }
 
     fun updateName(newName: String) {
-        require(newName.isNotBlank()) {
+        if (newName.isBlank()) {
             throw CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.")
         }
         this.name = newName

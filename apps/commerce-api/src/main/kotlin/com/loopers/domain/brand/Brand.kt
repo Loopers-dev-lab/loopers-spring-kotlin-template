@@ -22,7 +22,7 @@ class Brand(
         protected set
 
     init {
-        require(name.isNotBlank()) {
+        if (name.isBlank()) {
             throw CoreException(ErrorType.BAD_REQUEST, "브랜드 이름은 비어있을 수 없습니다.")
         }
     }
