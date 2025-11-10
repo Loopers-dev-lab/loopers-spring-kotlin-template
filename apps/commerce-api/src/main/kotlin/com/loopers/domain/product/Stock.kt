@@ -23,6 +23,10 @@ class Stock(
     var quantity: Int = quantity
         protected set
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    lateinit var createdAt: ZonedDateTime
+        protected set
+
     @Column(name = "updated_at", nullable = false)
     lateinit var updatedAt: ZonedDateTime
         protected set
@@ -36,6 +40,7 @@ class Stock(
     @PrePersist
     private fun prePersist() {
         val now = ZonedDateTime.now()
+        createdAt = now
         updatedAt = now
     }
 
