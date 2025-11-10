@@ -1,34 +1,88 @@
 package com.loopers.application.order
 
+import com.loopers.domain.order.OrderItem
 import com.loopers.domain.order.OrderQueryService
 import com.loopers.domain.order.OrderService
+import com.loopers.domain.point.PointService
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductQueryService
+import com.loopers.domain.product.StockService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 @Component
 class OrderFacade(
     private val orderService: OrderService,
     private val orderQueryService: OrderQueryService,
+    private val productQueryService: ProductQueryService,
+    private val stockService: StockService,
+    private val pointService: PointService,
 ) {
+    @Transactional
     fun createOrder(userId: Long, request: OrderCreateRequest): OrderCreateInfo {
-        val commands = request.items.map {
-            com.loopers.domain.order.CreateOrderItemCommand(
-                productId = it.productId,
-                quantity = it.quantity,
-            )
-        }
-        val order = orderService.createOrder(userId, commands)
+        val orderItems = validateAndCreateOrderItems(request)
+        val totalMoney = calculateTotalAmount(orderItems)
+
+        pointService.validateUserPoint(userId, totalMoney)
+
+        val order = orderService.createOrder(userId, orderItems)
+
+        deductStocks(request.items)
+        pointService.deductPoint(userId, totalMoney)
+
         return OrderCreateInfo.from(order)
     }
 
-    fun getOrders(userId: Long, pageable: Pageable): Page<OrderListInfo> {
-        val orders = orderQueryService.getOrders(userId, pageable)
-        return orders.map { OrderListInfo.from(it) }
+    private fun validateAndCreateOrderItems(
+        request: OrderCreateRequest,
+    ): List<OrderItem> = request.items.map { item ->
+        val productDetail = productQueryService.getProductDetail(item.productId)
+        val product = productDetail.product
+
+        stockService.validateStockAvailability(productDetail.stock, product.name, item.quantity)
+
+        createOrderItemSnapshot(product, item.quantity)
     }
 
-    fun getOrderDetail(userId: Long, orderId: Long): OrderDetailInfo {
-        val order = orderQueryService.getOrderDetail(userId, orderId)
-        return OrderDetailInfo.from(order)
+    private fun calculateTotalAmount(orderItems: List<OrderItem>): com.loopers.domain.order.Money {
+        return com.loopers.domain.order.Money(
+            amount = orderItems.sumOf { it.priceAtOrder.amount * it.quantity.toBigDecimal() },
+            currency = com.loopers.domain.product.Currency.KRW,
+        )
     }
+
+    private fun deductStocks(items: List<OrderItemRequest>) {
+        items.sortedBy { it.productId }.forEach { item ->
+            stockService.decreaseStock(item.productId, item.quantity)
+        }
+    }
+
+    private fun createOrderItemSnapshot(
+        product: Product,
+        quantity: Int,
+    ): OrderItem = OrderItem(
+        productId = product.id,
+        productName = product.name,
+        brandId = product.brand.id,
+        brandName = product.brand.name,
+        brandDescription = product.brand.description,
+        quantity = quantity,
+        priceAtOrder = product.price,
+    )
+
+    fun getOrders(
+        userId: Long,
+        pageable: Pageable,
+    ): Page<OrderListInfo> = orderQueryService
+        .getOrders(userId, pageable)
+        .map { OrderListInfo.from(it) }
+
+    fun getOrderDetail(
+        userId: Long,
+        orderId: Long,
+    ): OrderDetailInfo = OrderDetailInfo.from(
+        orderQueryService.getOrderDetail(userId, orderId),
+    )
 }

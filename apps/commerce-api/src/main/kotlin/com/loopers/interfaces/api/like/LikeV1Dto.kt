@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.like
 
-import com.loopers.application.like.LikedProductInfo
+import com.loopers.application.product.LikedProductInfo
 import java.math.BigDecimal
 import java.time.ZonedDateTime
 

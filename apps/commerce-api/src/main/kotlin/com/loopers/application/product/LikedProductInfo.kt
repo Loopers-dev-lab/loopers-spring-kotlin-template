@@ -1,4 +1,4 @@
-package com.loopers.application.like
+package com.loopers.application.product
 
 import com.loopers.application.brand.BrandInfo
 import com.loopers.domain.like.Like

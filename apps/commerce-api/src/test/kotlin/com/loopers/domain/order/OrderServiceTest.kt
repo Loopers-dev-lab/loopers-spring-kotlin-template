@@ -1,210 +1,78 @@
 package com.loopers.domain.order
 
-import com.loopers.domain.point.Point
-import com.loopers.domain.point.PointRepository
 import com.loopers.domain.product.Currency
-import com.loopers.domain.product.ProductRepository
-import com.loopers.domain.product.Stock
-import com.loopers.domain.product.StockRepository
+import com.loopers.domain.product.Price
 import com.loopers.fixtures.createTestBrand
-import com.loopers.fixtures.createTestProduct
-import com.loopers.support.error.CoreException
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
 class OrderServiceTest {
     private val orderRepository: OrderRepository = mockk(relaxed = true)
-    private val productRepository: ProductRepository = mockk()
-    private val stockRepository: StockRepository = mockk()
-    private val pointRepository: PointRepository = mockk()
 
-    private val orderService = OrderService(
-        orderRepository,
-        productRepository,
-        stockRepository,
-        pointRepository,
-    )
+    private val orderService = OrderService(orderRepository)
 
     @Test
-    fun `정상적으로 주문을 생성할 수 있다`() {
+    fun `주문을 생성할 수 있다`() {
         // given
         val userId = 1L
         val brand = createTestBrand(id = 1L, name = "Test Brand")
-        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
-        val stock = Stock(productId = 100L, quantity = 100)
-        val point = Point(userId = userId, balance = Money(BigDecimal("500000"), Currency.KRW))
-
-        val orderItemRequests = listOf(
-            CreateOrderItemCommand(productId = 100L, quantity = 2),
+        val orderItem = OrderItem(
+            productId = 100L,
+            productName = "운동화",
+            brandId = brand.id,
+            brandName = brand.name,
+            brandDescription = brand.description,
+            quantity = 2,
+            priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
         )
 
-        every { productRepository.findById(100L) } returns product
-        every { stockRepository.findByProductId(100L) } returns stock
-        every { pointRepository.findByUserId(userId) } returns point
-        every { stockRepository.findByProductIdWithLock(100L) } returns stock
-        every { pointRepository.findByUserIdWithLock(userId) } returns point
         every { orderRepository.save(any()) } answers { firstArg() }
-        every { stockRepository.save(any()) } answers { firstArg() }
-        every { pointRepository.save(any()) } answers { firstArg() }
 
         // when
-        val order = orderService.createOrder(userId, orderItemRequests)
+        val order = orderService.createOrder(userId, listOf(orderItem))
 
         // then
         assertThat(order.userId).isEqualTo(userId)
         assertThat(order.items).hasSize(1)
         assertThat(order.items[0].quantity).isEqualTo(2)
         verify { orderRepository.save(any()) }
-        verify { stockRepository.save(any()) }
-        verify { pointRepository.save(any()) }
     }
 
     @Test
-    fun `존재하지 않는 상품 주문 시 예외가 발생한다`() {
-        // given
-        val userId = 1L
-        val orderItemRequests = listOf(
-            CreateOrderItemCommand(productId = 999L, quantity = 1),
-        )
-
-        every { productRepository.findById(999L) } returns null
-
-        // when & then
-        assertThatThrownBy {
-            orderService.createOrder(userId, orderItemRequests)
-        }.isInstanceOf(CoreException::class.java)
-            .hasMessageContaining("상품을 찾을 수 없습니다")
-    }
-
-    @Test
-    fun `재고가 부족하면 예외가 발생한다`() {
+    fun `여러 주문 아이템으로 주문을 생성할 수 있다`() {
         // given
         val userId = 1L
         val brand = createTestBrand(id = 1L, name = "Test Brand")
-        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
-        val stock = Stock(productId = 100L, quantity = 5)
-
-        val orderItemRequests = listOf(
-            CreateOrderItemCommand(productId = 100L, quantity = 10),
+        val orderItem1 = OrderItem(
+            productId = 100L,
+            productName = "운동화",
+            brandId = brand.id,
+            brandName = brand.name,
+            brandDescription = brand.description,
+            quantity = 1,
+            priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+        )
+        val orderItem2 = OrderItem(
+            productId = 101L,
+            productName = "티셔츠",
+            brandId = brand.id,
+            brandName = brand.name,
+            brandDescription = brand.description,
+            quantity = 2,
+            priceAtOrder = Price(BigDecimal("50000"), Currency.KRW),
         )
 
-        every { productRepository.findById(100L) } returns product
-        every { stockRepository.findByProductId(100L) } returns stock
-
-        // when & then
-        assertThatThrownBy {
-            orderService.createOrder(userId, orderItemRequests)
-        }.isInstanceOf(CoreException::class.java)
-            .hasMessageContaining("재고 부족")
-    }
-
-    @Test
-    fun `포인트가 부족하면 예외가 발생한다`() {
-        // given
-        val userId = 1L
-        val brand = createTestBrand(id = 1L, name = "Test Brand")
-        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
-        val stock = Stock(productId = 100L, quantity = 100)
-        val point = Point(userId = userId, balance = Money(BigDecimal("50000"), Currency.KRW))
-
-        val orderItemRequests = listOf(
-            // 총 200,000원
-            CreateOrderItemCommand(productId = 100L, quantity = 2),
-        )
-
-        every { productRepository.findById(100L) } returns product
-        every { stockRepository.findByProductId(100L) } returns stock
-        every { pointRepository.findByUserId(userId) } returns point
-
-        // when & then
-        assertThatThrownBy {
-            orderService.createOrder(userId, orderItemRequests)
-        }.isInstanceOf(CoreException::class.java)
-            .hasMessageContaining("포인트 부족")
-    }
-
-    @Test
-    fun `주문 시 재고 정보가 없으면 예외가 발생한다`() {
-        // given
-        val userId = 1L
-        val brand = createTestBrand(id = 1L, name = "Test Brand")
-        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
-
-        val orderItemRequests = listOf(
-            CreateOrderItemCommand(productId = 100L, quantity = 1),
-        )
-
-        every { productRepository.findById(100L) } returns product
-        every { stockRepository.findByProductId(100L) } returns null
-
-        // when & then
-        assertThatThrownBy {
-            orderService.createOrder(userId, orderItemRequests)
-        }.isInstanceOf(CoreException::class.java)
-            .hasMessageContaining("재고 정보를 찾을 수 없습니다")
-    }
-
-    @Test
-    fun `주문 시 포인트 정보가 없으면 예외가 발생한다`() {
-        // given
-        val userId = 1L
-        val brand = createTestBrand(id = 1L, name = "Test Brand")
-        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
-        val stock = Stock(productId = 100L, quantity = 100)
-
-        val orderItemRequests = listOf(
-            CreateOrderItemCommand(productId = 100L, quantity = 1),
-        )
-
-        every { productRepository.findById(100L) } returns product
-        every { stockRepository.findByProductId(100L) } returns stock
-        every { pointRepository.findByUserId(userId) } returns null
-
-        // when & then
-        assertThatThrownBy {
-            orderService.createOrder(userId, orderItemRequests)
-        }.isInstanceOf(CoreException::class.java)
-            .hasMessageContaining("포인트 정보를 찾을 수 없습니다")
-    }
-
-    @Test
-    fun `여러 상품을 주문할 수 있다`() {
-        // given
-        val userId = 1L
-        val brand = createTestBrand(id = 1L, name = "Test Brand")
-        val product1 = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
-        val product2 = createTestProduct(id = 101L, name = "티셔츠", price = BigDecimal("50000"), brand = brand)
-        val stock1 = Stock(productId = 100L, quantity = 100)
-        val stock2 = Stock(productId = 101L, quantity = 100)
-        val point = Point(userId = userId, balance = Money(BigDecimal("500000"), Currency.KRW))
-
-        val orderItemRequests = listOf(
-            CreateOrderItemCommand(productId = 100L, quantity = 1),
-            CreateOrderItemCommand(productId = 101L, quantity = 2),
-        )
-
-        every { productRepository.findById(100L) } returns product1
-        every { productRepository.findById(101L) } returns product2
-        every { stockRepository.findByProductId(100L) } returns stock1
-        every { stockRepository.findByProductId(101L) } returns stock2
-        every { pointRepository.findByUserId(userId) } returns point
-        every { stockRepository.findByProductIdWithLock(100L) } returns stock1
-        every { stockRepository.findByProductIdWithLock(101L) } returns stock2
-        every { pointRepository.findByUserIdWithLock(userId) } returns point
         every { orderRepository.save(any()) } answers { firstArg() }
-        every { stockRepository.save(any()) } answers { firstArg() }
-        every { pointRepository.save(any()) } answers { firstArg() }
 
         // when
-        val order = orderService.createOrder(userId, orderItemRequests)
+        val order = orderService.createOrder(userId, listOf(orderItem1, orderItem2))
 
         // then
         assertThat(order.items).hasSize(2)
-        assertThat(order.calculateTotalAmount().amount).isEqualTo(BigDecimal("200000")) // 100000 + 100000
+        assertThat(order.calculateTotalAmount().amount).isEqualTo(BigDecimal("200000"))
     }
 }

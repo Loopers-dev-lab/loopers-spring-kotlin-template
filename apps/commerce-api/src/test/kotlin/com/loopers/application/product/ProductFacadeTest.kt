@@ -1,10 +1,11 @@
 package com.loopers.application.product
 
+import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.product.ProductDetailData
 import com.loopers.domain.product.ProductQueryService
-import com.loopers.domain.product.ProductWithLikeCount
 import com.loopers.domain.product.Stock
 import com.loopers.fixtures.createTestBrand
+import com.loopers.fixtures.createTestLike
 import com.loopers.fixtures.createTestProduct
 import com.loopers.support.error.CoreException
 import io.mockk.every
@@ -18,9 +19,11 @@ import java.math.BigDecimal
 
 class ProductFacadeTest {
     private val productQueryService: ProductQueryService = mockk()
+    private val likeQueryService: LikeQueryService = mockk()
 
     private val productFacade = ProductFacade(
         productQueryService,
+        likeQueryService,
     )
 
     @Test
@@ -30,13 +33,10 @@ class ProductFacadeTest {
         val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val pageable = PageRequest.of(0, 20)
 
-        val productsWithLikeCount = PageImpl(
-            listOf(ProductWithLikeCount(product, 10L)),
-        )
+        val products = PageImpl(listOf(product))
 
-        every {
-            productQueryService.findProducts(null, "latest", pageable)
-        } returns productsWithLikeCount
+        every { productQueryService.findProducts(null, "latest", pageable) } returns products
+        every { likeQueryService.countByProductIdIn(listOf(100L)) } returns mapOf(100L to 10L)
 
         // when
         val result = productFacade.getProducts(null, "latest", pageable)
@@ -56,8 +56,9 @@ class ProductFacadeTest {
         val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val stock = Stock(productId = 100L, quantity = 50)
 
-        val productDetailData = ProductDetailData(product, stock, 10L)
+        val productDetailData = ProductDetailData(product, stock)
         every { productQueryService.getProductDetail(100L) } returns productDetailData
+        every { likeQueryService.countByProductId(100L) } returns 10L
 
         // when
         val result = productFacade.getProductDetail(100L)
@@ -68,6 +69,28 @@ class ProductFacadeTest {
         assertThat(result.stockQuantity).isEqualTo(50)
         assertThat(result.likeCount).isEqualTo(10L)
         assertThat(result.brand.name).isEqualTo("나이키")
+    }
+
+    @Test
+    fun `좋아요한 상품 목록을 조회할 수 있다`() {
+        // given
+        val userId = 1L
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
+        val like = createTestLike(id = 1L, userId = userId, productId = product.id)
+        val pageable = PageRequest.of(0, 20)
+
+        every { likeQueryService.getLikesByUserId(userId, pageable) } returns PageImpl(listOf(like))
+        every { productQueryService.getProductsByIds(listOf(100L)) } returns listOf(product)
+
+        // when
+        val result = productFacade.getLikedProducts(userId, pageable)
+
+        // then
+        assertThat(result.content).hasSize(1)
+        assertThat(result.content[0].productId).isEqualTo(100L)
+        assertThat(result.content[0].productName).isEqualTo("운동화")
+        assertThat(result.content[0].brand.name).isEqualTo("나이키")
     }
 
     @Test

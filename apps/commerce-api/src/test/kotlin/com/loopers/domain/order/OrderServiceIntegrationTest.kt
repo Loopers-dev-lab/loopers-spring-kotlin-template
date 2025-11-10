@@ -1,5 +1,8 @@
 package com.loopers.domain.order
 
+import com.loopers.application.order.OrderCreateRequest
+import com.loopers.application.order.OrderFacade
+import com.loopers.application.order.OrderItemRequest
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.brand.BrandRepository
 import com.loopers.domain.point.Point
@@ -28,7 +31,7 @@ import java.time.LocalDate
 @Transactional
 class OrderServiceIntegrationTest {
     @Autowired
-    private lateinit var orderService: OrderService
+    private lateinit var orderFacade: OrderFacade
 
     @Autowired
     private lateinit var userRepository: UserRepository
@@ -98,17 +101,22 @@ class OrderServiceIntegrationTest {
     @Test
     fun `정상적으로 주문을 생성하고 재고와 포인트가 차감된다`() {
         // given
-        val orderItemRequests = listOf(
-            CreateOrderItemCommand(productId = product1.id, quantity = 2),
-            CreateOrderItemCommand(productId = product2.id, quantity = 1),
+        val request = OrderCreateRequest(
+            items = listOf(
+                OrderItemRequest(productId = product1.id, quantity = 2),
+                OrderItemRequest(productId = product2.id, quantity = 1),
+            ),
         )
 
         // when
-        val order = orderService.createOrder(user.id, orderItemRequests)
+        val orderInfo = orderFacade.createOrder(user.id, request)
 
         // then
-        assertThat(order.userId).isEqualTo(user.id)
-        assertThat(order.items).hasSize(2)
+        assertThat(orderInfo.userId).isEqualTo(user.id)
+        assertThat(orderInfo.totalAmount).isEqualTo(BigDecimal("250000")) // 200000 + 50000
+
+        val savedOrder = orderRepository.findById(orderInfo.orderId)!!
+        assertThat(savedOrder.items).hasSize(2)
 
         // 재고 확인
         val stock1 = stockRepository.findByProductId(product1.id)!!
@@ -124,16 +132,18 @@ class OrderServiceIntegrationTest {
     @Test
     fun `재고가 부족하면 주문이 실패하고 트랜잭션이 롤백된다`() {
         // given
-        val orderItemRequests = listOf(
-            // 재고 부족
-            CreateOrderItemCommand(productId = product1.id, quantity = 101),
+        val request = OrderCreateRequest(
+            items = listOf(
+                // 재고 부족
+                OrderItemRequest(productId = product1.id, quantity = 101),
+            ),
         )
 
         val initialPoint = pointRepository.findByUserId(user.id)!!.balance.amount
 
         // when & then
         assertThatThrownBy {
-            orderService.createOrder(user.id, orderItemRequests)
+            orderFacade.createOrder(user.id, request)
         }.isInstanceOf(CoreException::class.java)
             .hasMessageContaining("재고 부족")
 
@@ -154,14 +164,16 @@ class OrderServiceIntegrationTest {
         point.deduct(Money(BigDecimal("950000"), Currency.KRW))
         pointRepository.save(point)
 
-        val orderItemRequests = listOf(
-            // 100,000원
-            CreateOrderItemCommand(productId = product1.id, quantity = 1),
+        val request = OrderCreateRequest(
+            items = listOf(
+                // 100,000원
+                OrderItemRequest(productId = product1.id, quantity = 1),
+            ),
         )
 
         // when & then
         assertThatThrownBy {
-            orderService.createOrder(user.id, orderItemRequests)
+            orderFacade.createOrder(user.id, request)
         }.isInstanceOf(CoreException::class.java)
             .hasMessageContaining("포인트 부족")
 
@@ -173,19 +185,21 @@ class OrderServiceIntegrationTest {
     @Test
     fun `주문 항목에 상품 스냅샷이 저장된다`() {
         // given
-        val orderItemRequests = listOf(
-            CreateOrderItemCommand(productId = product1.id, quantity = 1),
+        val request = OrderCreateRequest(
+            items = listOf(
+                OrderItemRequest(productId = product1.id, quantity = 1),
+            ),
         )
 
         // when
-        val order = orderService.createOrder(user.id, orderItemRequests)
+        val orderInfo = orderFacade.createOrder(user.id, request)
 
         // 상품 가격 변경
         product1.updatePrice(Price(BigDecimal("200000"), Currency.KRW))
         productRepository.save(product1)
 
         // then
-        val savedOrder = orderRepository.findById(order.id)!!
+        val savedOrder = orderRepository.findById(orderInfo.orderId)!!
         assertThat(savedOrder.items[0].productName).isEqualTo("통합테스트상품1")
         assertThat(savedOrder.items[0].priceAtOrder.amount).isEqualTo(BigDecimal("100000")) // 주문 당시 가격
         assertThat(savedOrder.items[0].brandName).isEqualTo("통합테스트브랜드")

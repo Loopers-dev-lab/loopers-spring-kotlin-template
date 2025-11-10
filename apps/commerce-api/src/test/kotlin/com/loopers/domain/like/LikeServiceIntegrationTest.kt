@@ -9,9 +9,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.user.Gender
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserRepository
-import com.loopers.support.error.CoreException
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -120,15 +118,6 @@ class LikeServiceIntegrationTest {
         // then (예외 없이 성공)
         val exists = likeRepository.existsByUserIdAndProductId(user.id, product.id)
         assertThat(exists).isFalse()
-    }
-
-    @Test
-    fun `존재하지 않는 상품에 좋아요를 시도하면 예외가 발생한다`() {
-        // when & then
-        assertThatThrownBy {
-            likeService.addLike(user.id, 99999L)
-        }.isInstanceOf(CoreException::class.java)
-            .hasMessageContaining("상품을 찾을 수 없습니다")
     }
 
     @Test

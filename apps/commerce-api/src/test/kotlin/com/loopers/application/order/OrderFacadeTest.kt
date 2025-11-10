@@ -3,8 +3,11 @@ package com.loopers.application.order
 import com.loopers.domain.order.OrderItem
 import com.loopers.domain.order.OrderQueryService
 import com.loopers.domain.order.OrderService
+import com.loopers.domain.point.PointService
 import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
+import com.loopers.domain.product.ProductQueryService
+import com.loopers.domain.product.StockService
 import com.loopers.fixtures.createTestOrder
 import com.loopers.support.error.CoreException
 import io.mockk.every
@@ -20,8 +23,17 @@ import java.math.BigDecimal
 class OrderFacadeTest {
     private val orderService: OrderService = mockk()
     private val orderQueryService: OrderQueryService = mockk()
+    private val productQueryService: ProductQueryService = mockk(relaxed = true)
+    private val stockService: StockService = mockk(relaxed = true)
+    private val pointService: PointService = mockk(relaxed = true)
 
-    private val orderFacade = OrderFacade(orderService, orderQueryService)
+    private val orderFacade = OrderFacade(
+        orderService,
+        orderQueryService,
+        productQueryService,
+        stockService,
+        pointService,
+    )
 
     @Test
     fun `주문을 생성할 수 있다`() {

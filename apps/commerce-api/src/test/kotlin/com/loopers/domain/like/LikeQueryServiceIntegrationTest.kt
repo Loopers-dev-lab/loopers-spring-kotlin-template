@@ -77,7 +77,7 @@ class LikeQueryServiceIntegrationTest {
     }
 
     @Test
-    fun `좋아요한 상품 목록을 조회할 수 있다`() {
+    fun `사용자의 좋아요 목록을 조회할 수 있다`() {
         // given
         val userId = requireNotNull(user.id) { "user.id must not be null" }
         products.forEach { product ->
@@ -86,22 +86,26 @@ class LikeQueryServiceIntegrationTest {
         val pageable = PageRequest.of(0, 20)
 
         // when
-        val result = likeQueryService.getLikedProducts(userId, pageable)
+        val result = likeQueryService.getLikesByUserId(userId, pageable)
 
         // then
         assertThat(result.content).hasSize(3)
-        assertThat(result.content.map { it.product.name }).containsExactlyInAnyOrder("상품1", "상품2", "상품3")
-        assertThat(result.content.map { it.like.userId }).allMatch { it == userId }
+        assertThat(result.content.map { it.productId }).containsExactlyInAnyOrder(
+            products[0].id,
+            products[1].id,
+            products[2].id,
+        )
+        assertThat(result.content.map { it.userId }).allMatch { it == userId }
     }
 
     @Test
-    fun `좋아요한 상품이 없으면 빈 목록을 반환한다`() {
+    fun `좋아요가 없으면 빈 목록을 반환한다`() {
         // given
         val userId = requireNotNull(user.id) { "user.id must not be null" }
         val pageable = PageRequest.of(0, 20)
 
         // when
-        val result = likeQueryService.getLikedProducts(userId, pageable)
+        val result = likeQueryService.getLikesByUserId(userId, pageable)
 
         // then
         assertThat(result.content).isEmpty()
@@ -117,7 +121,7 @@ class LikeQueryServiceIntegrationTest {
         val pageable = PageRequest.of(0, 2)
 
         // when
-        val result = likeQueryService.getLikedProducts(userId, pageable)
+        val result = likeQueryService.getLikesByUserId(userId, pageable)
 
         // then
         assertThat(result.content).hasSize(2)

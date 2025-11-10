@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.like
 
 import com.loopers.application.like.LikeFacade
+import com.loopers.application.product.ProductFacade
 import com.loopers.interfaces.api.ApiResponse
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1")
 class LikeV1Controller(
     private val likeFacade: LikeFacade,
+    private val productFacade: ProductFacade,
 ) : LikeV1ApiSpec {
     @PostMapping("/products/{productId}/likes")
     override fun addLike(
@@ -43,7 +45,7 @@ class LikeV1Controller(
         @RequestParam(defaultValue = "20") size: Int,
     ): ApiResponse<Page<LikeV1Dto.LikedProductResponse>> {
         val pageable = PageRequest.of(page, size)
-        return likeFacade.getLikedProducts(userId, pageable)
+        return productFacade.getLikedProducts(userId, pageable)
             .map { LikeV1Dto.LikedProductResponse.from(it) }
             .let { ApiResponse.success(it) }
     }

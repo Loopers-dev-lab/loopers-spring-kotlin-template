@@ -1,26 +1,29 @@
 package com.loopers.application.like
 
-import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.like.LikeService
-import org.springframework.data.domain.Page
-import org.springframework.data.domain.Pageable
+import com.loopers.domain.product.ProductRepository
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Component
 
 @Component
 class LikeFacade(
     private val likeService: LikeService,
-    private val likeQueryService: LikeQueryService,
+    private val productRepository: ProductRepository,
 ) {
     fun addLike(userId: Long, productId: Long) {
+        if (!productRepository.existsById(productId)) {
+            throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
+        }
+
         likeService.addLike(userId, productId)
     }
 
     fun removeLike(userId: Long, productId: Long) {
-        likeService.removeLike(userId, productId)
-    }
+        if (!productRepository.existsById(productId)) {
+            throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
+        }
 
-    fun getLikedProducts(userId: Long, pageable: Pageable): Page<LikedProductInfo> {
-        val likedProducts = likeQueryService.getLikedProducts(userId, pageable)
-        return likedProducts.map { LikedProductInfo.from(it.like, it.product) }
+        likeService.removeLike(userId, productId)
     }
 }
