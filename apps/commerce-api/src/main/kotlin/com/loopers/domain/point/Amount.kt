@@ -13,8 +13,16 @@ data class Amount(
         validate(value)
     }
 
+    fun isLessThan(other: Amount): Boolean {
+        return this.value < other.value
+    }
+
+    fun isZero(): Boolean {
+        return this.value == 0L
+    }
+
     private fun validate(amount: Long) {
-        require(amount > 0) { ERROR_MESSAGE_NOT_POSITIVE }
+        require(amount >= 0) { ERROR_MESSAGE_NOT_POSITIVE }
     }
 
     operator fun plus(other: Amount): Amount {
@@ -26,6 +34,6 @@ data class Amount(
     }
 
     companion object {
-        private const val ERROR_MESSAGE_NOT_POSITIVE = "충전 금액은 0보다 커야 합니다."
+        private const val ERROR_MESSAGE_NOT_POSITIVE = "금액은 0이상 이여야 합니다."
     }
 }
