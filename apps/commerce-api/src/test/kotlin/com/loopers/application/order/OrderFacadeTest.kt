@@ -1,11 +1,11 @@
 package com.loopers.application.order
 
-import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderItem
 import com.loopers.domain.order.OrderQueryService
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
+import com.loopers.fixtures.createTestOrder
 import com.loopers.support.error.CoreException
 import io.mockk.every
 import io.mockk.mockk
@@ -23,7 +23,15 @@ class OrderFacadeTest {
 
     private val orderFacade = OrderFacade(orderService, orderQueryService)
 
-    private fun createTestOrder(orderId: Long, userId: Long): Order {
+    @Test
+    fun `주문을 생성할 수 있다`() {
+        // given
+        val userId = 1L
+        val request = OrderCreateRequest(
+            items = listOf(
+                OrderItemRequest(productId = 100L, quantity = 2),
+            ),
+        )
         val items = listOf(
             OrderItem(
                 productId = 100L,
@@ -35,33 +43,7 @@ class OrderFacadeTest {
                 priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
             ),
         )
-        return Order(userId = userId, items = items).apply {
-            val superclass = Order::class.java.superclass
-
-            val idField = superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(this, orderId)
-
-            val createdAtField = superclass.getDeclaredField("createdAt")
-            createdAtField.isAccessible = true
-            createdAtField.set(this, java.time.ZonedDateTime.now())
-
-            val updatedAtField = superclass.getDeclaredField("updatedAt")
-            updatedAtField.isAccessible = true
-            updatedAtField.set(this, java.time.ZonedDateTime.now())
-        }
-    }
-
-    @Test
-    fun `주문을 생성할 수 있다`() {
-        // given
-        val userId = 1L
-        val request = OrderCreateRequest(
-            items = listOf(
-                OrderItemRequest(productId = 100L, quantity = 2),
-            ),
-        )
-        val order = createTestOrder(1L, userId)
+        val order = createTestOrder(id = 1L, userId = userId, items = items)
 
         every { orderService.createOrder(userId, any()) } returns order
 
@@ -79,7 +61,18 @@ class OrderFacadeTest {
         // given
         val userId = 1L
         val pageable = PageRequest.of(0, 20)
-        val order = createTestOrder(1L, userId)
+        val items = listOf(
+            OrderItem(
+                productId = 100L,
+                productName = "운동화",
+                brandId = 1L,
+                brandName = "나이키",
+                brandDescription = null,
+                quantity = 2,
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
+        )
+        val order = createTestOrder(id = 1L, userId = userId, items = items)
 
         every { orderQueryService.getOrders(userId, pageable) } returns PageImpl(listOf(order))
 
@@ -96,7 +89,18 @@ class OrderFacadeTest {
         // given
         val userId = 1L
         val orderId = 1L
-        val order = createTestOrder(orderId, userId)
+        val items = listOf(
+            OrderItem(
+                productId = 100L,
+                productName = "운동화",
+                brandId = 1L,
+                brandName = "나이키",
+                brandDescription = null,
+                quantity = 2,
+                priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
+            ),
+        )
+        val order = createTestOrder(id = orderId, userId = userId, items = items)
 
         every { orderQueryService.getOrderDetail(userId, orderId) } returns order
 

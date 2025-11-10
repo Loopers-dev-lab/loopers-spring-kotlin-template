@@ -1,7 +1,8 @@
 package com.loopers.domain.product
 
-import com.loopers.domain.brand.Brand
 import com.loopers.domain.like.LikeRepository
+import com.loopers.fixtures.createTestBrand
+import com.loopers.fixtures.createTestProduct
 import com.loopers.support.error.CoreException
 import io.mockk.every
 import io.mockk.mockk
@@ -18,52 +19,12 @@ class ProductQueryServiceTest {
     private val likeRepository: LikeRepository = mockk()
     private val productQueryService = ProductQueryService(productRepository, stockRepository, likeRepository)
 
-    private fun createTestProduct(id: Long, name: String, price: BigDecimal, brand: Brand): Product {
-        return Product(
-            name = name,
-            price = Price(price, Currency.KRW),
-            brand = brand,
-        ).apply {
-            val superclass = Product::class.java.superclass
-
-            val idField = superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(this, id)
-
-            val createdAtField = superclass.getDeclaredField("createdAt")
-            createdAtField.isAccessible = true
-            createdAtField.set(this, java.time.ZonedDateTime.now())
-
-            val updatedAtField = superclass.getDeclaredField("updatedAt")
-            updatedAtField.isAccessible = true
-            updatedAtField.set(this, java.time.ZonedDateTime.now())
-        }
-    }
-
-    private fun createTestBrand(id: Long, name: String): Brand {
-        return Brand(name = name, description = "Test Description").apply {
-            val superclass = Brand::class.java.superclass
-
-            val idField = superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(this, id)
-
-            val createdAtField = superclass.getDeclaredField("createdAt")
-            createdAtField.isAccessible = true
-            createdAtField.set(this, java.time.ZonedDateTime.now())
-
-            val updatedAtField = superclass.getDeclaredField("updatedAt")
-            updatedAtField.isAccessible = true
-            updatedAtField.set(this, java.time.ZonedDateTime.now())
-        }
-    }
-
     @Test
     fun `상품 목록 조회 시 각 상품의 좋아요 수를 함께 반환한다`() {
         // given
-        val brand = createTestBrand(1L, "나이키")
-        val product1 = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
-        val product2 = createTestProduct(101L, "티셔츠", BigDecimal("50000"), brand)
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product1 = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
+        val product2 = createTestProduct(id = 101L, name = "티셔츠", price = BigDecimal("50000"), brand = brand)
 
         val products = PageImpl(listOf(product1, product2))
         val pageable = PageRequest.of(0, 20)
@@ -85,8 +46,8 @@ class ProductQueryServiceTest {
     @Test
     fun `브랜드로 필터링하여 상품을 조회할 수 있다`() {
         // given
-        val brand = createTestBrand(1L, "나이키")
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
 
         val products = PageImpl(listOf(product))
         val pageable = PageRequest.of(0, 20)
@@ -107,9 +68,9 @@ class ProductQueryServiceTest {
     @Test
     fun `가격순으로 정렬하여 상품을 조회할 수 있다`() {
         // given
-        val brand = createTestBrand(1L, "나이키")
-        val product1 = createTestProduct(100L, "운동화", BigDecimal("50000"), brand)
-        val product2 = createTestProduct(101L, "티셔츠", BigDecimal("100000"), brand)
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product1 = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("50000"), brand = brand)
+        val product2 = createTestProduct(id = 101L, name = "티셔츠", price = BigDecimal("100000"), brand = brand)
 
         val products = PageImpl(listOf(product1, product2))
         val pageable = PageRequest.of(0, 20)
@@ -129,8 +90,8 @@ class ProductQueryServiceTest {
     @Test
     fun `좋아요 수가 0인 상품도 조회할 수 있다`() {
         // given
-        val brand = createTestBrand(1L, "나이키")
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
 
         val products = PageImpl(listOf(product))
         val pageable = PageRequest.of(0, 20)
@@ -149,8 +110,8 @@ class ProductQueryServiceTest {
     @Test
     fun `상품 상세 정보를 조회할 수 있다`() {
         // given
-        val brand = createTestBrand(1L, "나이키")
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val stock = Stock(productId = 100L, quantity = 50)
 
         every { productRepository.findById(100L) } returns product
@@ -182,8 +143,8 @@ class ProductQueryServiceTest {
     @Test
     fun `재고 정보가 없는 상품 조회 시 예외가 발생한다`() {
         // given
-        val brand = createTestBrand(1L, "나이키")
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
 
         every { productRepository.findById(100L) } returns product
         every { stockRepository.findByProductId(100L) } returns null

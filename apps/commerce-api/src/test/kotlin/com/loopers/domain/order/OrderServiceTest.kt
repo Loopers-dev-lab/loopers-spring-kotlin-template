@@ -3,11 +3,11 @@ package com.loopers.domain.order
 import com.loopers.domain.point.Point
 import com.loopers.domain.point.PointRepository
 import com.loopers.domain.product.Currency
-import com.loopers.domain.product.Price
-import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
+import com.loopers.fixtures.createTestBrand
+import com.loopers.fixtures.createTestProduct
 import com.loopers.support.error.CoreException
 import io.mockk.every
 import io.mockk.mockk
@@ -30,37 +30,12 @@ class OrderServiceTest {
         pointRepository,
     )
 
-    private fun createTestProduct(id: Long, name: String, price: BigDecimal): Product {
-        return Product(
-            name = name,
-            price = Price(price, Currency.KRW),
-            brand = mockk {
-                every { this@mockk.id } returns 1L
-                every { this@mockk.name } returns "Test Brand"
-                every { this@mockk.description } returns "Test Description"
-            },
-        ).apply {
-            val superclass = Product::class.java.superclass
-
-            val idField = superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(this, id)
-
-            val createdAtField = superclass.getDeclaredField("createdAt")
-            createdAtField.isAccessible = true
-            createdAtField.set(this, java.time.ZonedDateTime.now())
-
-            val updatedAtField = superclass.getDeclaredField("updatedAt")
-            updatedAtField.isAccessible = true
-            updatedAtField.set(this, java.time.ZonedDateTime.now())
-        }
-    }
-
     @Test
     fun `정상적으로 주문을 생성할 수 있다`() {
         // given
         val userId = 1L
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"))
+        val brand = createTestBrand(id = 1L, name = "Test Brand")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val stock = Stock(productId = 100L, quantity = 100)
         val point = Point(userId = userId, balance = Money(BigDecimal("500000"), Currency.KRW))
 
@@ -110,7 +85,8 @@ class OrderServiceTest {
     fun `재고가 부족하면 예외가 발생한다`() {
         // given
         val userId = 1L
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"))
+        val brand = createTestBrand(id = 1L, name = "Test Brand")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val stock = Stock(productId = 100L, quantity = 5)
 
         val orderItemRequests = listOf(
@@ -131,7 +107,8 @@ class OrderServiceTest {
     fun `포인트가 부족하면 예외가 발생한다`() {
         // given
         val userId = 1L
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"))
+        val brand = createTestBrand(id = 1L, name = "Test Brand")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val stock = Stock(productId = 100L, quantity = 100)
         val point = Point(userId = userId, balance = Money(BigDecimal("50000"), Currency.KRW))
 
@@ -155,7 +132,8 @@ class OrderServiceTest {
     fun `주문 시 재고 정보가 없으면 예외가 발생한다`() {
         // given
         val userId = 1L
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"))
+        val brand = createTestBrand(id = 1L, name = "Test Brand")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
 
         val orderItemRequests = listOf(
             CreateOrderItemCommand(productId = 100L, quantity = 1),
@@ -175,7 +153,8 @@ class OrderServiceTest {
     fun `주문 시 포인트 정보가 없으면 예외가 발생한다`() {
         // given
         val userId = 1L
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"))
+        val brand = createTestBrand(id = 1L, name = "Test Brand")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val stock = Stock(productId = 100L, quantity = 100)
 
         val orderItemRequests = listOf(
@@ -197,8 +176,9 @@ class OrderServiceTest {
     fun `여러 상품을 주문할 수 있다`() {
         // given
         val userId = 1L
-        val product1 = createTestProduct(100L, "운동화", BigDecimal("100000"))
-        val product2 = createTestProduct(101L, "티셔츠", BigDecimal("50000"))
+        val brand = createTestBrand(id = 1L, name = "Test Brand")
+        val product1 = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
+        val product2 = createTestProduct(id = 101L, name = "티셔츠", price = BigDecimal("50000"), brand = brand)
         val stock1 = Stock(productId = 100L, quantity = 100)
         val stock2 = Stock(productId = 101L, quantity = 100)
         val point = Point(userId = userId, balance = Money(BigDecimal("500000"), Currency.KRW))

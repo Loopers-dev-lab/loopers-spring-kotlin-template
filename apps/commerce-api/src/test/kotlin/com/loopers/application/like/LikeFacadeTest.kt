@@ -1,13 +1,11 @@
 package com.loopers.application.like
 
-import com.loopers.domain.brand.Brand
-import com.loopers.domain.like.Like
 import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.like.LikeService
 import com.loopers.domain.like.LikedProductData
-import com.loopers.domain.product.Currency
-import com.loopers.domain.product.Price
-import com.loopers.domain.product.Product
+import com.loopers.fixtures.createTestBrand
+import com.loopers.fixtures.createTestLike
+import com.loopers.fixtures.createTestProduct
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -25,64 +23,6 @@ class LikeFacadeTest {
         likeService,
         likeQueryService,
     )
-
-    private fun createTestProduct(id: Long, name: String, price: BigDecimal, brand: Brand): Product {
-        return Product(
-            name = name,
-            price = Price(price, Currency.KRW),
-            brand = brand,
-        ).apply {
-            val superclass = Product::class.java.superclass
-
-            val idField = superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(this, id)
-
-            val createdAtField = superclass.getDeclaredField("createdAt")
-            createdAtField.isAccessible = true
-            createdAtField.set(this, java.time.ZonedDateTime.now())
-
-            val updatedAtField = superclass.getDeclaredField("updatedAt")
-            updatedAtField.isAccessible = true
-            updatedAtField.set(this, java.time.ZonedDateTime.now())
-        }
-    }
-
-    private fun createTestBrand(id: Long, name: String): Brand {
-        return Brand(name = name, description = "Test Description").apply {
-            val superclass = Brand::class.java.superclass
-
-            val idField = superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(this, id)
-
-            val createdAtField = superclass.getDeclaredField("createdAt")
-            createdAtField.isAccessible = true
-            createdAtField.set(this, java.time.ZonedDateTime.now())
-
-            val updatedAtField = superclass.getDeclaredField("updatedAt")
-            updatedAtField.isAccessible = true
-            updatedAtField.set(this, java.time.ZonedDateTime.now())
-        }
-    }
-
-    private fun createTestLike(userId: Long, productId: Long): Like {
-        return Like(userId = userId, productId = productId).apply {
-            val superclass = Like::class.java.superclass
-
-            val idField = superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(this, 1L)
-
-            val createdAtField = superclass.getDeclaredField("createdAt")
-            createdAtField.isAccessible = true
-            createdAtField.set(this, java.time.ZonedDateTime.now())
-
-            val updatedAtField = superclass.getDeclaredField("updatedAt")
-            updatedAtField.isAccessible = true
-            updatedAtField.set(this, java.time.ZonedDateTime.now())
-        }
-    }
 
     @Test
     fun `좋아요를 등록할 수 있다`() {
@@ -114,9 +54,9 @@ class LikeFacadeTest {
     fun `좋아요한 상품 목록을 조회할 수 있다`() {
         // given
         val userId = 1L
-        val brand = createTestBrand(1L, "나이키")
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
-        val like = createTestLike(userId, product.id)
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
+        val like = createTestLike(id = 1L, userId = userId, productId = product.id)
         val pageable = PageRequest.of(0, 20)
 
         val likedProductData = LikedProductData(like, product)

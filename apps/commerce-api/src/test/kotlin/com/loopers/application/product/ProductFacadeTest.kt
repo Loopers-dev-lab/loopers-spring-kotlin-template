@@ -1,13 +1,11 @@
 package com.loopers.application.product
 
-import com.loopers.domain.brand.Brand
-import com.loopers.domain.product.Currency
-import com.loopers.domain.product.Price
-import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductDetailData
 import com.loopers.domain.product.ProductQueryService
 import com.loopers.domain.product.ProductWithLikeCount
 import com.loopers.domain.product.Stock
+import com.loopers.fixtures.createTestBrand
+import com.loopers.fixtures.createTestProduct
 import com.loopers.support.error.CoreException
 import io.mockk.every
 import io.mockk.mockk
@@ -25,51 +23,11 @@ class ProductFacadeTest {
         productQueryService,
     )
 
-    private fun createTestProduct(id: Long, name: String, price: BigDecimal, brand: Brand): Product {
-        return Product(
-            name = name,
-            price = Price(price, Currency.KRW),
-            brand = brand,
-        ).apply {
-            val superclass = Product::class.java.superclass
-
-            val idField = superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(this, id)
-
-            val createdAtField = superclass.getDeclaredField("createdAt")
-            createdAtField.isAccessible = true
-            createdAtField.set(this, java.time.ZonedDateTime.now())
-
-            val updatedAtField = superclass.getDeclaredField("updatedAt")
-            updatedAtField.isAccessible = true
-            updatedAtField.set(this, java.time.ZonedDateTime.now())
-        }
-    }
-
-    private fun createTestBrand(id: Long, name: String): Brand {
-        return Brand(name = name, description = "Test Description").apply {
-            val superclass = Brand::class.java.superclass
-
-            val idField = superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.set(this, id)
-
-            val createdAtField = superclass.getDeclaredField("createdAt")
-            createdAtField.isAccessible = true
-            createdAtField.set(this, java.time.ZonedDateTime.now())
-
-            val updatedAtField = superclass.getDeclaredField("updatedAt")
-            updatedAtField.isAccessible = true
-            updatedAtField.set(this, java.time.ZonedDateTime.now())
-        }
-    }
-
     @Test
     fun `상품 목록을 조회할 수 있다`() {
         // given
-        val brand = createTestBrand(1L, "나이키")
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val pageable = PageRequest.of(0, 20)
 
         val productsWithLikeCount = PageImpl(
@@ -94,8 +52,8 @@ class ProductFacadeTest {
     @Test
     fun `상품 상세 정보를 조회할 수 있다`() {
         // given
-        val brand = createTestBrand(1L, "나이키")
-        val product = createTestProduct(100L, "운동화", BigDecimal("100000"), brand)
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val stock = Stock(productId = 100L, quantity = 50)
 
         val productDetailData = ProductDetailData(product, stock, 10L)
