@@ -20,14 +20,14 @@ data class Money(
         }
     }
 
-    fun add(other: Money): Money {
+    operator fun plus(other: Money): Money {
         if (this.currency != other.currency) {
             throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 금액은 더할 수 없습니다.")
         }
         return Money(this.amount + other.amount, this.currency)
     }
 
-    fun subtract(other: Money): Money {
+    operator fun minus(other: Money): Money {
         if (this.currency != other.currency) {
             throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 금액은 뺄 수 없습니다.")
         }
@@ -38,7 +38,11 @@ data class Money(
         return Money(result, this.currency)
     }
 
-    fun multiply(multiplier: Int): Money = Money(this.amount * BigDecimal(multiplier), this.currency)
+    operator fun times(multiplier: Int): Money = Money(this.amount * BigDecimal(multiplier), this.currency)
+
+    operator fun unaryPlus(): Money = this
+
+    operator fun unaryMinus(): Money = Money(-this.amount, this.currency)
 
     fun isGreaterThanOrEqual(other: Money): Boolean {
         if (this.currency != other.currency) {

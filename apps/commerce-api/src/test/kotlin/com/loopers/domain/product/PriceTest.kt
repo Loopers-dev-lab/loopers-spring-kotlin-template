@@ -32,7 +32,7 @@ class PriceTest {
         val price2 = Price(amount = BigDecimal("5000"), currency = Currency.KRW)
 
         // when
-        val result = price1.add(price2)
+        val result = price1 + price2
 
         // then
         assertThat(result.amount).isEqualTo(BigDecimal("15000"))
@@ -45,7 +45,7 @@ class PriceTest {
         val price = Price(amount = BigDecimal("10000"), currency = Currency.KRW)
 
         // when
-        val result = price.multiply(3)
+        val result = price * 3
 
         // then
         assertThat(result.amount).isEqualTo(BigDecimal("30000"))
@@ -72,7 +72,7 @@ class PriceTest {
 
         // when & then
         assertThatThrownBy {
-            krw.add(usd)
+            krw + usd
         }.isInstanceOf(CoreException::class.java)
             .hasMessageContaining("통화")
     }
@@ -86,5 +86,29 @@ class PriceTest {
         // when & then
         assertThat(price1).isEqualTo(price2)
         assertThat(price1.hashCode()).isEqualTo(price2.hashCode())
+    }
+
+    @Test
+    fun `단항 플러스 연산자는 자기 자신을 반환한다`() {
+        // given
+        val price = Price(amount = BigDecimal("10000"), currency = Currency.KRW)
+
+        // when
+        val result = +price
+
+        // then
+        assertThat(result).isEqualTo(price)
+    }
+
+    @Test
+    fun `단항 마이너스 연산자는 예외를 발생시킨다`() {
+        // given
+        val price = Price(amount = BigDecimal("10000"), currency = Currency.KRW)
+
+        // when & then
+        assertThatThrownBy {
+            -price
+        }.isInstanceOf(CoreException::class.java)
+            .hasMessageContaining("0 이상")
     }
 }

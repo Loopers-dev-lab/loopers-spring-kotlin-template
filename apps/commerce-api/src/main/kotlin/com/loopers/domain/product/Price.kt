@@ -19,14 +19,18 @@ data class Price(
         }
     }
 
-    fun add(other: Price): Price {
+    operator fun plus(other: Price): Price {
         if (this.currency != other.currency) {
             throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 가격은 더할 수 없습니다.")
         }
         return Price(this.amount + other.amount, this.currency)
     }
 
-    fun multiply(multiplier: Int): Price = Price(this.amount * BigDecimal(multiplier), this.currency)
+    operator fun times(multiplier: Int): Price = Price(this.amount * BigDecimal(multiplier), this.currency)
+
+    operator fun unaryPlus(): Price = this
+
+    operator fun unaryMinus(): Price = Price(-this.amount, this.currency)
 
     override fun compareTo(other: Price): Int {
         if (this.currency != other.currency) {

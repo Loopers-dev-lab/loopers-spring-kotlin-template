@@ -33,7 +33,7 @@ class MoneyTest {
         val money2 = Money(amount = BigDecimal("5000"), currency = Currency.KRW)
 
         // when
-        val result = money1.add(money2)
+        val result = money1 + money2
 
         // then
         assertThat(result.amount).isEqualTo(BigDecimal("15000"))
@@ -46,7 +46,7 @@ class MoneyTest {
         val money2 = Money(amount = BigDecimal("3000"), currency = Currency.KRW)
 
         // when
-        val result = money1.subtract(money2)
+        val result = money1 - money2
 
         // then
         assertThat(result.amount).isEqualTo(BigDecimal("7000"))
@@ -58,7 +58,7 @@ class MoneyTest {
         val money = Money(amount = BigDecimal("10000"), currency = Currency.KRW)
 
         // when
-        val result = money.multiply(3)
+        val result = money * 3
 
         // then
         assertThat(result.amount).isEqualTo(BigDecimal("30000"))
@@ -73,5 +73,29 @@ class MoneyTest {
         // when & then
         assertThat(money1).isEqualTo(money2)
         assertThat(money1.hashCode()).isEqualTo(money2.hashCode())
+    }
+
+    @Test
+    fun `단항 플러스 연산자는 자기 자신을 반환한다`() {
+        // given
+        val money = Money(amount = BigDecimal("10000"), currency = Currency.KRW)
+
+        // when
+        val result = +money
+
+        // then
+        assertThat(result).isEqualTo(money)
+    }
+
+    @Test
+    fun `단항 마이너스 연산자는 예외를 발생시킨다`() {
+        // given
+        val money = Money(amount = BigDecimal("10000"), currency = Currency.KRW)
+
+        // when & then
+        assertThatThrownBy {
+            -money
+        }.isInstanceOf(CoreException::class.java)
+            .hasMessageContaining("0 이상")
     }
 }
