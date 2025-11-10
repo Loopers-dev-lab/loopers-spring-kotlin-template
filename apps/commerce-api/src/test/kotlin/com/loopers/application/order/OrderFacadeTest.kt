@@ -36,9 +36,19 @@ class OrderFacadeTest {
             ),
         )
         return Order(userId = userId, items = items).apply {
-            val idField = Order::class.java.superclass.getDeclaredField("id")
+            val superclass = Order::class.java.superclass
+
+            val idField = superclass.getDeclaredField("id")
             idField.isAccessible = true
             idField.set(this, orderId)
+
+            val createdAtField = superclass.getDeclaredField("createdAt")
+            createdAtField.isAccessible = true
+            createdAtField.set(this, java.time.ZonedDateTime.now())
+
+            val updatedAtField = superclass.getDeclaredField("updatedAt")
+            updatedAtField.isAccessible = true
+            updatedAtField.set(this, java.time.ZonedDateTime.now())
         }
     }
 

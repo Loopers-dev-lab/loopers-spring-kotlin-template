@@ -40,10 +40,19 @@ class OrderServiceTest {
                 every { this@mockk.description } returns "Test Description"
             },
         ).apply {
-            // Reflection으로 id 설정
-            val idField = Product::class.java.superclass.getDeclaredField("id")
+            val superclass = Product::class.java.superclass
+
+            val idField = superclass.getDeclaredField("id")
             idField.isAccessible = true
             idField.set(this, id)
+
+            val createdAtField = superclass.getDeclaredField("createdAt")
+            createdAtField.isAccessible = true
+            createdAtField.set(this, java.time.ZonedDateTime.now())
+
+            val updatedAtField = superclass.getDeclaredField("updatedAt")
+            updatedAtField.isAccessible = true
+            updatedAtField.set(this, java.time.ZonedDateTime.now())
         }
     }
 

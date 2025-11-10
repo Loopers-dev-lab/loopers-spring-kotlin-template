@@ -31,17 +31,37 @@ class ProductFacadeTest {
             price = Price(price, Currency.KRW),
             brand = brand,
         ).apply {
-            val idField = Product::class.java.superclass.getDeclaredField("id")
+            val superclass = Product::class.java.superclass
+
+            val idField = superclass.getDeclaredField("id")
             idField.isAccessible = true
             idField.set(this, id)
+
+            val createdAtField = superclass.getDeclaredField("createdAt")
+            createdAtField.isAccessible = true
+            createdAtField.set(this, java.time.ZonedDateTime.now())
+
+            val updatedAtField = superclass.getDeclaredField("updatedAt")
+            updatedAtField.isAccessible = true
+            updatedAtField.set(this, java.time.ZonedDateTime.now())
         }
     }
 
     private fun createTestBrand(id: Long, name: String): Brand {
         return Brand(name = name, description = "Test Description").apply {
-            val idField = Brand::class.java.superclass.getDeclaredField("id")
+            val superclass = Brand::class.java.superclass
+
+            val idField = superclass.getDeclaredField("id")
             idField.isAccessible = true
             idField.set(this, id)
+
+            val createdAtField = superclass.getDeclaredField("createdAt")
+            createdAtField.isAccessible = true
+            createdAtField.set(this, java.time.ZonedDateTime.now())
+
+            val updatedAtField = superclass.getDeclaredField("updatedAt")
+            updatedAtField.isAccessible = true
+            updatedAtField.set(this, java.time.ZonedDateTime.now())
         }
     }
 

@@ -25,11 +25,11 @@ abstract class BaseEntity {
     val id: Long = 0
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    var createdAt: ZonedDateTime = ZonedDateTime.now()
+    lateinit var createdAt: ZonedDateTime
         protected set
 
     @Column(name = "updated_at", nullable = false)
-    var updatedAt: ZonedDateTime = ZonedDateTime.now()
+    lateinit var updatedAt: ZonedDateTime
         protected set
 
     @Column(name = "deleted_at")
