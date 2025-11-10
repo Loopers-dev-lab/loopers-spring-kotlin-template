@@ -8,7 +8,7 @@ import jakarta.persistence.Enumerated
 import java.math.BigDecimal
 
 @Embeddable
-data class Price(
+data class Price private constructor(
     val amount: BigDecimal,
     @Enumerated(EnumType.STRING)
     val currency: Currency = Currency.KRW,
@@ -17,6 +17,13 @@ data class Price(
         if (amount < BigDecimal.ZERO) {
             throw CoreException(ErrorType.BAD_REQUEST, "금액은 0 이상이어야 합니다.")
         }
+    }
+
+    companion object {
+        operator fun invoke(
+            amount: BigDecimal,
+            currency: Currency = Currency.KRW,
+        ): Price = Price(amount, currency)
     }
 
     operator fun plus(other: Price): Price {

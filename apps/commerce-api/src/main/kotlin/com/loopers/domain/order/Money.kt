@@ -9,7 +9,7 @@ import jakarta.persistence.Enumerated
 import java.math.BigDecimal
 
 @Embeddable
-data class Money(
+data class Money private constructor(
     val amount: BigDecimal,
     @Enumerated(EnumType.STRING)
     val currency: Currency = Currency.KRW,
@@ -18,6 +18,13 @@ data class Money(
         if (amount < BigDecimal.ZERO) {
             throw CoreException(ErrorType.BAD_REQUEST, "금액은 0 이상이어야 합니다.")
         }
+    }
+
+    companion object {
+        operator fun invoke(
+            amount: BigDecimal,
+            currency: Currency = Currency.KRW,
+        ): Money = Money(amount, currency)
     }
 
     operator fun plus(other: Money): Money {
