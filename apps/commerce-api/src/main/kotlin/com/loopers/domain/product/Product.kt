@@ -20,10 +20,12 @@ class Product(
 
     ) : BaseEntity() {
     companion object {
-        fun create(name: String, brandId: Long): Product {
+        fun create(name: String, price: Long, brandId: Long): Product {
+            require(price > 0) { "상품 가격은 0보다 커야 합니다." }
+
             return Product(
                 name = name,
-                price = 0L,
+                price = price,
                 brandId = brandId,
             )
         }

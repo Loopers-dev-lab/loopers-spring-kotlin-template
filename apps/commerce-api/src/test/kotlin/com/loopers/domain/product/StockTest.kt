@@ -57,11 +57,9 @@ class StockTest {
         val stock = Stock(quantity = 0L, productId = 1L)
 
         // when & then
-        assertThatThrownBy {
-            stock.decrease(1L)
-        }.isInstanceOf(CoreException::class.java)
-            .extracting("errorType")
-            .isEqualTo(ErrorType.INSUFFICIENT_STOCK)
+        assertThatThrownBy { stock.decrease(1L) }
+            .isInstanceOf(CoreException::class.java)
+            .hasFieldOrPropertyWithValue("errorType", ErrorType.INSUFFICIENT_STOCK)
     }
 
     @Test
@@ -70,11 +68,9 @@ class StockTest {
         val stock = Stock(quantity = 5L, productId = 1L)
 
         // when & then
-        assertThatThrownBy {
-            stock.decrease(10L)
-        }.isInstanceOf(CoreException::class.java)
-            .extracting("errorType")
-            .isEqualTo(ErrorType.INSUFFICIENT_STOCK)
+        assertThatThrownBy { stock.decrease(10L) }
+            .isInstanceOf(CoreException::class.java)
+            .hasFieldOrPropertyWithValue("errorType", ErrorType.INSUFFICIENT_STOCK)
     }
 
     @ParameterizedTest
