@@ -28,7 +28,7 @@ data class Price(
 
     operator fun times(multiplier: Int): Price {
         if (multiplier < 0) {
-            throw CoreException(ErrorType.BAD_REQUEST, "금액은 0 이상이어야 합니다.")
+            throw CoreException(ErrorType.BAD_REQUEST, "수량은 0 이상이어야 합니다.")
         }
         return Price(this.amount * BigDecimal(multiplier), this.currency)
     }
