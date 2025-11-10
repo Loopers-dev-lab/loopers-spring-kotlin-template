@@ -3,6 +3,7 @@ package com.loopers.application.product
 import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.product.ProductQueryService
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
 
@@ -34,10 +35,11 @@ class ProductFacade(
         val products = productQueryService.getProductsByIds(productIds)
         val productMap = products.associateBy { it.id }
 
-        return likes.map { like ->
+        val likedProductInfos = likes.content.mapNotNull { like ->
             productMap[like.productId]?.let { product ->
                 LikedProductInfo.from(like, product)
             }
         }
+        return PageImpl(likedProductInfos, pageable, likes.totalElements)
     }
 }
