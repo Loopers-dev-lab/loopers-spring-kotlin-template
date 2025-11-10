@@ -2,7 +2,364 @@
 
 ---
 
-## 1. 브랜드 조회
+## 0. Payment 상태 다이어그램
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: 결제 생성
+    PENDING --> COMPLETED: 포인트 차감 성공
+    PENDING --> FAILED: 포인트 차감 실패
+    COMPLETED --> CANCELLED: 주문 취소
+
+    FAILED --> [*]
+    CANCELLED --> [*]
+
+    note right of PENDING
+        초기 상태
+        포인트 차감 대기
+    end note
+
+    note right of COMPLETED
+        결제 완료
+        포인트 차감 완료
+    end note
+
+    note right of FAILED
+        결제 실패
+        포인트 부족 등
+    end note
+
+    note right of CANCELLED
+        결제 취소
+        포인트 환불 완료
+    end note
+```
+
+---
+
+## 1. User (회원)
+
+### 1.1 회원 조회
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant API as UserController
+    participant Service as UserService
+    participant Repo as UserRepository
+    participant DB as Database
+
+    User->>API: 회원 조회 요청
+    API->>Service: 회원 정보 조회
+    Service->>Repo: 회원 찾기
+    Repo->>DB: 회원 데이터 조회
+
+    alt 회원 존재
+        DB-->>Repo: 회원 데이터
+        Repo-->>Service: 회원 정보
+        Service-->>API: 회원 응답 데이터
+        API-->>User: 조회 성공 (회원 정보)
+    else 회원 없음
+        DB-->>Repo: 데이터 없음
+        Repo-->>Service: null
+        Service-->>API: 회원을 찾을 수 없음
+        API-->>User: 조회 실패 (회원이 존재하지 않습니다)
+    end
+```
+
+### 1.2 회원 목록 조회
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant API as UserController
+    participant Service as UserService
+    participant Repo as UserRepository
+    participant DB as Database
+
+    User->>API: 회원 목록 조회 요청
+    API->>Service: 전체 회원 조회
+    Service->>Repo: 모든 회원 찾기
+    Repo->>DB: 회원 전체 조회
+    DB-->>Repo: 회원 목록
+    Repo-->>Service: 회원 목록
+    Service-->>API: 회원 목록 응답
+    API-->>User: 조회 성공 (회원 목록)
+```
+
+---
+
+## 2. Point (포인트)
+
+### 2.1 포인트 조회
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant API as PointController
+    participant Service as PointService
+    participant Repo as PointRepository
+    participant DB as Database
+
+    User->>API: 포인트 조회 요청
+    API->>API: 로그인 확인
+
+    alt 비로그인
+        API-->>User: 인증 실패 (로그인이 필요합니다)
+    end
+
+    API->>Service: 포인트 조회
+    Service->>Repo: 사용자의 포인트 찾기
+    Repo->>DB: 포인트 데이터 조회
+    DB-->>Repo: 포인트 데이터
+    Repo-->>Service: 포인트 정보
+    Service-->>API: 포인트 응답
+    API-->>User: 조회 성공 (포인트 잔액)
+```
+
+### 2.2 포인트 충전
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant API as PointController
+    participant Service as PointService
+    participant PointRepo as PointRepository
+    participant TxRepo as PointTransactionRepository
+    participant DB as Database
+
+    User->>API: 포인트 충전 요청
+    API->>API: 로그인 확인
+
+    alt 비로그인
+        API-->>User: 인증 실패 (로그인이 필요합니다)
+    end
+
+    API->>Service: 포인트 충전 처리
+
+    Service->>Service: 충전 금액 검증 (양수 확인)
+
+    alt 충전 금액 <= 0
+        Service-->>API: 잘못된 충전 금액
+        API-->>User: 충전 실패 (충전 금액은 0보다 커야 합니다)
+    end
+
+    Note over Service,DB: 트랜잭션 시작
+
+    Service->>PointRepo: 포인트 조회 및 잠금
+    PointRepo->>DB: 포인트 데이터 조회 (FOR UPDATE)
+    DB-->>PointRepo: 포인트 데이터 (잔액 5,000원)
+    PointRepo-->>Service: 포인트 정보
+
+    Service->>Service: 변경 전 잔액 저장 (5,000원)
+    Service->>Service: 포인트 증가 계산 (5,000 + 10,000 = 15,000)
+
+    Service->>PointRepo: 포인트 업데이트
+    PointRepo->>DB: 포인트 데이터 업데이트 (15,000원)
+    DB-->>PointRepo: 업데이트 완료
+    PointRepo-->>Service: 업데이트된 포인트
+
+    Service->>TxRepo: 포인트 트랜잭션 생성
+    Note over Service: 트랜잭션 정보<br/>타입: CHARGE<br/>금액: 10,000<br/>변경 전: 5,000<br/>변경 후: 15,000
+    TxRepo->>DB: 트랜잭션 데이터 생성
+    DB-->>TxRepo: 트랜잭션 생성 완료
+    TxRepo-->>Service: 트랜잭션 정보
+
+    Note over Service,DB: 트랜잭션 커밋
+
+    Service-->>API: 충전 완료 응답
+    API-->>User: 충전 성공 (충전 후 잔액)
+```
+
+### 2.3 포인트 트랜잭션 이력 조회
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant API as PointController
+    participant Service as PointService
+    participant Repo as PointTransactionRepository
+    participant DB as Database
+
+    User->>API: 포인트 이력 조회 요청
+    API->>API: 로그인 확인
+
+    alt 비로그인
+        API-->>User: 인증 실패 (로그인이 필요합니다)
+    end
+
+    API->>Service: 포인트 이력 조회
+    Service->>Repo: 사용자의 트랜잭션 조회
+    Repo->>DB: 트랜잭션 데이터 조회 (최신순)
+    DB-->>Repo: 트랜잭션 목록
+    Repo-->>Service: 트랜잭션 목록
+    Service-->>API: 트랜잭션 이력 응답
+    API-->>User: 조회 성공 (트랜잭션 이력)
+```
+
+---
+
+## 3. Stock (재고)
+
+### 3.1 재고 조회
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant API as StockController
+    participant Service as StockService
+    participant Repo as StockRepository
+    participant DB as Database
+
+    User->>API: 재고 조회 요청
+    API->>Service: 재고 정보 조회
+    Service->>Repo: 상품의 재고 찾기
+    Repo->>DB: 재고 데이터 조회
+
+    alt 재고 존재
+        DB-->>Repo: 재고 데이터
+        Repo-->>Service: 재고 정보
+        Service-->>API: 재고 응답
+        API-->>User: 조회 성공 (재고 수량)
+    else 재고 없음
+        DB-->>Repo: 데이터 없음
+        Repo-->>Service: null
+        Service-->>API: 재고를 찾을 수 없음
+        API-->>User: 조회 실패 (재고가 존재하지 않습니다)
+    end
+```
+
+### 3.2 재고 증가
+
+```mermaid
+sequenceDiagram
+    actor Admin as 관리자
+    participant API as StockController
+    participant Service as StockService
+    participant Repo as StockRepository
+    participant DB as Database
+
+    Admin->>API: 재고 증가 요청
+    API->>Service: 재고 증가 처리
+
+    Service->>Service: 증가 수량 검증 (양수 확인)
+
+    alt 증가 수량 <= 0
+        Service-->>API: 잘못된 증가 수량
+        API-->>Admin: 실패 (증가 수량은 0보다 커야 합니다)
+    end
+
+    Note over Service,DB: 트랜잭션 시작
+
+    Service->>Repo: 재고 조회 및 잠금
+    Repo->>DB: 재고 데이터 조회 (FOR UPDATE)
+    DB-->>Repo: 재고 데이터
+    Repo-->>Service: 재고 정보
+
+    Service->>Service: 재고 증가 계산
+    Service->>Repo: 재고 업데이트
+    Repo->>DB: 재고 데이터 업데이트
+    DB-->>Repo: 업데이트 완료
+    Repo-->>Service: 업데이트된 재고
+
+    Note over Service,DB: 트랜잭션 커밋
+
+    Service-->>API: 증가 완료 응답
+    API-->>Admin: 증가 성공 (증가 후 재고 수량)
+```
+
+---
+
+## 4. Payment (결제)
+
+### 4.1 결제 생성 (성공)
+
+```mermaid
+sequenceDiagram
+    participant OrderService as OrderService
+    participant PaymentService as PaymentService
+    participant PaymentRepo as PaymentRepository
+    participant PointService as PointService
+    participant DB as Database
+
+    OrderService->>PaymentService: 결제 생성 요청
+
+    Note over PaymentService,DB: 트랜잭션 시작
+
+    PaymentService->>PaymentRepo: 결제 엔티티 생성 (상태: PENDING)
+    PaymentRepo->>DB: 결제 데이터 생성
+    DB-->>PaymentRepo: 생성된 결제
+    PaymentRepo-->>PaymentService: 결제 정보
+
+    PaymentService->>PointService: 포인트 차감 요청
+    Note over PointService: 포인트 차감 시<br/>PointTransaction 생성<br/>(타입: USE, 주문ID 포함)
+
+    alt 포인트 차감 성공
+        PointService-->>PaymentService: 차감 완료
+        PaymentService->>PaymentRepo: 결제 상태를 COMPLETED로 변경
+        PaymentRepo->>DB: 결제 상태 업데이트
+        DB-->>PaymentRepo: 업데이트 완료
+        PaymentRepo-->>PaymentService: 업데이트된 결제
+
+        Note over PaymentService,DB: 트랜잭션 커밋
+
+        PaymentService-->>OrderService: 결제 완료
+    else 포인트 차감 실패
+        PointService-->>PaymentService: 차감 실패 (포인트 부족)
+        PaymentService->>PaymentRepo: 결제 상태를 FAILED로 변경
+        PaymentRepo->>DB: 결제 상태 업데이트
+        DB-->>PaymentRepo: 업데이트 완료
+
+        Note over PaymentService,DB: 롤백
+
+        PaymentService-->>OrderService: 결제 실패
+    end
+```
+
+### 4.2 결제 취소
+
+```mermaid
+sequenceDiagram
+    participant OrderService as OrderService
+    participant PaymentService as PaymentService
+    participant PaymentRepo as PaymentRepository
+    participant PointService as PointService
+    participant DB as Database
+
+    OrderService->>PaymentService: 결제 취소 요청
+
+    PaymentService->>PaymentRepo: 결제 정보 조회
+    PaymentRepo->>DB: 결제 데이터 조회
+    DB-->>PaymentRepo: 결제 데이터
+    PaymentRepo-->>PaymentService: 결제 정보
+
+    PaymentService->>PaymentService: 결제 상태 확인
+
+    alt 결제 상태가 COMPLETED가 아님
+        PaymentService-->>OrderService: 취소 불가 (완료된 결제가 아닙니다)
+    end
+
+    Note over PaymentService,DB: 트랜잭션 시작
+
+    PaymentService->>PointService: 포인트 환불 요청
+    PointService->>DB: 포인트 증가
+    DB-->>PointService: 환불 완료
+    Note over PointService: 포인트 환불 시<br/>PointTransaction 생성<br/>(타입: REFUND, 주문ID 포함)
+    PointService-->>PaymentService: 환불 완료
+
+    PaymentService->>PaymentRepo: 결제 상태를 CANCELLED로 변경
+    PaymentRepo->>DB: 결제 상태 업데이트
+    DB-->>PaymentRepo: 업데이트 완료
+    PaymentRepo-->>PaymentService: 업데이트된 결제
+
+    Note over PaymentService,DB: 트랜잭션 커밋
+
+    PaymentService-->>OrderService: 결제 취소 완료
+```
+
+---
+
+## 5. 브랜드 조회
 
 ### 1.1 브랜드 상세 조회
 
