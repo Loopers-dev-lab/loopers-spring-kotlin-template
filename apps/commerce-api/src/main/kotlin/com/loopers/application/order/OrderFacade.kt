@@ -1,5 +1,6 @@
 package com.loopers.application.order
 
+import com.loopers.domain.order.Money
 import com.loopers.domain.order.OrderItem
 import com.loopers.domain.order.OrderQueryService
 import com.loopers.domain.order.OrderService
@@ -7,10 +8,13 @@ import com.loopers.domain.point.PointService
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductQueryService
 import com.loopers.domain.product.StockService
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Component
 class OrderFacade(
@@ -46,11 +50,21 @@ class OrderFacade(
         createOrderItemSnapshot(product, item.quantity)
     }
 
-    private fun calculateTotalAmount(orderItems: List<OrderItem>): com.loopers.domain.order.Money {
-        return com.loopers.domain.order.Money(
-            amount = orderItems.sumOf { it.priceAtOrder.amount * it.quantity.toBigDecimal() },
-            currency = com.loopers.domain.product.Currency.KRW,
-        )
+    private fun calculateTotalAmount(orderItems: List<OrderItem>): Money {
+        if (orderItems.isEmpty()) {
+            return Money(BigDecimal.ZERO, com.loopers.domain.product.Currency.KRW)
+        }
+
+        val firstCurrency = orderItems.first().priceAtOrder.currency
+        if (orderItems.any { it.priceAtOrder.currency != firstCurrency }) {
+            throw CoreException(ErrorType.BAD_REQUEST, "모든 주문 항목은 동일한 통화를 사용해야 합니다.")
+        }
+
+        val totalAmount = orderItems.fold(BigDecimal.ZERO) { acc, item ->
+            acc + item.calculateItemAmount().amount
+        }
+
+        return Money(amount = totalAmount, currency = firstCurrency)
     }
 
     private fun deductStocks(items: List<OrderItemRequest>) {
