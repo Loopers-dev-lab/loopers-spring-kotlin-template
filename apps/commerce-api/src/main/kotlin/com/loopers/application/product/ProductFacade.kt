@@ -35,9 +35,9 @@ class ProductFacade(
         val productMap = products.associateBy { it.id }
 
         return likes.map { like ->
-            val product = productMap[like.productId]
-                ?: throw IllegalStateException("Product not found: ${like.productId}")
-            LikedProductInfo.from(like, product)
+            productMap[like.productId]?.let { product ->
+                LikedProductInfo.from(like, product)
+            }
         }
     }
 }
