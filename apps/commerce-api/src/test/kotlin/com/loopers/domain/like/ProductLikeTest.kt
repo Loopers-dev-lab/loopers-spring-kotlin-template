@@ -1,6 +1,6 @@
-package com.loopers.domain.product
+package com.loopers.domain.like
 
-import org.assertj.core.api.SoftAssertions.assertSoftly
+import org.assertj.core.api.SoftAssertions
 import org.junit.jupiter.api.Test
 
 class ProductLikeTest {
@@ -18,7 +18,7 @@ class ProductLikeTest {
         )
 
         // then
-        assertSoftly { softly ->
+        SoftAssertions.assertSoftly { softly ->
             softly.assertThat(productLike.productId).isEqualTo(1L)
             softly.assertThat(productLike.userId).isEqualTo(100L)
         }

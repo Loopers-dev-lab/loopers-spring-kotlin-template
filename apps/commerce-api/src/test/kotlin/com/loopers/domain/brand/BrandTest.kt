@@ -1,6 +1,6 @@
-package com.loopers.domain.product
+package com.loopers.domain.brand
 
-import org.assertj.core.api.SoftAssertions.assertSoftly
+import org.assertj.core.api.SoftAssertions
 import org.junit.jupiter.api.Test
 
 class BrandTest {
@@ -16,7 +16,7 @@ class BrandTest {
         )
 
         // then
-        assertSoftly { softly ->
+        SoftAssertions.assertSoftly { softly ->
             softly.assertThat(brand.name).isEqualTo(name)
         }
     }

@@ -1,7 +1,7 @@
 package com.loopers.domain.order
 
 import com.loopers.domain.BaseEntity
-import com.loopers.domain.product.Brand
+import com.loopers.domain.brand.Brand
 import com.loopers.domain.product.Product
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

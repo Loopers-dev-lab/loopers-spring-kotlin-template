@@ -1,6 +1,6 @@
 package com.loopers.domain.order
 
-import com.loopers.domain.product.Brand
+import com.loopers.domain.brand.Brand
 import com.loopers.domain.product.Product
 import com.loopers.support.util.withId
 import org.assertj.core.api.Assertions.assertThatThrownBy
