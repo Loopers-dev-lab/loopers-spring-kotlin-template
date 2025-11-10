@@ -35,7 +35,16 @@ data class Price(
 
     operator fun unaryPlus(): Price = this
 
-    operator fun unaryMinus(): Price = Price(-this.amount, this.currency)
+    operator fun minus(other: Price): Price {
+        if (this.currency != other.currency) {
+            throw CoreException(ErrorType.BAD_REQUEST, "통화가 다른 가격은 뺄 수 없습니다.")
+        }
+        val resultAmount = this.amount - other.amount
+        if (resultAmount < BigDecimal.ZERO) {
+            throw CoreException(ErrorType.BAD_REQUEST, "금액은 0 이상이어야 합니다.")
+        }
+        return Price(resultAmount, this.currency)
+    }
 
     override fun compareTo(other: Price): Int {
         if (this.currency != other.currency) {

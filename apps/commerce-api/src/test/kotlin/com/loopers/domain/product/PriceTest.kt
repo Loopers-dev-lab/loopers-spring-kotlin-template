@@ -101,14 +101,56 @@ class PriceTest {
     }
 
     @Test
-    fun `단항 마이너스 연산자는 예외를 발생시킨다`() {
+    fun `가격을 뺄 수 있다`() {
         // given
-        val price = Price(amount = BigDecimal("10000"), currency = Currency.KRW)
+        val price1 = Price(amount = BigDecimal("10000"), currency = Currency.KRW)
+        val price2 = Price(amount = BigDecimal("3000"), currency = Currency.KRW)
+
+        // when
+        val result = price1 - price2
+
+        // then
+        assertThat(result.amount).isEqualTo(BigDecimal("7000"))
+        assertThat(result.currency).isEqualTo(Currency.KRW)
+    }
+
+    @Test
+    fun `가격을 빼서 0이 될 수 있다`() {
+        // given
+        val price1 = Price(amount = BigDecimal("10000"), currency = Currency.KRW)
+        val price2 = Price(amount = BigDecimal("10000"), currency = Currency.KRW)
+
+        // when
+        val result = price1 - price2
+
+        // then
+        assertThat(result.amount).isEqualTo(BigDecimal.ZERO)
+        assertThat(result.currency).isEqualTo(Currency.KRW)
+    }
+
+    @Test
+    fun `가격을 빼서 음수가 되면 예외가 발생한다`() {
+        // given
+        val price1 = Price(amount = BigDecimal("5000"), currency = Currency.KRW)
+        val price2 = Price(amount = BigDecimal("10000"), currency = Currency.KRW)
 
         // when & then
         assertThatThrownBy {
-            -price
+            price1 - price2
         }.isInstanceOf(CoreException::class.java)
             .hasMessageContaining("0 이상")
+    }
+
+    @Test
+    fun `통화가 다른 가격끼리 빼면 예외가 발생한다`() {
+        // given
+        val krw = Price(amount = BigDecimal("10000"), currency = Currency.KRW)
+        val usd = Price(amount = BigDecimal("50"), currency = Currency.USD)
+
+        // when & then
+        assertThatThrownBy {
+            krw - usd
+        }.isInstanceOf(CoreException::class.java)
+            .hasMessageContaining("통화")
     }
 }
