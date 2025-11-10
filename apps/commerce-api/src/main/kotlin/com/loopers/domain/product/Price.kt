@@ -26,7 +26,12 @@ data class Price(
         return Price(this.amount + other.amount, this.currency)
     }
 
-    operator fun times(multiplier: Int): Price = Price(this.amount * BigDecimal(multiplier), this.currency)
+    operator fun times(multiplier: Int): Price {
+        if (multiplier < 0) {
+            throw CoreException(ErrorType.BAD_REQUEST, "금액은 0 이상이어야 합니다.")
+        }
+        return Price(this.amount * BigDecimal(multiplier), this.currency)
+    }
 
     operator fun unaryPlus(): Price = this
 
