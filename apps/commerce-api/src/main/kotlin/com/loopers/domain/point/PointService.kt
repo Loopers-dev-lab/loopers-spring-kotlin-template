@@ -9,13 +9,9 @@ import org.springframework.stereotype.Service
 class PointService(
     private val pointRepository: PointRepository,
 ) {
-    fun getPointByUserId(userId: Long): Point {
-        return pointRepository.findByUserId(userId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "포인트 정보를 찾을 수 없습니다: $userId")
-    }
-
     fun validateUserPoint(userId: Long, totalAmount: Money) {
-        val point = getPointByUserId(userId)
+        val point = pointRepository.findByUserIdWithLock(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "포인트 정보를 찾을 수 없습니다: $userId")
 
         if (!point.canDeduct(totalAmount)) {
             throw CoreException(
