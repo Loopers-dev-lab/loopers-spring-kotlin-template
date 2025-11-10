@@ -43,11 +43,9 @@ class PointTest {
         val point = Point.create(amount = 1000L, userId = "user123")
 
         // when & then
-        assertThatThrownBy {
-            point.use(1500L)
-        }.isInstanceOf(CoreException::class.java)
-            .extracting("errorType")
-            .isEqualTo(ErrorType.INSUFFICIENT_BALANCE)
+        assertThatThrownBy { point.use(1500L) }
+            .isInstanceOf(CoreException::class.java)
+            .hasFieldOrPropertyWithValue("errorType", ErrorType.INSUFFICIENT_BALANCE)
     }
 
     @Test
@@ -57,11 +55,9 @@ class PointTest {
         point.use(1000L)
 
         // when & then
-        assertThatThrownBy {
-            point.use(100L)
-        }.isInstanceOf(CoreException::class.java)
-            .extracting("errorType")
-            .isEqualTo(ErrorType.INSUFFICIENT_BALANCE)
+        assertThatThrownBy { point.use(100L) }
+            .isInstanceOf(CoreException::class.java)
+            .hasFieldOrPropertyWithValue("errorType", ErrorType.INSUFFICIENT_BALANCE)
     }
 
     @ParameterizedTest(name = "1000원 보유 시 {0}원 사용 시도 => 예외 발생")
@@ -71,11 +67,9 @@ class PointTest {
         val point = Point.create(amount = 1000L, userId = "user123")
 
         // when & then
-        assertThatThrownBy {
-            point.use(useAmount)
-        }.isInstanceOf(CoreException::class.java)
-            .extracting("errorType")
-            .isEqualTo(ErrorType.INSUFFICIENT_BALANCE)
+        assertThatThrownBy { point.use(useAmount) }
+            .isInstanceOf(CoreException::class.java)
+            .hasFieldOrPropertyWithValue("errorType", ErrorType.INSUFFICIENT_BALANCE)
     }
 
     @ParameterizedTest(name = "0 이하의 값({0}) 사용 시도 => 예외 발생")
