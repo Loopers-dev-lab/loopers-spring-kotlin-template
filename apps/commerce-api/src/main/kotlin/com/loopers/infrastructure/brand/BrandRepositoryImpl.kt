@@ -10,4 +10,5 @@ class BrandRepositoryImpl(
     private val brandJpaRepository: BrandJpaRepository,
 ) : BrandRepository {
     override fun findById(id: Long): Brand? = brandJpaRepository.findByIdOrNull(id)
+    override fun findAll(ids: List<Long>): List<Brand> = brandJpaRepository.findAllById(ids).toList()
 }

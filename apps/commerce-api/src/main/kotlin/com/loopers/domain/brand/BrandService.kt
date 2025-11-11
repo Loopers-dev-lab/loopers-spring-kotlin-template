@@ -13,4 +13,6 @@ class BrandService(
             ?: throw CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다: $brandId")
         return BrandResult.from(brand)
     }
+
+    fun getAllBrand(brandId: List<Long>): List<Brand> = brandRepository.findAll(brandId)
 }
