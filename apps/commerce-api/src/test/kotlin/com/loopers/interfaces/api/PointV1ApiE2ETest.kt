@@ -21,6 +21,7 @@ import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
+import java.math.BigDecimal
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PointV1ApiE2ETest @Autowired constructor(
@@ -49,16 +50,17 @@ class PointV1ApiE2ETest @Autowired constructor(
             val user = userJpaRepository.save(
                 User(
                     username = "testuser",
+                    password = "password123",
                     email = "test@example.com",
                     birthDate = "1997-03-25",
                     gender = User.Gender.MALE,
                 ),
             )
-            val amount = 1000L
+            val amount = BigDecimal("1000.00")
             pointJpaRepository.save(
                 Point.of(
                     userId = user.id,
-                    initialAmount = amount,
+                    initialBalance = amount,
                 ),
             )
 
@@ -79,7 +81,7 @@ class PointV1ApiE2ETest @Autowired constructor(
             assertAll(
                 { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
-                { assertThat(response.body?.data?.amount).isEqualTo(amount) },
+                { assertThat(response.body?.data?.balance).isEqualTo(amount) },
             )
         }
 
@@ -113,19 +115,20 @@ class PointV1ApiE2ETest @Autowired constructor(
         @Test
         fun returnsChargedAmount_whenUserExists() {
             // arrange
-            val initialAmount = 500L
-            val amount = 1000L
-            val totalAmount = initialAmount + amount
+            val initialAmount = BigDecimal("500.00")
+            val amount = BigDecimal("1000.00")
+            val totalAmount = initialAmount.add(amount)
 
             val user = userJpaRepository.save(
                 User(
                     username = "testuser",
+                    password = "password123",
                     email = "test@example.com",
                     birthDate = "1997-03-25",
                     gender = User.Gender.MALE,
                 ),
             )
-            pointJpaRepository.save(Point.of(userId = user.id, initialAmount = initialAmount))
+            pointJpaRepository.save(Point.of(userId = user.id, initialBalance = initialAmount))
 
             val request = PointRequest.PointChargeRequestDto(amount = amount)
             val headers = HttpHeaders().apply {
@@ -145,7 +148,7 @@ class PointV1ApiE2ETest @Autowired constructor(
             assertAll(
                 { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
-                { assertThat(response.body?.data?.amount).isEqualTo(totalAmount) },
+                { assertThat(response.body?.data?.balance).isEqualTo(totalAmount) },
             )
         }
 
@@ -153,7 +156,7 @@ class PointV1ApiE2ETest @Autowired constructor(
         @Test
         fun returnsNotFound_whenUserDoesNotExist() {
             // arrange
-            val request = PointRequest.PointChargeRequestDto(amount = 1000L)
+            val request = PointRequest.PointChargeRequestDto(amount = BigDecimal("1000.00"))
             val headers = HttpHeaders().apply {
                 set("X-USER-ID", "999")
             }
