@@ -14,8 +14,12 @@ import org.springframework.stereotype.Repository
 class ProductRepositoryImpl(
     private val productJpaRepository: ProductJpaRepository,
 ) : ProductRepository {
-    override fun findBy(productId: Long): Product? {
-        return productJpaRepository.findByIdOrNull(productId)
+    override fun findBy(id: Long): Product? {
+        return productJpaRepository.findByIdOrNull(id)
+    }
+
+    override fun findAllBy(ids: List<Long>): List<Product> {
+        return productJpaRepository.findAllById(ids)
     }
 
     override fun findAll(

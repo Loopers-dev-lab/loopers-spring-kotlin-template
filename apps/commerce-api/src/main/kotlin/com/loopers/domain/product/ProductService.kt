@@ -16,4 +16,8 @@ class ProductService(
     fun getProduct(productId: Long): Product? {
         return productRepository.findBy(productId)
     }
+
+    fun getProducts(productIds: List<Long>): List<Product> {
+        return productRepository.findAllBy(productIds)
+    }
 }
