@@ -10,14 +10,11 @@ import com.loopers.domain.user.Gender
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserCommand
 import com.loopers.domain.user.UserService
-import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
 import com.loopers.support.util.withCreatedAt
 import com.loopers.support.util.withId
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -97,20 +94,6 @@ class OrderFacadeTest {
                 softly.assertThat(result.totalElements).isEqualTo(0)
             }
         }
-
-        @Test
-        fun `존재하지 않는 사용자는 예외를 발생시킨다`() {
-            // given
-            val userId = "999"
-
-            every { userService.getMyInfo(userId) } returns null
-
-            // when & then
-            assertThatThrownBy { orderFacade.getOrders(userId, pageable) }
-                .isInstanceOf(CoreException::class.java)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND)
-                .hasMessageContaining("유저를 찾을 수 없습니다")
-        }
     }
 
     @Nested
@@ -153,25 +136,6 @@ class OrderFacadeTest {
                 softly.assertThat(result.items[0].brandName).isEqualTo("브랜드A")
                 softly.assertThat(result.items[0].productName).isEqualTo("상품1")
             }
-        }
-
-        @Test
-        fun `존재하지 않는 사용자는 예외를 발생시킨다`() {
-            // given
-            val userId = "999"
-            val orderId = 1L
-
-            every { userService.getMyInfo(userId) } returns null
-
-            // when & then
-            assertThatThrownBy { orderFacade.getOrder(userId, orderId) }
-                .isInstanceOf(CoreException::class.java)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND)
-                .hasMessageContaining("유저를 찾을 수 없습니다")
-
-            verify(exactly = 1) { userService.getMyInfo(userId) }
-            verify(exactly = 0) { orderService.getOrder(any(), any()) }
-            verify(exactly = 0) { orderService.getOrderDetail(any()) }
         }
     }
 

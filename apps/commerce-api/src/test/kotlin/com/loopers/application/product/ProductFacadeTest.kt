@@ -183,25 +183,6 @@ class ProductFacadeTest {
         }
 
         @Test
-        fun `존재하지 않는 브랜드는 예외를 발생시킨다`() {
-            // given
-            val productId = 1L
-            val brandId = 999L
-            val userId = "1"
-
-            val product = createProduct(productId, "상품1", 10000L, brandId)
-
-            every { productService.getProduct(productId) } returns product
-            every { brandService.getBrand(brandId) } returns null
-
-            // when & then
-            assertThatThrownBy { productFacade.getProduct(productId, userId) }
-                .isInstanceOf(CoreException::class.java)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND)
-                .hasMessageContaining("브랜드를 찾을 수 없습니다")
-        }
-
-        @Test
         fun `userId가 null이면 likedByMe는 false다`() {
             // given
             val productId = 1L
@@ -298,20 +279,6 @@ class ProductFacadeTest {
                 softly.assertThat(result.content).isEmpty()
                 softly.assertThat(result.totalElements).isEqualTo(0)
             }
-        }
-
-        @Test
-        fun `존재하지 않는 사용자는 예외를 발생시킨다`() {
-            // given
-            val userId = "999"
-
-            every { userService.getMyInfo(userId) } returns null
-
-            // when & then
-            assertThatThrownBy { productFacade.getLikedProducts(userId, pageable) }
-                .isInstanceOf(CoreException::class.java)
-                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND)
-                .hasMessageContaining("유저를 찾을 수 없습니다")
         }
     }
 

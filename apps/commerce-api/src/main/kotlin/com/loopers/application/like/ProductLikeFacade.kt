@@ -18,7 +18,6 @@ class ProductLikeFacade(
     @Transactional
     fun like(productId: Long, userId: String) {
         val user = userService.getMyInfo(userId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다: $userId")
 
         val product =
             productService.getProduct(productId) ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
@@ -29,7 +28,6 @@ class ProductLikeFacade(
     @Transactional
     fun unlike(productId: Long, userId: String) {
         val user = userService.getMyInfo(userId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다: $userId")
 
         val product =
             productService.getProduct(productId) ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")

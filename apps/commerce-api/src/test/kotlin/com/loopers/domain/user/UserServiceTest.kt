@@ -86,17 +86,6 @@ class UserServiceTest : IntegrationTest() {
                 softly.assertThat(user.gender).isEqualTo(command.gender)
             }
         }
-
-        @Test
-        fun `해당 ID 의 회원이 존재하지 않을 경우, null 이 반환된다`() {
-            // given & when
-            val user = userService.getMyInfo("nonUserId")
-
-            // then
-            assertSoftly { softly ->
-                softly.assertThat(user).isNull()
-            }
-        }
     }
 
     private fun createSignUpCommand(

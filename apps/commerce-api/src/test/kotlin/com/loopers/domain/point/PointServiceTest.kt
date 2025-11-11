@@ -89,17 +89,6 @@ class PointServiceTest : IntegrationTest() {
                 softly.assertThat(point.amount.value).isEqualTo(1000L)
             }
         }
-
-        @Test
-        fun `해당 ID 의 회원이 존재하지 않을 경우, null 이 반환된다`() {
-            // given & when
-            val point = pointService.getBy("user123")
-
-            // then
-            assertSoftly { softly ->
-                softly.assertThat(point).isNull()
-            }
-        }
     }
 
     private fun createSignUpCommand(

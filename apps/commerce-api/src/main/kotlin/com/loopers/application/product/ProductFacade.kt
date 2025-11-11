@@ -74,7 +74,6 @@ class ProductFacade(
     fun getLikedProducts(userId: String, pageable: Pageable): Page<ProductResult.LikedInfo> {
         // 1. 사용자 존재 여부 확인
         val user = userService.getMyInfo(userId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다: $userId")
 
         // 2. 사용자가 좋아요한 상품 페이지 조회
         val productLikePage = productLikeService.getAllBy(user.id, pageable)

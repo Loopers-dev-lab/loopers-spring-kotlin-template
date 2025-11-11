@@ -20,7 +20,8 @@ class UserService(
     }
 
     @Transactional(readOnly = true)
-    fun getMyInfo(userId: String): User? {
+    fun getMyInfo(userId: String): User {
         return userRepository.findBy(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다: $userId")
     }
 }
