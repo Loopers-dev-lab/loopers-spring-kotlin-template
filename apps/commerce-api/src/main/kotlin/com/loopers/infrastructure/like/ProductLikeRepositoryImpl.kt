@@ -9,4 +9,5 @@ class ProductLikeRepositoryImpl(
     private val productLikeJpaRepository: ProductLikeJpaRepository,
 ) : ProductLikeRepository {
     override fun findAllBy(productIds: List<Long>): List<ProductLike> = productLikeJpaRepository.findAllByProductIdIn(productIds)
+    override fun findAllBy(productId: Long): List<ProductLike> = productLikeJpaRepository.findAllByProductId(productId)
 }

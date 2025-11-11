@@ -12,4 +12,8 @@ class ProductService(
     fun getProducts(brandId: Long?, sort: ProductSort, pageable: Pageable): Page<Product> {
         return productRepository.findAll(brandId, sort, pageable)
     }
+
+    fun getProduct(productId: Long): Product? {
+        return productRepository.findBy(productId)
+    }
 }

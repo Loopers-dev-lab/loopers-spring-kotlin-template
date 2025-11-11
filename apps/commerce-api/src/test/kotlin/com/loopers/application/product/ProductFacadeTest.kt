@@ -78,6 +78,44 @@ class ProductFacadeTest {
         }
     }
 
+    @Nested
+    @DisplayName("상품 상세 조회")
+    inner class GetProduct {
+
+        @Test
+        fun `상품 상세 조회 시 모든 서비스 메서드가 순서대로 호출된다`() {
+            // given
+            val productId = 1L
+            val brandId = 1L
+            val userId = "1"
+
+            val product = createProduct(productId, "상품1", 10000L, brandId)
+            val brand = Brand.create(name = "브랜드A").withId(brandId)
+            val productLike = createProductLike(1L, productId, userId.toLong())
+            val productLikes = listOf(productLike)
+
+            every { productService.getProduct(productId) } returns product
+            every { brandService.getBrand(brandId) } returns brand
+            every { productLikeService.findAllBy(productId) } returns productLikes
+
+            // when
+            val result = productFacade.getProduct(productId, userId)
+
+            // then
+            verify(exactly = 1) { productService.getProduct(productId) }
+            verify(exactly = 1) { brandService.getBrand(brandId) }
+            verify(exactly = 1) { productLikeService.findAllBy(productId) }
+
+            assertSoftly { softly ->
+                softly.assertThat(result.id).isEqualTo(productId)
+                softly.assertThat(result.name).isEqualTo("상품1")
+                softly.assertThat(result.brandName).isEqualTo("브랜드A")
+                softly.assertThat(result.likeCount).isEqualTo(1L)
+                softly.assertThat(result.likedByMe).isTrue()
+            }
+        }
+    }
+
     private fun createProduct(
         id: Long,
         name: String,

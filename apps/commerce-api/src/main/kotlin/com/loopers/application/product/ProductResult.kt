@@ -6,7 +6,7 @@ import com.loopers.domain.product.Product
 
 object ProductResult {
 
-    data class Info(
+    data class ListInfo(
         val id: Long,
         val name: String,
         val price: Long,
@@ -18,16 +18,48 @@ object ProductResult {
                 product: Product,
                 productLikes: List<ProductLike>,
                 brands: List<Brand>,
-            ): Info {
+            ): ListInfo {
                 val brandName = brands.find { it.id == product.brandId }!!.name
                 val likeCount = productLikes.count { it.productId == product.id }.toLong()
 
-                return Info(
+                return ListInfo(
                     id = product.id,
                     name = product.name,
                     price = product.price,
                     brandName = brandName,
                     likeCount = likeCount,
+                )
+            }
+        }
+    }
+
+    data class DetailInfo(
+        val id: Long,
+        val name: String,
+        val price: Long,
+        val brandName: String,
+        val likeCount: Long,
+        val likedByMe: Boolean,
+    ) {
+        companion object {
+            fun from(
+                product: Product,
+                productLikes: List<ProductLike>,
+                brand: Brand,
+                userId: String?,
+            ): DetailInfo {
+                val likeCount = productLikes.size.toLong()
+                val likedByMe = userId?.let { uid ->
+                    productLikes.any { it.userId.toString() == uid }
+                } ?: false
+
+                return DetailInfo(
+                    id = product.id,
+                    name = product.name,
+                    price = product.price,
+                    brandName = brand.name,
+                    likeCount = likeCount,
+                    likedByMe = likedByMe,
                 )
             }
         }

@@ -7,12 +7,16 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Repository
 
 @Repository
 class ProductRepositoryImpl(
     private val productJpaRepository: ProductJpaRepository,
 ) : ProductRepository {
+    override fun findBy(productId: Long): Product? {
+        return productJpaRepository.findByIdOrNull(productId)
+    }
 
     override fun findAll(
         brandId: Long?,
