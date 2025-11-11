@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.v1.brand
 
-import com.loopers.application.facade.BrandFacade
+import com.loopers.application.brand.BrandFacade
 import com.loopers.interfaces.api.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable

@@ -6,9 +6,7 @@ import org.springframework.stereotype.Service
 class BrandService(
     private val brandRepository: BrandRepository,
 ) {
-    fun getBrand(brandId: Long): Brand? {
-        return brandRepository.findById(brandId)
-    }
+    fun getBrand(id: Long): Brand? = brandRepository.findById(id)
 
-    fun getAllBrand(brandId: List<Long>): List<Brand> = brandRepository.findAll(brandId)
+    fun getAllBrand(ids: List<Long>): List<Brand> = brandRepository.findAll(ids)
 }

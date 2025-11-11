@@ -1,4 +1,4 @@
-package com.loopers.application.facade
+package com.loopers.application.brand
 
 import com.loopers.domain.brand.BrandResult
 import com.loopers.domain.brand.BrandService
