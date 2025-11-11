@@ -18,7 +18,7 @@ class UserRepositoryImpl(
         return userJpaRepository.existsByUserId(UserId(userId))
     }
 
-    override fun getBy(userId: String): User? {
+    override fun findBy(userId: String): User? {
         return userJpaRepository.findByUserId(UserId(userId))
     }
 }

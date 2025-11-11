@@ -21,6 +21,6 @@ class UserService(
 
     @Transactional(readOnly = true)
     fun getMyInfo(userId: String): User? {
-        return userRepository.getBy(userId)
+        return userRepository.findBy(userId)
     }
 }
