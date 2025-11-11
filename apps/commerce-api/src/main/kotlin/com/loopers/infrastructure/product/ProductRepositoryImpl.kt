@@ -36,13 +36,13 @@ class ProductRepositoryImpl(
 
             ProductSort.LATEST -> {
                 val sortedPageable = sortPageable(pageable, Sort.by("createdAt").descending())
-                brandId?.let { productJpaRepository.findByBrandId(it, sortedPageable) }
+                brandId?.let { productJpaRepository.findAllByBrandId(it, sortedPageable) }
                     ?: productJpaRepository.findAll(sortedPageable)
             }
 
             ProductSort.PRICE_ASC -> {
                 val sortedPageable = sortPageable(pageable, Sort.by("price").ascending())
-                brandId?.let { productJpaRepository.findByBrandId(it, sortedPageable) }
+                brandId?.let { productJpaRepository.findAllByBrandId(it, sortedPageable) }
                     ?: productJpaRepository.findAll(sortedPageable)
             }
         }

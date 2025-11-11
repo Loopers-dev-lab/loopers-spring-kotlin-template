@@ -79,7 +79,7 @@ class ProductJpaRepositoryTest @Autowired constructor(
             val pageable = PageRequest.of(0, 10)
 
             // when
-            val result = productJpaRepository.findByBrandId(brand1.id, pageable)
+            val result = productJpaRepository.findAllByBrandId(brand1.id, pageable)
 
             // then
             assertSoftly { softly ->
@@ -105,7 +105,7 @@ class ProductJpaRepositoryTest @Autowired constructor(
             val pageable = PageRequest.of(0, 10)
 
             // when
-            val result = productJpaRepository.findByBrandId(brand1.id, pageable)
+            val result = productJpaRepository.findAllByBrandId(brand1.id, pageable)
 
             // then
             assertSoftly { softly ->

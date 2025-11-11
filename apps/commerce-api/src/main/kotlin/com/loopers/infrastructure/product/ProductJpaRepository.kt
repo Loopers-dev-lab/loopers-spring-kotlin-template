@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 
 interface ProductJpaRepository : JpaRepository<Product, Long> {
-    fun findByBrandId(brandId: Long, pageable: Pageable): Page<Product>
+    fun findAllByBrandId(brandId: Long, pageable: Pageable): Page<Product>
 
     @Query(
         value = """

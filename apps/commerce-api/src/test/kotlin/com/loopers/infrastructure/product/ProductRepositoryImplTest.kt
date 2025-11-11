@@ -112,7 +112,7 @@ class ProductRepositoryImplTest {
             // given
             val sortedPageable = PageRequest.of(0, 20, Sort.by("createdAt").descending())
             every {
-                productJpaRepository.findByBrandId(brandId, sortedPageable)
+                productJpaRepository.findAllByBrandId(brandId, sortedPageable)
             } returns mockProducts
 
             // when
@@ -121,7 +121,7 @@ class ProductRepositoryImplTest {
             // then
             assertThat(result).isEqualTo(mockProducts)
             verify(exactly = 1) {
-                productJpaRepository.findByBrandId(brandId, sortedPageable)
+                productJpaRepository.findAllByBrandId(brandId, sortedPageable)
             }
         }
 
@@ -130,7 +130,7 @@ class ProductRepositoryImplTest {
             // given
             val sortedPageable = PageRequest.of(0, 20, Sort.by("price").ascending())
             every {
-                productJpaRepository.findByBrandId(brandId, sortedPageable)
+                productJpaRepository.findAllByBrandId(brandId, sortedPageable)
             } returns mockProducts
 
             // when
@@ -139,7 +139,7 @@ class ProductRepositoryImplTest {
             // then
             assertThat(result).isEqualTo(mockProducts)
             verify(exactly = 1) {
-                productJpaRepository.findByBrandId(brandId, sortedPageable)
+                productJpaRepository.findAllByBrandId(brandId, sortedPageable)
             }
         }
     }
@@ -163,7 +163,7 @@ class ProductRepositoryImplTest {
                 productJpaRepository.findAllByBrandIdOrderByLikesDesc(any(), any())
             } returns mockProducts
             every {
-                productJpaRepository.findByBrandId(any(), any())
+                productJpaRepository.findAllByBrandId(any(), any())
             } returns mockProducts
 
             // when
@@ -178,7 +178,7 @@ class ProductRepositoryImplTest {
                 }
                 ProductSort.LATEST, ProductSort.PRICE_ASC -> {
                     verify(exactly = 1) {
-                        productJpaRepository.findByBrandId(brandId, sortedPageable)
+                        productJpaRepository.findAllByBrandId(brandId, sortedPageable)
                     }
                 }
             }
