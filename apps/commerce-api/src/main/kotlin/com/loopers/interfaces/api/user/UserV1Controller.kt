@@ -21,6 +21,7 @@ class UserV1Controller(
     ): ApiResponse<UserResponse.UserResponseDto> {
         val result = userFacade.createUser(
             username = request.username,
+            password = request.password,
             email = request.email,
             birthDate = request.birthDate,
             gender = request.gender,

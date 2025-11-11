@@ -12,11 +12,12 @@ class UserService(
 ) {
     private val log = LoggerFactory.getLogger(UserService::class.java)
 
-    fun createUser(username: String, email: String, birthDate: String, gender: User.Gender): User {
+    fun createUser(username: String, password: String, email: String, birthDate: String, gender: User.Gender): User {
         return try {
             userRepository.save(
                 User.of(
                     username = username,
+                    password = password,
                     email = email,
                     birthDate = birthDate,
                     gender = gender,

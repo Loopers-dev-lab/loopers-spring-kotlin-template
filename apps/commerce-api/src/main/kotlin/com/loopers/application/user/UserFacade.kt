@@ -13,6 +13,7 @@ class UserFacade(
 ) {
     fun createUser(
         username: String,
+        password: String,
         email: String,
         birthDate: String,
         gender: User.Gender,
@@ -20,6 +21,7 @@ class UserFacade(
         userService.throwIfUsernameExists(username)
         return userService.createUser(
             username = username,
+            password = password,
             email = email,
             birthDate = birthDate,
             gender = gender,
