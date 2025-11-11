@@ -10,7 +10,6 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
-import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.springframework.beans.factory.annotation.Autowired
@@ -44,24 +43,21 @@ class UserServiceTest : IntegrationTest() {
                 softly.assertThat(user.gender).isEqualTo(command.gender)
             }
             verify(userRepository, times(1)).save(any())
-            verify(userRepository, times(1)).exist(any())
+            verify(userRepository, times(1)).findBy(any<String>())
         }
 
         @Test
         fun `이미 가입된 userId로 회원가입 시도시 실패한다`() {
             // given
             val command = createSignUpCommand()
+            userService.signUp(command)
 
-            // when
-            doReturn(true).`when`(userRepository).exist(command.userId)
-
-            // then
+            // when & then
             assertThatThrownBy {
                 userService.signUp(command)
             }.isInstanceOfSatisfying(CoreException::class.java) { error ->
                 assertThat(error.errorType).isEqualTo(ErrorType.CONFLICT)
             }
-            verify(userRepository, times(1)).exist(any())
         }
     }
 
@@ -80,7 +76,7 @@ class UserServiceTest : IntegrationTest() {
             // then
             assertSoftly { softly ->
                 softly.assertThat(user).isNotNull
-                softly.assertThat(user!!.userId.value).isEqualTo(command.userId)
+                softly.assertThat(user.userId.value).isEqualTo(command.userId)
                 softly.assertThat(user.email.value).isEqualTo(command.email)
                 softly.assertThat(user.birthDate.value).isEqualTo(command.birthDate)
                 softly.assertThat(user.gender).isEqualTo(command.gender)

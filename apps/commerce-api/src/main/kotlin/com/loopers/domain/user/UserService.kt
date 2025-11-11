@@ -12,7 +12,7 @@ class UserService(
 
     @Transactional
     fun signUp(command: UserCommand.SignUp): User {
-        if (userRepository.exist(command.userId)) {
+        if (userRepository.findBy(command.userId) != null) {
             throw CoreException(ErrorType.CONFLICT)
         }
 
