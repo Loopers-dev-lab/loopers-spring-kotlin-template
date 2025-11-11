@@ -1,11 +1,14 @@
 package com.loopers.application.order
 
 import com.loopers.domain.brand.Brand
+import com.loopers.domain.brand.BrandService
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderDetail
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.point.PointService
 import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.Gender
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserCommand
@@ -30,7 +33,10 @@ class OrderFacadeTest {
 
     private val orderService: OrderService = mockk()
     private val userService: UserService = mockk()
-    private val orderFacade = OrderFacade(orderService, userService)
+    private val brandService: BrandService = mockk()
+    private val productService: ProductService = mockk()
+    private val pointService: PointService = mockk()
+    private val orderFacade = OrderFacade(orderService, userService, brandService, productService, pointService)
 
     private val pageable: Pageable = PageRequest.of(0, 20)
 

@@ -29,11 +29,12 @@ class PointServiceTest : IntegrationTest() {
         @Test
         fun `존재하지 않는 유저 ID 로 충전을 시도한 경우, 실패한다`() {
             // given
-            val command = createPointChargeCommand()
+            val amount = 100L
+            val userId = 1L
 
             // when & then
             assertThatThrownBy {
-                pointService.charge(command)
+                pointService.charge(amount, userId)
             }.isInstanceOfSatisfying(CoreException::class.java) { error ->
                 assertThat(error.errorType).isEqualTo(ErrorType.NOT_FOUND)
             }
@@ -43,23 +44,22 @@ class PointServiceTest : IntegrationTest() {
         fun `포인트 충전에 성공한다`() {
             // given
             val user = userJpaRepository.save(User.create(createSignUpCommand()))
+            val userId = 1L
 
             // when
             pointService.charge(
-                createPointChargeCommand(
-                    amount = 1000L,
-                ),
+                amount = 1000L,
+                userId = userId,
             )
             val secondPoint = pointService.charge(
-                createPointChargeCommand(
-                    amount = 2000L,
-                ),
+                amount = 2000L,
+                userId = userId,
             )
 
             // then
             assertSoftly { softly ->
                 softly.assertThat(secondPoint).isNotNull()
-                softly.assertThat(secondPoint.userId).isEqualTo(user.userId)
+                softly.assertThat(secondPoint.userId).isEqualTo(user.id)
                 softly.assertThat(secondPoint.amount).isEqualTo(Amount(3000L))
             }
         }
@@ -73,19 +73,17 @@ class PointServiceTest : IntegrationTest() {
             // given
             val user = userJpaRepository.save(User.create(createSignUpCommand()))
             pointService.charge(
-                createPointChargeCommand(
-                    amount = 1000L,
-                    userId = user.userId.value,
-                ),
+                amount = 1000L,
+                userId = user.id,
             )
 
             // when
-            val point = pointService.getBy(user.userId.value)
+            val point = pointService.getBy(user.id)
 
             // then
             assertSoftly { softly ->
                 softly.assertThat(point).isNotNull()
-                softly.assertThat(point!!.userId.value).isEqualTo(user.userId.value)
+                softly.assertThat(point!!.userId).isEqualTo(user.id)
                 softly.assertThat(point.amount.value).isEqualTo(1000L)
             }
         }
@@ -97,9 +95,4 @@ class PointServiceTest : IntegrationTest() {
         birthDate: String = "2000-01-01",
         gender: Gender = Gender.MALE,
     ) = UserCommand.SignUp(userId, email, birthDate, gender)
-
-    private fun createPointChargeCommand(
-        amount: Long = 100L,
-        userId: String = "testUserId",
-    ) = PointCommand.Charge(amount, userId)
 }

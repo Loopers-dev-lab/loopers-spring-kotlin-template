@@ -20,12 +20,16 @@ class Stock(
     ) : BaseEntity() {
 
     companion object {
-        fun create(productId: Long): Stock {
+        fun create(quantity: Long, productId: Long): Stock {
             return Stock(
-                quantity = 0L,
+                quantity = quantity,
                 productId = productId,
             )
         }
+    }
+
+    fun isAvailable(quantity: Long): Boolean {
+        return this.quantity >= quantity
     }
 
     fun decrease(quantity: Long) {

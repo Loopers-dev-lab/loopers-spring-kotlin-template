@@ -14,7 +14,7 @@ class PointTest {
     @ValueSource(longs = [0L, -1L, -100L, -1000L])
     fun `0 이하의 금액으로 충전 시 예외가 발생한다`(chargeAmount: Long) {
         // given
-        val point = Point.create(amount = 100L, userId = "user123")
+        val point = Point.create(amount = 100L, userId = 1L)
 
         // when & then
         assertThatThrownBy {
@@ -26,7 +26,7 @@ class PointTest {
     @Test
     fun `포인트를 여러 번 충전할 수 있다`() {
         // given
-        val point = Point.create(amount = 1000L, userId = "user123")
+        val point = Point.create(amount = 1000L, userId = 1L)
 
         // when
         point.charge(500L)
@@ -40,7 +40,7 @@ class PointTest {
     @Test
     fun `잔액이 부족하면 포인트 사용 시 예외가 발생한다`() {
         // given
-        val point = Point.create(amount = 1000L, userId = "user123")
+        val point = Point.create(amount = 1000L, userId = 1L)
 
         // when & then
         assertThatThrownBy { point.use(1500L) }
@@ -51,7 +51,7 @@ class PointTest {
     @Test
     fun `잔액이 0일 때 포인트 사용 시 예외가 발생한다`() {
         // given
-        val point = Point.create(amount = 1000L, userId = "user123")
+        val point = Point.create(amount = 1000L, userId = 1L)
         point.use(1000L)
 
         // when & then
@@ -64,7 +64,7 @@ class PointTest {
     @ValueSource(longs = [1001L, 1500L, 2000L, 10000L])
     fun `잔액보다 많은 포인트 사용 시 예외가 발생한다`(useAmount: Long) {
         // given
-        val point = Point.create(amount = 1000L, userId = "user123")
+        val point = Point.create(amount = 1000L, userId = 1L)
 
         // when & then
         assertThatThrownBy { point.use(useAmount) }
@@ -76,7 +76,7 @@ class PointTest {
     @ValueSource(longs = [0L, -1L, -100L, -1000L])
     fun `0 이하의 금액으로 사용 시 예외가 발생한다`(invalidAmount: Long) {
         // given
-        val point = Point.create(amount = 1000L, userId = "user123")
+        val point = Point.create(amount = 1000L, userId = 1L)
 
         // when & then
         assertThatThrownBy {
@@ -88,7 +88,7 @@ class PointTest {
     @Test
     fun `포인트 충전과 사용을 반복할 수 있다`() {
         // given
-        val point = Point.create(amount = 1000L, userId = "user123")
+        val point = Point.create(amount = 1000L, userId = 1L)
 
         // when
         point.charge(500L)

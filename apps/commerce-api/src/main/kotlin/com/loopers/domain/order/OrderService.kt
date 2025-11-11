@@ -26,4 +26,29 @@ class OrderService(
     fun getOrderDetail(orderId: Long): List<OrderDetail> {
         return orderRepository.findAllOrderDetailBy(orderId)
     }
+
+    fun createOrder(param: OrderCommand.Create) {
+        val order = orderRepository.save(
+            Order.create(
+                totalAmount = param.totalAmount,
+                userId = param.userId,
+            ),
+        )
+
+        val brandMap = param.brands.associateBy { it.id }
+        val productMap = param.products.associateBy { it.id }
+
+        val orderDetails = param.items.map { item ->
+            val product = productMap[item.productId]!!
+            val brand = brandMap[product.brandId]!!
+
+            OrderDetail.create(
+                quantity = item.quantity,
+                brand = brand,
+                product = product,
+                order = order,
+            )
+        }
+        orderRepository.saveAllOrderDetail(orderDetails)
+    }
 }

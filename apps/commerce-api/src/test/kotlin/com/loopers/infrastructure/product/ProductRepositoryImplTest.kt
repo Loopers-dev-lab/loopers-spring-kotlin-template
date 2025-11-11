@@ -21,7 +21,8 @@ import org.springframework.data.domain.Sort
 class ProductRepositoryImplTest {
 
     private val productJpaRepository: ProductJpaRepository = mockk()
-    private val productRepository = ProductRepositoryImpl(productJpaRepository)
+    private val stockJpaRepository: StockJpaRepository = mockk()
+    private val productRepository = ProductRepositoryImpl(productJpaRepository, stockJpaRepository)
 
     private val pageable: Pageable = PageRequest.of(0, 20)
     private val mockProducts: Page<Product> = PageImpl(emptyList())
@@ -176,6 +177,7 @@ class ProductRepositoryImplTest {
                         productJpaRepository.findAllByBrandIdOrderByLikesDesc(brandId, pageable)
                     }
                 }
+
                 ProductSort.LATEST, ProductSort.PRICE_ASC -> {
                     verify(exactly = 1) {
                         productJpaRepository.findAllByBrandId(brandId, sortedPageable)

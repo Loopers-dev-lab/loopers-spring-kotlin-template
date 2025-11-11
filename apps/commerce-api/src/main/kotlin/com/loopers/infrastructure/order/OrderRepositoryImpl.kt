@@ -24,4 +24,12 @@ class OrderRepositoryImpl(
     override fun findAllOrderDetailBy(orderId: Long): List<OrderDetail> {
         return orderDetailJpaRepository.findAllByOrderId(orderId)
     }
+
+    override fun save(order: Order): Order {
+        return orderJpaRepository.save(order)
+    }
+
+    override fun saveAllOrderDetail(orderDetails: List<OrderDetail>): List<OrderDetail> {
+        return orderDetailJpaRepository.saveAll(orderDetails)
+    }
 }

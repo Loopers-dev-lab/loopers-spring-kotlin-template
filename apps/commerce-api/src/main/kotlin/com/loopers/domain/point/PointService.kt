@@ -13,22 +13,24 @@ class PointService(
 ) {
 
     @Transactional
-    fun charge(command: PointCommand.Charge): Point {
-        if (!userRepository.exist(command.userId)) {
+    fun charge(amount: Long, userId: Long): Point {
+        if (!userRepository.exist(userId)) {
             throw CoreException(ErrorType.NOT_FOUND)
         }
 
-        val point = pointRepository.getBy(command.userId)
-        if (point == null) {
-            return pointRepository.save(Point.create(command.amount, command.userId))
-        } else {
-            point.charge(command.amount)
-            return point
-        }
+        val point = pointRepository.getBy(userId) ?: return pointRepository.save(Point.create(amount, userId))
+        point.charge(amount)
+        return point
+    }
+
+    @Transactional
+    fun use(amount: Long, userId: Long) {
+        val point = pointRepository.getBy(userId) ?: pointRepository.save(Point.init(userId))
+        point.use(amount)
     }
 
     @Transactional(readOnly = true)
-    fun getBy(userId: String): Point? {
+    fun getBy(userId: Long): Point? {
         return pointRepository.getBy(userId)
     }
 }

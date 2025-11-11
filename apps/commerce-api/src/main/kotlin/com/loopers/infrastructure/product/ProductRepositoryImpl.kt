@@ -3,6 +3,7 @@ package com.loopers.infrastructure.product
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductSort
+import com.loopers.domain.product.Stock
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository
 @Repository
 class ProductRepositoryImpl(
     private val productJpaRepository: ProductJpaRepository,
+    private val stockJpaRepository: StockJpaRepository,
 ) : ProductRepository {
     override fun findBy(id: Long): Product? {
         return productJpaRepository.findByIdOrNull(id)
@@ -46,6 +48,10 @@ class ProductRepositoryImpl(
                     ?: productJpaRepository.findAll(sortedPageable)
             }
         }
+    }
+
+    override fun findStockAllBy(productIds: List<Long>): List<Stock> {
+        return stockJpaRepository.findAllByProductIdIn(productIds)
     }
 
     private fun sortPageable(pageable: Pageable, sort: Sort): Pageable {

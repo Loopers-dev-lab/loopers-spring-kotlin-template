@@ -1,7 +1,6 @@
 package com.loopers.domain.point
 
 import com.loopers.domain.BaseEntity
-import com.loopers.domain.user.UserId
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import jakarta.persistence.Embedded
@@ -14,15 +13,21 @@ class Point(
     @Embedded
     var amount: Amount,
 
-    @Embedded
-    val userId: UserId,
+    val userId: Long,
 ) : BaseEntity() {
 
     companion object {
-        fun create(amount: Long, userId: String): Point {
+        fun init(userId: Long): Point {
+            return Point(
+                amount = Amount(0),
+                userId = userId,
+            )
+        }
+
+        fun create(amount: Long, userId: Long): Point {
             return Point(
                 amount = Amount(amount),
-                userId = UserId(userId),
+                userId = userId,
             )
         }
     }
