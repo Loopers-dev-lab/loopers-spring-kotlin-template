@@ -86,7 +86,7 @@ class OrderDetailTest {
     }
 
     private fun createOrder(): Order {
-        return Order.create(1500000L, "user123")
+        return Order.create(1500000L, 1L)
             .withId(100L)
     }
 }

@@ -21,11 +21,11 @@ class Order(
     val totalAmount: Long,
 
     @Column(nullable = false)
-    val userId: String,
+    val userId: Long,
 ) : BaseEntity() {
 
     companion object {
-        fun create(totalAmount: Long, userId: String): Order {
+        fun create(totalAmount: Long, userId: Long): Order {
             require(totalAmount > 0) { "주문 총액은 0보다 커야 합니다." }
 
             return Order(
@@ -33,6 +33,12 @@ class Order(
                 totalAmount = totalAmount,
                 userId = userId,
             )
+        }
+    }
+
+    fun validateOwner(userId: Long) {
+        if (this.userId != userId) {
+            throw CoreException(ErrorType.FORBIDDEN)
         }
     }
 

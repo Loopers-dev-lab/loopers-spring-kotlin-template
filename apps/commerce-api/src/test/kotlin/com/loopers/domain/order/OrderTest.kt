@@ -23,7 +23,7 @@ class OrderTest {
         fun createOrder() {
             // given
             val totalAmount = 10000L
-            val userId = "user123"
+            val userId = 1L
 
             // when
             val order = Order.create(totalAmount, userId)
@@ -41,12 +41,42 @@ class OrderTest {
         @DisplayName("주문 총액이 0 이하이면 예외가 발생한다")
         fun createOrderWithInvalidAmount(totalAmount: Long) {
             // given
-            val userId = "user123"
+            val userId = 1L
 
             // when & then
             assertThatThrownBy { Order.create(totalAmount, userId) }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessage("주문 총액은 0보다 커야 합니다.")
+        }
+    }
+
+    @Nested
+    @DisplayName("주문 소유자 확인")
+    inner class IsOwnedByTest {
+
+        @Test
+        @DisplayName("주문 소유자가 맞으면 예외가 발생하지 않는다")
+        fun checkOwnerSuccess() {
+            // given
+            val userId = 1L
+            val order = Order.create(10000L, userId)
+
+            // when & then
+            order.validateOwner(userId)
+        }
+
+        @ParameterizedTest
+        @ValueSource(longs = [2L, 3L, 100L, 999L])
+        @DisplayName("주문 소유자가 아니면 예외가 발생한다")
+        fun checkOwnerFail(otherUserId: Long) {
+            // given
+            val ownerId = 1L
+            val order = Order.create(10000L, ownerId)
+
+            // when & then
+            assertThatThrownBy { order.validateOwner(otherUserId) }
+                .isInstanceOf(CoreException::class.java)
+                .hasFieldOrPropertyWithValue("errorType", ErrorType.FORBIDDEN)
         }
     }
 
@@ -58,7 +88,7 @@ class OrderTest {
         @DisplayName("PENDING 상태의 주문은 정상적으로 완료된다")
         fun completePendingOrder() {
             // given
-            val order = Order.create(10000L, "user123")
+            val order = Order.create(10000L, 1L)
 
             // when
             order.complete()
@@ -74,7 +104,7 @@ class OrderTest {
         @DisplayName("PENDING이 아닌 상태의 주문은 완료할 수 없다")
         fun completeNonPendingOrder(initialStatus: OrderStatus) {
             // given
-            val order = Order.create(10000L, "user123")
+            val order = Order.create(10000L, 1L)
             when (initialStatus) {
                 OrderStatus.COMPLETED -> order.complete()
                 OrderStatus.CANCELLED -> order.cancel()
@@ -96,7 +126,7 @@ class OrderTest {
         @DisplayName("PENDING 상태의 주문은 정상적으로 취소된다")
         fun cancelPendingOrder() {
             // given
-            val order = Order.create(10000L, "user123")
+            val order = Order.create(10000L, 1L)
 
             // when
             order.cancel()
@@ -112,7 +142,7 @@ class OrderTest {
         @DisplayName("PENDING이 아닌 상태의 주문은 취소할 수 없다")
         fun cancelNonPendingOrder(initialStatus: OrderStatus) {
             // given
-            val order = Order.create(10000L, "user123")
+            val order = Order.create(10000L, 1L)
             when (initialStatus) {
                 OrderStatus.COMPLETED -> order.complete()
                 OrderStatus.CANCELLED -> order.cancel()

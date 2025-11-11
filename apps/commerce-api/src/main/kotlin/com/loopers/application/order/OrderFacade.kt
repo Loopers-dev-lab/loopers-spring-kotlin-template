@@ -26,4 +26,15 @@ class OrderFacade(
 
         return orderPage.map { OrderResult.ListInfo.from(it) }
     }
+
+    @Transactional(readOnly = true)
+    fun getOrder(userId: String, orderId: Long): OrderResult.DetailInfo {
+        val user = userService.getMyInfo(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다: $userId")
+
+        val order = orderService.getOrder(user.id, orderId)
+        val orderDetail = orderService.getOrderDetail(orderId)
+
+        return OrderResult.DetailInfo.from(order, orderDetail)
+    }
 }
