@@ -3,7 +3,7 @@ package com.loopers.application.product
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.like.ProductLike
 import com.loopers.domain.product.Product
-import com.loopers.support.util.withId
+import com.loopers.support.fixtures.withId
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.DisplayName

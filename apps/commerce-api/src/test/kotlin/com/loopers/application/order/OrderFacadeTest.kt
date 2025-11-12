@@ -1,20 +1,19 @@
 package com.loopers.application.order
 
-import com.loopers.domain.brand.Brand
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.order.Order
-import com.loopers.domain.order.OrderDetail
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.point.PointService
-import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.Gender
-import com.loopers.domain.user.User
-import com.loopers.domain.user.UserCommand
 import com.loopers.domain.user.UserService
-import com.loopers.support.util.withCreatedAt
-import com.loopers.support.util.withId
+import com.loopers.support.fixtures.BrandFixtures.createBrand
+import com.loopers.support.fixtures.OrderFixtures.createOrder
+import com.loopers.support.fixtures.OrderFixtures.createOrderDetail
+import com.loopers.support.fixtures.ProductFixtures.createProduct
+import com.loopers.support.fixtures.UserFixtures
+import com.loopers.support.fixtures.UserFixtures.createUser
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -26,7 +25,6 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
-import java.time.ZonedDateTime
 
 @DisplayName("OrderFacade 단위 테스트")
 class OrderFacadeTest {
@@ -50,7 +48,7 @@ class OrderFacadeTest {
             val userId = "1"
             val userIdLong = 1L
 
-            val user = createUser(userIdLong, "userId", "test@example.com", "1990-01-01", Gender.MALE)
+            val user = UserFixtures.createUser(userIdLong, "userId", "test@example.com", "1990-01-01", Gender.MALE)
 
             val order1 = createOrder(1L, OrderStatus.PENDING, 10000L, userIdLong)
             val order2 = createOrder(2L, OrderStatus.COMPLETED, 20000L, userIdLong)
@@ -143,77 +141,5 @@ class OrderFacadeTest {
                 softly.assertThat(result.items[0].productName).isEqualTo("상품1")
             }
         }
-    }
-
-    private fun createUser(
-        id: Long,
-        userId: String,
-        email: String,
-        birthDate: String,
-        gender: Gender,
-    ): User {
-        return User.create(
-            UserCommand.SignUp(
-                userId = userId,
-                email = email,
-                birthDate = birthDate,
-                gender = gender,
-            ),
-        ).withId(id)
-    }
-
-    private fun createBrand(
-        id: Long,
-        name: String,
-    ): Brand {
-        return Brand.create(name = name)
-            .withId(id)
-            .withCreatedAt(ZonedDateTime.now())
-    }
-
-    private fun createProduct(
-        id: Long,
-        name: String,
-        price: Long,
-        brandId: Long,
-    ): Product {
-        return Product.create(
-            name = name,
-            price = price,
-            brandId = brandId,
-        ).withId(id).withCreatedAt(ZonedDateTime.now())
-    }
-
-    private fun createOrder(
-        id: Long,
-        status: OrderStatus,
-        totalAmount: Long,
-        userId: Long,
-    ): Order {
-        return Order.create(
-            totalAmount = totalAmount,
-            userId = userId,
-        ).apply {
-            when (status) {
-                OrderStatus.COMPLETED -> complete()
-                OrderStatus.CANCELLED -> cancel()
-                else -> {}
-            }
-        }.withId(id).withCreatedAt(ZonedDateTime.now())
-    }
-
-    private fun createOrderDetail(
-        id: Long,
-        quantity: Long,
-        brand: Brand,
-        product: Product,
-        order: Order,
-    ): OrderDetail {
-        return OrderDetail.create(
-            quantity = quantity,
-            brand = brand,
-            product = product,
-            order = order,
-        ).withId(id).withCreatedAt(ZonedDateTime.now())
     }
 }

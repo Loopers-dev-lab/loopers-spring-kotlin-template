@@ -1,8 +1,8 @@
 package com.loopers.domain.order
 
-import com.loopers.domain.brand.Brand
-import com.loopers.domain.product.Product
-import com.loopers.support.util.withId
+import com.loopers.support.fixtures.BrandFixtures.createBrand
+import com.loopers.support.fixtures.OrderFixtures.createOrder
+import com.loopers.support.fixtures.ProductFixtures.createProduct
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.DisplayName
@@ -23,7 +23,7 @@ class OrderDetailTest {
         fun createOrderDetail(quantity: Long) {
             // given
             val brand = createBrand()
-            val product = createProduct(brand)
+            val product = createProduct(brand.id)
             val order = createOrder()
 
             // when
@@ -31,13 +31,13 @@ class OrderDetailTest {
 
             // then
             assertSoftly { softly ->
-                softly.assertThat(orderDetail.brandName).isEqualTo("Apple")
-                softly.assertThat(orderDetail.productName).isEqualTo("iPhone 15")
-                softly.assertThat(orderDetail.price).isEqualTo(1500000L)
+                softly.assertThat(orderDetail.brandName).isEqualTo(brand.name)
+                softly.assertThat(orderDetail.productName).isEqualTo(product.name)
+                softly.assertThat(orderDetail.price).isEqualTo(product.price)
                 softly.assertThat(orderDetail.quantity).isEqualTo(quantity)
                 softly.assertThat(orderDetail.brandId).isEqualTo(1L)
-                softly.assertThat(orderDetail.productId).isEqualTo(10L)
-                softly.assertThat(orderDetail.orderId).isEqualTo(100L)
+                softly.assertThat(orderDetail.productId).isEqualTo(product.id)
+                softly.assertThat(orderDetail.orderId).isEqualTo(order.id)
             }
         }
 
@@ -47,7 +47,7 @@ class OrderDetailTest {
         fun createOrderDetailWithInvalidQuantity(quantity: Long) {
             // given
             val brand = createBrand()
-            val product = createProduct(brand)
+            val product = createProduct(brand.id)
             val order = createOrder()
 
             // when & then
@@ -64,7 +64,7 @@ class OrderDetailTest {
         fun createOrderDetailWithTooLargeQuantity(quantity: Long) {
             // given
             val brand = createBrand()
-            val product = createProduct(brand)
+            val product = createProduct(brandId = brand.id)
             val order = createOrder()
 
             // when & then
@@ -74,19 +74,5 @@ class OrderDetailTest {
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessage("주문 수량은 999개를 초과할 수 없습니다.")
         }
-    }
-
-    private fun createBrand(): Brand {
-        return Brand.create("Apple").withId(1L)
-    }
-
-    private fun createProduct(brand: Brand): Product {
-        return Product.create("iPhone 15", 1500000L, brand.id)
-            .withId(10L)
-    }
-
-    private fun createOrder(): Order {
-        return Order.create(1500000L, 1L)
-            .withId(100L)
     }
 }

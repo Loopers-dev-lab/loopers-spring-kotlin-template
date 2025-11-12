@@ -3,7 +3,8 @@ package com.loopers.domain.product
 import com.loopers.domain.order.OrderCommand
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import com.loopers.support.util.withId
+import com.loopers.support.fixtures.ProductFixtures.createProduct
+import com.loopers.support.fixtures.ProductFixtures.createStock
 import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -205,29 +206,5 @@ class OrderValidatorTest {
             Arguments.of(99L, 100),
             Arguments.of(1L, 1000),
         )
-
-        private fun createProduct(
-            id: Long,
-            price: Long,
-            name: String = "테스트 상품",
-            brandId: Long = 1L,
-        ): Product {
-            return Product.create(
-                name = name,
-                price = price,
-                brandId = brandId,
-            ).withId(id)
-        }
-
-        private fun createStock(
-            productId: Long,
-            quantity: Long,
-            id: Long = 1L,
-        ): Stock {
-            return Stock.create(
-                productId = productId,
-                quantity = quantity,
-            ).withId(id)
-        }
     }
 }

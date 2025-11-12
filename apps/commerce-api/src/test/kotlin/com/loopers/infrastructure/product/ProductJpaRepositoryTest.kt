@@ -11,7 +11,7 @@ import com.loopers.domain.user.User
 import com.loopers.domain.user.UserCommand
 import com.loopers.infrastructure.brand.BrandJpaRepository
 import com.loopers.infrastructure.user.UserJpaRepository
-import com.loopers.support.util.withId
+import com.loopers.support.fixtures.withId
 import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName

@@ -1,4 +1,4 @@
-package com.loopers.support.util
+package com.loopers.support.fixtures
 
 import com.loopers.domain.BaseEntity
 import java.time.ZonedDateTime

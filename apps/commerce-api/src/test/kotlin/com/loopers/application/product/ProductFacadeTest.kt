@@ -1,6 +1,5 @@
 package com.loopers.application.product
 
-import com.loopers.domain.brand.Brand
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.like.ProductLike
 import com.loopers.domain.like.ProductLikeService
@@ -8,13 +7,14 @@ import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductSort
 import com.loopers.domain.user.Gender
-import com.loopers.domain.user.User
-import com.loopers.domain.user.UserCommand
 import com.loopers.domain.user.UserService
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import com.loopers.support.util.withCreatedAt
-import com.loopers.support.util.withId
+import com.loopers.support.fixtures.BrandFixtures.createBrand
+import com.loopers.support.fixtures.ProductFixtures.createProduct
+import com.loopers.support.fixtures.ProductLikeFixtures
+import com.loopers.support.fixtures.ProductLikeFixtures.createProductLike
+import com.loopers.support.fixtures.UserFixtures.createUser
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -27,7 +27,6 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
-import java.time.ZonedDateTime
 
 @DisplayName("ProductFacade 단위 테스트")
 class ProductFacadeTest {
@@ -59,8 +58,8 @@ class ProductFacadeTest {
             val products = listOf(product1, product2)
             val productPage: Page<Product> = PageImpl(products, pageable, products.size.toLong())
 
-            val productLike1 = createProductLike(1L, product1.id, userId)
-            val productLike2 = createProductLike(2L, product2.id, userId)
+            val productLike1 = ProductLikeFixtures.createProductLike(1L, product1.id, userId)
+            val productLike2 = ProductLikeFixtures.createProductLike(2L, product2.id, userId)
             val productLikes = listOf(productLike1, productLike2)
 
             every { productService.getProducts(brandId, sort, pageable) } returns productPage
@@ -280,55 +279,5 @@ class ProductFacadeTest {
                 softly.assertThat(result.totalElements).isEqualTo(0)
             }
         }
-    }
-
-    private fun createBrand(
-        id: Long,
-        name: String,
-    ): Brand {
-        return Brand.create(name = name)
-            .withId(id)
-            .withCreatedAt(ZonedDateTime.now())
-    }
-
-    private fun createProduct(
-        id: Long,
-        name: String,
-        price: Long,
-        brandId: Long,
-    ): Product {
-        return Product.create(
-            name = name,
-            price = price,
-            brandId = brandId,
-        ).withId(id).withCreatedAt(ZonedDateTime.now())
-    }
-
-    private fun createProductLike(
-        id: Long,
-        productId: Long,
-        userId: Long,
-    ): ProductLike {
-        return ProductLike.create(
-            productId = productId,
-            userId = userId,
-        ).withId(id).withCreatedAt(ZonedDateTime.now())
-    }
-
-    private fun createUser(
-        id: Long,
-        userId: String,
-        email: String,
-        birthDate: String,
-        gender: Gender,
-    ): User {
-        return User.create(
-            UserCommand.SignUp(
-                userId = userId,
-                email = email,
-                birthDate = birthDate,
-                gender = gender,
-            ),
-        ).withId(id)
     }
 }

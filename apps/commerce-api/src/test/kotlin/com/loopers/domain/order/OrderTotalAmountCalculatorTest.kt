@@ -1,7 +1,6 @@
 package com.loopers.domain.order
 
-import com.loopers.domain.product.Product
-import com.loopers.support.util.withId
+import com.loopers.support.fixtures.ProductFixtures.createProduct
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -90,18 +89,5 @@ class OrderTotalAmountCalculatorTest {
         }
             .isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("상품 ID 999에 해당하는 상품을 찾을 수 없습니다.")
-    }
-
-    private fun createProduct(
-        id: Long,
-        price: Long,
-        name: String = "테스트 상품",
-        brandId: Long = 1L,
-    ): Product {
-        return Product.create(
-            name = name,
-            price = price,
-            brandId = brandId,
-        ).withId(id)
     }
 }
