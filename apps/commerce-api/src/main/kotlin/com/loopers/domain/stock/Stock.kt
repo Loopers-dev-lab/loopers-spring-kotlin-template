@@ -51,7 +51,7 @@ class Stock(
 
     private fun validateQuantity(quantity: Int) {
         if (quantity < 0) {
-            throw CoreException(ErrorType.BAD_REQUEST, "재고 수량은 0 이상이어야 합니다.")
+            throw CoreException(ErrorType.OUT_OF_STOCK, "재고가 부족합니다.")
         }
     }
 }
