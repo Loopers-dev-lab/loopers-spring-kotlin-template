@@ -12,13 +12,17 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.time.LocalDate
 
 class UserTest {
+    companion object {
+        private const val ANY_USER_NAME = "username"
+        private const val ANY_BIRTH = "2000-01-01"
+        private const val ANY_EMAIL = "toong@toong.io"
+        private const val ANY_POINT_BALANCE = 231231
+        private val ANY_GENDER = Gender.MALE
+    }
+
     @DisplayName("회원가입 테스트")
     @Nested
     inner class SignUp {
-        val correctUsername = "username"
-        val correctBirth = "2000-01-01"
-        val correctEmail = "toong@toong.io"
-        val correctGender = Gender.MALE
 
         @DisplayName("ID가 영문 및 숫자 10자 이내이거나 공백이 아니면 가입에 성공한다.")
         @ParameterizedTest
@@ -27,9 +31,9 @@ class UserTest {
             // when
             val user = User.signUp(
                 username = validUsername,
-                birth = correctBirth,
-                email = correctEmail,
-                gender = correctGender,
+                birth = ANY_BIRTH,
+                email = ANY_EMAIL,
+                gender = ANY_GENDER,
             )
 
             // then
@@ -44,9 +48,9 @@ class UserTest {
             val exception = assertThrows<CoreException> {
                 User.signUp(
                     username = invalidUsername,
-                    birth = correctBirth,
-                    email = correctEmail,
-                    gender = correctGender,
+                    birth = ANY_BIRTH,
+                    email = ANY_EMAIL,
+                    gender = ANY_GENDER,
                 )
             }
 
@@ -62,10 +66,10 @@ class UserTest {
             // when
             val exception = assertThrows<CoreException> {
                 User.signUp(
-                    username = correctUsername,
-                    birth = correctBirth,
+                    username = ANY_USER_NAME,
+                    birth = ANY_BIRTH,
                     email = invalidEmail,
-                    gender = correctGender,
+                    gender = ANY_GENDER,
                 )
             }
 
@@ -80,10 +84,10 @@ class UserTest {
         fun signUpUser_whenEmailIsValid(validEmail: String) {
             // when
             val user = User.signUp(
-                username = correctUsername,
-                birth = correctBirth,
+                username = ANY_USER_NAME,
+                birth = ANY_BIRTH,
                 email = validEmail,
-                gender = correctGender,
+                gender = ANY_GENDER,
             )
 
             // then
@@ -97,10 +101,10 @@ class UserTest {
             // when
             val exception = assertThrows<CoreException> {
                 User.signUp(
-                    username = correctUsername,
+                    username = ANY_USER_NAME,
                     birth = invalidBirth,
-                    email = correctEmail,
-                    gender = correctGender,
+                    email = ANY_EMAIL,
+                    gender = ANY_GENDER,
                 )
             }
 
@@ -115,10 +119,10 @@ class UserTest {
         fun signUpUser_whenBirthIsValid(validBirth: String) {
             // when
             val user = User.signUp(
-                username = correctUsername,
+                username = ANY_USER_NAME,
                 birth = validBirth,
-                email = correctEmail,
-                gender = correctGender,
+                email = ANY_EMAIL,
+                gender = ANY_GENDER,
             )
 
             // then
@@ -132,9 +136,9 @@ class UserTest {
             // when
             val providedGender = Gender.FEMALE
             val user = User.signUp(
-                username = correctUsername,
-                birth = correctBirth,
-                email = correctEmail,
+                username = ANY_USER_NAME,
+                birth = ANY_BIRTH,
+                email = ANY_EMAIL,
                 gender = providedGender,
             )
 

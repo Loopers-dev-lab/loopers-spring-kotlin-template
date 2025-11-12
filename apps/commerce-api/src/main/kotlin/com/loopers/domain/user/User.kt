@@ -61,6 +61,10 @@ class User(
             return User(username, parsedBirthDate, email, gender)
         }
 
+        fun of(username: String, birth: LocalDate, email: String, gender: Gender): User {
+            return User(username, birth, email, gender)
+        }
+
         private val EMAIL_PATTERN = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]+$".toRegex()
         private val USERNAME_PATTERN = "^[A-Za-z0-9]{1,10}$".toRegex()
         private const val BIRTH_DATE_FORMAT = "yyyy-MM-dd"

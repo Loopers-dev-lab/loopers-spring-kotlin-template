@@ -17,10 +17,8 @@ class UserService(
 
     @Transactional
     fun signUp(command: UserCommand.SignUp): User {
-        val existsByUsername = userRepository.existsBy(command.username)
-        if (existsByUsername) {
-            throw CoreException(ErrorType.CONFLICT, "이미 가입된 유저입니다.")
-        }
+        userRepository.findByUsername(command.username)
+            ?.let { throw CoreException(ErrorType.CONFLICT, "이미 가입된 유저입니다.") }
 
         val user = User.signUp(command.username, command.birth, command.email, command.gender)
 
@@ -31,7 +29,8 @@ class UserService(
                 is ConstraintViolationException ->
                     throw CoreException(ErrorType.BAD_REQUEST, exception.message)
 
-                else -> throw exception
+                else ->
+                    throw exception
             }
         }
     }

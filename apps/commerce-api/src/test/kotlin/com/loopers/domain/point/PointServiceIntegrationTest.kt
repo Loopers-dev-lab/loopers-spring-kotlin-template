@@ -1,16 +1,10 @@
 package com.loopers.domain.point
 
-import com.loopers.domain.user.Gender
-import com.loopers.domain.user.User
-import com.loopers.domain.user.UserRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import com.loopers.support.test.KSelect
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
-import org.instancio.Instancio
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -18,12 +12,11 @@ import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import java.time.LocalDate
 
 @SpringBootTest
 class PointServiceIntegrationTest @Autowired constructor(
     private val pointService: PointService,
-    private val userRepository: UserRepository,
+    private val pointAccountRepository: PointAccountRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
     @AfterEach
@@ -31,30 +24,35 @@ class PointServiceIntegrationTest @Autowired constructor(
         databaseCleanUp.truncateAllTables()
     }
 
+    @DisplayName("포인트 계좌 생성 통합테스트")
+    @Nested
+    inner class Create {
+        @DisplayName("포인트 계좌를 생성할 수 있다.")
+        @Test
+        fun createPointAccount_whenValidUserIdIsProvided() {
+            // when
+            val userId = 1L
+            val pointAccount = pointService.createPointAccount(userId)
+
+            // then
+            assertAll(
+                { assertThat(pointAccount.userId).isEqualTo(userId) },
+                { assertThat(pointAccount.balance).isEqualTo(Money.ZERO_KRW) },
+            )
+        }
+    }
+
     @DisplayName("포인트 충전 통합테스트")
     @Nested
     inner class Charge {
-        var user: User? = null
-
-        @BeforeEach
-        fun setUp() {
-            val mockUser = Instancio.of(User::class.java)
-                .ignore(KSelect.field(User::id))
-                .set(KSelect.field(User::username), "김준형")
-                .set(KSelect.field(User::birth), LocalDate.of(1994, 9, 23))
-                .set(KSelect.field(User::email), "toong@toong.io")
-                .set(KSelect.field(User::gender), Gender.MALE)
-                .create()
-            user = userRepository.save(mockUser)
-        }
-
         @DisplayName("존재하지 않는 유저 id로 충전을 할 수 없다.")
         @Test
         fun throwsException_whenInvalidUserIdIsProvided() {
             // when
             val invalidUserId = 999L
-            val correctAmount = Money.krw(1000)
-            val exception = assertThrows<CoreException> { pointService.charge(invalidUserId, correctAmount) }
+            val exception = assertThrows<CoreException> {
+                charge(invalidUserId)
+            }
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
@@ -65,20 +63,39 @@ class PointServiceIntegrationTest @Autowired constructor(
         @Test
         fun chargePoint_whenValidUserIdIsProvided() {
             // given
-            val existUser = user!!
+            val currentBalance = Money.krw(2312312)
+            val createPointAccount = createPointAccount(
+                balance = currentBalance,
+            )
 
             // when
-            val correctAmount = Money.krw(1000)
-            val wallet = pointService.charge(existUser.id, correctAmount)
+            val chargeAmount = Money.krw(1000)
+            charge(
+                userId = createPointAccount.userId,
+                amount = chargeAmount,
+            )
 
             // then
-            val pointTransactions = wallet.transactions()
+            val pointAccount = pointAccountRepository.findByUserId(createPointAccount.userId)
             assertAll(
-                { assertThat(wallet.userId).isEqualTo(existUser.id) },
-                { assertThat(pointTransactions).hasSize(1) },
-                { assertThat(pointTransactions[0].amount).isEqualTo(correctAmount) },
-                { assertThat(pointTransactions[0].transactionType).isEqualTo(PointTransactionType.CHARGE) },
+                { assertThat(pointAccount?.balance).isEqualTo(currentBalance.plus(chargeAmount)) },
             )
         }
+    }
+
+    private fun charge(
+        userId: Long = 1L,
+        amount: Money = Money.krw(1000),
+    ): PointAccount = pointService.charge(
+        userId = userId,
+        amount = amount,
+    )
+
+    private fun createPointAccount(
+        userId: Long = 1L,
+        balance: Money = Money.ZERO_KRW,
+    ): PointAccount {
+        val account = PointAccount.of(userId, balance)
+        return pointAccountRepository.save(account)
     }
 }
