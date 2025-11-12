@@ -11,4 +11,20 @@ interface ProductV1ApiSpec {
     fun getProduct(
         productId: Long,
     ): ApiResponse<ProductResponse.ProductInfoDto>
+
+    @Operation(summary = "상품 등록")
+    fun createProduct(
+        request: ProductRequest.CreateDto,
+    ): ApiResponse<ProductResponse.ProductInfoDto>
+
+    @Operation(summary = "상품 수정")
+    fun updateProduct(
+        productId: Long,
+        request: ProductRequest.UpdateDto,
+    ): ApiResponse<ProductResponse.ProductInfoDto>
+
+    @Operation(summary = "상품 삭제")
+    fun deleteProduct(
+        productId: Long,
+    ): ApiResponse<Unit>
 }

@@ -12,18 +12,32 @@ import java.math.BigDecimal
 @Table(name = "loopers_product")
 class Product(
     @Column(nullable = false, length = 200)
-    val name: String,
+    var name: String,
 
     @Column(nullable = false, precision = 10, scale = 2)
-    val price: BigDecimal,
+    var price: BigDecimal,
 
     @Column(nullable = false)
-    val brandId: Long,
+    var brandId: Long,
 ) : BaseEntity() {
 
     init {
         validateName(name)
         validatePrice(price)
+    }
+
+    fun update(name: String?, price: BigDecimal?, brandId: Long?) {
+        name?.let {
+            validateName(it)
+            this.name = it
+        }
+        price?.let {
+            validatePrice(it)
+            this.price = it
+        }
+        brandId?.let {
+            this.brandId = it
+        }
     }
 
     companion object {

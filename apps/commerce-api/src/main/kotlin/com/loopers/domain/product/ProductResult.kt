@@ -16,7 +16,7 @@ class ProductResult {
         val updatedAt: ZonedDateTime,
     ) {
         companion object {
-            fun of(product: Product, brand: Brand, likeCount: Long): ProductInfo {
+            fun of(product: Product, brand: Brand, likeCount: Long = 0): ProductInfo {
                 return ProductInfo(
                     id = product.id,
                     name = product.name,
