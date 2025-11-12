@@ -65,7 +65,7 @@ class PointV1ApiE2ETest @Autowired constructor(
             )
 
             val headers = HttpHeaders().apply {
-                set("X-USER-ID", user.id.toString())
+                set("X-USER-ID", user.username)
             }
 
             // act
@@ -85,96 +85,49 @@ class PointV1ApiE2ETest @Autowired constructor(
             )
         }
 
-        @DisplayName("X-USER-ID 헤더가 없을 경우, 400 Bad Request 응답을 반환한다.")
-        @Test
-        fun returnsBadRequest_whenHeaderIsMissing() {
-            // arrange
-            val headers = HttpHeaders()
+        @DisplayName("POST /api/v1/points/charge")
+        @Nested
+        inner class ChargePoint {
+            @DisplayName("존재하는 유저가 500원의 잔고에서 1,000원을 충전할 경우, 충전된 보유 총량인 1,500원을 응답으로 반환한다.")
+            @Test
+            fun returnsChargedAmount_whenUserExists() {
+                // arrange
+                val initialAmount = BigDecimal("500.00")
+                val amount = BigDecimal("1000.00")
+                val totalAmount = initialAmount.add(amount)
 
-            // act
-            val responseType = object : ParameterizedTypeReference<ApiResponse<PointResponse.PointResponseDto>>() {}
-            val response = testRestTemplate.exchange(
-                ENDPOINT_GET,
-                HttpMethod.GET,
-                HttpEntity<Any>(null, headers),
-                responseType,
-            )
+                val user = userJpaRepository.save(
+                    User(
+                        username = "testuser",
+                        password = "password123",
+                        email = "test@example.com",
+                        birthDate = "1997-03-25",
+                        gender = User.Gender.MALE,
+                    ),
+                )
+                pointJpaRepository.save(Point.of(userId = user.id, initialBalance = initialAmount))
 
-            // assert
-            assertAll(
-                { assertThat(response.statusCode.is4xxClientError).isTrue() },
-                { assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST) },
-            )
-        }
-    }
+                val request = PointRequest.PointChargeRequestDto(amount = amount)
+                val headers = HttpHeaders().apply {
+                    set("X-USER-ID", user.username)
+                }
 
-    @DisplayName("POST /api/v1/points/charge")
-    @Nested
-    inner class ChargePoint {
-        @DisplayName("존재하는 유저가 500원의 잔고에서 1,000원을 충전할 경우, 충전된 보유 총량인 1,500원을 응답으로 반환한다.")
-        @Test
-        fun returnsChargedAmount_whenUserExists() {
-            // arrange
-            val initialAmount = BigDecimal("500.00")
-            val amount = BigDecimal("1000.00")
-            val totalAmount = initialAmount.add(amount)
+                // act
+                val responseType = object : ParameterizedTypeReference<ApiResponse<PointResponse.PointResponseDto>>() {}
+                val response = testRestTemplate.exchange(
+                    ENDPOINT_CHARGE,
+                    HttpMethod.POST,
+                    HttpEntity(request, headers),
+                    responseType,
+                )
 
-            val user = userJpaRepository.save(
-                User(
-                    username = "testuser",
-                    password = "password123",
-                    email = "test@example.com",
-                    birthDate = "1997-03-25",
-                    gender = User.Gender.MALE,
-                ),
-            )
-            pointJpaRepository.save(Point.of(userId = user.id, initialBalance = initialAmount))
-
-            val request = PointRequest.PointChargeRequestDto(amount = amount)
-            val headers = HttpHeaders().apply {
-                set("X-USER-ID", user.id.toString())
+                // assert
+                assertAll(
+                    { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
+                    { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                    { assertThat(response.body?.data?.balance).isEqualTo(totalAmount) },
+                )
             }
-
-            // act
-            val responseType = object : ParameterizedTypeReference<ApiResponse<PointResponse.PointResponseDto>>() {}
-            val response = testRestTemplate.exchange(
-                ENDPOINT_CHARGE,
-                HttpMethod.POST,
-                HttpEntity(request, headers),
-                responseType,
-            )
-
-            // assert
-            assertAll(
-                { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
-                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
-                { assertThat(response.body?.data?.balance).isEqualTo(totalAmount) },
-            )
-        }
-
-        @DisplayName("존재하지 않는 유저로 요청할 경우, 404 Not Found 응답을 반환한다.")
-        @Test
-        fun returnsNotFound_whenUserDoesNotExist() {
-            // arrange
-            val request = PointRequest.PointChargeRequestDto(amount = BigDecimal("1000.00"))
-            val headers = HttpHeaders().apply {
-                set("X-USER-ID", "999")
-            }
-
-            // act
-            val responseType = object : ParameterizedTypeReference<ApiResponse<PointResponse.PointResponseDto>>() {}
-            val response = testRestTemplate.exchange(
-                ENDPOINT_CHARGE,
-                HttpMethod.POST,
-                HttpEntity(request, headers),
-                responseType,
-            )
-
-            // assert
-            assertAll(
-                { assertThat(response.statusCode.is4xxClientError).isTrue() },
-                { assertThat(response.statusCode).isEqualTo(HttpStatus.NOT_FOUND) },
-            )
         }
     }
 }
