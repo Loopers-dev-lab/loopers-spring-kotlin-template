@@ -25,7 +25,8 @@ class PointService(
 
     @Transactional
     fun use(amount: Long, userId: Long) {
-        val point = pointRepository.getBy(userId) ?: pointRepository.save(Point.init(userId))
+        val point = pointRepository.getBy(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND)
         point.use(amount)
     }
 
