@@ -27,4 +27,8 @@ class LikeRepositoryImpl(
     override fun delete(like: Like) {
         likeJpaRepository.delete(like)
     }
+
+    override fun countByProductId(productId: Long): Long {
+        return likeJpaRepository.countByProductId(productId)
+    }
 }
