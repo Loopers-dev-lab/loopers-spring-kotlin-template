@@ -1,6 +1,7 @@
 package com.loopers.domain.user
 
 import com.loopers.IntegrationTest
+import com.loopers.domain.point.PointRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.assertj.core.api.Assertions.assertThat
@@ -20,6 +21,9 @@ class UserServiceTest : IntegrationTest() {
     @MockitoSpyBean
     private lateinit var userRepository: UserRepository
 
+    @MockitoSpyBean
+    private lateinit var pointRepository: PointRepository
+
     @Autowired
     private lateinit var userService: UserService
 
@@ -27,7 +31,7 @@ class UserServiceTest : IntegrationTest() {
     @Nested
     inner class SignUp {
         @Test
-        fun `회원 가입시 User 저장이 수행된다`() {
+        fun `회원 가입시 User와 Point 저장이 수행된다`() {
             // given
             val command = createSignUpCommand()
 
@@ -43,6 +47,7 @@ class UserServiceTest : IntegrationTest() {
                 softly.assertThat(user.gender).isEqualTo(command.gender)
             }
             verify(userRepository, times(1)).save(any())
+            verify(pointRepository, times(1)).save(any())
             verify(userRepository, times(1)).findBy(any<String>())
         }
 
