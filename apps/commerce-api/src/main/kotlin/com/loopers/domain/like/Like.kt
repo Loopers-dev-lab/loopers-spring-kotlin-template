@@ -4,9 +4,18 @@ import com.loopers.domain.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 
 @Entity
-@Table(name = "loopers_like")
+@Table(
+    name = "loopers_like",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_like_user_product",
+            columnNames = ["user_id", "product_id"],
+        ),
+    ],
+)
 class Like(
     @Column(nullable = false)
     val userId: Long,

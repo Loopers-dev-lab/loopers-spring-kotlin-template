@@ -12,4 +12,19 @@ class LikeService(
     fun countLikesByProductId(productId: Long): Long {
         return likeRepository.countByProductId(productId)
     }
+
+    @Transactional
+    fun addLike(userId: Long, productId: Long) {
+        if (likeRepository.existsByUserIdAndProductId(userId, productId)) {
+            return
+        }
+
+        likeRepository.save(Like.of(userId, productId))
+    }
+
+    @Transactional
+    fun removeLike(userId: Long, productId: Long) {
+        val like = likeRepository.findByUserIdAndProductId(userId, productId) ?: return
+        likeRepository.delete(like)
+    }
 }
