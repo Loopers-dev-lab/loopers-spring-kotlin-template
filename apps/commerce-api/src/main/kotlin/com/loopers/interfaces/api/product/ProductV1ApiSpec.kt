@@ -1,6 +1,8 @@
 package com.loopers.interfaces.api.product
 
 import com.loopers.interfaces.api.ApiResponse
+import com.loopers.interfaces.api.common.PageRequestDto
+import com.loopers.interfaces.api.common.PageResponseDto
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 
@@ -27,4 +29,9 @@ interface ProductV1ApiSpec {
     fun deleteProduct(
         productId: Long,
     ): ApiResponse<Unit>
+
+    @Operation(summary = "상품 리스트 조회 (검색)")
+    fun getProducts(
+        request: PageRequestDto,
+    ): ApiResponse<PageResponseDto<ProductResponse.ProductInfoDto>>
 }

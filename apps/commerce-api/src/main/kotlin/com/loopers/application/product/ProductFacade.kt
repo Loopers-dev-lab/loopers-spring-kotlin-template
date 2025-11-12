@@ -1,6 +1,8 @@
 package com.loopers.application.product
 
 import com.loopers.domain.brand.BrandService
+import com.loopers.domain.common.PageCommand
+import com.loopers.domain.common.PageResult
 import com.loopers.domain.like.LikeService
 import com.loopers.domain.product.ProductResult
 import com.loopers.domain.product.ProductService
@@ -22,6 +24,11 @@ class ProductFacade(
         val likeCount = likeService.countLikesByProductId(productId)
 
         return ProductResult.ProductInfo.of(product, brand, likeCount)
+    }
+
+    @Transactional(readOnly = true)
+    fun getProducts(command: PageCommand): PageResult<ProductResult.ProductInfo> {
+        return productService.getProducts(command)
     }
 
     @Transactional

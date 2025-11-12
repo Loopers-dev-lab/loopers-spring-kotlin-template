@@ -12,10 +12,6 @@ class LikeRepositoryImpl(
         return likeJpaRepository.save(like)
     }
 
-    override fun findByUserIdAndProductId(userId: Long, productId: Long): Like? {
-        return likeJpaRepository.findByUserIdAndProductId(userId, productId)
-    }
-
     override fun findByUserId(userId: Long): List<Like> {
         return likeJpaRepository.findByUserId(userId)
     }

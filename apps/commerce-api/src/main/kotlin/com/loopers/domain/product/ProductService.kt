@@ -1,5 +1,7 @@
 package com.loopers.domain.product
 
+import com.loopers.domain.common.PageCommand
+import com.loopers.domain.common.PageResult
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Component
@@ -15,6 +17,11 @@ class ProductService(
     fun getProduct(id: Long): Product {
         return productRepository.findById(id)
             ?: throw CoreException(ErrorType.NOT_FOUND, "[id = $id] 상품을 찾을 수 없습니다.")
+    }
+
+    @Transactional(readOnly = true)
+    fun getProducts(pageCommand: PageCommand): PageResult<ProductResult.ProductInfo> {
+        return productRepository.getProducts(pageCommand)
     }
 
     @Transactional
