@@ -6,7 +6,6 @@ import com.loopers.domain.user.User
 import com.loopers.domain.user.UserCommand
 import com.loopers.infrastructure.user.UserJpaRepository
 import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.SoftAssertions.assertSoftly
@@ -30,20 +29,6 @@ class PointServiceTest : IntegrationTest() {
     @DisplayName("PointService Charge")
     @Nested
     inner class Charge {
-        @Test
-        fun `존재하지 않는 유저 ID 로 충전을 시도한 경우, 실패한다`() {
-            // given
-            val amount = 100L
-            val userId = 1L
-
-            // when & then
-            assertThatThrownBy {
-                pointService.charge(amount, userId)
-            }.isInstanceOfSatisfying(CoreException::class.java) { error ->
-                assertThat(error.errorType).isEqualTo(ErrorType.NOT_FOUND)
-            }
-        }
-
         @Test
         fun `포인트 충전에 성공한다`() {
             // given

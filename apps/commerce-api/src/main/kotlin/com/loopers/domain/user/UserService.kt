@@ -1,7 +1,5 @@
 package com.loopers.domain.user
 
-import com.loopers.domain.point.Point
-import com.loopers.domain.point.PointRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Service
@@ -10,7 +8,6 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class UserService(
     private val userRepository: UserRepository,
-    private val pointRepository: PointRepository,
 ) {
 
     @Transactional
@@ -19,7 +16,6 @@ class UserService(
             throw CoreException(ErrorType.CONFLICT)
         }
         val user = userRepository.save(User.create(command))
-        pointRepository.save(Point.init(user.id))
         return user
     }
 

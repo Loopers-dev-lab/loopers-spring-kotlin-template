@@ -15,10 +15,6 @@ class UserRepositoryImpl(
         return userJpaRepository.save(user)
     }
 
-    override fun exist(id: Long): Boolean {
-        return userJpaRepository.existsById(id)
-    }
-
     override fun findBy(id: Long): User? {
         return userJpaRepository.findByIdOrNull(id)
     }
