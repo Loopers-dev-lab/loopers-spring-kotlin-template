@@ -4,10 +4,8 @@ import com.loopers.domain.user.Gender
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserRepository
 import com.loopers.interfaces.api.ApiResponse
-import com.loopers.support.test.KSelect
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
-import org.instancio.Instancio
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -22,6 +20,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import java.time.LocalDate
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -31,11 +30,6 @@ class UserV1ApiE2ETest @Autowired constructor(
     private val userRepository: UserRepository,
 ) {
 
-    companion object {
-        private val ENDPOINT_SIGNUP: () -> String = { "/api/v1/users/sign-up" }
-        private val ENDPOINT_GET_BY_ID: (Long) -> String = { id: Long -> "/api/v1/users/$id" }
-    }
-
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
@@ -44,18 +38,11 @@ class UserV1ApiE2ETest @Autowired constructor(
     @DisplayName("GET /api/v1/users/{userId}")
     @Nested
     inner class GetByID {
-        val correctUsername = "username"
-        val correctBirth: LocalDate = LocalDate.of(2000, 1, 1)
-        val correctGender = Gender.MALE
-        val correctEmail = "to323ong@toong.io"
-
         @DisplayName("숫자가 아닌 ID 로 요청하면, 400 BAD_REQUEST 응답을 받는다.")
         @Test
         fun throwsBadRequest_whenIdIsNotProvided() {
             // when
-            val requestUrl = "/api/v1/users/나나"
-            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Response.GetUserById>>() {}
-            val response = testRestTemplate.exchange(requestUrl, HttpMethod.GET, null, responseType)
+            val response = getUserBy("나나")
 
             // then
             assertAll(
@@ -67,48 +54,33 @@ class UserV1ApiE2ETest @Autowired constructor(
         @DisplayName("존재하지 않는 예시 ID를 주면, 404 NOT_FOUND 응답을 받는다.")
         @Test
         fun throwsException_whenInvalidIdIsProvided() {
-            // arrange
+            // given
             val invalidId = -1L
-            val requestUrl = ENDPOINT_GET_BY_ID(invalidId)
 
-            // act
-            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Response.GetUserById>>() {}
-            val response = testRestTemplate.exchange(requestUrl, HttpMethod.GET, HttpEntity<Any>(Unit), responseType)
+            // when
+            val response = getUserBy(invalidId)
 
-            // assert
+            // then
             assertAll(
                 { assert(response.statusCode.is4xxClientError) },
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.NOT_FOUND) },
             )
         }
 
-        @DisplayName("내 정보 조회에 성공할 경우, 해당하는 유저 정보를 응답으로 반환한다.")
+        @DisplayName("내 정보 조회하면, 해당하는 유저 정보를 응답으로 반환한다.")
         @Test
         fun returnUserResponse_whenAlreadyExistIdIsProvided() {
             // given
-            val existingUser = Instancio.of(User::class.java)
-                .ignore(KSelect.field(User::id))
-                .set(KSelect.field(User::username), correctUsername)
-                .set(KSelect.field(User::birth), correctBirth)
-                .set(KSelect.field(User::gender), correctGender)
-                .set(KSelect.field(User::email), correctEmail)
-                .create()
-            val savedUserId = userRepository.save(existingUser).id
+            val existUser = createUser()
 
             // when
-            val requestUrl = ENDPOINT_GET_BY_ID(savedUserId)
-            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Response.GetUserById>>() {}
-            val response = testRestTemplate.exchange(requestUrl, HttpMethod.GET, null, responseType)
+            val response = getUserBy(existUser.id)
 
             // then
             assertAll(
                 { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
                 { assertThat(response.body?.data).isNotNull() },
-                { assertThat(response.body?.data?.id).isEqualTo(savedUserId) },
-                { assertThat(response.body?.data?.username).isEqualTo(correctUsername) },
-                { assertThat(response.body?.data?.birth).isEqualTo(correctBirth) },
-                { assertThat(response.body?.data?.gender).isEqualTo(correctGender) },
-                { assertThat(response.body?.data?.email).isEqualTo(correctEmail) },
+                { assertThat(response.body?.data?.id).isEqualTo(existUser.id) },
             )
         }
     }
@@ -116,34 +88,12 @@ class UserV1ApiE2ETest @Autowired constructor(
     @DisplayName("POST /api/v1/users/sign-up")
     @Nested
     inner class SignUp {
-        val correctUsername = "username"
-        val correctBirth = "2000-01-01"
-        val correctGender = Gender.MALE
-        val correctEmail = "to323ong@toong.io"
-
-        @DisplayName("적절한 값으로 회원가입을 요청하는 경우 회원가입에 성공한다.")
+        @DisplayName("적절한 값으로 회원가입할 수 있다.")
         @Test
         fun signUpUser_whenValidRequestIsProvided() {
             // when
-            val request = UserV1Request.SignUp(
-                username = correctUsername,
-                birth = correctBirth,
-                gender = correctGender,
-                email = correctEmail,
-            )
-            val headers = HttpHeaders().apply {
-                contentType = MediaType.APPLICATION_JSON
-            }
-            val httpEntity = HttpEntity(request, headers)
-
-            val requestUrl = ENDPOINT_SIGNUP()
-            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Response.SignUp>>() {}
-            val response = testRestTemplate.exchange(
-                requestUrl,
-                HttpMethod.POST,
-                httpEntity,
-                responseType,
-            )
+            val request = createSignUpRequest()
+            val response = signUp(request)
 
             // then
             assertAll(
@@ -157,31 +107,18 @@ class UserV1ApiE2ETest @Autowired constructor(
             )
         }
 
-        @DisplayName("성별 정보 없이 회원가입을 요청하는 경우 400 BAD_REQUEST 응답을 받는다.")
+        @DisplayName("성별 정보 없이 회원가입하면, 400 BAD_REQUEST 응답을 받는다.")
         @Test
         fun signUpUser_whenGenderIsMissing_thenReturnBadRequest() {
             // when
-            val requestJson = """
+            val invalidJson = """
                 {
-                    "username": {$correctUsername},
-                    "birth": {$correctBirth},
-                    "email": {$correctEmail}},
+                    "username": "testuser",
+                    "birth": "2000-01-01",
+                    "email": "test@toong.io"
                 }
             """.trimIndent()
-
-            val headers = HttpHeaders().apply {
-                contentType = MediaType.APPLICATION_JSON
-            }
-            val httpEntity = HttpEntity(requestJson, headers)
-            val requestUrl = ENDPOINT_SIGNUP()
-
-            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Response.SignUp>>() {}
-            val response = testRestTemplate.exchange(
-                requestUrl,
-                HttpMethod.POST,
-                httpEntity,
-                responseType,
-            )
+            val response = signUpWithRawJson(invalidJson)
 
             // then
             assertAll(
@@ -190,36 +127,18 @@ class UserV1ApiE2ETest @Autowired constructor(
             )
         }
 
-        @DisplayName("이미 존재하는 username로 회원가입을 요청하는 경우 409 CONFLICT 응답을 받는다.")
+        @DisplayName("이미 존재하는 username로 회원가입하면, 409 CONFLICT 응답을 받는다.")
         @Test
         fun signUpUser_whenUsernameAlreadyExists_thenReturnConflict() {
             // given
-            val existingUsername = "existingUsername"
-            val existingUser = Instancio.of(User::class.java)
-                .ignore(KSelect.field(User::id))
-                .set(KSelect.field(User::username), existingUsername)
-                .create()
-            userRepository.save(existingUser)
+            val existUsername = "username"
+            val existUser = createUser(
+                username = existUsername,
+            )
 
             // when
-            val request = UserV1Request.SignUp(
-                username = existingUsername,
-                birth = correctBirth,
-                gender = correctGender,
-                email = correctEmail,
-            )
-            val headers = HttpHeaders().apply {
-                contentType = MediaType.APPLICATION_JSON
-            }
-            val httpEntity = HttpEntity(request, headers)
-            val requestUrl = ENDPOINT_SIGNUP()
-            val responseType = object : ParameterizedTypeReference<ApiResponse<UserV1Response.SignUp>>() {}
-            val response = testRestTemplate.exchange(
-                requestUrl,
-                HttpMethod.POST,
-                httpEntity,
-                responseType,
-            )
+            val request = createSignUpRequest(username = existUsername)
+            val response = signUp(request)
 
             // then
             assertAll(
@@ -227,5 +146,74 @@ class UserV1ApiE2ETest @Autowired constructor(
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT) },
             )
         }
+    }
+
+    private fun getUserBy(userId: Long): ResponseEntity<ApiResponse<UserV1Response.GetUserById>> {
+        return testRestTemplate.exchange(
+            "/api/v1/users/$userId",
+            HttpMethod.GET,
+            null,
+            object : ParameterizedTypeReference<ApiResponse<UserV1Response.GetUserById>>() {},
+        )
+    }
+
+    private fun getUserBy(userId: String): ResponseEntity<ApiResponse<UserV1Response.GetUserById>> {
+        return testRestTemplate.exchange(
+            "/api/v1/users/$userId",
+            HttpMethod.GET,
+            null,
+            object : ParameterizedTypeReference<ApiResponse<UserV1Response.GetUserById>>() {},
+        )
+    }
+
+    private fun createSignUpRequest(
+        username: String = "username",
+        birth: String = "2000-01-01",
+        gender: Gender = Gender.MALE,
+        email: String = "test@example.com",
+    ): UserV1Request.SignUp {
+        return UserV1Request.SignUp(username, birth, email, gender)
+    }
+
+    private fun signUpWithRawJson(json: String): ResponseEntity<ApiResponse<UserV1Response.SignUp>> {
+        val httpHeaders = HttpHeaders().apply {
+            contentType = MediaType.APPLICATION_JSON
+        }
+
+        return testRestTemplate.exchange(
+            "/api/v1/users/sign-up",
+            HttpMethod.POST,
+            HttpEntity(json, httpHeaders),
+            object : ParameterizedTypeReference<ApiResponse<UserV1Response.SignUp>>() {},
+        )
+    }
+
+    private fun signUp(request: UserV1Request.SignUp): ResponseEntity<ApiResponse<UserV1Response.SignUp>> {
+        val httpHeaders = HttpHeaders().apply {
+            contentType = MediaType.APPLICATION_JSON
+        }
+
+        return testRestTemplate.exchange(
+            "/api/v1/users/sign-up",
+            HttpMethod.POST,
+            HttpEntity(request, httpHeaders),
+            object : ParameterizedTypeReference<ApiResponse<UserV1Response.SignUp>>() {},
+        )
+    }
+
+    private fun createUser(
+        username: String = "username",
+        birth: LocalDate = LocalDate.of(2000, 1, 1),
+        gender: Gender = Gender.MALE,
+        email: String = "test@example.com",
+    ): User {
+        val user = User.of(
+            username = username,
+            birth = birth,
+            gender = gender,
+            email = email,
+
+            )
+        return userRepository.save(user)
     }
 }

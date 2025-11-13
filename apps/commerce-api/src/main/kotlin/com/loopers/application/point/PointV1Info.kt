@@ -1,15 +1,15 @@
 package com.loopers.application.point
 
-import com.loopers.domain.point.Money
+import com.loopers.domain.point.PointAccount
 
 class PointV1Info {
     data class Charge(
         val balance: Int,
     ) {
         companion object {
-            fun from(amount: Money): Charge {
+            fun from(pointAccount: PointAccount): Charge {
                 return Charge(
-                    balance = amount.amount.toInt(),
+                    balance = pointAccount.balance.amount.toInt(),
                 )
             }
         }
@@ -19,9 +19,9 @@ class PointV1Info {
         val balance: Int,
     ) {
         companion object {
-            fun from(amount: Money): GetBalance {
+            fun from(pointAccount: PointAccount): GetBalance {
                 return GetBalance(
-                    balance = amount.amount.toInt(),
+                    balance = pointAccount.balance.amount.toInt(),
                 )
             }
         }

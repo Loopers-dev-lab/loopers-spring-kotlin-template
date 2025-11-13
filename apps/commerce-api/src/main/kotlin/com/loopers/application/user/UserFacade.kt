@@ -1,5 +1,6 @@
 package com.loopers.application.user
 
+import com.loopers.domain.point.PointService
 import com.loopers.domain.user.UserService
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -9,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class UserFacade(
     private val userService: UserService,
+    private val pointService: PointService,
 ) {
     fun getUserBy(id: Long): UserV1Info.GetById {
         return userService.findUserBy(id)
@@ -18,7 +20,9 @@ class UserFacade(
 
     @Transactional
     fun signUp(criteria: UserV1Criteria.SignUp): UserV1Info.SignUp {
-        userService.signUp(criteria.to())
-            .let { return UserV1Info.SignUp.from(it) }
+        val signUpUser = userService.signUp(criteria.to())
+        pointService.createPointAccount(signUpUser.id)
+
+        return UserV1Info.SignUp.from(signUpUser)
     }
 }
