@@ -52,10 +52,13 @@ object OrderValidator {
     ) {
         val stockMap = stocks.associateBy { it.productId }
 
-        items.forEach { item ->
-            val stock = getStockOrThrow(item.productId, stockMap)
-            validateSufficientStock(item, stock, products)
-        }
+        items
+            .groupBy { it.productId }
+            .forEach { (productId, groupedItems) ->
+                val stock = getStockOrThrow(productId, stockMap)
+                val requestedQuantity = groupedItems.sumOf { it.quantity.toLong() }
+                validateSufficientStock(productId, requestedQuantity, stock, products)
+            }
     }
 
     /**
@@ -86,15 +89,16 @@ object OrderValidator {
      * @throws CoreException 재고가 부족한 경우 (ErrorType.INSUFFICIENT_STOCK)
      */
     private fun validateSufficientStock(
-        item: OrderCommand.OrderDetailCommand,
+        productId: Long,
+        requestedQuantity: Long,
         stock: Stock,
         products: List<Product>,
     ) {
-        if (!stock.isAvailable(item.quantity.toLong())) {
-            val productName = products.find { it.id == item.productId }?.name ?: "알 수 없음"
+        if (!stock.isAvailable(requestedQuantity)) {
+            val productName = products.find { it.id == productId }?.name ?: "알 수 없음"
             throw CoreException(
                 ErrorType.INSUFFICIENT_STOCK,
-                "상품 '$productName'의 재고가 부족합니다. (요청: ${item.quantity}, 현재: ${stock.quantity})",
+                "상품 '$productName'의 재고가 부족합니다. (요청: $requestedQuantity, 현재: ${stock.quantity})",
             )
         }
     }

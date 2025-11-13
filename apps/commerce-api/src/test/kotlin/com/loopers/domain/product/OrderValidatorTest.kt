@@ -49,7 +49,26 @@ class OrderValidatorTest {
             // given
             val products = listOf(createProduct(id = 1L, price = 10000L))
             val stocks = listOf(createStock(productId = 1L, quantity = 10L))
-            val items = listOf(OrderCommand.OrderDetailCommand(productId = 1L, quantity = 10))
+            val items = listOf(
+                OrderCommand.OrderDetailCommand(productId = 1L, quantity = 10),
+            )
+
+            // when & then
+            assertThatCode {
+                OrderValidator.validate(items, products, stocks)
+            }.doesNotThrowAnyException()
+        }
+
+        @Test
+        fun `동일 상품에 대한 중복 주문 항목 수량 합이 재고와 같으면 검증을 통과한다`() {
+            // given
+            val products = listOf(createProduct(id = 1L, price = 10000L))
+            val stocks = listOf(createStock(productId = 1L, quantity = 10L))
+            val items = listOf(
+                OrderCommand.OrderDetailCommand(productId = 1L, quantity = 4),
+                OrderCommand.OrderDetailCommand(productId = 1L, quantity = 3),
+                OrderCommand.OrderDetailCommand(productId = 1L, quantity = 3),
+            )
 
             // when & then
             assertThatCode {
@@ -195,6 +214,35 @@ class OrderValidatorTest {
                 .isInstanceOf(CoreException::class.java)
                 .hasFieldOrPropertyWithValue("errorType", ErrorType.INSUFFICIENT_STOCK)
                 .hasMessageContaining("부족한 재고")
+        }
+
+        @Test
+        fun `여러 상품의 중복 항목을 각각 합산하여 검증한다`() {
+            // given
+            val products = listOf(
+                createProduct(id = 1L, price = 10000L, name = "상품1"),
+                createProduct(id = 2L, price = 20000L, name = "상품2"),
+            )
+            val stocks = listOf(
+                createStock(productId = 1L, quantity = 10L),
+                createStock(productId = 2L, quantity = 5L),
+            )
+            val items = listOf(
+                OrderCommand.OrderDetailCommand(productId = 1L, quantity = 5),
+                OrderCommand.OrderDetailCommand(productId = 2L, quantity = 3),
+                OrderCommand.OrderDetailCommand(productId = 1L, quantity = 5),
+                OrderCommand.OrderDetailCommand(productId = 2L, quantity = 3),
+            )
+
+            // when & then
+            assertThatThrownBy {
+                OrderValidator.validate(items, products, stocks)
+            }
+                .isInstanceOf(CoreException::class.java)
+                .hasFieldOrPropertyWithValue("errorType", ErrorType.INSUFFICIENT_STOCK)
+                .hasMessageContaining("상품2")
+                .hasMessageContaining("요청: 6")
+                .hasMessageContaining("현재: 5")
         }
     }
 
