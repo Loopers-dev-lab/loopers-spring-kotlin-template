@@ -1,8 +1,8 @@
 package com.loopers.interfaces.api.point
 
 import com.loopers.application.point.PointFacade
-import com.loopers.domain.point.Money
 import com.loopers.interfaces.api.ApiResponse
+import com.loopers.support.values.Money
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody

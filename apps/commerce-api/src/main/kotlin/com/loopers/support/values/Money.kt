@@ -1,4 +1,4 @@
-package com.loopers.domain.point
+package com.loopers.support.values
 
 import jakarta.persistence.Column
 import jakarta.persistence.Embeddable

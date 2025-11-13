@@ -1,10 +1,10 @@
 package com.loopers.application.point
 
-import com.loopers.domain.point.Money
 import com.loopers.domain.point.PointService
 import com.loopers.domain.user.UserRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.values.Money
 import org.springframework.stereotype.Component
 
 @Component

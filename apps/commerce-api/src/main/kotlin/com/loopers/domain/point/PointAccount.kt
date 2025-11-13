@@ -3,6 +3,7 @@ package com.loopers.domain.point
 import com.loopers.domain.BaseEntity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.values.Money
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
