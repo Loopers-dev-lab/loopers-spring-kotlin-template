@@ -3,6 +3,8 @@ package com.loopers.domain.order
 import com.loopers.domain.BaseEntity
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.product.Product
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
@@ -35,6 +37,31 @@ class OrderDetail(
     ) : BaseEntity() {
 
     companion object {
+        fun create(
+            items: List<OrderCommand.OrderDetailCommand>,
+            brands: List<Brand>,
+            products: List<Product>,
+            order: Order,
+        ): List<OrderDetail> {
+            require(items.isNotEmpty()) { "주문 항목은 최소 1개 이상이어야 합니다." }
+            val brandMap = brands.associateBy { it.id }
+            val productMap = products.associateBy { it.id }
+
+            return items.map { item ->
+                val product = productMap[item.productId]
+                    ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: ${item.productId}")
+                val brand = brandMap[product.brandId]
+                    ?: throw CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다: ${product.brandId}")
+
+                create(
+                    quantity = item.quantity,
+                    brand = brand,
+                    product = product,
+                    order = order,
+                )
+            }
+        }
+
         fun create(
             quantity: Long,
             brand: Brand,

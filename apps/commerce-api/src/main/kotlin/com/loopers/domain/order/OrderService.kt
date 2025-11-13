@@ -18,8 +18,7 @@ class OrderService(
 
     @Transactional(readOnly = true)
     fun getOrder(id: Long, userId: Long): Order {
-        val order = orderRepository.findById(id)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다: $userId")
+        val order = orderRepository.findById(id) ?: throw CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다: $id")
 
         order.validateOwner(userId)
 
@@ -40,20 +39,12 @@ class OrderService(
             ),
         )
 
-        val brandMap = param.brands.associateBy { it.id }
-        val productMap = param.products.associateBy { it.id }
-
-        val orderDetails = param.items.map { item ->
-            val product = productMap[item.productId]!!
-            val brand = brandMap[product.brandId]!!
-
-            OrderDetail.create(
-                quantity = item.quantity,
-                brand = brand,
-                product = product,
-                order = order,
-            )
-        }
+        val orderDetails = OrderDetail.create(
+            items = param.items,
+            brands = param.brands,
+            products = param.products,
+            order = order,
+        )
         orderRepository.saveAllOrderDetail(orderDetails)
     }
 }
