@@ -1,6 +1,8 @@
 package com.loopers.domain.product
 
 import com.loopers.domain.order.OrderCommand
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
@@ -39,7 +41,8 @@ class ProductService(
         val stockMap = stocks.associateBy { it.productId }
 
         items.forEach { item ->
-            val stock = stockMap[item.productId]!!
+            val stock = stockMap[item.productId]
+                ?: throw CoreException(ErrorType.INSUFFICIENT_STOCK, "productId=${item.productId}에 대한 재고가 없습니다.")
             stock.decrease(item.quantity)
         }
     }

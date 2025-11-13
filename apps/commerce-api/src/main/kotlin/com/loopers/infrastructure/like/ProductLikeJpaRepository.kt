@@ -8,13 +8,13 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 
 interface ProductLikeJpaRepository : JpaRepository<ProductLike, Long> {
-    fun findAllByProductIdIn(productId: List<Long>): List<ProductLike>
+    fun findAllByProductIdIn(productIds: List<Long>): List<ProductLike>
     fun findAllByProductId(productId: Long): List<ProductLike>
 
     fun findAllByUserId(userId: Long, pageable: Pageable): Page<ProductLike>
 
     @Query("SELECT pl FROM ProductLike pl WHERE pl.productId = :productId AND pl.userId = :userId")
-    fun findBy(productId: Long, userId: Long): ProductLike
+    fun findBy(productId: Long, userId: Long): ProductLike?
 
     @Modifying
     @Query("DELETE FROM ProductLike pl WHERE pl.productId = :productId AND pl.userId = :userId")

@@ -9,8 +9,8 @@ object PointFixtures {
         userId: Long = 1L,
     ): Point {
         return Point.create(
-            amount = 1000L,
-            userId = 1L,
+            amount = amount,
+            userId = userId,
         ).withId(id)
     }
 }

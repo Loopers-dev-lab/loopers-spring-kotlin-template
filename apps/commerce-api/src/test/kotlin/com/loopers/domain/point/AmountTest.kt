@@ -15,7 +15,7 @@ class AmountTest {
         assertThatThrownBy {
             Amount(value)
         }.isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("금액은 0이상 이여야 합니다.")
+            .hasMessageContaining("금액은 0이상 이어야 합니다.")
     }
 
     @Test

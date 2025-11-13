@@ -34,6 +34,6 @@ data class Amount(
     }
 
     companion object {
-        private const val ERROR_MESSAGE_NOT_POSITIVE = "금액은 0이상 이여야 합니다."
+        private const val ERROR_MESSAGE_NOT_POSITIVE = "금액은 0이상 이어야 합니다."
     }
 }
