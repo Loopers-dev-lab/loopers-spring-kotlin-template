@@ -1,10 +1,12 @@
 package com.loopers.domain.product
 
+import com.loopers.domain.common.vo.Money
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.math.BigDecimal
 
 class ProductModelTest {
 
@@ -18,10 +20,11 @@ class ProductModelTest {
             val product = ProductModel.create(
                 name = "Test product",
                 stock = 100,
+                price = Money(BigDecimal.valueOf(10000)),
                 refBrandId = 1,
             )
 
-            product.decreaseStock(1)
+            product.occupyStock(1)
             assertThat(product.stock).isEqualTo(99)
         }
 
@@ -31,11 +34,12 @@ class ProductModelTest {
             val product = ProductModel.create(
                 name = "Test product",
                 stock = 100,
+                price = Money(BigDecimal.valueOf(10000)),
                 refBrandId = 1,
             )
 
             val exception = assertThrows<IllegalArgumentException> {
-                product.decreaseStock(-1)
+                product.occupyStock(-1)
             }
             assertThat(exception.message).isEqualTo("감소 수량은 0보다 커야 합니다.")
         }
