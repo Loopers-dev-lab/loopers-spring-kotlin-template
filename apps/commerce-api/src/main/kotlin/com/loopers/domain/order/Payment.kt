@@ -1,6 +1,8 @@
 package com.loopers.domain.order
 
 import com.loopers.domain.BaseEntity
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
 import jakarta.persistence.AttributeOverride
 import jakarta.persistence.Column
@@ -44,6 +46,14 @@ class Payment(
             order: Order,
             usedPoint: Money,
         ): Payment {
+            if (usedPoint < Money.ZERO_KRW) {
+                throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트는 0 이상이어야 합니다.")
+            }
+
+            if (usedPoint != order.totalAmount) {
+                throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트가 주문 금액과 일치하지 않습니다.")
+            }
+
             return Payment(
                 orderId = order.id,
                 userId = userId,

@@ -19,4 +19,9 @@ class PointAccountRdbRepository(
     override fun save(pointAccount: PointAccount): PointAccount {
         return pointAccountJpaRepository.save(pointAccount)
     }
+
+    @Transactional
+    override fun findByUserIdWithLock(userId: Long): PointAccount? {
+        return pointAccountJpaRepository.findByUserIdWithLock(userId)
+    }
 }

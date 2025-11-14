@@ -51,4 +51,16 @@ class PointAccount(
 
         this.balance = amount.plus(this.balance)
     }
+
+    fun deduct(amount: Money) {
+        if (amount <= Money.ZERO_KRW) {
+            throw CoreException(ErrorType.BAD_REQUEST, "차감은 양수여야 합니다.")
+        }
+
+        if (this.balance < amount) {
+            throw CoreException(ErrorType.BAD_REQUEST, "포인트가 부족합니다.")
+        }
+
+        this.balance = this.balance.minus(amount)
+    }
 }

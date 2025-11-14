@@ -41,6 +41,10 @@ data class Money(
         return Money(amount.add(other.amount))
     }
 
+    operator fun minus(other: Money): Money {
+        return Money(amount.subtract(other.amount))
+    }
+
     operator fun times(multiplier: Int): Money {
         return Money(amount.multiply(BigDecimal.valueOf(multiplier.toLong())))
     }
