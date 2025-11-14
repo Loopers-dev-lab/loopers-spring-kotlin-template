@@ -37,8 +37,12 @@ data class Money(
         return amount.compareTo(other.amount)
     }
 
-    fun plus(other: Money): Money {
+    operator fun plus(other: Money): Money {
         return Money(amount.add(other.amount))
+    }
+
+    operator fun times(multiplier: Int): Money {
+        return Money(amount.multiply(BigDecimal.valueOf(multiplier.toLong())))
     }
 
     /**
