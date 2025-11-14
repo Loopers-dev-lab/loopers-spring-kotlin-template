@@ -28,10 +28,6 @@ class Stock(
         }
     }
 
-    fun isAvailable(quantity: Long): Boolean {
-        return this.quantity >= quantity
-    }
-
     fun decrease(quantity: Long) {
         require(quantity > 0) { "차감 수량은 0보다 커야 합니다." }
 

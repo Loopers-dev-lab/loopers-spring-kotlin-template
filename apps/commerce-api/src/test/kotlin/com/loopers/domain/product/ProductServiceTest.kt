@@ -9,6 +9,7 @@ import com.loopers.infrastructure.product.StockJpaRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.DisplayName
@@ -249,6 +250,72 @@ class ProductServiceTest : IntegrationTest() {
     }
 
     @Nested
+    @DisplayName("validateProductsExist")
+    inner class ValidateProductsExist {
+
+        @Test
+        fun `모든 상품이 존재하면 검증을 통과한다`() {
+            // given
+            val brand = createAndSaveBrand("테스트브랜드")
+            val product1 = createAndSaveProduct("상품1", 10000L, brand.id)
+            val product2 = createAndSaveProduct("상품2", 20000L, brand.id)
+            val products = listOf(product1, product2)
+
+            val items = listOf(
+                OrderCommand.OrderDetailCommand(productId = product1.id, quantity = 10),
+                OrderCommand.OrderDetailCommand(productId = product2.id, quantity = 5),
+            )
+
+            // when & then
+            assertThatCode {
+                productService.validateProductsExist(items, products)
+            }.doesNotThrowAnyException()
+        }
+
+        @Test
+        fun `여러 상품이 존재하지 않으면 모두 포함하여 예외가 발생한다`() {
+            // given
+            val brand = createAndSaveBrand("테스트브랜드")
+            val product1 = createAndSaveProduct("상품1", 10000L, brand.id)
+            val products = listOf(product1)
+
+            val items = listOf(
+                OrderCommand.OrderDetailCommand(productId = product1.id, quantity = 10),
+                OrderCommand.OrderDetailCommand(productId = 998L, quantity = 5),
+                OrderCommand.OrderDetailCommand(productId = 999L, quantity = 3),
+            )
+
+            // when & then
+            assertThatThrownBy {
+                productService.validateProductsExist(items, products)
+            }
+                .isInstanceOf(CoreException::class.java)
+                .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND)
+                .hasMessageContaining("998")
+                .hasMessageContaining("999")
+        }
+
+        @Test
+        fun `중복된 상품 ID가 있어도 한 번만 검증한다`() {
+            // given
+            val brand = createAndSaveBrand("테스트브랜드")
+            val product1 = createAndSaveProduct("상품1", 10000L, brand.id)
+            val products = listOf(product1)
+
+            val items = listOf(
+                OrderCommand.OrderDetailCommand(productId = product1.id, quantity = 10),
+                OrderCommand.OrderDetailCommand(productId = product1.id, quantity = 5),
+                OrderCommand.OrderDetailCommand(productId = product1.id, quantity = 3),
+            )
+
+            // when & then
+            assertThatCode {
+                productService.validateProductsExist(items, products)
+            }.doesNotThrowAnyException()
+        }
+    }
+
+    @Nested
     @DisplayName("deductAllStock")
     inner class DeductAllStock {
 
@@ -279,6 +346,30 @@ class ProductServiceTest : IntegrationTest() {
                 soft.assertThat(updatedStock1.quantity).isEqualTo(90L)
                 soft.assertThat(updatedStock2.quantity).isEqualTo(180L)
             }
+        }
+
+        @Test
+        fun `동일 상품에 대한 중복 주문 항목 수량을 합산하여 차감한다`() {
+            // given
+            val brand = createAndSaveBrand("테스트브랜드")
+            val product = createAndSaveProduct("상품1", 10000L, brand.id)
+            val stock = createAndSaveStock(100L, product.id)
+
+            val items = listOf(
+                OrderCommand.OrderDetailCommand(productId = product.id, quantity = 10L),
+                OrderCommand.OrderDetailCommand(productId = product.id, quantity = 20L),
+                OrderCommand.OrderDetailCommand(productId = product.id, quantity = 30L),
+            )
+
+            // when
+            transactionTemplate.execute {
+                val stocks = stockJpaRepository.findAllById(listOf(stock.id))
+                productService.deductAllStock(items, stocks)
+            }
+
+            // then
+            val updatedStock = stockJpaRepository.findById(stock.id).get()
+            assertThat(updatedStock.quantity).isEqualTo(40L)
         }
 
         @Test

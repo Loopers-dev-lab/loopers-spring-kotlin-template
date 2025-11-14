@@ -33,6 +33,22 @@ class ProductService(
         return productRepository.findStockAllBy(productIds)
     }
 
+    fun validateProductsExist(
+        items: List<OrderCommand.OrderDetailCommand>,
+        products: List<Product>,
+    ) {
+        val requestedIds = items.map { it.productId }
+        val foundIds = products.map { it.id }.toSet()
+        val missingIds = requestedIds.filterNot { it in foundIds }
+
+        if (missingIds.isNotEmpty()) {
+            throw CoreException(
+                ErrorType.NOT_FOUND,
+                "상품을 찾을 수 없습니다: ${missingIds.joinToString(", ")}",
+            )
+        }
+    }
+
     @Transactional
     fun deductAllStock(
         items: List<OrderCommand.OrderDetailCommand>,
@@ -40,10 +56,18 @@ class ProductService(
     ) {
         val stockMap = stocks.associateBy { it.productId }
 
-        items.forEach { item ->
-            val stock = stockMap[item.productId]
-                ?: throw CoreException(ErrorType.INSUFFICIENT_STOCK, "productId=${item.productId}에 대한 재고가 없습니다.")
-            stock.decrease(item.quantity)
-        }
+        items
+            .groupBy { it.productId }
+            .forEach { (productId, groupedItems) ->
+                val stock = stockMap[productId]
+                    ?: throw CoreException(
+                        ErrorType.NOT_FOUND,
+                        "재고 정보를 찾을 수 없습니다: $productId",
+                    )
+
+                val totalQuantity = groupedItems.sumOf { it.quantity }
+
+                stock.decrease(totalQuantity)
+            }
     }
 }

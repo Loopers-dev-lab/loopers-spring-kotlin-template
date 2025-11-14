@@ -6,7 +6,6 @@ import com.loopers.domain.order.OrderCommand.OrderDetailCommand
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderTotalAmountCalculator
 import com.loopers.domain.point.PointService
-import com.loopers.domain.product.OrderValidator
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.UserService
 import org.springframework.data.domain.Page
@@ -50,15 +49,15 @@ class OrderFacade(
         val productIds = items.map { it.productId }
         val products = productService.getProducts(productIds)
 
-        // 2. 브랜드 조회
+        // 2. 상품 존재 여부 검증
+        productService.validateProductsExist(items, products)
+
+        // 3. 브랜드 조회
         val brandIds = products.map { it.brandId }.distinct()
         val brands = brandService.getAllBrand(brandIds)
 
-        // 3. 재고 조회
+        // 4. 재고 조회
         val stocks = productService.getStocksBy(productIds)
-
-        // 4. 주문 가능 여부 검증
-        OrderValidator.validate(items, products, stocks)
 
         // 5. 총 주문 금액 계산
         val totalAmount = OrderTotalAmountCalculator.calculate(items, products)
@@ -66,7 +65,7 @@ class OrderFacade(
         // 6. 포인트 사용
         pointService.use(user.id, totalAmount)
 
-        // 7, 재고 감소
+        // 7. 재고 감소
         productService.deductAllStock(items, stocks)
 
         // 8. 주문 생성
@@ -79,7 +78,6 @@ class OrderFacade(
                 products = products,
             ),
         )
-
         // TODO. 주문 정보 외부 시스템 전송
     }
 }
