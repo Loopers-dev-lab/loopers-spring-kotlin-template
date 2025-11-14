@@ -1,0 +1,55 @@
+package com.loopers.domain.order
+
+import com.loopers.application.order.OrderCommand
+import com.loopers.application.order.OrderItemCommand
+import com.loopers.domain.BaseEntity
+import com.loopers.domain.common.vo.Money
+import jakarta.persistence.CascadeType
+import jakarta.persistence.Column
+import jakarta.persistence.Entity
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.OneToMany
+import jakarta.persistence.Table
+import java.math.BigDecimal
+
+@Entity
+@Table(name = "orders")
+class OrderModel(
+    @Column
+    val refUserId: Long,
+) : BaseEntity() {
+
+    @Column
+    var totalPrice: Money = Money(BigDecimal.ZERO)
+
+    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
+    @JoinColumn(name = "ref_order_id")
+    val orderItems: MutableList<OrderItemModel> = mutableListOf()
+
+    fun addOrderItems(items: List<OrderItemCommand>) {
+        items.forEach { item ->
+            val orderItem = OrderItemModel(
+                refProductId = item.productId,
+                quantity = item.quantity,
+                productPrice = Money(item.productPrice),
+            )
+            orderItems.add(orderItem)
+        }
+    }
+
+    fun updateTotalPrice() {
+        this.totalPrice = orderItems
+            .map { it.productPrice.amount.multiply(BigDecimal(it.quantity)) }
+            .fold(BigDecimal.ZERO) { acc, price -> acc.add(price) }
+            .let { Money(it) }
+    }
+
+    companion object {
+        fun order(refUserId: Long, command: OrderCommand): OrderModel {
+            val order = OrderModel(refUserId)
+            order.addOrderItems(command.orderItems)
+            order.updateTotalPrice()
+            return order
+        }
+    }
+}
