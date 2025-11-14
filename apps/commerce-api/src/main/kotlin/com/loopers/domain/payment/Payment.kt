@@ -25,10 +25,6 @@ class Payment(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     var status: PaymentStatus,
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    val method: PaymentMethod,
 ) : BaseEntity() {
 
     init {
@@ -40,14 +36,12 @@ class Payment(
             orderId: Long,
             userId: Long,
             amount: BigDecimal,
-            method: PaymentMethod = PaymentMethod.POINT,
         ): Payment {
             return Payment(
                 orderId = orderId,
                 userId = userId,
                 amount = amount,
                 status = PaymentStatus.PENDING,
-                method = method,
             )
         }
     }
@@ -92,9 +86,5 @@ class Payment(
         COMPLETED("완료"),
         FAILED("실패"),
         CANCELLED("취소"),
-    }
-
-    enum class PaymentMethod(val description: String) {
-        POINT("포인트"),
     }
 }
