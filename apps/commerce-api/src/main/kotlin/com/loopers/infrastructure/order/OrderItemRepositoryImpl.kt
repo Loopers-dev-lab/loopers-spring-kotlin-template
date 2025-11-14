@@ -15,4 +15,8 @@ class OrderItemRepositoryImpl(
     override fun findByOrderId(orderId: Long): List<OrderItem> {
         return orderItemJpaRepository.findByOrderId(orderId)
     }
+
+    override fun saveAll(orderItems: List<OrderItem>): List<OrderItem> {
+        return orderItemJpaRepository.saveAll(orderItems)
+    }
 }

@@ -52,7 +52,7 @@ class Point(
 
     private fun validateBalance(balance: BigDecimal) {
         if (balance < BigDecimal.ZERO) {
-            throw CoreException(ErrorType.BAD_REQUEST, "포인트 잔액은 0 이상이어야 합니다.")
+            throw CoreException(ErrorType.INSUFFICIENT_POINT, "포인트가 부족합니다.")
         }
     }
 }

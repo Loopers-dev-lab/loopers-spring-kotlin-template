@@ -15,4 +15,9 @@ class BrandService(
         return brandRepository.findById(id)
             ?: throw CoreException(ErrorType.NOT_FOUND, "[id = $id] 브랜드를 찾을 수 없습니다.")
     }
+
+    @Transactional(readOnly = true)
+    fun getBrandById(ids: List<Long>): Map<Long, Brand> {
+        return brandRepository.findByIdIn(ids).associateBy { it.id }
+    }
 }

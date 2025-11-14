@@ -29,4 +29,11 @@ class PointService(
         point.charge(amount)
         return pointRepository.save(point)
     }
+
+    @Transactional
+    fun deductPoint(userId: Long, amount: BigDecimal) {
+        val point = pointRepository.findByUserIdWithLock(userId)
+            ?: throw CoreException(ErrorType.INSUFFICIENT_POINT, "포인트 정보가 없습니다. [userId: $userId]")
+        point.deduct(amount)
+    }
 }

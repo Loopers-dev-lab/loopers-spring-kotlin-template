@@ -6,5 +6,6 @@ import com.loopers.domain.common.PageResult
 interface ProductRepository {
     fun save(product: Product): Product
     fun findById(id: Long): Product?
+    fun findByIdIn(ids: List<Long>): List<Product>
     fun getProducts(pageCommand: PageCommand): PageResult<ProductResult.ProductInfo>
 }

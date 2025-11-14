@@ -11,4 +11,8 @@ class StockRepositoryImpl(
     override fun save(stock: Stock): Stock {
         return stockJpaRepository.save(stock)
     }
+
+    override fun findByProductIdWithLock(productId: Long): Stock? {
+        return stockJpaRepository.findByProductIdWithLock(productId)
+    }
 }

@@ -20,7 +20,12 @@ class ProductService(
     }
 
     @Transactional(readOnly = true)
-    fun getProducts(pageCommand: PageCommand): PageResult<ProductResult.ProductInfo> {
+    fun getProductById(ids: List<Long>): Map<Long, Product> {
+        return productRepository.findByIdIn(ids).associateBy { it.id }
+    }
+
+    @Transactional(readOnly = true)
+    fun getProductById(pageCommand: PageCommand): PageResult<ProductResult.ProductInfo> {
         return productRepository.getProducts(pageCommand)
     }
 

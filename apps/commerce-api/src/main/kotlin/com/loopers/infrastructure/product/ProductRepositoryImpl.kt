@@ -21,6 +21,10 @@ class ProductRepositoryImpl(
         return jpa.findByIdOrNull(id)
     }
 
+    override fun findByIdIn(ids: List<Long>): List<Product> {
+        return jpa.findAllById(ids)
+    }
+
     override fun getProducts(pageCommand: PageCommand): PageResult<ProductResult.ProductInfo> {
         val projectionResult = querydsl.findProducts(pageCommand)
 

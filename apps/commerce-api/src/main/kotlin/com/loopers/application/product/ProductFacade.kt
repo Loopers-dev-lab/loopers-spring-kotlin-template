@@ -28,7 +28,7 @@ class ProductFacade(
 
     @Transactional(readOnly = true)
     fun getProducts(command: PageCommand): PageResult<ProductResult.ProductInfo> {
-        return productService.getProducts(command)
+        return productService.getProductById(command)
     }
 
     @Transactional

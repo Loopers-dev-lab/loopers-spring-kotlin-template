@@ -16,4 +16,8 @@ class BrandRepositoryImpl(
     override fun findById(id: Long): Brand? {
         return brandJpaRepository.findByIdOrNull(id)
     }
+
+    override fun findByIdIn(ids: List<Long>): List<Brand> {
+        return brandJpaRepository.findAllById(ids)
+    }
 }
