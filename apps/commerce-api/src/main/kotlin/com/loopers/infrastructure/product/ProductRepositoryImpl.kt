@@ -1,0 +1,54 @@
+package com.loopers.infrastructure.product
+
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.ProductSortType
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
+import org.springframework.stereotype.Component
+
+@Component
+class ProductRepositoryImpl(
+    private val productJpaRepository: ProductJpaRepository,
+) : ProductRepository {
+    override fun save(product: Product): Product {
+        return productJpaRepository.save(product)
+    }
+
+    override fun findById(id: Long): Product? {
+        return productJpaRepository.findById(id).orElse(null)
+    }
+
+    override fun findByIdOrThrow(id: Long): Product {
+        return findById(id)
+            ?: throw CoreException(ErrorType.PRODUCT_NOT_FOUND,"상품을 찾을 수 없습니다. id: $id")
+    }
+
+    override fun findAll(
+        brandId: Long?,
+        sort: ProductSortType,
+        pageable: Pageable,
+    ): Page<Product> {
+        val sortOrder = when(sort) {
+            ProductSortType.LATEST -> Sort.by(Sort.Direction.DESC, "createdAt")
+            ProductSortType.PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price.amount")
+            ProductSortType.LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likesCount")
+        }
+
+        val pageableWithSort = PageRequest.of(pageable.pageNumber, pageable.pageSize, sortOrder)
+
+        return if (brandId != null) {
+            productJpaRepository.findByBrandId(brandId, pageableWithSort)
+        } else {
+            productJpaRepository.findAll(pageableWithSort)
+        }
+    }
+
+    override fun findAllByIdIn(ids: List<Long>): List<Product> {
+        return productJpaRepository.findAllById(ids)
+    }
+}
