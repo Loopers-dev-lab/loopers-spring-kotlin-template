@@ -6,7 +6,7 @@ import java.math.BigDecimal
 
 @Embeddable
 data class Money(
-    @Column(name = "amount", nullable = false, scale = 2)
+    @Column(name = "amount", nullable = false, scale = 2, precision = 15)
     val amount: BigDecimal,
 ) : Comparable<Money> {
 

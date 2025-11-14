@@ -4,7 +4,9 @@ import com.loopers.domain.BaseEntity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
+import jakarta.persistence.AttributeOverride
 import jakarta.persistence.Column
+import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
 
@@ -21,7 +23,8 @@ class PointAccount(
     var userId: Long = userId
         private set
 
-    @Column(name = "balance", nullable = false)
+    @Embedded
+    @AttributeOverride(name = "amount", column = Column(name = "balance", nullable = false))
     var balance: Money = balance
         private set
 
