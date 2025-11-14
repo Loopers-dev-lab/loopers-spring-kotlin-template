@@ -30,6 +30,7 @@ class UserTest {
             // act
             val user = User(
                 username = username,
+                password = "password123",
                 email = email,
                 birthDate = birthDate,
                 gender = gender,
@@ -52,6 +53,7 @@ class UserTest {
             val result = assertThrows<CoreException> {
                 User(
                     username = username,
+                    password = "password123",
                     email = "user@example.com",
                     birthDate = "1997-03-25",
                     gender = User.Gender.MALE,
@@ -70,6 +72,7 @@ class UserTest {
             val result = assertThrows<CoreException> {
                 User(
                     username = "user123",
+                    password = "password123",
                     email = email,
                     birthDate = "1997-03-25",
                     gender = User.Gender.MALE,
@@ -88,6 +91,7 @@ class UserTest {
             val result = assertThrows<CoreException> {
                 User(
                     username = "user123",
+                    password = "password123",
                     email = "user@example.com",
                     birthDate = birthDate,
                     gender = User.Gender.MALE,

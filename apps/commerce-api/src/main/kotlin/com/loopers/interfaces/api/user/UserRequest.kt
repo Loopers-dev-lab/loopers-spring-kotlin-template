@@ -13,6 +13,10 @@ class UserRequest {
         @field:NotBlank(message = "아이디는 필수값입니다.")
         val username: String,
 
+        @field:Schema(description = "비밀번호", example = "password123")
+        @field:NotBlank(message = "비밀번호는 필수값입니다.")
+        val password: String,
+
         @field:Schema(description = "이메일", example = "user@example.com")
         @field:NotBlank(message = "이메일은 필수값입니다.")
         @field:Email(message = "이메일 형식이 올바르지 않습니다.")

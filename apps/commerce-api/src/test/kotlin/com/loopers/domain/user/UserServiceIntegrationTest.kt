@@ -46,6 +46,7 @@ class UserServiceIntegrationTest @Autowired constructor(
             // act
             val result = userService.createUser(
                 username = username,
+                password = "password123",
                 email = email,
                 birthDate = birthDate,
                 gender = gender,
@@ -70,6 +71,7 @@ class UserServiceIntegrationTest @Autowired constructor(
             // act
             userService.createUser(
                 username = duplicateUsername,
+                password = "password123",
                 email = "test@example.com",
                 birthDate = "1997-03-25",
                 gender = User.Gender.MALE,
@@ -78,6 +80,7 @@ class UserServiceIntegrationTest @Autowired constructor(
             val exception = assertThrows<CoreException> {
                 userService.createUser(
                     username = duplicateUsername,
+                    password = "password456",
                     email = "another@example.com",
                     birthDate = "1990-01-01",
                     gender = User.Gender.FEMALE,
@@ -104,6 +107,7 @@ class UserServiceIntegrationTest @Autowired constructor(
 
             userService.createUser(
                 username = username,
+                password = "password123",
                 email = email,
                 birthDate = birthDate,
                 gender = gender,

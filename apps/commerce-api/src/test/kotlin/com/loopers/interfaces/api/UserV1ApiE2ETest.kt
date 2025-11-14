@@ -44,6 +44,7 @@ class UserV1ApiE2ETest @Autowired constructor(
             // arrange
             val request = UserRequest.UserCreateRequestDto(
                 username = "testuser",
+                password = "password123",
                 email = "test@example.com",
                 birthDate = "1997-03-25",
                 gender = User.Gender.MALE,
@@ -106,6 +107,7 @@ class UserV1ApiE2ETest @Autowired constructor(
             val user = userJpaRepository.save(
                 User(
                     username = "testuser",
+                    password = "password123",
                     email = "test@example.com",
                     birthDate = "1997-03-25",
                     gender = User.Gender.MALE,

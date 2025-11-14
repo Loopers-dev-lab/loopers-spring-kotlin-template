@@ -3,6 +3,7 @@ package com.loopers.application.point
 import com.loopers.domain.point.PointResult
 import com.loopers.domain.point.PointService
 import org.springframework.stereotype.Component
+import java.math.BigDecimal
 
 @Component
 class PointFacade(
@@ -13,7 +14,7 @@ class PointFacade(
             ?.let { PointResult.PointInfoResult.from(it) }
     }
 
-    fun chargePoint(userId: Long, amount: Long): PointResult.PointInfoResult {
+    fun chargePoint(userId: Long, amount: BigDecimal): PointResult.PointInfoResult {
         return pointService.chargePoint(userId, amount)
             .let { PointResult.PointInfoResult.from(it) }
     }

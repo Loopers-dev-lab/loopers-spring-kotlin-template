@@ -12,6 +12,10 @@ import jakarta.persistence.Table
 class User(
     @Column(unique = true, length = 10)
     val username: String,
+
+    @Column(nullable = false, length = 255)
+    val password: String,
+
     val email: String,
     val birthDate: String,
     val gender: Gender,
@@ -19,14 +23,16 @@ class User(
 
     init {
         validateUsername(username)
+        validatePassword(password)
         validateEmail(email)
         validateBirthDate(birthDate)
     }
 
     companion object {
-        fun of(username: String, email: String, birthDate: String, gender: Gender): User {
+        fun of(username: String, password: String, email: String, birthDate: String, gender: Gender): User {
             return User(
                 username = username,
+                password = password,
                 email = email,
                 birthDate = birthDate,
                 gender = gender,
@@ -41,6 +47,12 @@ class User(
     private fun validateUsername(username: String) {
         if (!username.matches(USERNAME_PATTERN)) {
             throw CoreException(ErrorType.BAD_REQUEST, "아이디는 영문 대소문자와 숫자로만 이루어진 1~10자리여야 합니다.")
+        }
+    }
+
+    private fun validatePassword(password: String) {
+        if (password.isBlank()) {
+            throw CoreException(ErrorType.BAD_REQUEST, "비밀번호는 비어있을 수 없습니다.")
         }
     }
 

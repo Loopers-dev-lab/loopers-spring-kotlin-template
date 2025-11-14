@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import java.math.BigDecimal
 
 @SpringBootTest
 class PointServiceIntegrationTest @Autowired constructor(
@@ -36,11 +37,12 @@ class PointServiceIntegrationTest @Autowired constructor(
         @Test
         fun returnsPoint_whenUserExists() {
             // arrange
-            val testPoint = 1000L
+            val testPoint = BigDecimal("1000.00")
 
             val user = userJpaRepository.save(
                 User(
                     username = "testuser",
+                    password = "password123",
                     email = "test@example.com",
                     birthDate = "1997-03-25",
                     gender = User.Gender.MALE,
@@ -49,7 +51,7 @@ class PointServiceIntegrationTest @Autowired constructor(
             pointJpaRepository.save(
                 Point.of(
                     userId = user.id,
-                    initialAmount = testPoint,
+                    initialBalance = testPoint,
                 ),
             )
 
@@ -59,7 +61,7 @@ class PointServiceIntegrationTest @Autowired constructor(
             // assert
             assertThat(result).isNotNull()
             assertThat(result?.userId).isEqualTo(user.id)
-            assertThat(result?.amount).isEqualTo(testPoint)
+            assertThat(result?.balance).isEqualTo(testPoint)
         }
 
         @DisplayName("해당 ID의 회원이 존재하지 않을 경우, null이 반환된다.")
@@ -85,7 +87,7 @@ class PointServiceIntegrationTest @Autowired constructor(
         fun throwsException_whenUserDoesNotExist() {
             // arrange
             val userId = 999L
-            val amount = 1000L
+            val amount = BigDecimal("1000.00")
 
             // act
             val exception = assertThrows<CoreException> {
