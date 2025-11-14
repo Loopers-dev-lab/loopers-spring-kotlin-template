@@ -19,6 +19,7 @@ import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
+import java.math.BigDecimal
 
 class PointApiE2ETest(
     private val testRestTemplate: TestRestTemplate,
@@ -47,7 +48,7 @@ class PointApiE2ETest(
             val user = UserFixture.create()
             userRepository.save(user)
 
-            val savedBalance = 100L
+            val savedBalance = BigDecimal.valueOf(100)
             val point = PointFixture.create(userId = user.id, balance = savedBalance)
             pointRepository.save(point)
 
@@ -103,14 +104,14 @@ class PointApiE2ETest(
             // arrange
             val user = UserFixture.create()
             userRepository.save(user)
-            val point = PointFixture.create(userId = user.id, balance = 1000L)
+            val point = PointFixture.create(userId = user.id, balance = BigDecimal.valueOf(1000))
             pointRepository.save(point)
 
             val requestUrl = ENDPOINT_POST
             val headers = HttpHeaders().apply {
                 set("X-USER-ID", user.loginId.value)
             }
-            val chargedBalance = 1000L
+            val chargedBalance = BigDecimal.valueOf(1000)
             val request = PointChargeDto.Request(chargedBalance)
 
             // act
@@ -125,7 +126,7 @@ class PointApiE2ETest(
             // assert
             assertAll(
                 { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
-                { assertThat(response.body?.data?.balance).isEqualTo(2000L) },
+                { assertThat(response.body?.data?.balance).isEqualTo(BigDecimal.valueOf(2000)) },
             )
         }
 
@@ -138,7 +139,7 @@ class PointApiE2ETest(
             val headers = HttpHeaders().apply {
                 set("X-USER-ID", notExistsLoginId)
             }
-            val chargedBalance = 1000L
+            val chargedBalance = BigDecimal.valueOf(1000)
             val request = PointChargeDto.Request(chargedBalance)
 
             // act
