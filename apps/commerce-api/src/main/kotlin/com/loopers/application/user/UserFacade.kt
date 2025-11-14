@@ -7,6 +7,7 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Component
+import java.math.BigDecimal
 
 @Component
 class UserFacade(private val userService: UserService, private val pointService: PointService) {
@@ -21,7 +22,7 @@ class UserFacade(private val userService: UserService, private val pointService:
         )
 
         val savedUser = userService.registerUser(user)
-        pointService.createPoint(savedUser.id, balance = 0L)
+        pointService.createPoint(savedUser.id, BigDecimal.ZERO)
 
         return UserInfo.from(savedUser)
     }

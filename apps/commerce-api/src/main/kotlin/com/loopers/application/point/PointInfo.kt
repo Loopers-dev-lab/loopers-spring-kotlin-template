@@ -1,8 +1,10 @@
 package com.loopers.application.point
 
-data class PointInfo(val balance: Long) {
+import java.math.BigDecimal
+
+data class PointInfo(val balance: BigDecimal) {
     companion object {
-        fun from(balance: Long) = PointInfo(
+        fun from(balance: BigDecimal) = PointInfo(
             balance = balance,
         )
     }
