@@ -3,15 +3,17 @@ package com.loopers.domain.product
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.data.domain.Slice
+import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-open class ProductService(
+@Component
+class ProductService(
     private val productRepository: ProductRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val brandRepository: BrandRepository,
 ) {
     @Transactional(readOnly = true)
-    open fun findProductViewById(id: Long): ProductView {
+    fun findProductViewById(id: Long): ProductView {
         val product = productRepository.findById(id)
             ?: throw CoreException(
                 errorType = ErrorType.NOT_FOUND,
@@ -38,7 +40,7 @@ open class ProductService(
     }
 
     @Transactional(readOnly = true)
-    open fun findProductViewsBy(command: ProductCommand.FindProductViewsBy): Slice<ProductView> {
+    fun searchProducts(command: ProductCommand.SearchProducts): Slice<ProductView> {
         val pageQuery = command.to()
         val slicedProduct = productRepository.findAllBy(pageQuery)
 
@@ -70,12 +72,12 @@ open class ProductService(
     }
 
     @Transactional(readOnly = true)
-    open fun findAllByIds(ids: List<Long>): List<Product> {
+    fun findAllByIds(ids: List<Long>): List<Product> {
         return productRepository.findAllByIds(ids)
     }
 
     @Transactional
-    open fun decreaseStocks(command: ProductCommand.DecreaseStocks) {
+    fun decreaseStocks(command: ProductCommand.DecreaseStocks) {
         val decreaseStockMap = command.units.associateBy { it.productId }
 
         val decreaseProductIds = decreaseStockMap.keys.toList()
@@ -95,12 +97,12 @@ open class ProductService(
     }
 
     @Transactional
-    open fun increaseProductLikeCount(productId: Long) {
+    fun increaseProductLikeCount(productId: Long) {
         productStatisticRepository.increaseLikeCountBy(productId)
     }
 
     @Transactional
-    open fun decreaseProductLikeCount(productId: Long) {
+    fun decreaseProductLikeCount(productId: Long) {
         productStatisticRepository.decreaseLikeCountBy(productId)
     }
 }

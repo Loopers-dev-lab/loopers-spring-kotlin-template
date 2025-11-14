@@ -1,13 +1,15 @@
 package com.loopers.domain.order
 
+import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-open class OrderService(
+@Component
+class OrderService(
     private val orderRepository: OrderRepository,
     private val paymentRepository: PaymentRepository,
 ) {
     @Transactional
-    open fun place(command: OrderCommand.PlaceOrder): Order {
+    fun place(command: OrderCommand.PlaceOrder): Order {
         val orderItems = command
             .items
             .map { OrderItem.create(it.productId, it.quantity, it.productName, it.currentPrice) }

@@ -6,15 +6,17 @@ import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-open class OrderFacade(
+@Component
+class OrderFacade(
     val productService: ProductService,
     val orderService: OrderService,
     val pointService: PointService,
 ) {
     @Transactional
-    open fun placeOrder(criteria: OrderCriteria.PlaceOrder): OrderInfo.PlaceOrder {
+    fun placeOrder(criteria: OrderCriteria.PlaceOrder): OrderInfo.PlaceOrder {
         productService.decreaseStocks(criteria.to())
 
         pointService.deduct(criteria.userId, criteria.usePoint)

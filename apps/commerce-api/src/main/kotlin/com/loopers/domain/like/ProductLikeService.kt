@@ -1,9 +1,10 @@
 package com.loopers.domain.like
 
-import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-open class ProductLikeService(
+@Component
+class ProductLikeService(
     private val productLikeRepository: ProductLikeRepository,
 ) {
     /**
@@ -14,19 +15,10 @@ open class ProductLikeService(
      * @return changed=true: 새로 추가됨, changed=false: 이미 존재함
      */
     @Transactional
-    open fun addLike(userId: Long, productId: Long): ProductResult.AddLike {
-        runCatching {
-            productLikeRepository.save(ProductLike.create(productId, userId))
-        }.onFailure { exception ->
-            when (exception) {
-                is DataIntegrityViolationException ->
-                    return ProductResult.AddLike(false)
-
-                else -> throw exception
-            }
-        }
-
-        return ProductResult.AddLike(true)
+    fun addLike(userId: Long, productId: Long): ProductResult.AddLike {
+        val upsertResult = productLikeRepository.upsert(ProductLike.of(productId, userId))
+        if (upsertResult == 1) return ProductResult.AddLike(true)
+        return ProductResult.AddLike(false)
     }
 
     /**
@@ -37,7 +29,7 @@ open class ProductLikeService(
      * @return changed=true: 삭제됨, changed=false: 이미 없음
      */
     @Transactional
-    open fun removeLike(userId: Long, productId: Long): ProductResult.RemoveLike {
+    fun removeLike(userId: Long, productId: Long): ProductResult.RemoveLike {
         val deletedCount = productLikeRepository.deleteByUserIdAndProductId(userId, productId)
 
         if (deletedCount == 0L) return ProductResult.RemoveLike(false)

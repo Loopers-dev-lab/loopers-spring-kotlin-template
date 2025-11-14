@@ -4,9 +4,18 @@ import com.loopers.domain.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 
 @Entity
-@Table(name = "product_statistics")
+@Table(
+    name = "product_statistics",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_product_statistic_product",
+            columnNames = ["product_id"],
+        ),
+    ],
+)
 class ProductStatistic(
     @Column(name = "product_id", nullable = false)
     val productId: Long,

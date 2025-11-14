@@ -5,4 +5,5 @@ interface ProductStatisticRepository {
     fun findAllByProductIds(productIds: List<Long>): List<ProductStatistic>
     fun increaseLikeCountBy(productId: Long)
     fun decreaseLikeCountBy(productId: Long)
+    fun save(productStatistic: ProductStatistic): ProductStatistic
 }

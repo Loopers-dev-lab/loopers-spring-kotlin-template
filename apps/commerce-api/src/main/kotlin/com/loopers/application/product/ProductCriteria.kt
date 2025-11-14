@@ -1,14 +1,17 @@
-package com.loopers.domain.product
+package com.loopers.application.product
 
-class ProductCommand {
+import com.loopers.domain.product.ProductCommand
+import com.loopers.domain.product.ProductSortType
+
+class ProductCriteria {
     data class SearchProducts(
         val page: Int? = null,
         val size: Int? = null,
         val sort: ProductSortType? = null,
         val brandId: Long? = null,
     ) {
-        fun to(): PageQuery {
-            return PageQuery.of(
+        fun to(): ProductCommand.SearchProducts {
+            return ProductCommand.SearchProducts(
                 page = page,
                 size = size,
                 sort = sort,
@@ -16,13 +19,4 @@ class ProductCommand {
             )
         }
     }
-
-    data class DecreaseStocks(
-        val units: List<DecreaseStockUnit>,
-    )
-
-    data class DecreaseStockUnit(
-        val productId: Long,
-        val amount: Int,
-    )
 }

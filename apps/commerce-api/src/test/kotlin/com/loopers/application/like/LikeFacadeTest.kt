@@ -1,6 +1,5 @@
 package com.loopers.application.like
 
-import com.loopers.domain.like.ProductLike
 import com.loopers.domain.like.ProductLikeRepository
 import com.loopers.domain.like.ProductLikeService
 import com.loopers.domain.product.ProductService
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.springframework.dao.DataIntegrityViolationException
 
 class LikeFacadeTest {
     private lateinit var productLikeRepository: ProductLikeRepository
@@ -27,11 +25,9 @@ class LikeFacadeTest {
 
     @BeforeEach
     fun setUp() {
-        // Repository Mock 생성
         productLikeRepository = mockk()
         productStatisticRepository = mockk()
 
-        // 실제 Service 객체 생성
         likeService = ProductLikeService(productLikeRepository)
 
         productService = ProductService(
@@ -54,14 +50,13 @@ class LikeFacadeTest {
             val userId = 1L
             val productId = 100L
 
-            every { productLikeRepository.save(match { it.productId == productId && it.userId == userId }) } throws
-                    DataIntegrityViolationException("Duplicate entry")
+            every { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) } returns 0
 
             // when
             likeFacade.addLike(userId, productId)
 
             // then
-            verify(exactly = 1) { productLikeRepository.save(match { it.productId == productId && it.userId == userId }) }
+            verify(exactly = 1) { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) }
             verify(exactly = 0) { productStatisticRepository.increaseLikeCountBy(productId) }
         }
 
@@ -71,11 +66,13 @@ class LikeFacadeTest {
             // given
             val userId = 1L
             val productId = 100L
-            val productLike = ProductLike.create(productId, userId)
 
-            every { productLikeRepository.save(match { it.productId == productId && it.userId == userId }) } returnsMany listOf(
-                productLike,
-            ) andThenThrows DataIntegrityViolationException("Duplicate")
+            every { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) } returnsMany listOf(
+                1,
+                0,
+                0,
+                0,
+            )
 
             every { productStatisticRepository.increaseLikeCountBy(productId) } just runs
 
@@ -85,7 +82,7 @@ class LikeFacadeTest {
             }
 
             // then
-            verify(exactly = 4) { productLikeRepository.save(match { it.productId == productId && it.userId == userId }) }
+            verify(exactly = 4) { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) }
             verify(exactly = 1) { productStatisticRepository.increaseLikeCountBy(productId) }
         }
 

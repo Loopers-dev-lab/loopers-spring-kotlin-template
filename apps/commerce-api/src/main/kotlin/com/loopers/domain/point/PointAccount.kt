@@ -9,10 +9,17 @@ import jakarta.persistence.Column
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 
 @Entity
 @Table(
     name = "point_accounts",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_point_account_user",
+            columnNames = ["user_id"],
+        ),
+    ],
 )
 class PointAccount(
     userId: Long,
