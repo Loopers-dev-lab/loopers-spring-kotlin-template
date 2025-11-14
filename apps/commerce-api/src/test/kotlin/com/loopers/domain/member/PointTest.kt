@@ -1,5 +1,6 @@
 package com.loopers.domain.member
 
+import com.loopers.support.error.CoreException
 import org.assertj.core.api.AssertionsForClassTypes
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -21,6 +22,6 @@ class PointTest {
     @ParameterizedTest
     @ValueSource(longs = [-1L, -100L, -1000L, -999999L])
     fun createPointWithVariousNegativeAmounts(amount: Long) {
-        assertThrows<InvalidPointAmountException> { Point(amount) }
+        assertThrows<CoreException> { Point(amount) }
     }
 }

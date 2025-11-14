@@ -1,5 +1,6 @@
 package com.loopers.domain.shared
 
+import com.loopers.support.error.CoreException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -26,7 +27,7 @@ class EmailTest {
     @ParameterizedTest
     @ValueSource(strings = ["", "abc123kor123", "@!@!#$%$"])
     fun invalidEmailPatternException(email: String) {
-        assertThrows<InvalidEmailPatternException> { Email(email) }
+        assertThrows<CoreException> { Email(email) }
     }
 
 }
