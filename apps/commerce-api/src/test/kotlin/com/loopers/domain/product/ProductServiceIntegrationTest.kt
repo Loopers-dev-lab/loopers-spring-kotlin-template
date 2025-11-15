@@ -78,11 +78,11 @@ class ProductServiceIntegrationTest @Autowired constructor(
             createProduct(name = "상품3")
 
             // when
-            val command = ProductCommand.SearchProducts(
+            val command = ProductCommand.FindProducts(
                 page = 0,
                 size = 2,
             )
-            val result = productService.searchProducts(command)
+            val result = productService.findProducts(command)
 
             // then
             assertThat(result.content).hasSize(2)
@@ -101,10 +101,10 @@ class ProductServiceIntegrationTest @Autowired constructor(
             createProduct(name = "상품3", brandId = brand2.id)
 
             // when
-            val command = ProductCommand.SearchProducts(
+            val command = ProductCommand.FindProducts(
                 brandId = brand1.id,
             )
-            val result = productService.searchProducts(command)
+            val result = productService.findProducts(command)
 
             // then
             assertThat(result.content).hasSize(2)

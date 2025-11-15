@@ -1,7 +1,7 @@
 package com.loopers.domain.product
 
 class ProductCommand {
-    data class SearchProducts(
+    data class FindProducts(
         val page: Int? = null,
         val size: Int? = null,
         val sort: ProductSortType? = null,

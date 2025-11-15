@@ -40,7 +40,7 @@ class ProductService(
     }
 
     @Transactional(readOnly = true)
-    fun searchProducts(command: ProductCommand.SearchProducts): Slice<ProductView> {
+    fun findProducts(command: ProductCommand.FindProducts): Slice<ProductView> {
         val pageQuery = command.to()
         val slicedProduct = productRepository.findAllBy(pageQuery)
 

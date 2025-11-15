@@ -8,7 +8,7 @@ class ProductInfo {
         val product: ProductView,
     )
 
-    data class SearchProducts(
+    data class FindProducts(
         val products: Slice<ProductView>,
     )
 }

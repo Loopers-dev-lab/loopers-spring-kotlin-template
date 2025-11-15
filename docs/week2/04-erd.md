@@ -6,7 +6,111 @@
 
 ## 1. ERD 다이어그램
 
-![img_4.png](https://i.imgur.com/TTCD1uh.png)
+```mermaid
+erDiagram
+    users ||..o{ point_accounts: "userId"
+    users ||..o{ orders: "userId"
+    users ||..o{ payments: "userId"
+    users ||..o{ product_likes: "userId"
+    brands ||..o{ products: "brandId"
+    products ||..o{ product_likes: "productId"
+    products ||..o{ product_statistics: "productId"
+    products ||..o{ order_items: "productId"
+    orders ||--|{ order_items: "orderId (FK)"
+    orders ||..o| payments: "orderId"
+
+    users {
+        BIGINT user_id PK "AUTO_INCREMENT"
+        VARCHAR_10 username UK "NOT NULL"
+        DATE birth "NOT NULL"
+        VARCHAR_100 email "NOT NULL"
+        VARCHAR_10 gender "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMP updated_at "NOT NULL"
+        TIMESTAMP deleted_at "NULL"
+    }
+
+    brands {
+        BIGINT brand_id PK "AUTO_INCREMENT"
+        VARCHAR_100 name UK "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMP updated_at "NOT NULL"
+        TIMESTAMP deleted_at "NULL"
+    }
+
+    products {
+        BIGINT product_id PK "AUTO_INCREMENT"
+        BIGINT brand_id "NOT NULL, 참조"
+        VARCHAR_200 name "NOT NULL"
+        DECIMAL price "NOT NULL"
+        VARCHAR_20 status "NOT NULL"
+        INT stock "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMP updated_at "NOT NULL"
+        TIMESTAMP deleted_at "NULL"
+    }
+
+    product_likes {
+        BIGINT product_like_id PK "AUTO_INCREMENT"
+        BIGINT user_id "NOT NULL"
+        BIGINT product_id "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMP updated_at "NOT NULL"
+        TIMESTAMP deleted_at "NULL"
+    }
+
+    product_statistics {
+        BIGINT product_statistic_id PK "AUTO_INCREMENT"
+        BIGINT product_id UK "NOT NULL"
+        BIGINT like_count "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMP updated_at "NOT NULL"
+        TIMESTAMP deleted_at "NULL"
+    }
+
+    orders {
+        BIGINT order_id PK "AUTO_INCREMENT"
+        BIGINT user_id "NOT NULL"
+        DECIMAL total_amount "NOT NULL"
+        VARCHAR_20 status "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMP updated_at "NOT NULL"
+        TIMESTAMP deleted_at "NULL"
+    }
+
+    order_items {
+        BIGINT order_item_id PK "AUTO_INCREMENT"
+        BIGINT order_id FK "NOT NULL"
+        BIGINT product_id "NOT NULL, 참조"
+        VARCHAR_200 product_name "NOT NULL"
+        DECIMAL unit_price "NOT NULL"
+        INT quantity "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMP updated_at "NOT NULL"
+        TIMESTAMP deleted_at "NULL"
+    }
+
+    payments {
+        BIGINT payment_id PK "AUTO_INCREMENT"
+        BIGINT order_id UK "NOT NULL, 참조"
+        BIGINT user_id "NOT NULL, 참조"
+        DECIMAL total_amount "NOT NULL"
+        DECIMAL used_point "NOT NULL"
+        VARCHAR_20 status "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMP updated_at "NOT NULL"
+        TIMESTAMP deleted_at "NULL"
+    }
+
+    point_accounts {
+        BIGINT point_account_id PK "AUTO_INCREMENT"
+        BIGINT user_id UK "NOT NULL"
+        DECIMAL balance "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMP updated_at "NOT NULL"
+        TIMESTAMP deleted_at "NULL"
+    }
+```
 
 **관계 표기:**
 
@@ -17,7 +121,29 @@
 
 ## 2. 테이블 상세 정의
 
-### 2.1 Products 도메인
+### 2.1 Users 도메인
+
+#### users (사용자)
+
+| 컬럼명        | 타입           | 제약                 | 설명                  |
+|------------|--------------|--------------------|---------------------|
+| user_id    | BIGINT       | PK, AUTO_INCREMENT | 사용자 ID              |
+| username   | VARCHAR(10)  | NOT NULL, UNIQUE   | 사용자명 (영문, 숫자)       |
+| birth      | DATE         | NOT NULL           | 생년월일                |
+| email      | VARCHAR(100) | NOT NULL           | 이메일                 |
+| gender     | VARCHAR(10)  | NOT NULL           | 성별 (MALE, FEMALE)   |
+| created_at | TIMESTAMP    | NOT NULL           | 생성 시각               |
+| updated_at | TIMESTAMP    | NOT NULL           | 수정 시각               |
+| deleted_at | TIMESTAMP    | NULL               | 삭제 시각 (Soft Delete) |
+
+**인덱스:**
+
+- PK: user_id
+- UK: username
+
+---
+
+### 2.2 Products 도메인
 
 #### brands (브랜드)
 
@@ -38,48 +164,31 @@
 
 #### products (상품)
 
-| 컬럼명        | 타입            | 제약                 | 설명                                         |
-|------------|---------------|--------------------|--------------------------------------------|
-| product_id | BIGINT        | PK, AUTO_INCREMENT | 상품 ID                                      |
-| brand_id   | BIGINT        | NOT NULL           | 브랜드 ID (참조)                                |
-| name       | VARCHAR(200)  | NOT NULL           | 상품명                                        |
-| price      | DECIMAL(15,2) | NOT NULL           | 가격                                         |
-| status     | VARCHAR(20)   | NOT NULL           | 상태 (AVAILABLE, OUT_OF_STOCK, DISCONTINUED) |
-| created_at | TIMESTAMP     | NOT NULL           | 생성 시각                                      |
-| updated_at | TIMESTAMP     | NOT NULL           | 수정 시각                                      |
-| deleted_at | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete)                        |
+| 컬럼명        | 타입            | 제약                 | 설명                                      |
+|------------|---------------|--------------------|-----------------------------------------|
+| product_id | BIGINT        | PK, AUTO_INCREMENT | 상품 ID                                   |
+| brand_id   | BIGINT        | NOT NULL           | 브랜드 ID (참조)                             |
+| name       | VARCHAR(200)  | NOT NULL           | 상품명                                     |
+| price      | DECIMAL(15,2) | NOT NULL           | 가격                                      |
+| status     | VARCHAR(20)   | NOT NULL           | 상태 (ACTIVE, OUT_OF_STOCK, DISCONTINUED) |
+| stock      | INT           | NOT NULL           | 재고 수량                                   |
+| created_at | TIMESTAMP     | NOT NULL           | 생성 시각                                   |
+| updated_at | TIMESTAMP     | NOT NULL           | 수정 시각                                   |
+| deleted_at | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete)                     |
 
 **인덱스:**
 
 - PK: product_id
-- IDX: brand_id (브랜드별 상품 조회용)
-- IDX: created_at (정렬용)
-
----
-
-#### stocks (재고)
-
-| 컬럼명        | 타입        | 제약                 | 설명                  |
-|------------|-----------|--------------------|---------------------|
-| stock_id   | BIGINT    | PK, AUTO_INCREMENT | 재고 ID               |
-| product_id | BIGINT    | NOT NULL, UNIQUE   | 상품 ID (참조)          |
-| quantity   | INT       | NOT NULL           | 재고 수량               |
-| created_at | TIMESTAMP | NOT NULL           | 생성 시각               |
-| updated_at | TIMESTAMP | NOT NULL           | 수정 시각               |
-| deleted_at | TIMESTAMP | NULL               | 삭제 시각 (Soft Delete) |
-
-**인덱스:**
-
-- PK: stock_id
-- UK: product_id
+- IDX: (brand_id, price) - 브랜드별 가격 정렬용
+- IDX: (brand_id, product_id DESC) - 브랜드별 최신순 조회용
 
 **제약:**
 
-- quantity >= 0 (CHECK)
+- stock >= 0 (CHECK)
 
 ---
 
-### 2.2 Likes 도메인
+### 2.3 Likes 도메인
 
 #### product_likes (상품 좋아요)
 
@@ -105,42 +214,42 @@
 
 ---
 
-#### product_like_counts (상품 좋아요 수)
+#### product_statistics (상품 통계)
 
-| 컬럼명                   | 타입        | 제약                 | 설명                  |
-|-----------------------|-----------|--------------------|---------------------|
-| product_like_count_id | BIGINT    | PK, AUTO_INCREMENT | 좋아요 수 ID            |
-| product_id            | BIGINT    | NOT NULL, UNIQUE   | 상품 ID (참조)          |
-| count                 | INT       | NOT NULL           | 좋아요 수               |
-| created_at            | TIMESTAMP | NOT NULL           | 생성 시각               |
-| updated_at            | TIMESTAMP | NOT NULL           | 수정 시각               |
-| deleted_at            | TIMESTAMP | NULL               | 삭제 시각 (Soft Delete) |
+| 컬럼명                  | 타입        | 제약                 | 설명                  |
+|----------------------|-----------|--------------------|---------------------|
+| product_statistic_id | BIGINT    | PK, AUTO_INCREMENT | 통계 ID               |
+| product_id           | BIGINT    | NOT NULL, UNIQUE   | 상품 ID (참조)          |
+| like_count           | BIGINT    | NOT NULL           | 좋아요 수               |
+| created_at           | TIMESTAMP | NOT NULL           | 생성 시각               |
+| updated_at           | TIMESTAMP | NOT NULL           | 수정 시각               |
+| deleted_at           | TIMESTAMP | NULL               | 삭제 시각 (Soft Delete) |
 
 **인덱스:**
 
-- PK: product_like_count_id
+- PK: product_statistic_id
 - UK: product_id
-- IDX: (count DESC)
+- IDX: (like_count DESC)
 
 **제약:**
 
-- count >= 0 (CHECK)
+- like_count >= 0 (CHECK)
 
 ---
 
-### 2.3 Orders 도메인
+### 2.4 Orders 도메인
 
 #### orders (주문)
 
-| 컬럼명          | 타입            | 제약                 | 설명                   |
-|--------------|---------------|--------------------|----------------------|
-| order_id     | BIGINT        | PK, AUTO_INCREMENT | 주문 ID                |
-| user_id      | BIGINT        | NOT NULL           | 사용자 ID (참조)          |
-| total_amount | DECIMAL(15,2) | NOT NULL           | 총 주문 금액              |
-| status       | VARCHAR(20)   | NOT NULL           | 주문 상태 (PLACED, PAID) |
-| created_at   | TIMESTAMP     | NOT NULL           | 생성 시각                |
-| updated_at   | TIMESTAMP     | NOT NULL           | 수정 시각                |
-| deleted_at   | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete)  |
+| 컬럼명          | 타입            | 제약                 | 설명                  |
+|--------------|---------------|--------------------|---------------------|
+| order_id     | BIGINT        | PK, AUTO_INCREMENT | 주문 ID               |
+| user_id      | BIGINT        | NOT NULL           | 사용자 ID (참조)         |
+| total_amount | DECIMAL(15,2) | NOT NULL           | 총 주문 금액             |
+| status       | VARCHAR(20)   | NOT NULL           | 주문 상태 (PAID)        |
+| created_at   | TIMESTAMP     | NOT NULL           | 생성 시각               |
+| updated_at   | TIMESTAMP     | NOT NULL           | 수정 시각               |
+| deleted_at   | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete) |
 
 **인덱스:**
 
@@ -152,18 +261,17 @@
 
 #### order_items (주문 항목)
 
-| 컬럼명           | 타입            | 제약                 | 설명                         |
-|---------------|---------------|--------------------|----------------------------|
-| order_item_id | BIGINT        | PK, AUTO_INCREMENT | 주문 항목 ID                   |
-| order_id      | BIGINT        | NOT NULL, FK       | 주문 ID                      |
-| product_id    | BIGINT        | NOT NULL           | 상품 ID (참조)                 |
-| product_name  | VARCHAR(200)  | NOT NULL           | 상품명 (스냅샷)                  |
-| unit_price    | DECIMAL(15,2) | NOT NULL           | 단가 (스냅샷)                   |
-| quantity      | INT           | NOT NULL           | 수량                         |
-| subtotal      | DECIMAL(15,2) | NOT NULL           | 소계 (unit_price × quantity) |
-| created_at    | TIMESTAMP     | NOT NULL           | 생성 시각                      |
-| updated_at    | TIMESTAMP     | NOT NULL           | 수정 시각                      |
-| deleted_at    | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete)        |
+| 컬럼명           | 타입            | 제약                 | 설명                  |
+|---------------|---------------|--------------------|---------------------|
+| order_item_id | BIGINT        | PK, AUTO_INCREMENT | 주문 항목 ID            |
+| order_id      | BIGINT        | NOT NULL, FK       | 주문 ID               |
+| product_id    | BIGINT        | NOT NULL           | 상품 ID (참조)          |
+| product_name  | VARCHAR(200)  | NOT NULL           | 상품명 (스냅샷)           |
+| unit_price    | DECIMAL(15,2) | NOT NULL           | 단가 (스냅샷)            |
+| quantity      | INT           | NOT NULL           | 수량                  |
+| created_at    | TIMESTAMP     | NOT NULL           | 생성 시각               |
+| updated_at    | TIMESTAMP     | NOT NULL           | 수정 시각               |
+| deleted_at    | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete) |
 
 **인덱스:**
 
@@ -174,20 +282,17 @@
 
 #### payments (결제)
 
-| 컬럼명                  | 타입            | 제약                 | 설명                  |
-|----------------------|---------------|--------------------|---------------------|
-| payment_id           | BIGINT        | PK, AUTO_INCREMENT | 결제 ID               |
-| order_id             | BIGINT        | NOT NULL, UNIQUE   | 주문 ID (참조)          |
-| user_id              | BIGINT        | NOT NULL           | 사용자 ID (참조)         |
-| total_amount         | DECIMAL(15,2) | NOT NULL           | 총 주문 금액             |
-| used_point           | DECIMAL(15,2) | NOT NULL           | 사용 포인트              |
-| paid_amount          | DECIMAL(15,2) | NOT NULL           | 실제 결제 금액            |
-| status               | VARCHAR(20)   | NOT NULL           | 결제 상태 (READY, PAID) |
-| external_payment_key | VARCHAR(200)  | NULL               | PG사 결제 키            |
-| approve_code         | VARCHAR(50)   | NULL               | 카드 승인번호             |
-| created_at           | TIMESTAMP     | NOT NULL           | 생성 시각               |
-| updated_at           | TIMESTAMP     | NOT NULL           | 수정 시각               |
-| deleted_at           | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete) |
+| 컬럼명          | 타입            | 제약                 | 설명                  |
+|--------------|---------------|--------------------|---------------------|
+| payment_id   | BIGINT        | PK, AUTO_INCREMENT | 결제 ID               |
+| order_id     | BIGINT        | NOT NULL, UNIQUE   | 주문 ID (참조)          |
+| user_id      | BIGINT        | NOT NULL           | 사용자 ID (참조)         |
+| total_amount | DECIMAL(15,2) | NOT NULL           | 총 주문 금액             |
+| used_point   | DECIMAL(15,2) | NOT NULL           | 사용 포인트              |
+| status       | VARCHAR(20)   | NOT NULL           | 결제 상태 (PAID)        |
+| created_at   | TIMESTAMP     | NOT NULL           | 생성 시각               |
+| updated_at   | TIMESTAMP     | NOT NULL           | 수정 시각               |
+| deleted_at   | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete) |
 
 **인덱스:**
 
@@ -197,7 +302,7 @@
 
 ---
 
-### 2.4 Points 도메인
+### 2.5 Points 도메인
 
 #### point_accounts (포인트 계좌)
 
@@ -221,37 +326,16 @@
 
 ---
 
-#### point_histories (포인트 이력)
-
-| 컬럼명           | 타입            | 제약                 | 설명                       |
-|---------------|---------------|--------------------|--------------------------|
-| history_id    | BIGINT        | PK, AUTO_INCREMENT | 포인트 이력 ID                |
-| user_id       | BIGINT        | NOT NULL           | 사용자 ID (참조)              |
-| reference_id  | VARCHAR(100)  | NULL               | 참조 ID (충전ID, 결제ID 등)     |
-| type          | VARCHAR(20)   | NOT NULL           | 포인트 타입 (CHARGE, PAYMENT) |
-| amount        | DECIMAL(15,2) | NOT NULL           | 거래 금액                    |
-| balance_after | DECIMAL(15,2) | NOT NULL           | 거래 후 잔액                  |
-| created_at    | TIMESTAMP     | NOT NULL           | 생성 시각                    |
-| updated_at    | TIMESTAMP     | NOT NULL           | 수정 시각                    |
-| deleted_at    | TIMESTAMP     | NULL               | 삭제 시각 (Soft Delete)      |
-
-**인덱스:**
-
-- PK: history_id
-- IDX: user_id,created_at  (사용자별 이력 조회용)
-
----
-
 ## 3. 설계 고려사항
 
 ### 3.1 동시성 제어
 
-- **stocks 테이블**: 재고 차감 시 비관적 락(`SELECT ... FOR UPDATE`) 사용
+- **products 테이블**: 재고 차감 시 비관적 락(`SELECT ... FOR UPDATE`) 사용
 
 ### 3.2 데이터 정합성
 
 - **order_items**: 주문 시점의 상품 정보를 스냅샷으로 저장 (가격 변동 영향 없음)
-- **payments**: total_amount = used_point + paid_amount 제약으로 정합성 보장
+- **payments**: total_amount == used_point (전액 포인트 결제)
 
 ### 3.3 FK 제약 전략
 
@@ -266,7 +350,7 @@
 
 ### 3.5 성능 최적화
 
-- **product_like_counts**: 좋아요 수 집계 테이블로 조회 성능 향상
+- **product_statistics**: 좋아요 수 집계 테이블로 조회 성능 향상
 - **인덱스**: 자주 조회되는 컬럼에 인덱스 설정 (created_at, user_id)
 
 ### 3.6 확장성
