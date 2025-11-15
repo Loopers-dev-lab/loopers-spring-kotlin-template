@@ -38,7 +38,7 @@ class OrderItem(
         }
 
         if (unitPrice <= Money.ZERO_KRW) {
-            throw CoreException(ErrorType.BAD_REQUEST, "단가는 0 이상이어야 합니다.")
+            throw CoreException(ErrorType.BAD_REQUEST, "단가는 0 보다 커야 합니다.")
         }
     }
 

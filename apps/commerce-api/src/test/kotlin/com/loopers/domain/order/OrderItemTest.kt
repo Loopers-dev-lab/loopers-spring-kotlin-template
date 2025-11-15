@@ -84,7 +84,7 @@ class OrderItemTest {
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("단가는 0 이상이어야 합니다.")
+            assertThat(exception.message).isEqualTo("단가는 0 보다 커야 합니다.")
         }
 
         @DisplayName("단가가 음수일 때 예외가 발생한다")
@@ -100,7 +100,7 @@ class OrderItemTest {
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("단가는 0 이상이어야 합니다.")
+            assertThat(exception.message).isEqualTo("단가는 0 보다 커야 합니다.")
         }
     }
 
