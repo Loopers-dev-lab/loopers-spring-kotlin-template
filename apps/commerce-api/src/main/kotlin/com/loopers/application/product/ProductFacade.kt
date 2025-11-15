@@ -43,7 +43,7 @@ class ProductFacade(
         return org.springframework.data.domain.PageImpl(
             likedProducts,
             validLikes.pageable,
-            likedProducts.size.toLong(),
+            validLikes.totalElements,
         )
     }
 }
