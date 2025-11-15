@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Query
 interface ProductJpaRepository : JpaRepository<Product, Long> {
     fun findByBrandId(brandId: Long, pageable: Pageable): Page<Product>
 
+    fun findByIdInAndDeletedAtIsNull(ids: List<Long>): List<Product>
+
     @Query(
         """
         SELECT p FROM Product p

@@ -16,6 +16,9 @@ class ProductRepositoryImpl(
 
     override fun findAllById(ids: List<Long>): List<Product> = productJpaRepository.findAllById(ids)
 
+    override fun findByIdInAndDeletedAtIsNull(ids: List<Long>): List<Product> =
+        productJpaRepository.findByIdInAndDeletedAtIsNull(ids)
+
     override fun findAll(
         brandId: Long?,
         sort: String,

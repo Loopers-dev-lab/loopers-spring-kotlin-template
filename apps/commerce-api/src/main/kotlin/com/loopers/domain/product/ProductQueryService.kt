@@ -31,6 +31,6 @@ class ProductQueryService(
     }
 
     fun getProductsByIds(productIds: List<Long>): List<Product> {
-        return productRepository.findAllById(productIds)
+        return productRepository.findByIdInAndDeletedAtIsNull(productIds)
     }
 }

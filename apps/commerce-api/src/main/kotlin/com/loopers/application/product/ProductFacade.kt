@@ -34,10 +34,16 @@ class ProductFacade(
         val products = productQueryService.getProductsByIds(productIds)
         val productMap = products.associateBy { it.id }
 
-        return validLikes.map { like ->
-            val product = productMap[like.productId]
-                ?: throw IllegalStateException("삭제된 상품 ${like.productId} 가 좋아요 목록에 포함되었습니다.")
-            LikedProductInfo.from(like, product)
+        val likedProducts = validLikes.content.mapNotNull { like ->
+            productMap[like.productId]?.let { product ->
+                LikedProductInfo.from(like, product)
+            }
         }
+
+        return org.springframework.data.domain.PageImpl(
+            likedProducts,
+            validLikes.pageable,
+            likedProducts.size.toLong(),
+        )
     }
 }

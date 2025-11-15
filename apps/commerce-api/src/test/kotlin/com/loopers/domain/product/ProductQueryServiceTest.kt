@@ -105,7 +105,7 @@ class ProductQueryServiceTest {
         val product1 = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val product2 = createTestProduct(id = 101L, name = "티셔츠", price = BigDecimal("50000"), brand = brand)
 
-        every { productRepository.findAllById(listOf(100L, 101L)) } returns listOf(product1, product2)
+        every { productRepository.findByIdInAndDeletedAtIsNull(listOf(100L, 101L)) } returns listOf(product1, product2)
 
         // when
         val result = productQueryService.getProductsByIds(listOf(100L, 101L))
