@@ -14,7 +14,7 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
-        every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns false
+        every { likeRepository.findByUserIdAndProductIdWithLock(userId, productId) } returns null
 
         // when
         likeService.addLike(userId, productId)
@@ -28,7 +28,8 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
-        every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns true
+        val existingLike = Like(userId = userId, productId = productId)
+        every { likeRepository.findByUserIdAndProductIdWithLock(userId, productId) } returns existingLike
 
         // when
         likeService.addLike(userId, productId)

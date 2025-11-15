@@ -1,9 +1,11 @@
 package com.loopers.infrastructure.like
 
 import com.loopers.domain.like.Like
+import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 
 interface ProductLikeCount {
@@ -16,6 +18,10 @@ interface LikeJpaRepository : JpaRepository<Like, Long> {
     fun countByProductId(productId: Long): Long
     fun deleteByUserIdAndProductId(userId: Long, productId: Long)
     fun findByUserId(userId: Long, pageable: Pageable): Page<Like>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM Like l WHERE l.userId = :userId AND l.productId = :productId")
+    fun findByUserIdAndProductIdWithLock(userId: Long, productId: Long): Like?
 
     @Query(
         """

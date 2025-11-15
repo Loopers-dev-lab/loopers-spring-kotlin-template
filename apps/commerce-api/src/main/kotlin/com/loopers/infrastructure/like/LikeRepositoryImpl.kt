@@ -38,4 +38,7 @@ class LikeRepositoryImpl(
         userId: Long,
         pageable: Pageable,
     ): Page<Like> = likeJpaRepository.findValidLikesByUserId(userId, pageable)
+
+    override fun findByUserIdAndProductIdWithLock(userId: Long, productId: Long): Like? =
+        likeJpaRepository.findByUserIdAndProductIdWithLock(userId, productId)
 }
