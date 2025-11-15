@@ -14,7 +14,7 @@ erDiagram
     users ||..o{ product_likes: "userId"
     brands ||..o{ products: "brandId"
     products ||..o{ product_likes: "productId"
-    products ||..o{ product_statistics: "productId"
+    products ||..o| product_statistics: "productId"
     products ||..o{ order_items: "productId"
     orders ||--|{ order_items: "orderId (FK)"
     orders ||..o| payments: "orderId"
