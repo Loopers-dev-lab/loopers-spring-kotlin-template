@@ -18,7 +18,7 @@ class OrderService(
 
         val savedOrder = orderRepository.save(paidOrder)
 
-        val paidPayment = Payment.paid(command.userId, paidOrder, command.usePoint)
+        val paidPayment = Payment.paid(command.userId, savedOrder, command.usePoint)
 
         paymentRepository.save(paidPayment)
 
