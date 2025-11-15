@@ -33,4 +33,9 @@ class LikeRepositoryImpl(
         userId: Long,
         pageable: Pageable,
     ): Page<Like> = likeJpaRepository.findByUserId(userId, pageable)
+
+    override fun findValidLikesByUserId(
+        userId: Long,
+        pageable: Pageable,
+    ): Page<Like> = likeJpaRepository.findValidLikesByUserId(userId, pageable)
 }

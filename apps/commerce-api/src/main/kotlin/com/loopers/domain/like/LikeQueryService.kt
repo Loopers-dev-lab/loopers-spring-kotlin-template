@@ -12,6 +12,10 @@ class LikeQueryService(
         return likeRepository.findByUserId(userId, pageable)
     }
 
+    fun getValidLikesByUserId(userId: Long, pageable: Pageable): Page<Like> {
+        return likeRepository.findValidLikesByUserId(userId, pageable)
+    }
+
     fun countByProductId(productId: Long): Long {
         return likeRepository.countByProductId(productId)
     }

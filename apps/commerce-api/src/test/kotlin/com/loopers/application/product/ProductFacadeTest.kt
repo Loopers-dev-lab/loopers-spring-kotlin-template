@@ -80,7 +80,7 @@ class ProductFacadeTest {
         val like = createTestLike(id = 1L, userId = userId, productId = product.id)
         val pageable = PageRequest.of(0, 20)
 
-        every { likeQueryService.getLikesByUserId(userId, pageable) } returns PageImpl(listOf(like))
+        every { likeQueryService.getValidLikesByUserId(userId, pageable) } returns PageImpl(listOf(like))
         every { productQueryService.getProductsByIds(listOf(100L)) } returns listOf(product)
 
         // when

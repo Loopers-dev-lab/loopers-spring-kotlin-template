@@ -26,4 +26,13 @@ interface LikeJpaRepository : JpaRepository<Like, Long> {
         """,
     )
     fun countByProductIdInGrouped(productIds: List<Long>): List<ProductLikeCount>
+
+    @Query(
+        """
+        SELECT l FROM Like l
+        INNER JOIN Product p ON l.productId = p.id
+        WHERE l.userId = :userId AND p.deletedAt IS NULL
+        """,
+    )
+    fun findValidLikesByUserId(userId: Long, pageable: Pageable): Page<Like>
 }

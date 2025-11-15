@@ -3,7 +3,6 @@ package com.loopers.application.product
 import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.product.ProductQueryService
 import org.springframework.data.domain.Page
-import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
 
@@ -30,16 +29,15 @@ class ProductFacade(
     }
 
     fun getLikedProducts(userId: Long, pageable: Pageable): Page<LikedProductInfo> {
-        val likes = likeQueryService.getLikesByUserId(userId, pageable)
-        val productIds = likes.content.map { it.productId }
+        val validLikes = likeQueryService.getValidLikesByUserId(userId, pageable)
+        val productIds = validLikes.content.map { it.productId }
         val products = productQueryService.getProductsByIds(productIds)
         val productMap = products.associateBy { it.id }
 
-        val likedProductInfos = likes.content.mapNotNull { like ->
-            productMap[like.productId]?.let { product ->
-                LikedProductInfo.from(like, product)
-            }
+        return validLikes.map { like ->
+            val product = productMap[like.productId]
+                ?: throw IllegalStateException("삭제된 상품 ${like.productId} 가 좋아요 목록에 포함되었습니다.")
+            LikedProductInfo.from(like, product)
         }
-        return PageImpl(likedProductInfos, pageable, likes.totalElements)
     }
 }
