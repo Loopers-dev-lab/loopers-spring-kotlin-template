@@ -35,10 +35,12 @@ class Payment(
     @Embedded
     @AttributeOverride(name = "amount", column = Column(name = "used_point", nullable = false))
     var usedPoint: Money = usedPoint
+        private set
 
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
     var status: PaymentStatus = status
+        private set
 
     companion object {
         fun paid(
