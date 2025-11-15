@@ -2,6 +2,7 @@ package com.loopers.domain.user
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 
@@ -15,7 +16,6 @@ class UserService(
         gender: Gender,
         birthDate: LocalDate,
     ): User {
-        // 이메일 중복 확인
         if (userRepository.existsByEmail(email)) {
             throw CoreException(
                 errorType = ErrorType.BAD_REQUEST,
@@ -29,8 +29,14 @@ class UserService(
             gender = gender,
             birthDate = birthDate,
         )
-
-        return userRepository.save(user)
+        return try {
+            userRepository.save(user)
+        } catch (e: DataIntegrityViolationException) {
+            throw CoreException(
+                errorType = ErrorType.BAD_REQUEST,
+                customMessage = "이미 사용 중인 이메일입니다: $email",
+            )
+        }
     }
 
     fun getUser(userId: Long): User {
