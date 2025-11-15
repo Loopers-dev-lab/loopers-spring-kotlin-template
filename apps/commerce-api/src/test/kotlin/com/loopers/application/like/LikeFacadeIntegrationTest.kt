@@ -66,6 +66,22 @@ class LikeFacadeIntegrationTest @Autowired constructor(
             val likeCountAfterSecondAdd = getProductLikeCount(product.id)
             assertThat(likeCountAfterSecondAdd).isEqualTo(likeCountAfterFirstAdd)
         }
+
+        @DisplayName("존재하지 않는 상품에 좋아요를 추가하면 예외가 발생한다")
+        @Test
+        fun `throw exception when add like to non existing product`() {
+            // given
+            val userId = 1L
+            val nonExistingProductId = 999L
+
+            // when & then
+            val exception = org.junit.jupiter.api.assertThrows<com.loopers.support.error.CoreException> {
+                likeFacade.addLike(userId, nonExistingProductId)
+            }
+
+            assertThat(exception.errorType).isEqualTo(com.loopers.support.error.ErrorType.NOT_FOUND)
+            assertThat(exception.message).contains("상품을 찾을 수 없습니다")
+        }
     }
 
     @DisplayName("좋아요 제거 통합테스트")
@@ -103,6 +119,22 @@ class LikeFacadeIntegrationTest @Autowired constructor(
             // then
             val likeCountAfterRemove = getProductLikeCount(product.id)
             assertThat(likeCountAfterRemove).isEqualTo(initialLikeCount)
+        }
+
+        @DisplayName("존재하지 않는 상품의 좋아요를 제거하면 예외가 발생한다")
+        @Test
+        fun `throw exception when remove like from non existing product`() {
+            // given
+            val userId = 1L
+            val nonExistingProductId = 999L
+
+            // when & then
+            val exception = org.junit.jupiter.api.assertThrows<com.loopers.support.error.CoreException> {
+                likeFacade.removeLike(userId, nonExistingProductId)
+            }
+
+            assertThat(exception.errorType).isEqualTo(com.loopers.support.error.ErrorType.NOT_FOUND)
+            assertThat(exception.message).contains("상품을 찾을 수 없습니다")
         }
     }
 

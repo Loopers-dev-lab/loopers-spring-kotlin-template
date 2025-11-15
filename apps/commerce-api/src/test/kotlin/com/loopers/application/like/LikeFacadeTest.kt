@@ -29,12 +29,7 @@ class LikeFacadeTest {
         productStatisticRepository = mockk()
 
         likeService = ProductLikeService(productLikeRepository)
-
-        productService = ProductService(
-            productRepository = mockk(),
-            productStatisticRepository = productStatisticRepository,
-            brandRepository = mockk(),
-        )
+        productService = mockk()
 
         // Facade 생성
         likeFacade = LikeFacade(likeService, productService)
@@ -50,14 +45,16 @@ class LikeFacadeTest {
             val userId = 1L
             val productId = 100L
 
+            every { productService.findProductById(productId) } returns mockk()
             every { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) } returns 0
 
             // when
             likeFacade.addLike(userId, productId)
 
             // then
+            verify(exactly = 1) { productService.findProductById(productId) }
             verify(exactly = 1) { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) }
-            verify(exactly = 0) { productStatisticRepository.increaseLikeCountBy(productId) }
+            verify(exactly = 0) { productService.increaseProductLikeCount(productId) }
         }
 
         @Test
@@ -67,6 +64,7 @@ class LikeFacadeTest {
             val userId = 1L
             val productId = 100L
 
+            every { productService.findProductById(productId) } returns mockk()
             every { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) } returnsMany listOf(
                 1,
                 0,
@@ -74,7 +72,7 @@ class LikeFacadeTest {
                 0,
             )
 
-            every { productStatisticRepository.increaseLikeCountBy(productId) } just runs
+            every { productService.increaseProductLikeCount(productId) } just runs
 
             // when
             repeat(4) {
@@ -82,8 +80,9 @@ class LikeFacadeTest {
             }
 
             // then
+            verify(exactly = 4) { productService.findProductById(productId) }
             verify(exactly = 4) { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) }
-            verify(exactly = 1) { productStatisticRepository.increaseLikeCountBy(productId) }
+            verify(exactly = 1) { productService.increaseProductLikeCount(productId) }
         }
 
         @Test
@@ -93,14 +92,16 @@ class LikeFacadeTest {
             val userId = 1L
             val productId = 100L
 
+            every { productService.findProductById(productId) } returns mockk()
             every { productLikeRepository.deleteByUserIdAndProductId(userId, productId) } returns 0L
 
             // when
             likeFacade.removeLike(userId, productId)
 
             // then
+            verify(exactly = 1) { productService.findProductById(productId) }
             verify(exactly = 1) { productLikeRepository.deleteByUserIdAndProductId(userId, productId) }
-            verify(exactly = 0) { productStatisticRepository.decreaseLikeCountBy(productId) }
+            verify(exactly = 0) { productService.decreaseProductLikeCount(productId) }
         }
 
         @Test
@@ -110,13 +111,14 @@ class LikeFacadeTest {
             val userId = 1L
             val productId = 100L
 
+            every { productService.findProductById(productId) } returns mockk()
             every { productLikeRepository.deleteByUserIdAndProductId(userId, productId) } returnsMany listOf(
                 1L,
                 0L,
                 0L,
                 0L,
             )
-            every { productStatisticRepository.decreaseLikeCountBy(productId) } just runs
+            every { productService.decreaseProductLikeCount(productId) } just runs
 
             // when
             repeat(4) {
@@ -124,8 +126,95 @@ class LikeFacadeTest {
             }
 
             // then
+            verify(exactly = 4) { productService.findProductById(productId) }
             verify(exactly = 4) { productLikeRepository.deleteByUserIdAndProductId(userId, productId) }
-            verify(exactly = 1) { productStatisticRepository.decreaseLikeCountBy(productId) }
+            verify(exactly = 1) { productService.decreaseProductLikeCount(productId) }
+        }
+    }
+
+    @Nested
+    @DisplayName("상품 존재 여부 검증 테스트")
+    inner class ProductValidation {
+        @Test
+        @DisplayName("좋아요 추가 시 상품 존재 여부를 확인한다")
+        fun `verify product exists when adding like`() {
+            // given
+            val userId = 1L
+            val productId = 100L
+
+            every { productService.findProductById(productId) } returns mockk()
+            every { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) } returns 1
+            every { productService.increaseProductLikeCount(productId) } just runs
+
+            // when
+            likeFacade.addLike(userId, productId)
+
+            // then
+            verify(exactly = 1) { productService.findProductById(productId) }
+        }
+
+        @Test
+        @DisplayName("좋아요 제거 시 상품 존재 여부를 확인한다")
+        fun `verify product exists when removing like`() {
+            // given
+            val userId = 1L
+            val productId = 100L
+
+            every { productService.findProductById(productId) } returns mockk()
+            every { productLikeRepository.deleteByUserIdAndProductId(userId, productId) } returns 1L
+            every { productService.decreaseProductLikeCount(productId) } just runs
+
+            // when
+            likeFacade.removeLike(userId, productId)
+
+            // then
+            verify(exactly = 1) { productService.findProductById(productId) }
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 상품에 좋아요 추가 시 예외가 전파된다")
+        fun `propagate exception when adding like to non existing product`() {
+            // given
+            val userId = 1L
+            val productId = 999L
+            val exception = com.loopers.support.error.CoreException(
+                errorType = com.loopers.support.error.ErrorType.NOT_FOUND,
+                customMessage = "상품을 찾을 수 없습니다.",
+            )
+
+            every { productService.findProductById(productId) } throws exception
+
+            // when & then
+            org.junit.jupiter.api.assertThrows<com.loopers.support.error.CoreException> {
+                likeFacade.addLike(userId, productId)
+            }
+
+            verify(exactly = 1) { productService.findProductById(productId) }
+            verify(exactly = 0) { productLikeRepository.upsert(any()) }
+            verify(exactly = 0) { productService.increaseProductLikeCount(any()) }
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 상품의 좋아요 제거 시 예외가 전파된다")
+        fun `propagate exception when removing like from non existing product`() {
+            // given
+            val userId = 1L
+            val productId = 999L
+            val exception = com.loopers.support.error.CoreException(
+                errorType = com.loopers.support.error.ErrorType.NOT_FOUND,
+                customMessage = "상품을 찾을 수 없습니다.",
+            )
+
+            every { productService.findProductById(productId) } throws exception
+
+            // when & then
+            org.junit.jupiter.api.assertThrows<com.loopers.support.error.CoreException> {
+                likeFacade.removeLike(userId, productId)
+            }
+
+            verify(exactly = 1) { productService.findProductById(productId) }
+            verify(exactly = 0) { productLikeRepository.deleteByUserIdAndProductId(any(), any()) }
+            verify(exactly = 0) { productService.decreaseProductLikeCount(any()) }
         }
     }
 }

@@ -27,6 +27,41 @@ class ProductServiceIntegrationTest @Autowired constructor(
         databaseCleanUp.truncateAllTables()
     }
 
+    @DisplayName("상품 조회 통합테스트")
+    @Nested
+    inner class FindProductById {
+
+        @DisplayName("존재하는 상품을 조회하면 상품이 반환된다")
+        @Test
+        fun `return product when product exists`() {
+            // given
+            val product = createProduct()
+
+            // when
+            val foundProduct = productService.findProductById(product.id)
+
+            // then
+            assertThat(foundProduct.id).isEqualTo(product.id)
+            assertThat(foundProduct.name).isEqualTo(product.name)
+        }
+
+        @DisplayName("존재하지 않는 상품을 조회하면 예외가 발생한다")
+        @Test
+        fun `throw exception when product not exists`() {
+            // given
+            val notExistId = 999L
+
+            // when
+            val exception = assertThrows<CoreException> {
+                productService.findProductById(notExistId)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+            assertThat(exception.message).contains("상품을 찾을 수 없습니다")
+        }
+    }
+
     @DisplayName("상품 상세 조회 통합테스트")
     @Nested
     inner class FindProductViewById {

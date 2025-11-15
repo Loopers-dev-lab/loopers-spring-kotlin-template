@@ -13,6 +13,15 @@ class ProductService(
     private val brandRepository: BrandRepository,
 ) {
     @Transactional(readOnly = true)
+    fun findProductById(id: Long): Product {
+        return productRepository.findById(id)
+            ?: throw CoreException(
+                errorType = ErrorType.NOT_FOUND,
+                customMessage = "[id = $id] 상품을 찾을 수 없습니다.",
+            )
+    }
+
+    @Transactional(readOnly = true)
     fun findProductViewById(id: Long): ProductView {
         val product = productRepository.findById(id)
             ?: throw CoreException(
