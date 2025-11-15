@@ -16,7 +16,7 @@ interface ProductV1ApiSpec {
     fun getProducts(
         @Parameter(description = "브랜드 ID (선택)")
         brandId: Long?,
-        @Parameter(description = "정렬 기준 (latest, price, likeCount)", schema = Schema(defaultValue = "latest"))
+        @Parameter(description = "정렬 기준 (latest, price_asc, likes_desc)", schema = Schema(defaultValue = "latest"))
         sort: String,
         @Parameter(description = "페이지 번호", schema = Schema(defaultValue = "0"))
         page: Int,

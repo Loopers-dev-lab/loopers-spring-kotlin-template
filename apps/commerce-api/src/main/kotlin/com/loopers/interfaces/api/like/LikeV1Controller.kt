@@ -15,12 +15,12 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/like")
 class LikeV1Controller(
     private val likeFacade: LikeFacade,
     private val productFacade: ProductFacade,
 ) : LikeV1ApiSpec {
-    @PostMapping("/products/{productId}/likes")
+    @PostMapping("/products/{productId}")
     override fun addLike(
         @RequestHeader("X-USER-ID") userId: Long,
         @PathVariable(value = "productId") productId: Long,
@@ -29,7 +29,7 @@ class LikeV1Controller(
         return ApiResponse.success(Unit)
     }
 
-    @DeleteMapping("/products/{productId}/likes")
+    @DeleteMapping("/products/{productId}")
     override fun removeLike(
         @RequestHeader("X-USER-ID") userId: Long,
         @PathVariable(value = "productId") productId: Long,
@@ -38,7 +38,7 @@ class LikeV1Controller(
         return ApiResponse.success(Unit)
     }
 
-    @GetMapping("/users/likes")
+    @GetMapping("/products")
     override fun getLikedProducts(
         @RequestHeader("X-USER-ID") userId: Long,
         @RequestParam(defaultValue = "0") page: Int,

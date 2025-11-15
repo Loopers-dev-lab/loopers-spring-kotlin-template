@@ -27,4 +27,16 @@ class PointService(
         lockedPoint.deduct(totalAmount)
         return pointRepository.save(lockedPoint)
     }
+
+    fun chargePoint(userId: Long, amount: Money): Point {
+        val point = pointRepository.findByUserId(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "포인트 정보를 찾을 수 없습니다: $userId")
+        point.charge(amount)
+        return pointRepository.save(point)
+    }
+
+    fun getPoint(userId: Long): Point {
+        return pointRepository.findByUserId(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "포인트 정보를 찾을 수 없습니다: $userId")
+    }
 }

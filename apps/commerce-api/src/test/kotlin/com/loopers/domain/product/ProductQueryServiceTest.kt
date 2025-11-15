@@ -68,10 +68,10 @@ class ProductQueryServiceTest {
         val products = PageImpl(listOf(product1, product2))
         val pageable = PageRequest.of(0, 20)
 
-        every { productRepository.findAll(null, "price", pageable) } returns products
+        every { productRepository.findAll(null, "price_asc", pageable) } returns products
 
         // when
-        val result = productQueryService.findProducts(null, "price", pageable)
+        val result = productQueryService.findProducts(null, "price_asc", pageable)
 
         // then
         assertThat(result.content).hasSize(2)

@@ -21,11 +21,11 @@ class ProductRepositoryImpl(
         sort: String,
         pageable: Pageable,
     ): Page<Product> = when {
-        brandId != null && sort == "likeCount" -> {
+        brandId != null && sort == "likes_desc" -> {
             productJpaRepository.findByBrandIdOrderByLikeCount(brandId, pageable)
         }
 
-        brandId != null && sort == "price" -> {
+        brandId != null && sort == "price_asc" -> {
             productJpaRepository.findByBrandId(brandId, pageable.withSort(Sort.by("price.amount").ascending()))
         }
 
@@ -40,11 +40,11 @@ class ProductRepositoryImpl(
             productJpaRepository.findByBrandId(brandId, pageable)
         }
 
-        sort == "likeCount" -> {
+        sort == "likes_desc" -> {
             productJpaRepository.findAllOrderByLikeCount(pageable)
         }
 
-        sort == "price" -> {
+        sort == "price_asc" -> {
             productJpaRepository.findAll(pageable.withSort(Sort.by("price.amount").ascending()))
         }
 
