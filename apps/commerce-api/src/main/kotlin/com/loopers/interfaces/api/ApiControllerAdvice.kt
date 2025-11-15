@@ -8,16 +8,13 @@ import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.server.ServerWebInputException
 import org.springframework.web.servlet.resource.NoResourceFoundException
-import kotlin.collections.joinToString
-import kotlin.jvm.java
-import kotlin.text.isNotEmpty
-import kotlin.text.toRegex
 
 @RestControllerAdvice
 class ApiControllerAdvice {
@@ -44,6 +41,17 @@ class ApiControllerAdvice {
         val type = e.parameterType
         val message = "필수 요청 파라미터 '$name' (타입: $type)가 누락되었습니다."
         return failureResponse(errorType = ErrorType.BAD_REQUEST, errorMessage = message)
+    }
+
+    @ExceptionHandler
+    fun handleMissingRequestHeader(e: MissingRequestHeaderException): ResponseEntity<ApiResponse<*>> {
+        val headerName = e.headerName
+        return if (headerName == "X-USER-ID") {
+            val message = "인증되지 않은 사용자 입니다."
+            failureResponse(errorType = ErrorType.FORBIDDEN, errorMessage = message)
+        } else {
+            throw e
+        }
     }
 
     @ExceptionHandler
