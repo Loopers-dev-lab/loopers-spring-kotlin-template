@@ -27,7 +27,7 @@ data class Stock(
     }
 
     fun increase(amount: Int): Stock {
-        if (amount < 0) {
+        if (amount <= 0) {
             throw CoreException(ErrorType.BAD_REQUEST, "재고 증가량은 0보다 커야 합니다.")
         }
         return copy(amount = this.amount + amount)
