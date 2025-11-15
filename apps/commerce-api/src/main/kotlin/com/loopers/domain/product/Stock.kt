@@ -34,7 +34,7 @@ data class Stock(
     }
 
     fun decrease(amount: Int): Stock {
-        if (amount < 0) {
+        if (amount <= 0) {
             throw CoreException(ErrorType.BAD_REQUEST, "재고 감소량은 0보다 커야 합니다.")
         }
         if (this.amount < amount) {
