@@ -13,6 +13,6 @@ class ProductLikeRdbRepository(
     }
 
     override fun upsert(productLike: ProductLike): Int {
-        return productLikeJpaRepository.upsertLike(productLike.userId, productLike.productId)
+        return productLikeJpaRepository.upsertLike(productLike.productId, productLike.userId)
     }
 }
