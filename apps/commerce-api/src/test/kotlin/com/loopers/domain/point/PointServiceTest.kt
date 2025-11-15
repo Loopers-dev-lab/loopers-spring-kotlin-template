@@ -32,7 +32,7 @@ class PointServiceTest {
                 balance = Money(BigDecimal("5000"), Currency.KRW),
             )
 
-            every { pointRepository.findByUserId(userId) } returns point
+            every { pointRepository.findByUserIdWithLock(userId) } returns point
             every { pointRepository.save(any()) } answers { firstArg() }
 
             // when
@@ -40,7 +40,7 @@ class PointServiceTest {
 
             // then
             assertThat(result.balance.amount).isEqualTo(BigDecimal("15000"))
-            verify(exactly = 1) { pointRepository.findByUserId(userId) }
+            verify(exactly = 1) { pointRepository.findByUserIdWithLock(userId) }
             verify(exactly = 1) { pointRepository.save(any()) }
         }
 
@@ -49,7 +49,7 @@ class PointServiceTest {
         fun chargePoint_whenPointNotFound_thenThrowsException() {
             // given
             val userId = 999L
-            every { pointRepository.findByUserId(userId) } returns null
+            every { pointRepository.findByUserIdWithLock(userId) } returns null
 
             // when & then
             val exception = assertThrows<CoreException> {
