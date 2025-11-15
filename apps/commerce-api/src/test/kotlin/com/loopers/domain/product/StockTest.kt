@@ -50,10 +50,11 @@ class StockTest {
     @DisplayName("재고 감소 테스트")
     @Nested
     inner class Decrease {
-        // when 재고를 감소시키면
-        // then 재고가 1씩 감소한다.
-        @Test
-        fun `decrease stock when valid amount is provided`() {
+
+        @DisplayName("재고를 1 이상으로 감소시키면 재고가 감소한다.")
+        @ParameterizedTest
+        @ValueSource(ints = [1, 3, 10])
+        fun `decrease stock when valid amount is provided`(decreaseAmount: Int) {
             // given
             val existAmount = 10
             val stock = createStock(
@@ -61,24 +62,22 @@ class StockTest {
             )
 
             // when
-            val decreaseAmount = 5
             val decreasedStock = stock.decrease(decreaseAmount)
 
             // then
             assertThat(decreasedStock.amount).isEqualTo(stock.amount - decreaseAmount)
         }
 
-        // when 0보다 작은 값으로 재고를 감소시키면
-        // then 예외가 발생한다.
-        @Test
-        fun `throws exception when decrease amount is zero or below`() {
+        @DisplayName("0 이하로 재고를 감소시키면 예외가 발생한다.")
+        @ParameterizedTest
+        @ValueSource(ints = [0, -1, -5])
+        fun `throws exception when decrease amount is zero or below`(amount: Int) {
             // given
             val stock = createStock()
 
             // when
-            val negativeAmount = -1
             val exception = assertThrows<CoreException> {
-                stock.decrease(negativeAmount)
+                stock.decrease(amount)
             }
 
             // then
@@ -86,8 +85,7 @@ class StockTest {
             assertThat(exception.message).isEqualTo("재고 감소량은 0보다 커야 합니다.")
         }
 
-        // when 현재 재고보다 적은 값으로 재고를 감소시키면
-        // then 예외가 발생한다.
+        @DisplayName("재고가 부족하면 예외가 발생한다.")
         @Test
         fun `throws exception when decrease amount is greater than exist amount`() {
             // given
