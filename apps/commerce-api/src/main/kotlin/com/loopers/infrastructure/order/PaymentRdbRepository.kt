@@ -9,7 +9,7 @@ class PaymentRdbRepository(
     private val paymentJpaRepository: PaymentJpaRepository,
 ) : PaymentRepository {
     override fun findByOrderId(orderId: Long): Payment? {
-        return paymentJpaRepository.findById(orderId).orElse(null)
+        return paymentJpaRepository.findByOrderId(orderId)
     }
 
     override fun save(payment: Payment): Payment {
