@@ -4,9 +4,7 @@ import com.loopers.domain.order.Money
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
-@Transactional
 @Service
 class PointService(
     private val pointRepository: PointRepository,
@@ -37,7 +35,6 @@ class PointService(
         return pointRepository.save(point)
     }
 
-    @Transactional(readOnly = true)
     fun getPoint(userId: Long): Point {
         return pointRepository.findByUserId(userId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "포인트 정보를 찾을 수 없습니다: $userId")
