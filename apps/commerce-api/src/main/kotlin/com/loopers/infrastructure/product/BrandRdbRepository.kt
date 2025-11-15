@@ -16,6 +16,7 @@ class BrandRdbRepository(
 
     @Transactional(readOnly = true)
     override fun findAllByIds(ids: List<Long>): List<Brand> {
+        if (ids.isEmpty()) return emptyList()
         return brandJpaRepository.findAllById(ids)
     }
 

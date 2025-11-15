@@ -16,6 +16,7 @@ class ProductStatisticRdbRepository(
 
     @Transactional(readOnly = true)
     override fun findAllByProductIds(productIds: List<Long>): List<ProductStatistic> {
+        if (productIds.isEmpty()) return emptyList()
         return productStatisticJpaRepository.findAllByProductIdIn(productIds)
     }
 

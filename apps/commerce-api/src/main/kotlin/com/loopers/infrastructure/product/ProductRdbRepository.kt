@@ -74,11 +74,13 @@ class ProductRdbRepository(
 
     @Transactional(readOnly = true)
     override fun findAllByIds(ids: List<Long>): List<Product> {
+        if (ids.isEmpty()) return emptyList()
         return productJpaRepository.findAllById(ids)
     }
 
     @Transactional
     override fun findAllByIdsWithLock(ids: List<Long>): List<Product> {
+        if (ids.isEmpty()) return emptyList()
         return productJpaRepository.findAllByIdsWithLock(ids)
     }
 
@@ -94,6 +96,7 @@ class ProductRdbRepository(
 
     @Transactional
     override fun saveAll(products: List<Product>): List<Product> {
+        if (products.isEmpty()) return emptyList()
         return productJpaRepository.saveAll(products)
     }
 }
