@@ -25,7 +25,7 @@ class PointService(
     @Transactional
     fun use(amount: Long, userId: Long) {
         val point = pointRepository.getBy(userId)
-            ?: throw CoreException(ErrorType.NOT_FOUND)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "유저의 포인트를 찾을 수 없습니다 userId: $userId")
         point.use(amount)
     }
 
