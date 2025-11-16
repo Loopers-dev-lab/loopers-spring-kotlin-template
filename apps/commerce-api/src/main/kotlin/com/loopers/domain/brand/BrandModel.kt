@@ -7,9 +7,12 @@ import jakarta.persistence.Table
 
 @Entity
 @Table(name = "brands")
-class BrandModel(name: String) : BaseEntity() {
-
+class BrandModel(
     @Column
-    var name: String = name
-        protected set
+    val name: String,
+) : BaseEntity() {
+
+    init {
+        require(!name.isBlank()) { "브랜드 이름을 필수 입니다." }
+    }
 }
