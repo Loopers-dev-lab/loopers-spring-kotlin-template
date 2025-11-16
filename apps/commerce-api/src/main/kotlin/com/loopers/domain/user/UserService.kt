@@ -12,15 +12,16 @@ class UserService(
 
     @Transactional
     fun signUp(command: UserCommand.SignUp): User {
-        if (userRepository.exist(command.userId)) {
+        if (userRepository.findBy(command.userId) != null) {
             throw CoreException(ErrorType.CONFLICT)
         }
-
-        return userRepository.save(User.create(command))
+        val user = userRepository.save(User.create(command))
+        return user
     }
 
     @Transactional(readOnly = true)
-    fun getMyInfo(userId: String): User? {
-        return userRepository.getBy(userId)
+    fun getMyInfo(userId: String): User {
+        return userRepository.findBy(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다: $userId")
     }
 }

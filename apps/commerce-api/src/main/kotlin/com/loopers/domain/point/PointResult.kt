@@ -1,5 +1,7 @@
 package com.loopers.domain.point
 
+import com.loopers.domain.user.UserId
+
 data class PointResult(
     val userId: String,
     val amount: Long,
@@ -12,7 +14,7 @@ data class PointResult(
             )
         }
 
-        fun from(point: Point) = with(point) {
+        fun from(point: Point, userId: UserId) = with(point) {
             PointResult(
                 userId = userId.value,
                 amount = amount.value,

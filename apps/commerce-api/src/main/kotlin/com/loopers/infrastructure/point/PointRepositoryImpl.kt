@@ -2,7 +2,6 @@ package com.loopers.infrastructure.point
 
 import com.loopers.domain.point.Point
 import com.loopers.domain.point.PointRepository
-import com.loopers.domain.user.UserId
 import org.springframework.stereotype.Repository
 
 @Repository
@@ -14,7 +13,7 @@ class PointRepositoryImpl(
         return pointJpaRepository.save(point)
     }
 
-    override fun getBy(userId: String): Point? {
-        return pointJpaRepository.findByUserId(UserId(userId))
+    override fun getBy(userId: Long): Point? {
+        return pointJpaRepository.findByUserId(userId)
     }
 }

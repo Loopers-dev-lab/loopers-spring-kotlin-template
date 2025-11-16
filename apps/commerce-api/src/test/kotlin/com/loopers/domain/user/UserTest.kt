@@ -1,5 +1,6 @@
 package com.loopers.domain.user
 
+import com.loopers.support.fixtures.UserFixtures.createUser
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.SoftAssertions.assertSoftly
@@ -60,22 +61,6 @@ class UserTest {
             softly.assertThat(user.email.value).isEqualTo(email)
             softly.assertThat(user.birthDate.value).isEqualTo(birthDate)
         }
-    }
-
-    private fun createUser(
-        userId: String = "user123",
-        email: String = "test@example.com",
-        birthDate: String = "2000-01-01",
-        gender: Gender = Gender.MALE,
-    ): User {
-        return User.create(
-            UserCommand.SignUp(
-                userId = userId,
-                email = email,
-                birthDate = birthDate,
-                gender = gender,
-            ),
-        )
     }
 
     companion object {

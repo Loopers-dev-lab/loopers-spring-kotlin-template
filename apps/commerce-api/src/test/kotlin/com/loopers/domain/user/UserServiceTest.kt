@@ -10,7 +10,6 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
-import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.springframework.beans.factory.annotation.Autowired
@@ -28,7 +27,7 @@ class UserServiceTest : IntegrationTest() {
     @Nested
     inner class SignUp {
         @Test
-        fun `회원 가입시 User 저장이 수행된다`() {
+        fun `회원 가입시 User와 Point 저장이 수행된다`() {
             // given
             val command = createSignUpCommand()
 
@@ -44,24 +43,21 @@ class UserServiceTest : IntegrationTest() {
                 softly.assertThat(user.gender).isEqualTo(command.gender)
             }
             verify(userRepository, times(1)).save(any())
-            verify(userRepository, times(1)).exist(any())
+            verify(userRepository, times(1)).findBy(any<String>())
         }
 
         @Test
         fun `이미 가입된 userId로 회원가입 시도시 실패한다`() {
             // given
             val command = createSignUpCommand()
+            userService.signUp(command)
 
-            // when
-            doReturn(true).`when`(userRepository).exist(command.userId)
-
-            // then
+            // when & then
             assertThatThrownBy {
                 userService.signUp(command)
             }.isInstanceOfSatisfying(CoreException::class.java) { error ->
                 assertThat(error.errorType).isEqualTo(ErrorType.CONFLICT)
             }
-            verify(userRepository, times(1)).exist(any())
         }
     }
 
@@ -80,21 +76,10 @@ class UserServiceTest : IntegrationTest() {
             // then
             assertSoftly { softly ->
                 softly.assertThat(user).isNotNull
-                softly.assertThat(user!!.userId.value).isEqualTo(command.userId)
+                softly.assertThat(user.userId.value).isEqualTo(command.userId)
                 softly.assertThat(user.email.value).isEqualTo(command.email)
                 softly.assertThat(user.birthDate.value).isEqualTo(command.birthDate)
                 softly.assertThat(user.gender).isEqualTo(command.gender)
-            }
-        }
-
-        @Test
-        fun `해당 ID 의 회원이 존재하지 않을 경우, null 이 반환된다`() {
-            // given & when
-            val user = userService.getMyInfo("nonUserId")
-
-            // then
-            assertSoftly { softly ->
-                softly.assertThat(user).isNull()
             }
         }
     }

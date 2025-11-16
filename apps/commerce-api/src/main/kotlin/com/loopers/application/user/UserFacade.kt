@@ -1,5 +1,6 @@
 package com.loopers.application.user
 
+import com.loopers.domain.point.PointService
 import com.loopers.domain.user.UserCommand
 import com.loopers.domain.user.UserResult
 import com.loopers.domain.user.UserService
@@ -11,11 +12,14 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class UserFacade(
     private val userService: UserService,
+    private val pointService: PointService,
 ) {
 
     @Transactional
     fun signUp(command: UserCommand.SignUp): UserResult {
-        return userService.signUp(command).let { UserResult.from(it) }
+        val user = userService.signUp(command)
+        pointService.init(user.id)
+        return user.let { UserResult.from(it) }
     }
 
     @Transactional(readOnly = true)
