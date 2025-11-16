@@ -11,5 +11,4 @@ interface LikeRepository {
     fun deleteByUserIdAndProductId(userId: Long, productId: Long)
     fun findByUserId(userId: Long, pageable: Pageable): Page<Like>
     fun findValidLikesByUserId(userId: Long, pageable: Pageable): Page<Like>
-    fun findByUserIdAndProductIdWithLock(userId: Long, productId: Long): Like?
 }

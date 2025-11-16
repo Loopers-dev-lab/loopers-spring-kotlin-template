@@ -3,21 +3,30 @@ package com.loopers.domain.like
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class LikeServiceTest {
     private val likeRepository: LikeRepository = mockk(relaxed = true)
-    private val likeService = LikeService(likeRepository)
+    private lateinit var likeService: LikeService
+
+    @BeforeEach
+    fun setUp() {
+        // 단위 테스트에서는 self-injection 동작을 테스트하지 않으므로
+        // self를 mockk로 대체
+        likeService = LikeService(likeRepository, mockk(relaxed = true))
+    }
 
     @Test
     fun `좋아요를 등록할 수 있다`() {
         // given
         val userId = 1L
         val productId = 100L
-        every { likeRepository.findByUserIdAndProductIdWithLock(userId, productId) } returns null
+        every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns false
 
         // when
-        likeService.addLike(userId, productId)
+        // addLikeInternal을 직접 호출하여 테스트
+        likeService.addLikeInternal(userId, productId)
 
         // then
         verify { likeRepository.save(any()) }
@@ -28,11 +37,11 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
-        val existingLike = Like(userId = userId, productId = productId)
-        every { likeRepository.findByUserIdAndProductIdWithLock(userId, productId) } returns existingLike
+        every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns true
 
         // when
-        likeService.addLike(userId, productId)
+        // addLikeInternal을 직접 호출하여 테스트
+        likeService.addLikeInternal(userId, productId)
 
         // then
         verify(exactly = 0) { likeRepository.save(any()) }
