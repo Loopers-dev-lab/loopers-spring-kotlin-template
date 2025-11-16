@@ -3,6 +3,7 @@ package com.loopers.domain.product
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class StockService(
@@ -22,6 +23,7 @@ class StockService(
         }
     }
 
+    @Transactional
     fun decreaseStock(productId: Long, quantity: Int): Stock {
         val stock = stockRepository.findByProductIdWithLock(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: $productId")
