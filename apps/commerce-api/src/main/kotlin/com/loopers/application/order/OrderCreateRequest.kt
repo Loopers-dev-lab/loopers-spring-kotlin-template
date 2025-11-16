@@ -1,7 +1,11 @@
 package com.loopers.application.order
 
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
+
 data class OrderCreateRequest(
     val items: List<OrderItemRequest>,
+    val couponId: Long? = null,
 )
 
 data class OrderItemRequest(
@@ -9,6 +13,8 @@ data class OrderItemRequest(
     val quantity: Int,
 ) {
     init {
-        require(quantity > 0) { "주문 수량은 0보다 커야 합니다. 현재 값: $quantity" }
+        if (quantity <= 0) {
+            throw CoreException(ErrorType.BAD_REQUEST, "주문 수량은 0보다 커야 합니다. 현재 값: $quantity")
+        }
     }
 }
