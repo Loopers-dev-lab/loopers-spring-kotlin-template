@@ -85,8 +85,8 @@ class LikeConcurrencyTest {
     }
 
     @Test
-    @DisplayName("동일한 사용자가 동일한 상품에 대해 좋아요/취소를 반복해도 정상 처리되어야 한다")
-    fun concurrency_sameUserRepeatedLikeAndUnlike_shouldBeProperlyHandled() {
+    @DisplayName("동일한 사용자가 동일한 상품에 대해 좋아요를 반복해도 멱등하게 처리되어야 한다")
+    fun concurrency_sameUserRepeatedLike_shouldBeIdempotent() {
         // given
         val userId = userIds.first()
         val numberOfThreads = 10

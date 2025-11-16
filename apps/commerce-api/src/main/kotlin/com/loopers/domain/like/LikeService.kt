@@ -10,7 +10,8 @@ class LikeService(
     /**
      * 좋아요를 등록한다
      * UniqueConstraint를 활용하여 멱등성 보장
-     * 동시성 처리는 호출하는 쪽(Facade)에서 DataIntegrityViolationException을 catch하여 처리
+     * 이미 존재하는 경우 별도 처리 없이 반환 (멱등성)
+     * 동시성 경합 상황에서 UniqueConstraint 위반이 발생할 수 있으므로 호출하는 쪽에서 DataIntegrityViolationException 처리 필요
      */
     @Transactional
     fun addLike(userId: Long, productId: Long) {
