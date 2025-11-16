@@ -117,7 +117,7 @@ class ApiControllerAdvice {
         log.warn("PessimisticLockException : {}", e.message, e)
         return failureResponse(
             errorType = ErrorType.CONFLICT,
-            errorMessage = "현재 다른 사용자가 쿠폰을 처리 중입니다. 잠시 후 다시 시도해주세요",
+            errorMessage = "요청을 처리하는 중 충돌이 발생했습니다. 잠시 후 다시 시도해주세요",
         )
     }
 
@@ -126,7 +126,7 @@ class ApiControllerAdvice {
         log.warn("CannotAcquireLockException : {}", e.message, e)
         return failureResponse(
             errorType = ErrorType.CONFLICT,
-            errorMessage = "현재 다른 사용자가 쿠폰을 처리 중입니다. 잠시 후 다시 시도해주세요",
+            errorMessage = "요청을 처리하는 중 충돌이 발생했습니다. 잠시 후 다시 시도해주세요",
         )
     }
 

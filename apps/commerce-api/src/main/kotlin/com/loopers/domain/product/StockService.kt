@@ -2,6 +2,10 @@ package com.loopers.domain.product
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import jakarta.persistence.PessimisticLockException
+import org.springframework.dao.CannotAcquireLockException
+import org.springframework.retry.annotation.Backoff
+import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -23,7 +27,12 @@ class StockService(
         }
     }
 
-    @Transactional
+    @Transactional(timeout = 5)
+    @Retryable(
+        retryFor = [PessimisticLockException::class, CannotAcquireLockException::class],
+        maxAttempts = 3,
+        backoff = Backoff(delay = 100, multiplier = 2.0),
+    )
     fun decreaseStock(productId: Long, quantity: Int): Stock {
         val stock = stockRepository.findByProductIdWithLock(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: $productId")
@@ -31,7 +40,12 @@ class StockService(
         return stockRepository.save(stock)
     }
 
-    @Transactional
+    @Transactional(timeout = 5)
+    @Retryable(
+        retryFor = [PessimisticLockException::class, CannotAcquireLockException::class],
+        maxAttempts = 3,
+        backoff = Backoff(delay = 100, multiplier = 2.0),
+    )
     fun increaseStock(productId: Long, quantity: Int): Stock {
         val stock = stockRepository.findByProductIdWithLock(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: $productId")
