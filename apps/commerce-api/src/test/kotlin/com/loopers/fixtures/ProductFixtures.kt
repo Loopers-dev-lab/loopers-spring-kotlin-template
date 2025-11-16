@@ -32,3 +32,17 @@ fun createTestProduct(
         brand = brand,
     ).withId(id, createdAt, updatedAt)
 }
+
+object ProductFixtures {
+    fun createProduct(
+        name: String = "테스트 상품",
+        price: BigDecimal = BigDecimal("100000"),
+        brand: Brand,
+    ): Product {
+        return Product(
+            name = name,
+            price = Price(price, Currency.KRW),
+            brand = brand,
+        )
+    }
+}

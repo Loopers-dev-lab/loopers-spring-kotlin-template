@@ -2,6 +2,7 @@ package com.loopers.fixtures
 
 import com.loopers.domain.brand.Brand
 import java.time.ZonedDateTime
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Brand 엔티티를 위한 테스트 픽스처 함수
@@ -24,4 +25,19 @@ fun createTestBrand(
         name = name,
         description = description,
     ).withId(id, createdAt, updatedAt)
+}
+
+object BrandFixtures {
+    private val brandNameCounter = AtomicLong(0)
+
+    fun createBrand(
+        name: String? = null,
+        description: String? = "테스트 브랜드 설명",
+    ): Brand {
+        val brandName = name ?: "테스트브랜드${brandNameCounter.incrementAndGet()}"
+        return Brand(
+            name = brandName,
+            description = description,
+        )
+    }
 }
