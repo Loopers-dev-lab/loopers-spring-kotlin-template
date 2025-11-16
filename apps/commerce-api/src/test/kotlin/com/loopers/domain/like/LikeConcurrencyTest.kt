@@ -1,7 +1,7 @@
 package com.loopers.domain.like
 
-import com.loopers.fixtures.BrandFixtures
-import com.loopers.fixtures.ProductFixtures
+import com.loopers.fixtures.createTestBrand
+import com.loopers.fixtures.createTestProduct
 import com.loopers.fixtures.TestFixtures
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -36,8 +36,8 @@ class LikeConcurrencyTest {
     fun setUp() {
         testFixtures.clear()
 
-        val brand = testFixtures.saveBrand(BrandFixtures.createBrand())
-        val product = testFixtures.saveProduct(ProductFixtures.createProduct(brand = brand))
+        val brand = testFixtures.saveBrand(createTestBrand())
+        val product = testFixtures.saveProduct(createTestProduct(brand = brand))
         productId = product.id
 
         // 10명의 사용자 생성
