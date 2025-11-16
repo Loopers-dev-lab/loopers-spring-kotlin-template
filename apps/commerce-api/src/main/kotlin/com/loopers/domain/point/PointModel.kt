@@ -17,23 +17,18 @@ class PointModel(
     var balance: Money,
 ) : BaseEntity() {
 
-    fun charge(amount: Money): Money {
-        require(amount.amount > BigDecimal.ZERO) {
-            "충전 금액은 0보다 커야 합니다."
-        }
+    fun charge(balance: Money): Money {
+        require(balance.amount > BigDecimal.ZERO) { "충전 금액은 0보다 커야 합니다." }
 
-        this.balance += amount
-        return balance
+        this.balance += balance
+        return this.balance
     }
 
-    fun pay(amount: Money): Money {
-        require(amount.amount > BigDecimal.ZERO) {
-            "사용 금액은 0보다 커야 합니다."
-        }
-        require(this.balance.amount >= amount.amount) {
-            "잔액이 부족합니다."
-        }
-        this.balance -= amount
-        return balance
+    fun pay(balance: Money): Money {
+        require(balance.amount > BigDecimal.ZERO) { "사용 금액은 0보다 커야 합니다." }
+        require(this.balance.amount >= balance.amount) { "잔액이 부족합니다." }
+
+        this.balance -= balance
+        return this.balance
     }
 }

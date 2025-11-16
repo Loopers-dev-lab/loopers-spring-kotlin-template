@@ -67,7 +67,7 @@ class PointApiE2ETest(
             )
             assertAll(
                 { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
-                { assertThat(response.body?.data?.balance).isEqualTo(savedBalance) },
+                { assertThat(response.body?.data?.balance).isEqualByComparingTo(savedBalance) },
             )
         }
 
@@ -126,7 +126,7 @@ class PointApiE2ETest(
             // assert
             assertAll(
                 { assertThat(response.statusCode.is2xxSuccessful).isTrue() },
-                { assertThat(response.body?.data?.balance).isEqualTo(BigDecimal.valueOf(2000)) },
+                { assertThat(response.body?.data?.balance).isEqualByComparingTo(BigDecimal.valueOf(2000)) },
             )
         }
 
