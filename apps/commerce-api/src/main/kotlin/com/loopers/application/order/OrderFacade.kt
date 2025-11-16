@@ -42,7 +42,7 @@ class OrderFacade(
     }
 
     @Transactional
-    fun createOrder(userId: String, items: List<OrderDetailCommand>) {
+    fun placeOrder(userId: String, items: List<OrderDetailCommand>) {
         val user = userService.getMyInfo(userId)
 
         // 1. 상품 조회

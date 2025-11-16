@@ -14,7 +14,7 @@ interface OrderV1ApiSpec {
         summary = "주문 생성",
         description = "여러 상품을 포함한 주문을 생성합니다. 재고 차감, 포인트 차감이 트랜잭션으로 처리됩니다.",
     )
-    fun createOrder(
+    fun placeOrder(
         @Parameter(description = "사용자 ID (X-USER-ID 헤더)", required = true)
         userId: String,
         request: OrderV1Dto.CreateOrderRequest,

@@ -1,5 +1,6 @@
 package com.loopers.domain.order
 
+import com.loopers.domain.product.Product
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.data.domain.Page
@@ -28,6 +29,19 @@ class OrderService(
     @Transactional(readOnly = true)
     fun getOrderDetail(orderId: Long): List<OrderDetail> {
         return orderRepository.findAllOrderDetailBy(orderId)
+    }
+
+    fun calculateTotalAmount(
+        items: List<OrderCommand.OrderDetailCommand>,
+        products: List<Product>
+    ): Long {
+        val productPriceMap = products.associateBy({ it.id }, { it.price })
+
+        return items.sumOf { item ->
+            val price = productPriceMap[item.productId]
+                ?: throw IllegalArgumentException("상품 ID ${item.productId}에 해당하는 상품을 찾을 수 없습니다.")
+            price * item.quantity
+        }
     }
 
     @Transactional

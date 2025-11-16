@@ -15,7 +15,7 @@ class UserService(
         if (userRepository.findBy(command.userId) != null) {
             throw CoreException(ErrorType.CONFLICT)
         }
-        val user = userRepository.save(User.create(command))
+        val user = userRepository.save(User.singUp(command))
         return user
     }
 

@@ -1,8 +1,6 @@
 package com.loopers.infrastructure.product
 
 import com.loopers.IntegrationTest
-import com.loopers.infrastructure.like.ProductLikeJpaRepository
-
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.like.ProductLike
 import com.loopers.domain.product.Product
@@ -10,6 +8,7 @@ import com.loopers.domain.user.Gender
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserCommand
 import com.loopers.infrastructure.brand.BrandJpaRepository
+import com.loopers.infrastructure.like.ProductLikeJpaRepository
 import com.loopers.infrastructure.user.UserJpaRepository
 import com.loopers.support.fixtures.withId
 import org.assertj.core.api.SoftAssertions.assertSoftly
@@ -38,7 +37,7 @@ class ProductJpaRepositoryTest @Autowired constructor(
         brand2 = brandJpaRepository.save(Brand(name = "브랜드B")).withId(2L)
 
         user1 = userJpaRepository.save(
-            User.create(
+            User.singUp(
                 UserCommand.SignUp(
                     userId = "user1",
                     email = "user1@test.com",
@@ -48,7 +47,7 @@ class ProductJpaRepositoryTest @Autowired constructor(
             ),
         ).withId(1L)
         user2 = userJpaRepository.save(
-            User.create(
+            User.singUp(
                 UserCommand.SignUp(
                     userId = "user2",
                     email = "user2@test.com",

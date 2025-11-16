@@ -22,11 +22,11 @@ class OrderV1Controller(
 ) : OrderV1ApiSpec {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    override fun createOrder(
+    override fun placeOrder(
         @RequestHeader(value = "X-USER-ID") userId: String,
         @RequestBody request: OrderV1Dto.CreateOrderRequest,
     ): ApiResponse<OrderV1Dto.CreateOrderResponse> {
-        orderFacade.createOrder(userId, request.toCommand())
+        orderFacade.placeOrder(userId, request.toCommand())
         return ApiResponse.success(OrderV1Dto.CreateOrderResponse())
     }
 
