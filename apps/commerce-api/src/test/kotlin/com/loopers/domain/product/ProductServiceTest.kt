@@ -51,8 +51,6 @@ class ProductServiceTest(
             )
             productRepository.save(product1)
 
-            Thread.sleep(10) // 시간 차이를 위해
-
             val product2 = ProductModel.create(
                 name = "Second Product",
                 stock = 50,
@@ -60,8 +58,6 @@ class ProductServiceTest(
                 refBrandId = brand.id,
             )
             productRepository.save(product2)
-
-            Thread.sleep(10)
 
             val product3 = ProductModel.create(
                 name = "Third Product",
