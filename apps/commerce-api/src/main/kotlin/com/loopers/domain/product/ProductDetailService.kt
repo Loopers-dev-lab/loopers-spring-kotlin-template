@@ -29,7 +29,7 @@ class ProductDetailService(
 data class ProductDetailResult(
     val id: Long,
     val name: String,
-    val stock: Int,
+    val stock: Long,
     val likeCount: Long,
     val brandId: Long,
     val brandName: String,

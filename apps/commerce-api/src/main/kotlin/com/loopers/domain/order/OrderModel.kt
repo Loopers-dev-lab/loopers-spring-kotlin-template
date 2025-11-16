@@ -39,7 +39,7 @@ class OrderModel(
 
     fun updateTotalPrice() {
         this.totalPrice = orderItems
-            .map { it.productPrice.amount.multiply(BigDecimal(it.quantity)) }
+            .map { it.productPrice.amount.multiply(it.quantity.toBigDecimal()) }
             .fold(BigDecimal.ZERO) { acc, price -> acc.add(price) }
             .let { Money(it) }
     }

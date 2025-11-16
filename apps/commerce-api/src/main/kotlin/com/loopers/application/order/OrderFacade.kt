@@ -4,8 +4,6 @@ import com.loopers.domain.order.OrderModel
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
-import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Component
 
@@ -18,19 +16,11 @@ class OrderFacade(
 
     @Transactional
     fun order(userId: Long, command: OrderCommand): OrderModel {
-        val totalPrice = command.orderItems.sumOf { it.productPrice }
+        val totalPrice = command.orderItems.sumOf { it.productPrice * it.quantity.toBigDecimal() }
 
-        try {
-            pointService.pay(userId, totalPrice)
-        } catch (e: IllegalArgumentException) {
-            throw CoreException(ErrorType.BAD_REQUEST, "포인트가 부족합니다: ${e.message}")
-        }
+        pointService.pay(userId, totalPrice)
 
-        try {
-            productService.occupyStocks(command)
-        } catch (e: IllegalArgumentException) {
-            throw CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다: ${e.message}")
-        }
+        productService.occupyStocks(command)
 
         // 주문 생성
         return orderService.order(userId, command)

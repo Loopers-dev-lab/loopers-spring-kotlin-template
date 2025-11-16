@@ -13,7 +13,7 @@ class OrderItemModel(
     val refProductId: Long,
 
     @Column
-    val quantity: Int,
+    val quantity: Long,
 
     @Column
     val productPrice: Money,

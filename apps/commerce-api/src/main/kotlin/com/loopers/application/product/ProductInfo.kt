@@ -7,7 +7,7 @@ import java.math.BigDecimal
 data class ProductInfo(
     val id: Long,
     val name: String,
-    val stock: Int,
+    val stock: Long,
     val price: BigDecimal,
     val likeCount: Long,
     val brandId: Long,
