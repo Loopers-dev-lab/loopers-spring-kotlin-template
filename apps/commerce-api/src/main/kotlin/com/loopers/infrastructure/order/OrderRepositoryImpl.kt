@@ -13,6 +13,8 @@ class OrderRepositoryImpl(
 ) : OrderRepository {
     override fun findById(id: Long): Order? = orderJpaRepository.findByIdOrNull(id)
 
+    override fun findByIdWithLock(id: Long): Order? = orderJpaRepository.findByIdWithLock(id)
+
     override fun findByUserId(
         userId: Long,
         pageable: Pageable,

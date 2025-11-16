@@ -51,6 +51,9 @@ class OrderServiceIntegrationTest {
     @Autowired
     private lateinit var orderRepository: OrderRepository
 
+    @Autowired
+    private lateinit var orderService: OrderService
+
     private lateinit var user: User
     private lateinit var brand: Brand
     private lateinit var product1: Product
@@ -203,5 +206,96 @@ class OrderServiceIntegrationTest {
         assertThat(savedOrder.items[0].productName).isEqualTo("통합테스트상품1")
         assertThat(savedOrder.items[0].priceAtOrder.amount).isEqualTo(BigDecimal("100000")) // 주문 당시 가격
         assertThat(savedOrder.items[0].brandName).isEqualTo("통합테스트브랜드")
+    }
+
+    @Test
+    fun `주문을 취소하면 재고가 복구된다`() {
+        // given
+        val request = OrderCreateRequest(
+            items = listOf(
+                OrderItemRequest(productId = product1.id, quantity = 2),
+                OrderItemRequest(productId = product2.id, quantity = 3),
+            ),
+        )
+        val orderInfo = orderFacade.createOrder(user.id, request)
+
+        // 재고 차감 확인
+        val stockAfterOrder1 = stockRepository.findByProductId(product1.id)!!
+        val stockAfterOrder2 = stockRepository.findByProductId(product2.id)!!
+        assertThat(stockAfterOrder1.quantity).isEqualTo(98) // 100 - 2
+        assertThat(stockAfterOrder2.quantity).isEqualTo(97) // 100 - 3
+
+        // when
+        orderService.cancelOrder(orderInfo.orderId, user.id)
+
+        // then
+        val cancelledOrder = orderRepository.findById(orderInfo.orderId)!!
+        assertThat(cancelledOrder.status).isEqualTo(OrderStatus.CANCELLED)
+
+        // 재고 복구 확인
+        val stockAfterCancel1 = stockRepository.findByProductId(product1.id)!!
+        val stockAfterCancel2 = stockRepository.findByProductId(product2.id)!!
+        assertThat(stockAfterCancel1.quantity).isEqualTo(100) // 98 + 2
+        assertThat(stockAfterCancel2.quantity).isEqualTo(100) // 97 + 3
+    }
+
+    @Test
+    fun `주문 취소 시 본인의 주문만 취소할 수 있다`() {
+        // given
+        val request = OrderCreateRequest(
+            items = listOf(
+                OrderItemRequest(productId = product1.id, quantity = 1),
+            ),
+        )
+        val orderInfo = orderFacade.createOrder(user.id, request)
+
+        // 다른 사용자 생성
+        val otherUser = User(
+            name = "김철수",
+            email = "kim@example.com",
+            gender = Gender.MALE,
+            birthDate = LocalDate.of(1995, 5, 5),
+        )
+        val savedOtherUser = userRepository.save(otherUser)
+
+        // when & then
+        assertThatThrownBy {
+            orderService.cancelOrder(orderInfo.orderId, savedOtherUser.id)
+        }.isInstanceOf(CoreException::class.java)
+            .hasMessageContaining("본인의 주문만 취소할 수 있습니다")
+
+        // 주문 상태는 변경되지 않아야 함
+        val order = orderRepository.findById(orderInfo.orderId)!!
+        assertThat(order.status).isEqualTo(OrderStatus.PENDING)
+
+        // 재고도 복구되지 않아야 함
+        val stock = stockRepository.findByProductId(product1.id)!!
+        assertThat(stock.quantity).isEqualTo(99) // 100 - 1 (여전히 차감된 상태)
+    }
+
+    @Test
+    fun `이미 확정된 주문은 취소할 수 없다`() {
+        // given
+        val request = OrderCreateRequest(
+            items = listOf(
+                OrderItemRequest(productId = product1.id, quantity = 2),
+            ),
+        )
+        val orderInfo = orderFacade.createOrder(user.id, request)
+
+        // 주문 확정
+        val order = orderRepository.findById(orderInfo.orderId)!!
+        order.confirm()
+        orderRepository.save(order)
+
+        // when & then
+        assertThatThrownBy {
+            orderService.cancelOrder(orderInfo.orderId, user.id)
+        }.isInstanceOf(CoreException::class.java)
+            .hasMessageContaining("이미 확정된 주문은 취소할 수 없습니다")
+
+        // 재고는 복구되지 않아야 함
+        val stock = stockRepository.findByProductId(product1.id)!!
+        assertThat(stock.quantity).isEqualTo(98) // 100 - 2 (여전히 차감된 상태)
     }
 }
