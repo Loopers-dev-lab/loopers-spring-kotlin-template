@@ -3,16 +3,24 @@ package com.loopers.domain.point
 import com.loopers.domain.BaseEntity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import jakarta.persistence.Column
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 
 @Entity
-@Table(name = "point")
+@Table(
+    name = "point",
+    indexes = [
+        Index(name = "idx_point_user_id", columnList = "ref_user_id"),
+    ],
+)
 class Point(
     @Embedded
     var amount: Amount,
 
+    @Column(name = "ref_user_id", nullable = false)
     val userId: Long,
 ) : BaseEntity() {
 

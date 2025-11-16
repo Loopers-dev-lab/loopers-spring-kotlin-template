@@ -7,10 +7,16 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType.STRING
 import jakarta.persistence.Enumerated
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 
 @Entity
-@Table(name = "orders")
+@Table(
+    name = "orders",
+    indexes = [
+        Index(name = "idx_orders_user_id", columnList = "ref_user_id"),
+    ],
+)
 class Order(
 
     @Column(name = "status", nullable = false)
@@ -20,7 +26,7 @@ class Order(
     @Column(nullable = false)
     val totalAmount: Long,
 
-    @Column(nullable = false)
+    @Column(name = "ref_user_id", nullable = false)
     val userId: Long,
 ) : BaseEntity() {
 
