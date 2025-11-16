@@ -103,8 +103,14 @@ class StockConcurrencyTest {
                 try {
                     stockService.decreaseStock(productId, quantityPerOrder)
                     successCount.incrementAndGet()
-                } catch (e: Exception) {
-                    failureCount.incrementAndGet()
+                } catch (e: com.loopers.support.error.CoreException) {
+                    // 재고 부족 예외만 실패로 카운트
+                    if (e.customMessage?.contains("재고 부족") == true) {
+                        failureCount.incrementAndGet()
+                    } else {
+                        // 예상하지 못한 CoreException은 재발생
+                        throw e
+                    }
                 } finally {
                     latch.countDown()
                 }
@@ -133,23 +139,22 @@ class StockConcurrencyTest {
         val executor = Executors.newFixedThreadPool(numberOfOperations)
         val increaseCount = AtomicInteger(0)
         val decreaseCount = AtomicInteger(0)
+        val failureCount = AtomicInteger(0)
 
         // when: 10번 증가, 10번 감소가 동시에 발생
         repeat(numberOfOperations) { index ->
             executor.submit {
                 try {
-                    val stock = stockRepository.findByProductIdWithLock(productId)
-                        ?: throw IllegalStateException("재고를 찾을 수 없습니다")
                     if (index % 2 == 0) {
-                        stock.increase(amount)
+                        stockService.increaseStock(productId, amount)
                         increaseCount.incrementAndGet()
                     } else {
-                        stock.decrease(amount)
+                        stockService.decreaseStock(productId, amount)
                         decreaseCount.incrementAndGet()
                     }
-                    stockRepository.save(stock)
                 } catch (e: Exception) {
                     println("재고 작업 실패 (index=$index): ${e.message}")
+                    failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
                 }
@@ -159,7 +164,11 @@ class StockConcurrencyTest {
         latch.await()
         executor.shutdown()
 
-        // then: 최종 재고 = 초기 100 + (증가 횟수 - 감소 횟수) * 5
+        // then: 모든 작업이 성공했는지 확인
+        assertThat(failureCount.get()).isEqualTo(0)
+        assertThat(increaseCount.get() + decreaseCount.get()).isEqualTo(numberOfOperations)
+
+        // 최종 재고 = 초기 100 + (증가 횟수 - 감소 횟수) * 5
         val stock = stockService.getStockByProductId(productId)
         val expectedQuantity = 100 + (increaseCount.get() - decreaseCount.get()) * amount
         assertThat(stock.quantity).isEqualTo(expectedQuantity)

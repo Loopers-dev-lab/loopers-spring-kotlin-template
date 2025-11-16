@@ -113,6 +113,24 @@ class ApiControllerAdvice {
     }
 
     @ExceptionHandler
+    fun handleLockAcquisitionFailure(e: jakarta.persistence.PessimisticLockException): ResponseEntity<ApiResponse<*>> {
+        log.warn("PessimisticLockException : {}", e.message, e)
+        return failureResponse(
+            errorType = ErrorType.CONFLICT,
+            errorMessage = "현재 다른 사용자가 쿠폰을 처리 중입니다. 잠시 후 다시 시도해주세요",
+        )
+    }
+
+    @ExceptionHandler
+    fun handleLockAcquisitionFailure(e: org.springframework.dao.CannotAcquireLockException): ResponseEntity<ApiResponse<*>> {
+        log.warn("CannotAcquireLockException : {}", e.message, e)
+        return failureResponse(
+            errorType = ErrorType.CONFLICT,
+            errorMessage = "현재 다른 사용자가 쿠폰을 처리 중입니다. 잠시 후 다시 시도해주세요",
+        )
+    }
+
+    @ExceptionHandler
     fun handle(e: Throwable): ResponseEntity<ApiResponse<*>> {
         log.error("Exception : {}", e.message, e)
         val errorType = ErrorType.INTERNAL_ERROR

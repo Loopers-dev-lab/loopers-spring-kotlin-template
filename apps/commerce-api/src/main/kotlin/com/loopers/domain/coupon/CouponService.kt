@@ -2,6 +2,10 @@ package com.loopers.domain.coupon
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import jakarta.persistence.PessimisticLockException
+import org.springframework.dao.CannotAcquireLockException
+import org.springframework.retry.annotation.Backoff
+import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -13,8 +17,14 @@ class CouponService(
     /**
      * 사용자 쿠폰을 조회하고 사용 처리한다 (비관적 락 사용)
      * 동시성 제어를 위해 비관적 락을 사용하여 중복 사용을 방지한다
+     * 락 획득 실패 시 최대 3회까지 재시도 (100ms, 200ms, 400ms 백오프)
      */
-    @Transactional
+    @Transactional(timeout = 5)
+    @Retryable(
+        retryFor = [PessimisticLockException::class, CannotAcquireLockException::class],
+        maxAttempts = 3,
+        backoff = Backoff(delay = 100, multiplier = 2.0),
+    )
     fun useUserCoupon(userId: Long, userCouponId: Long): UserCoupon {
         val userCoupon = userCouponRepository.findByIdAndUserIdWithLock(userCouponId, userId)
             ?: throw CoreException(

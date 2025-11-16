@@ -30,4 +30,12 @@ class StockService(
         stock.decrease(quantity)
         return stockRepository.save(stock)
     }
+
+    @Transactional
+    fun increaseStock(productId: Long, quantity: Int): Stock {
+        val stock = stockRepository.findByProductIdWithLock(productId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: $productId")
+        stock.increase(quantity)
+        return stockRepository.save(stock)
+    }
 }

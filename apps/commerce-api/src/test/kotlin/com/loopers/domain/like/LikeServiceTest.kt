@@ -1,21 +1,23 @@
 package com.loopers.domain.like
 
+import com.ninjasquad.springmockk.MockkBean
+import io.mockk.Runs
 import io.mockk.every
-import io.mockk.mockk
+import io.mockk.just
 import io.mockk.verify
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
 
+@SpringBootTest
+@ActiveProfiles("test")
 class LikeServiceTest {
-    private val likeRepository: LikeRepository = mockk(relaxed = true)
+    @Autowired
     private lateinit var likeService: LikeService
 
-    @BeforeEach
-    fun setUp() {
-        // 단위 테스트에서는 self-injection 동작을 테스트하지 않으므로
-        // self를 mockk로 대체
-        likeService = LikeService(likeRepository, mockk(relaxed = true))
-    }
+    @MockkBean
+    private lateinit var likeRepository: LikeRepository
 
     @Test
     fun `좋아요를 등록할 수 있다`() {
@@ -23,10 +25,10 @@ class LikeServiceTest {
         val userId = 1L
         val productId = 100L
         every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns false
+        every { likeRepository.save(any()) } returns Like(userId = userId, productId = productId)
 
         // when
-        // addLikeInternal을 직접 호출하여 테스트
-        likeService.addLikeInternal(userId, productId)
+        likeService.addLike(userId, productId)
 
         // then
         verify { likeRepository.save(any()) }
@@ -40,8 +42,7 @@ class LikeServiceTest {
         every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns true
 
         // when
-        // addLikeInternal을 직접 호출하여 테스트
-        likeService.addLikeInternal(userId, productId)
+        likeService.addLike(userId, productId)
 
         // then
         verify(exactly = 0) { likeRepository.save(any()) }
@@ -52,6 +53,7 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
+        every { likeRepository.deleteByUserIdAndProductId(userId, productId) } just Runs
 
         // when
         likeService.removeLike(userId, productId)
@@ -65,6 +67,7 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
+        every { likeRepository.deleteByUserIdAndProductId(userId, productId) } just Runs
 
         // when
         likeService.removeLike(userId, productId)

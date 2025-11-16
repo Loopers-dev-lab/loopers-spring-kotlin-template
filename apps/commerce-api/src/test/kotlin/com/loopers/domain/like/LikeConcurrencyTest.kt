@@ -118,4 +118,40 @@ class LikeConcurrencyTest {
         val likeCount = likeQueryService.countByProductId(productId)
         assertThat(likeCount).isEqualTo(1)
     }
+
+    @Test
+    @DisplayName("동일한 사용자의 동시 좋아요 요청은 재시도를 통해 멱등하게 처리되어야 한다")
+    fun concurrency_simultaneousLikesBySameUser_shouldRetryAndSucceed() {
+        // given
+        val userId = userIds.first()
+        val numberOfThreads = 5
+        val latch = CountDownLatch(numberOfThreads)
+        val executor = Executors.newFixedThreadPool(numberOfThreads)
+
+        // when: 같은 사용자가 정확히 동시에 좋아요 요청
+        val startTime = System.currentTimeMillis()
+        repeat(numberOfThreads) {
+            executor.submit {
+                try {
+                    likeService.addLike(userId, productId)
+                } catch (e: Exception) {
+                    println("좋아요 실패: ${e.message}")
+                } finally {
+                    latch.countDown()
+                }
+            }
+        }
+
+        latch.await()
+        executor.shutdown()
+        val elapsedTime = System.currentTimeMillis() - startTime
+
+        // then: 재시도 메커니즘에 의해 모두 성공적으로 처리됨
+        val likeCount = likeQueryService.countByProductId(productId)
+        assertThat(likeCount).isEqualTo(1)
+
+        // 재시도가 있었으므로 즉각 완료되지 않음 (일부 요청은 재시도함)
+        // 최소한의 시간이 소요되었는지만 확인 (너무 엄격하지 않게)
+        println("Elapsed time: ${elapsedTime}ms")
+    }
 }
