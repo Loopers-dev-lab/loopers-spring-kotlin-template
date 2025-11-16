@@ -52,8 +52,11 @@ class ProductService(
     @Transactional
     fun deductAllStock(
         items: List<OrderCommand.OrderDetailCommand>,
-        stocks: List<Stock>,
     ) {
+        val productIds = items.map { it.productId }
+            .sorted()
+        val stocks = productRepository.findStockAllBy(productIds)
+
         val stockMap = stocks.associateBy { it.productId }
 
         items

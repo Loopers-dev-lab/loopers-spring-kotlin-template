@@ -56,19 +56,19 @@ class OrderFacade(
         val brandIds = products.map { it.brandId }.distinct()
         val brands = brandService.getAllBrand(brandIds)
 
-        // 4. 재고 조회
-        val stocks = productService.getStocksBy(productIds)
-
-        // 5. 총 주문 금액 계산
+        // 4. 총 주문 금액 계산
         val totalAmount = OrderTotalAmountCalculator.calculate(items, products)
 
-        // 6. 포인트 사용
-        pointService.use(user.id, totalAmount)
+        // 5. 포인트 사용
+        pointService.use(
+            userId = user.id,
+            amount = totalAmount
+        )
 
-        // 7. 재고 감소
-        productService.deductAllStock(items, stocks)
+        // 6. 재고 감소
+        productService.deductAllStock(items)
 
-        // 8. 주문 생성
+        // 7. 주문 생성
         orderService.createOrder(
             OrderCommand.Create(
                 userId = user.id,
