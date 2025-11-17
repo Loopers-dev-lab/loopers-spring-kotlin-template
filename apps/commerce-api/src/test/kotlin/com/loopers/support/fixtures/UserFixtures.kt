@@ -6,13 +6,29 @@ import com.loopers.domain.user.UserCommand
 
 object UserFixtures {
     fun createUser(
+        userId: String = "userId",
+        email: String = "test@example.com",
+        birthDate: String = "1990-01-01",
+        gender: Gender = Gender.MALE,
+    ): User {
+        return User.singUp(
+            UserCommand.SignUp(
+                userId = userId,
+                email = email,
+                birthDate = birthDate,
+                gender = gender,
+            ),
+        )
+    }
+
+    fun createUser(
         id: Long = 1L,
         userId: String = "userId",
         email: String = "test@example.com",
         birthDate: String = "1990-01-01",
         gender: Gender = Gender.MALE,
     ): User {
-        return User.create(
+        return User.singUp(
             UserCommand.SignUp(
                 userId = userId,
                 email = email,
