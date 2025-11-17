@@ -12,6 +12,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.math.BigDecimal
 
 class PointServiceTest(
     private val pointService: PointService,
@@ -35,14 +36,15 @@ class PointServiceTest(
             val user = UserFixture.create(gender = "FEMALE")
             userRepository.save(user)
 
-            val pointModel = PointFixture.create(userId = user.id, balance = 100L)
+            val pointModel =
+                PointFixture.create(userId = user.id, balance = BigDecimal.valueOf(100))
             pointRepository.save(pointModel)
 
             // act
             val findPoint = pointService.getPointByUserId(user.id)
 
             // assert
-            assertThat(findPoint?.balance).isEqualTo(100L)
+            assertThat(findPoint?.balance?.amount).isEqualByComparingTo(BigDecimal.valueOf(100))
         }
 
         @DisplayName("해당 ID 의 회원이 존재하지 않을 경우, null 이 반환된다.")
@@ -69,12 +71,13 @@ class PointServiceTest(
             val user = UserFixture.create()
             userRepository.save(user)
 
-            val pointModel = PointFixture.create(userId = user.id, balance = 100L)
+            val pointModel =
+                PointFixture.create(userId = user.id, balance = BigDecimal.valueOf(100))
             pointRepository.save(pointModel)
 
             // act
-            val chargedPoint = pointService.charge(user.id, 10L)
-            assertThat(chargedPoint.balance).isEqualTo(110L)
+            val chargedPoint = pointService.charge(user.id, BigDecimal.valueOf(10))
+            assertThat(chargedPoint.balance.amount).isEqualByComparingTo(BigDecimal.valueOf(110))
         }
 
         @DisplayName("존재하지 않는 유저 ID 로 충전을 시도한 경우, 실패한다.")
@@ -84,28 +87,128 @@ class PointServiceTest(
             val notExistUserId = 1L
 
             // act, assert
-            val exception = assertThrows<CoreException> {
-                pointService.charge(notExistUserId, 10L)
-            }
+            val exception =
+                assertThrows<CoreException> {
+                    pointService.charge(notExistUserId, BigDecimal.valueOf(10))
+                }
 
-            assertThat(exception.message).isEqualTo("존재하지 않는 유저입니다.")
+            assertThat(exception.message).isEqualTo("유저가 존재하지 않습니다.")
         }
 
-        @DisplayName("존재하는 유저 ID 로 충전량을 음수로 충전할 경우, 실패한다")
+        @DisplayName("존재하는 유저 ID 로 충전량을 0원으로 충전할 경우, 실패한다")
         @Test
-        fun chargePointFails_whenAmountIsNotPositive() {
+        fun chargePointFails_whenAmountIsZero() {
             // arrange
             val user = UserFixture.create()
             userRepository.save(user)
 
-            val pointModel = PointFixture.create(userId = user.id, balance = 100L)
+            val pointModel =
+                PointFixture.create(userId = user.id, balance = BigDecimal.valueOf(100))
             pointRepository.save(pointModel)
 
             // act
-            val exception = assertThrows<IllegalArgumentException> {
-                pointService.charge(user.id, -10L)
-            }
+            val exception =
+                assertThrows<IllegalArgumentException> {
+                    pointService.charge(user.id, BigDecimal.ZERO)
+                }
             assertThat(exception.message).isEqualTo("충전 금액은 0보다 커야 합니다.")
+        }
+    }
+
+    @DisplayName("포인트 결제 시")
+    @Nested
+    inner class Pay {
+        @DisplayName("존재하는 유저 ID로 결제를 시도하고 잔액이 충분한 경우, 성공한다.")
+        @Test
+        fun paySuccess_whenExistsUserAndSufficientBalance() {
+            // arrange
+            val user = UserFixture.create()
+            userRepository.save(user)
+
+            val pointModel =
+                PointFixture.create(userId = user.id, balance = BigDecimal.valueOf(1000))
+            pointRepository.save(pointModel)
+
+            // act
+            val paidPoint = pointService.pay(user.id, BigDecimal.valueOf(300))
+
+            // assert
+            assertThat(paidPoint.balance.amount).isEqualByComparingTo(BigDecimal.valueOf(700))
+        }
+
+        @DisplayName("존재하지 않는 유저 ID로 결제를 시도한 경우, 실패한다.")
+        @Test
+        fun payFails_whenNotExistsUser() {
+            // arrange
+            val notExistUserId = 1L
+
+            // act, assert
+            val exception =
+                assertThrows<CoreException> {
+                    pointService.pay(notExistUserId, BigDecimal.valueOf(100))
+                }
+
+            assertThat(exception.message).isEqualTo("유저가 존재하지 않습니다.")
+        }
+
+        @DisplayName("결제 금액이 0원인 경우, 실패한다.")
+        @Test
+        fun payFails_whenAmountIsZero() {
+            // arrange
+            val user = UserFixture.create()
+            userRepository.save(user)
+
+            val pointModel =
+                PointFixture.create(userId = user.id, balance = BigDecimal.valueOf(1000))
+            pointRepository.save(pointModel)
+
+            // act, assert
+            val exception =
+                assertThrows<IllegalArgumentException> {
+                    pointService.pay(user.id, BigDecimal.ZERO)
+                }
+
+            assertThat(exception.message).isEqualTo("사용 금액은 0보다 커야 합니다.")
+        }
+
+        @DisplayName("잔액이 부족한 경우, 실패한다.")
+        @Test
+        fun payFails_whenInsufficientBalance() {
+            // arrange
+            val user = UserFixture.create()
+            userRepository.save(user)
+
+            val pointModel =
+                PointFixture.create(userId = user.id, balance = BigDecimal.valueOf(100))
+            pointRepository.save(pointModel)
+
+            // act, assert
+            val exception =
+                assertThrows<IllegalArgumentException> {
+                    pointService.pay(user.id, BigDecimal.valueOf(500))
+                }
+
+            assertThat(exception.message).isEqualTo("잔액이 부족합니다.")
+        }
+
+        @DisplayName("결제 금액이 음수인 경우, 실패한다.")
+        @Test
+        fun payFails_whenAmountIsNegative() {
+            // arrange
+            val user = UserFixture.create()
+            userRepository.save(user)
+
+            val pointModel =
+                PointFixture.create(userId = user.id, balance = BigDecimal.valueOf(1000))
+            pointRepository.save(pointModel)
+
+            // act, assert
+            val exception =
+                assertThrows<IllegalArgumentException> {
+                    pointService.pay(user.id, BigDecimal.valueOf(-100))
+                }
+
+            assertThat(exception.message).isEqualTo("금액은 0 이상이어야 합니다.")
         }
     }
 }

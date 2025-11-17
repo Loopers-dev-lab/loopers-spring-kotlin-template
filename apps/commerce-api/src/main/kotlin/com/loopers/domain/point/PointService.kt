@@ -1,19 +1,24 @@
 package com.loopers.domain.point
 
-import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
+import com.loopers.domain.common.vo.Money
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Component
 class PointService(private val pointRepository: PointRepository) {
     fun getPointByUserId(userId: Long): PointModel? = pointRepository.findByUserId(userId)
 
-    fun createPoint(userId: Long, balance: Long): PointModel {
-        val point = PointModel(userId, balance)
+    fun createPoint(userId: Long, amount: BigDecimal): PointModel {
+        val point = PointModel(userId, Money(amount))
         return pointRepository.save(point)
     }
 
-    fun charge(userId: Long, point: Long): PointModel = pointRepository.findByUserId(userId)
-        ?.also { it.charge(point) }
-        ?: throw CoreException(ErrorType.NOT_FOUND, "존재하지 않는 유저입니다.")
+    @Transactional
+    fun charge(userId: Long, amount: BigDecimal): PointModel = pointRepository.getUserBy(userId)
+        .also { it.charge(Money(amount)) }
+
+    @Transactional
+    fun pay(userId: Long, amount: BigDecimal): PointModel = pointRepository.getUserBy(userId)
+        .also { it.pay(Money(amount)) }
 }
