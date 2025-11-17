@@ -62,7 +62,7 @@ class OrderFacade(
         // 5. 포인트 사용
         pointService.use(
             userId = user.id,
-            amount = totalAmount
+            amount = totalAmount,
         )
 
         // 6. 재고 감소

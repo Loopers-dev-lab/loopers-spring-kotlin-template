@@ -13,7 +13,12 @@ interface ProductLikeJpaRepository : JpaRepository<ProductLike, Long> {
 
     fun findAllByUserId(userId: Long, pageable: Pageable): Page<ProductLike>
 
-    @Query("SELECT CASE WHEN COUNT(pl) > 0 THEN true ELSE false END FROM ProductLike pl WHERE pl.productId = :productId AND pl.userId = :userId")
+    @Query(
+        """
+        SELECT CASE WHEN COUNT(pl) > 0 THEN true ELSE false END 
+        FROM ProductLike pl WHERE pl.productId = :productId AND pl.userId = :userId
+    """,
+    )
     fun existsByProductIdAndUserId(productId: Long, userId: Long): Boolean
 
     @Query("SELECT pl FROM ProductLike pl WHERE pl.productId = :productId AND pl.userId = :userId")

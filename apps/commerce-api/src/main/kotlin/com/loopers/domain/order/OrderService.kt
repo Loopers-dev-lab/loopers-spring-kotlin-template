@@ -33,7 +33,7 @@ class OrderService(
 
     fun calculateTotalAmount(
         items: List<OrderCommand.OrderDetailCommand>,
-        products: List<Product>
+        products: List<Product>,
     ): Long {
         val productPriceMap = products.associateBy({ it.id }, { it.price })
 
