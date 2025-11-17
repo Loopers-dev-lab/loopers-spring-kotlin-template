@@ -3,6 +3,7 @@ package com.loopers.domain.like
 import com.loopers.IntegrationTestSupport
 import com.loopers.domain.common.vo.Money
 import com.loopers.domain.product.ProductModel
+import com.loopers.domain.product.signal.ProductTotalSignalRepository
 import com.loopers.domain.user.UserModel
 import com.loopers.infrastructure.product.ProductJpaRepository
 import com.loopers.infrastructure.user.UserJpaRepository
@@ -17,6 +18,7 @@ import java.math.BigDecimal
 class LikeServiceTest(
     private val userRepository: UserJpaRepository,
     private val productRepository: ProductJpaRepository,
+    private val productTotalSignalRepository: ProductTotalSignalRepository,
     private val likeService: LikeService,
     private val databaseCleanUp: DatabaseCleanUp,
 ) : IntegrationTestSupport() {

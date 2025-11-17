@@ -6,12 +6,16 @@ import org.springframework.stereotype.Component
 class ProductTotalSignalService(private val productTotalSignalRepository: ProductTotalSignalRepository) {
 
     fun incrementLikeCount(productId: Long) {
-        val totalSignal = productTotalSignalRepository.findByProductId(productId)
-        totalSignal?.incrementLikeCount()
+        val totalSignal = productTotalSignalRepository.getByProductIdWithPessimisticLock(productId)
+        totalSignal.incrementLikeCount()
+
+        productTotalSignalRepository.save(totalSignal)
     }
 
     fun decrementLikeCount(productId: Long) {
-        val totalSignal = productTotalSignalRepository.findByProductId(productId)
-        totalSignal?.decrementLikeCount()
+        val totalSignal = productTotalSignalRepository.getByProductIdWithPessimisticLock(productId)
+        totalSignal.decrementLikeCount()
+
+        productTotalSignalRepository.save(totalSignal)
     }
 }
