@@ -13,6 +13,6 @@ class BrandModel(
 ) : BaseEntity() {
 
     init {
-        require(!name.isBlank()) { "브랜드 이름을 필수 입니다." }
+        require(!name.isBlank()) { "브랜드 이름을 필수입니다." }
     }
 }
