@@ -1,8 +1,8 @@
 package com.loopers.domain.point
 
 import com.loopers.domain.common.vo.Money
-import jakarta.transaction.Transactional
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
 @Component

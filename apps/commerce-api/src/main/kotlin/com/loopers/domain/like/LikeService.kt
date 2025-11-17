@@ -1,7 +1,7 @@
 package com.loopers.domain.like
 
-import jakarta.transaction.Transactional
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 @Component
 class LikeService(private val likeRepository: LikeRepository) {
