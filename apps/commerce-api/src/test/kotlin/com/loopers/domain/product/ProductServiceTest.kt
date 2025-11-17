@@ -334,8 +334,7 @@ class ProductServiceTest : IntegrationTest() {
             )
             // when
             transactionTemplate.execute {
-                val stocks = stockJpaRepository.findAllById(listOf(stock1.id, stock2.id))
-                productService.deductAllStock(items, stocks)
+                productService.deductAllStock(items)
             }
 
             // then
@@ -363,8 +362,7 @@ class ProductServiceTest : IntegrationTest() {
 
             // when
             transactionTemplate.execute {
-                val stocks = stockJpaRepository.findAllById(listOf(stock.id))
-                productService.deductAllStock(items, stocks)
+                productService.deductAllStock(items)
             }
 
             // then
@@ -377,16 +375,15 @@ class ProductServiceTest : IntegrationTest() {
             // given
             val brand = createAndSaveBrand("테스트브랜드")
             val product = createAndSaveProduct("상품1", 10000L, brand.id)
-            val stock = createAndSaveStock(10L, product.id)
+            createAndSaveStock(10L, product.id)
 
             val items = listOf(
                 OrderCommand.OrderDetailCommand(productId = product.id, quantity = 20L),
             )
-            val stocks = listOf(stock)
 
             // when & then
             assertThatThrownBy {
-                productService.deductAllStock(items, stocks)
+                productService.deductAllStock(items)
             }
                 .isInstanceOf(CoreException::class.java)
                 .hasFieldOrPropertyWithValue("errorType", ErrorType.INSUFFICIENT_STOCK)
@@ -399,17 +396,15 @@ class ProductServiceTest : IntegrationTest() {
             val product1 = createAndSaveProduct("상품1", 10000L, brand.id)
             val product2 = createAndSaveProduct("상품2", 20000L, brand.id)
             val stock1 = createAndSaveStock(100L, product1.id)
-            val stock2 = createAndSaveStock(10L, product2.id)
+            createAndSaveStock(10L, product2.id)
 
             val items = listOf(
                 OrderCommand.OrderDetailCommand(productId = product1.id, quantity = 10L),
                 OrderCommand.OrderDetailCommand(productId = product2.id, quantity = 20L),
             )
-            val stocks = listOf(stock1, stock2)
-
             // when
             try {
-                productService.deductAllStock(items, stocks)
+                productService.deductAllStock(items)
                 stockJpaRepository.flush()
             } catch (e: CoreException) {
                 // 예외 무시
