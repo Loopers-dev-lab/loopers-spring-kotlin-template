@@ -22,7 +22,10 @@ class ProductLikeService(
 
     @Transactional
     fun like(product: Product, user: User) {
-        productLikeRepository.findBy(product.id, user.id) ?: productLikeRepository.save(ProductLike.create(product.id, user.id))
+        if (productLikeRepository.existsBy(product.id, user.id)) {
+            return
+        }
+        productLikeRepository.save(ProductLike.create(product.id, user.id))
     }
 
     @Transactional

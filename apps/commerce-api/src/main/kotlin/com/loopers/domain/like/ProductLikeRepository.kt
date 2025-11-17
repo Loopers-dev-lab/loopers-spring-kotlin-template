@@ -8,6 +8,7 @@ interface ProductLikeRepository {
     fun findAllBy(productId: Long): List<ProductLike>
     fun findAllBy(userId: Long, pageable: Pageable): Page<ProductLike>
     fun findBy(productId: Long, userId: Long): ProductLike?
+    fun existsBy(productId: Long, userId: Long): Boolean
     fun save(productLike: ProductLike): ProductLike
     fun deleteBy(productId: Long, userId: Long)
 }
