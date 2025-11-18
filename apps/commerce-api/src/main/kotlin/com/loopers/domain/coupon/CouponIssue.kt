@@ -13,8 +13,8 @@ import java.time.ZonedDateTime
     name = "coupon_issue",
     indexes = [
         Index(name = "idx_coupon_issue_user_id", columnList = "user_id"),
-        Index(name = "idx_coupon_issue_coupon_id", columnList = "coupon_id")
-    ]
+        Index(name = "idx_coupon_issue_coupon_id", columnList = "coupon_id"),
+    ],
 )
 class CouponIssue(
     val couponId: Long,
@@ -26,13 +26,13 @@ class CouponIssue(
 
     var usedAt: ZonedDateTime? = null,
 
-    val issuedAt: ZonedDateTime = ZonedDateTime.now()
+    val issuedAt: ZonedDateTime = ZonedDateTime.now(),
 ) : BaseEntity() {
     companion object {
         fun issue(couponId: Long, userId: Long): CouponIssue {
             return CouponIssue(
                 couponId = couponId,
-                userId = userId
+                userId = userId,
             )
         }
     }

@@ -24,7 +24,7 @@ class CouponIssueTest {
             // when
             val couponIssue = CouponFixtures.createCouponIssue(
                 couponId = couponId,
-                userId = userId
+                userId = userId,
             )
 
             // then

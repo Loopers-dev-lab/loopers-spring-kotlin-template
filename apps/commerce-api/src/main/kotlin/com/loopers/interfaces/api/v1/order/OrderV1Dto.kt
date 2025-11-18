@@ -11,6 +11,8 @@ class OrderV1Dto {
     data class CreateOrderRequest(
         @Schema(description = "주문 상품 목록", required = true)
         val items: List<OrderItemRequest>,
+        @Schema(description = "쿠폰 ID", required = false)
+        val couponId: Long?,
     ) {
         fun toCommand(): List<OrderCommand.OrderDetailCommand> = items.map {
             OrderCommand.OrderDetailCommand(

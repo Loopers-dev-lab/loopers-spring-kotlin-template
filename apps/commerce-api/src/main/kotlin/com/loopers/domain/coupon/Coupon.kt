@@ -26,7 +26,7 @@ class Coupon(
             return Coupon(
                 name = name,
                 discountType = discountType,
-                discountValue = discountValue
+                discountValue = discountValue,
             )
         }
     }

@@ -24,7 +24,7 @@ class CouponTest {
             val coupon = CouponFixtures.createCoupon(
                 name = "5000원 할인 쿠폰",
                 discountType = DiscountType.FIXED,
-                discountValue = 5000L
+                discountValue = 5000L,
             )
 
             // then
@@ -41,7 +41,7 @@ class CouponTest {
             val coupon = CouponFixtures.createCoupon(
                 name = "10% 할인 쿠폰",
                 discountType = DiscountType.RATE,
-                discountValue = 10L
+                discountValue = 10L,
             )
 
             // then
@@ -60,7 +60,7 @@ class CouponTest {
                 Coupon.create(
                     name = name,
                     discountType = DiscountType.FIXED,
-                    discountValue = 5000L
+                    discountValue = 5000L,
                 )
             }
                 .isInstanceOf(IllegalArgumentException::class.java)
@@ -75,7 +75,7 @@ class CouponTest {
                 Coupon.create(
                     name = "할인율 테스트 쿠폰",
                     discountType = DiscountType.RATE,
-                    discountValue = discountValue
+                    discountValue = discountValue,
                 )
             }
                 .isInstanceOf(IllegalArgumentException::class.java)
@@ -91,17 +91,17 @@ class CouponTest {
         @CsvSource(
             "5000, 10000, 5000",   // 할인액이 주문금액보다 작음 → 할인액만큼 할인
             "5000, 3000, 3000",     // 할인액이 주문금액보다 큼 → 주문금액만큼만 할인 (음수 방지)
-            "5000, 5000, 5000"      // 할인액과 주문금액 동일 → 전액 할인 (0원)
+            "5000, 5000, 5000",      // 할인액과 주문금액 동일 → 전액 할인 (0원)
         )
         fun `정액 쿠폰의 할인 금액을 계산한다`(
             discountValue: Long,
             totalAmount: Long,
-            expectedDiscount: Long
+            expectedDiscount: Long,
         ) {
             // given
             val coupon = CouponFixtures.createCoupon(
                 discountType = DiscountType.FIXED,
-                discountValue = discountValue
+                discountValue = discountValue,
             )
 
             // when
@@ -116,7 +116,7 @@ class CouponTest {
             "10, 10000, 1000",    // 10% 할인
             "20, 50000, 10000",   // 20% 할인
             "50, 20000, 10000",   // 50% 할인
-            "100, 10000, 10000"   // 100% 할인
+            "100, 10000, 10000",   // 100% 할인
         )
         fun `정률 쿠폰의 할인 금액을 계산한다`(
             discountValue: Long,

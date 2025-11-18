@@ -26,7 +26,7 @@ class OrderV1Controller(
         @RequestHeader(value = "X-USER-ID") userId: String,
         @RequestBody request: OrderV1Dto.CreateOrderRequest,
     ): ApiResponse<OrderV1Dto.CreateOrderResponse> {
-        orderFacade.placeOrder(userId, request.toCommand())
+        orderFacade.placeOrder(userId, request.couponId, request.toCommand())
         return ApiResponse.success(OrderV1Dto.CreateOrderResponse())
     }
 
