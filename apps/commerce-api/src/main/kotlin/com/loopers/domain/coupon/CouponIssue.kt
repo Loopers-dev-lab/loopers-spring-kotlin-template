@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import jakarta.persistence.Version
 import java.time.ZonedDateTime
 
 @Entity
@@ -27,6 +28,10 @@ class CouponIssue(
     var usedAt: ZonedDateTime? = null,
 
     val issuedAt: ZonedDateTime = ZonedDateTime.now(),
+
+    @Version
+    var version: Long = 0
+
 ) : BaseEntity() {
     companion object {
         fun issue(couponId: Long, userId: Long): CouponIssue {

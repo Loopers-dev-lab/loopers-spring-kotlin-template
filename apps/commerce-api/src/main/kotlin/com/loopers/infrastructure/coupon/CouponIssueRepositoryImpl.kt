@@ -9,6 +9,6 @@ class CouponIssueRepositoryImpl(
     private val couponIssueJpaRepository: CouponIssueJpaRepository,
 ) : CouponIssueRepository {
     override fun findBy(userId: Long, couponId: Long): CouponIssue? {
-        return couponIssueJpaRepository.findByUserIdAndCouponIdWithLock(userId, couponId)
+        return couponIssueJpaRepository.findByUserIdAndCouponId(userId, couponId)
     }
 }
