@@ -60,12 +60,15 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
             // when
             repeat(threadCount) {
                 executor.submit {
+                    val threadName = Thread.currentThread().name
                     try {
+                        log.info("[$threadName] 좋아요 시도")
                         productLikeService.like(product, user)
                         success.incrementAndGet()
+                        log.info("[$threadName] 좋아요 성공")
                     } catch (e: Exception) {
                         fail.incrementAndGet()
-                        log.warn("예외 발생: ${e.message}")
+                        log.warn("[$threadName] 좋아요 실패: ${e.message}")
                     } finally {
                         latch.countDown()
                     }
@@ -107,13 +110,16 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
             // when
             repeat(threadCount) { index ->
                 executor.submit {
+                    val threadName = Thread.currentThread().name
                     try {
                         val user = users[index]
+                        log.info("[$threadName] user${index + 1} 좋아요 시도")
                         productLikeService.like(product, user)
                         success.incrementAndGet()
+                        log.info("[$threadName] user${index + 1} 좋아요 성공")
                     } catch (e: Exception) {
                         fail.incrementAndGet()
-                        log.warn("예외 발생: ${e.message}")
+                        log.warn("[$threadName] user${index + 1} 좋아요 실패: ${e.message}")
                     } finally {
                         latch.countDown()
                     }
@@ -167,14 +173,17 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
             val fail = AtomicInteger(0)
 
             // when
-            usersToUnlike.forEach { user ->
+            usersToUnlike.forEachIndexed { index, user ->
                 executor.submit {
+                    val threadName = Thread.currentThread().name
                     try {
+                        log.info("[$threadName] user${index + 1} 좋아요 취소 시도")
                         productLikeService.unlike(product, user)
                         success.incrementAndGet()
+                        log.info("[$threadName] user${index + 1} 좋아요 취소 성공")
                     } catch (e: Exception) {
                         fail.incrementAndGet()
-                        log.warn("예외 발생: ${e.message}")
+                        log.warn("[$threadName] user${index + 1} 좋아요 취소 실패: ${e.message}")
                     } finally {
                         latch.countDown()
                     }

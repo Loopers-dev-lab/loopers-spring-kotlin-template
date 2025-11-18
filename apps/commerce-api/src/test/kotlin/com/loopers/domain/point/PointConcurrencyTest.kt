@@ -52,12 +52,15 @@ class PointConcurrencyTest : IntegrationTest() {
 
             repeat(threadCount) {
                 executor.submit {
+                    val threadName = Thread.currentThread().name
                     try {
+                        log.info("[$threadName] 포인트 충전 시도: ${chargeAmount}원")
                         pointService.charge(chargeAmount, user.id)
                         successCount.incrementAndGet()
+                        log.info("[$threadName] 포인트 충전 성공")
                     } catch (e: Exception) {
                         failCount.incrementAndGet()
-                        log.warn("충전 실패: ${e.message}")
+                        log.warn("[$threadName] 포인트 충전 실패: ${e.message}")
                     } finally {
                         latch.countDown()
                     }
@@ -102,12 +105,15 @@ class PointConcurrencyTest : IntegrationTest() {
 
             repeat(threadCount) {
                 executor.submit {
+                    val threadName = Thread.currentThread().name
                     try {
+                        log.info("[$threadName] 포인트 사용 시도: ${useAmount}원")
                         pointService.use(user.id, useAmount)
                         successCount.incrementAndGet()
+                        log.info("[$threadName] 포인트 사용 성공")
                     } catch (e: Exception) {
                         failCount.incrementAndGet()
-                        log.warn("사용 실패: ${e.message}")
+                        log.warn("[$threadName] 포인트 사용 실패: ${e.message}")
                     } finally {
                         latch.countDown()
                     }
@@ -145,13 +151,17 @@ class PointConcurrencyTest : IntegrationTest() {
 
             repeat(threadCount) {
                 executor.submit {
+                    val threadName = Thread.currentThread().name
                     try {
+                        log.info("[$threadName] 포인트 사용 시도: ${useAmount}원")
                         pointService.use(user.id, useAmount)
                         successCount.incrementAndGet()
+                        log.info("[$threadName] 포인트 사용 성공")
                     } catch (e: CoreException) {
                         failCount.incrementAndGet()  // 잔액 부족 예외
+                        log.info("[$threadName] 포인트 부족으로 실패")
                     } catch (e: Exception) {
-                        log.warn("예상치 못한 예외: ${e.message}")
+                        log.warn("[$threadName] 예상치 못한 예외: ${e.message}")
                     } finally {
                         latch.countDown()
                     }
@@ -208,11 +218,14 @@ class PointConcurrencyTest : IntegrationTest() {
             // 충전 스레드 50개
             repeat(numberOfCharges) {
                 executor.submit {
+                    val threadName = Thread.currentThread().name
                     try {
+                        log.info("[$threadName] 포인트 충전 시도: ${chargeAmount}원")
                         pointService.charge(chargeAmount, user.id)
                         chargeSuccessCount.incrementAndGet()
+                        log.info("[$threadName] 포인트 충전 성공")
                     } catch (e: Exception) {
-                        log.warn("충전 실패: ${e.message}")
+                        log.warn("[$threadName] 포인트 충전 실패: ${e.message}")
                     } finally {
                         latch.countDown()
                     }
@@ -222,11 +235,14 @@ class PointConcurrencyTest : IntegrationTest() {
             // 사용 스레드 30개
             repeat(numberOfUses) {
                 executor.submit {
+                    val threadName = Thread.currentThread().name
                     try {
+                        log.info("[$threadName] 포인트 사용 시도: ${useAmount}원")
                         pointService.use(user.id, useAmount)
                         useSuccessCount.incrementAndGet()
+                        log.info("[$threadName] 포인트 사용 성공")
                     } catch (e: Exception) {
-                        log.warn("사용 실패: ${e.message}")
+                        log.warn("[$threadName] 포인트 사용 실패: ${e.message}")
                     } finally {
                         latch.countDown()
                     }

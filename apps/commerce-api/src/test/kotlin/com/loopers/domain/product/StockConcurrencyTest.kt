@@ -53,15 +53,18 @@ class StockConcurrencyTest : IntegrationTest() {
 
         repeat(threadCount) {
             executor.submit {
+                val threadName = Thread.currentThread().name
                 try {
+                    log.info("[$threadName] 재고 차감 시도")
                     productService.deductAllStock(
                         listOf(OrderCommand.OrderDetailCommand(product.id, 1L)),
                     )
                     successCount.incrementAndGet()
+                    log.info("[$threadName] 재고 차감 성공")
                 } catch (e: Exception) {
                     // 예외는 정상적인 동작(재고 부족, 락 획득 실패 등)
                     failCount.incrementAndGet()
-                    log.warn("Error : " + e.message)
+                    log.warn("[$threadName] 재고 차감 실패: ${e.message}")
                 } finally {
                     latch.countDown()
                 }
@@ -115,11 +118,15 @@ class StockConcurrencyTest : IntegrationTest() {
 
             // when - 두 스레드가 정확히 동시에 시작
             executor.submit {
+                val threadName = Thread.currentThread().name
                 readyLatch.countDown()  // 준비 완료
                 startLatch.await()       // 시작 신호 대기
                 try {
+                    log.info("[$threadName] 주문1 시작 (상품1→상품2)")
                     productService.deductAllStock(order1Commands)
+                    log.info("[$threadName] 주문1 성공")
                 } catch (e: Exception) {
+                    log.warn("[$threadName] 주문1 실패: ${e.message}")
                     synchronized(exceptions) {
                         exceptions.add(e)
                     }
@@ -129,11 +136,15 @@ class StockConcurrencyTest : IntegrationTest() {
             }
 
             executor.submit {
+                val threadName = Thread.currentThread().name
                 readyLatch.countDown() // 준비 완료
                 startLatch.await() // 시작 신호 대기
                 try {
+                    log.info("[$threadName] 주문2 시작 (상품2→상품1)")
                     productService.deductAllStock(order2Commands)
+                    log.info("[$threadName] 주문2 성공")
                 } catch (e: Exception) {
+                    log.warn("[$threadName] 주문2 실패: ${e.message}")
                     synchronized(exceptions) {
                         exceptions.add(e)
                     }
@@ -146,6 +157,7 @@ class StockConcurrencyTest : IntegrationTest() {
             readyLatch.await()
 
             // 동시에 시작
+            log.info("모든 스레드 준비 완료, 동시 시작!")
             startLatch.countDown()
 
             // Then: 5초 내에 완료되어야 함 (데드락 없음)
