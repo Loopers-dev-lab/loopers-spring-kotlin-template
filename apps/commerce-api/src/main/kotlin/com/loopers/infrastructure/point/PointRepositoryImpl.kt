@@ -13,7 +13,7 @@ class PointRepositoryImpl(
         return pointJpaRepository.save(point)
     }
 
-    override fun getBy(userId: Long): Point? {
-        return pointJpaRepository.findByUserId(userId)
+    override fun findByWithLock(userId: Long): Point? {
+        return pointJpaRepository.findByUserIdWithLock(userId)
     }
 }

@@ -12,5 +12,5 @@ interface StockJpaRepository : JpaRepository<Stock, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
     @Query("SELECT s FROM Stock s WHERE s.productId IN :productIds ORDER BY s.productId ASC")
-    fun findAllByProductIdIn(productIds: List<Long>): List<Stock>
+    fun findAllByProductIdInWithLock(productIds: List<Long>): List<Stock>
 }

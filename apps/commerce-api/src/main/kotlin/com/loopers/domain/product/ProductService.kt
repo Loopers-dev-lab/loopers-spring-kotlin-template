@@ -28,9 +28,9 @@ class ProductService(
         return productRepository.findAllBy(productIds)
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun getStocksBy(productIds: List<Long>): List<Stock> {
-        return productRepository.findStockAllBy(productIds)
+        return productRepository.findStockAllByWithLock(productIds)
     }
 
     fun validateProductsExist(
@@ -55,7 +55,7 @@ class ProductService(
     ) {
         val productIds = items.map { it.productId }
             .sorted()
-        val stocks = productRepository.findStockAllBy(productIds)
+        val stocks = productRepository.findStockAllByWithLock(productIds)
 
         val stockMap = stocks.associateBy { it.productId }
 

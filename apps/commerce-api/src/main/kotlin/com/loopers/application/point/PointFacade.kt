@@ -19,7 +19,7 @@ class PointFacade(
         return pointService.charge(command.amount, user.id).let { PointResult.from(it, user.userId) }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun getBy(userId: String): PointResult {
         val user = userService.getMyInfo(userId)
 
