@@ -1,5 +1,6 @@
 package com.loopers.domain.shared
 
+import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Embeddable
@@ -13,7 +14,7 @@ data class Email(
     private val EMAIL_PATTERN: Pattern = Pattern.compile("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$")
     init {
         if (!EMAIL_PATTERN.matcher(address).matches()) {
-            throw InvalidEmailPatternException(ErrorType.BAD_REQUEST,"이메일 형식이 올바르지 않습니다")
+            throw CoreException(ErrorType.BAD_REQUEST,"이메일 형식이 올바르지 않습니다")
         }
     }
 }

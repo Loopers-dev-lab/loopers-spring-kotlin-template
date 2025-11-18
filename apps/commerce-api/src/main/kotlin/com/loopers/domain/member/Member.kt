@@ -2,6 +2,7 @@ package com.loopers.domain.member
 
 import com.loopers.domain.BaseEntity
 import com.loopers.domain.shared.Email
+import com.loopers.domain.shared.Money
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -28,7 +29,15 @@ class Member(
         protected set
 
     fun chargePoint(amount: Long) {
-        point = Point(point.amount + amount)
+        point = point.charge(amount)
+    }
+
+    fun usePoint(amount: Long) {
+        point = point.use(amount)
+    }
+
+    fun pay(totalAmount: Money) {
+        usePoint(totalAmount.amount)
     }
 
 }
