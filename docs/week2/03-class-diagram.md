@@ -120,22 +120,59 @@ classDiagram
         + create(productId, userId) ProductLike
     }
 
+    class Coupon {
+        - Long id
+        - String name
+        - DiscountType discountType
+        - Long discountValue
+        + create(name, discountType, discountValue) Coupon
+        + calculateDiscount(totalAmount) Long
+    }
+    
+    class DiscountType {
+        <<enumeration>>
+        FIXED
+        RATE
+    }
+    
+    class CouponIssue {
+        - Long id
+        - Long couponId
+        - Long userId
+        - CouponStatus status
+        - LocalDateTime usedAt
+        + issue(couponId, userId) CouponIssue
+        + isUsable() boolean
+        + use() void
+    }
+    
+    class CouponStatus {
+        <<enumeration>>
+        ISSUED
+        USED
+    }
+
     %% Relationships - Value Objects
     User *-- UserId: contains
     User *-- Email: contains
     User *-- BirthDate: contains
     User --> Gender: uses
     Point *-- Amount: contains
-
+    
     %% Relationships - Entities
     User "1" --> "N" Order: 주문
     User "1" --> "1" Point: 보유
+    User "1" --> "N" CouponIssue: 보유
     Brand "1" --> "N" Product: 소속
     Product "1" --> "1" Stock: 재고
     Product "1" --> "N" ProductLike: 받음
     Product "1" --> "N" OrderDetail: 포함됨
     Order "1" --> "N" OrderDetail: 주문 상품
     Order --> OrderStatus: 상태
+    Order --> CouponIssue: 사용
+    Coupon "1" --> "N" CouponIssue: 발급
+    Coupon --> DiscountType: 할인 타입
+    CouponIssue --> CouponStatus: 상태
 ```
 
 # 설계 의사결정 문서
