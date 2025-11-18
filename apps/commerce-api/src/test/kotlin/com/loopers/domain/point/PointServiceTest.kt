@@ -64,7 +64,7 @@ class PointServiceTest : IntegrationTest() {
             pointService.charge(amount = 5000L, userId = user.id)
 
             // when
-            pointService.use(amount = 2000L, userId = user.id)
+            pointService.use(userId = user.id, amount = 2000L)
 
             // then
             val point = pointService.getBy(user.id)
@@ -79,7 +79,7 @@ class PointServiceTest : IntegrationTest() {
             pointService.charge(amount = chargeAmount, userId = user.id)
 
             // when
-            pointService.use(amount = useAmount, userId = user.id)
+            pointService.use(userId = user.id, amount = useAmount)
 
             // then
             val point = pointService.getBy(user.id)
@@ -93,9 +93,9 @@ class PointServiceTest : IntegrationTest() {
             pointService.charge(amount = 10000L, userId = user.id)
 
             // when
-            pointService.use(amount = 2000L, userId = user.id)
-            pointService.use(amount = 3000L, userId = user.id)
-            pointService.use(amount = 1000L, userId = user.id)
+            pointService.use(userId = user.id, amount = 2000L)
+            pointService.use(userId = user.id, amount = 3000L)
+            pointService.use(userId = user.id, amount = 1000L)
 
             // then
             val point = pointService.getBy(user.id)
@@ -110,7 +110,7 @@ class PointServiceTest : IntegrationTest() {
 
             // when & then
             assertThatThrownBy {
-                pointService.use(amount = 2000L, userId = user.id)
+                pointService.use(userId = user.id, amount = 2000L)
             }.isInstanceOf(CoreException::class.java)
         }
     }

@@ -103,7 +103,7 @@ class PointConcurrencyTest : IntegrationTest() {
             repeat(threadCount) {
                 executor.submit {
                     try {
-                        pointService.use(useAmount, user.id)
+                        pointService.use(user.id, useAmount)
                         successCount.incrementAndGet()
                     } catch (e: Exception) {
                         failCount.incrementAndGet()
@@ -146,7 +146,7 @@ class PointConcurrencyTest : IntegrationTest() {
             repeat(threadCount) {
                 executor.submit {
                     try {
-                        pointService.use(useAmount, user.id)
+                        pointService.use(user.id, useAmount)
                         successCount.incrementAndGet()
                     } catch (e: CoreException) {
                         failCount.incrementAndGet()  // 잔액 부족 예외
@@ -223,7 +223,7 @@ class PointConcurrencyTest : IntegrationTest() {
             repeat(numberOfUses) {
                 executor.submit {
                     try {
-                        pointService.use(useAmount, user.id)
+                        pointService.use(user.id, useAmount)
                         useSuccessCount.incrementAndGet()
                     } catch (e: Exception) {
                         log.warn("사용 실패: ${e.message}")
