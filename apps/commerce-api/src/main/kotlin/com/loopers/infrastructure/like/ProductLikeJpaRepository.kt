@@ -21,7 +21,7 @@ interface ProductLikeJpaRepository : JpaRepository<ProductLike, Long> {
     """,
         nativeQuery = true,
     )
-    fun upsertLike(
+    fun trySave(
         @Param("productId") productId: Long,
         @Param("userId") userId: Long,
     ): Int

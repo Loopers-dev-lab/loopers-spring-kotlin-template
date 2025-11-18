@@ -1,6 +1,10 @@
 package com.loopers.application.like
 
 import com.loopers.domain.like.ProductLikeRepository
+import com.loopers.domain.like.ProductLikeRepository.DeleteResult.Deleted
+import com.loopers.domain.like.ProductLikeRepository.DeleteResult.NotExist
+import com.loopers.domain.like.ProductLikeRepository.SaveResult.AlreadyExists
+import com.loopers.domain.like.ProductLikeRepository.SaveResult.Created
 import com.loopers.domain.like.ProductLikeService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductStatisticRepository
@@ -13,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 class LikeFacadeTest {
     private lateinit var productLikeRepository: ProductLikeRepository
@@ -46,14 +51,14 @@ class LikeFacadeTest {
             val productId = 100L
 
             every { productService.findProductById(productId) } returns mockk()
-            every { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) } returns 0
+            every { productLikeRepository.save(match { it.productId == productId && it.userId == userId }) } returns AlreadyExists
 
             // when
             likeFacade.addLike(userId, productId)
 
             // then
             verify(exactly = 1) { productService.findProductById(productId) }
-            verify(exactly = 1) { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) }
+            verify(exactly = 1) { productLikeRepository.save(match { it.productId == productId && it.userId == userId }) }
             verify(exactly = 0) { productService.increaseProductLikeCount(productId) }
         }
 
@@ -65,11 +70,11 @@ class LikeFacadeTest {
             val productId = 100L
 
             every { productService.findProductById(productId) } returns mockk()
-            every { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) } returnsMany listOf(
-                1,
-                0,
-                0,
-                0,
+            every { productLikeRepository.save(match { it.productId == productId && it.userId == userId }) } returnsMany listOf(
+                Created,
+                AlreadyExists,
+                AlreadyExists,
+                AlreadyExists,
             )
 
             every { productService.increaseProductLikeCount(productId) } just runs
@@ -81,7 +86,7 @@ class LikeFacadeTest {
 
             // then
             verify(exactly = 4) { productService.findProductById(productId) }
-            verify(exactly = 4) { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) }
+            verify(exactly = 4) { productLikeRepository.save(match { it.productId == productId && it.userId == userId }) }
             verify(exactly = 1) { productService.increaseProductLikeCount(productId) }
         }
 
@@ -93,7 +98,7 @@ class LikeFacadeTest {
             val productId = 100L
 
             every { productService.findProductById(productId) } returns mockk()
-            every { productLikeRepository.deleteByUserIdAndProductId(userId, productId) } returns 0L
+            every { productLikeRepository.deleteByUserIdAndProductId(userId, productId) } returns NotExist
 
             // when
             likeFacade.removeLike(userId, productId)
@@ -113,10 +118,10 @@ class LikeFacadeTest {
 
             every { productService.findProductById(productId) } returns mockk()
             every { productLikeRepository.deleteByUserIdAndProductId(userId, productId) } returnsMany listOf(
-                1L,
-                0L,
-                0L,
-                0L,
+                Deleted,
+                NotExist,
+                NotExist,
+                NotExist,
             )
             every { productService.decreaseProductLikeCount(productId) } just runs
 
@@ -143,7 +148,7 @@ class LikeFacadeTest {
             val productId = 100L
 
             every { productService.findProductById(productId) } returns mockk()
-            every { productLikeRepository.upsert(match { it.productId == productId && it.userId == userId }) } returns 1
+            every { productLikeRepository.save(match { it.productId == productId && it.userId == userId }) } returns Created
             every { productService.increaseProductLikeCount(productId) } just runs
 
             // when
@@ -161,7 +166,7 @@ class LikeFacadeTest {
             val productId = 100L
 
             every { productService.findProductById(productId) } returns mockk()
-            every { productLikeRepository.deleteByUserIdAndProductId(userId, productId) } returns 1L
+            every { productLikeRepository.deleteByUserIdAndProductId(userId, productId) } returns Deleted
             every { productService.decreaseProductLikeCount(productId) } just runs
 
             // when
@@ -185,12 +190,12 @@ class LikeFacadeTest {
             every { productService.findProductById(productId) } throws exception
 
             // when & then
-            org.junit.jupiter.api.assertThrows<com.loopers.support.error.CoreException> {
+            assertThrows<com.loopers.support.error.CoreException> {
                 likeFacade.addLike(userId, productId)
             }
 
             verify(exactly = 1) { productService.findProductById(productId) }
-            verify(exactly = 0) { productLikeRepository.upsert(any()) }
+            verify(exactly = 0) { productLikeRepository.save(any()) }
             verify(exactly = 0) { productService.increaseProductLikeCount(any()) }
         }
 
@@ -208,7 +213,7 @@ class LikeFacadeTest {
             every { productService.findProductById(productId) } throws exception
 
             // when & then
-            org.junit.jupiter.api.assertThrows<com.loopers.support.error.CoreException> {
+            assertThrows<com.loopers.support.error.CoreException> {
                 likeFacade.removeLike(userId, productId)
             }
 

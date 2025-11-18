@@ -10,13 +10,17 @@ class OrderService(
 ) {
     @Transactional
     fun place(command: OrderCommand.PlaceOrder): Order {
-        val orderItems = command
+        val newOrder = Order.place(command.userId)
+
+        command
             .items
-            .map { OrderItem.create(it.productId, it.quantity, it.productName, it.currentPrice) }
+            .forEach {
+                newOrder.addOrderItem(it.productId, it.quantity, it.productName, it.currentPrice)
+            }
 
-        val paidOrder = Order.paid(command.userId, orderItems.toMutableList())
+        newOrder.paid()
 
-        val savedOrder = orderRepository.save(paidOrder)
+        val savedOrder = orderRepository.save(newOrder)
 
         val paidPayment = Payment.paid(command.userId, savedOrder, command.usePoint)
 

@@ -6,6 +6,7 @@ import com.loopers.support.values.Money
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.Test
 
@@ -63,84 +64,216 @@ class OrderTest {
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
             assertThat(exception.message).isEqualTo("주문 금액은 0 이상이어야 합니다.")
         }
+    }
 
-        @DisplayName("주문 상품이 비어있을 때 예외가 발생한다")
+    @DisplayName("place 생성 테스트")
+    @Nested
+    inner class Place {
+
+        @DisplayName("빈 주문이 PLACED 상태로 생성된다")
         @Test
-        fun `throws exception when order items is empty`() {
+        fun `create empty order with PLACED status`() {
             // given
-            val emptyOrderItems = mutableListOf<OrderItem>()
+            val userId = 1L
+
+            // when
+            val order = Order.place(userId)
+
+            // then
+            assertThat(order.userId).isEqualTo(userId)
+            assertThat(order.totalAmount).isEqualTo(Money.ZERO_KRW)
+            assertThat(order.status).isEqualTo(OrderStatus.PLACED)
+            assertThat(order.orderItems).isEmpty()
+        }
+    }
+
+    @DisplayName("addOrderItem 테스트")
+    @Nested
+    inner class AddOrderItem {
+
+        @DisplayName("주문에 상품을 추가할 수 있다")
+        @Test
+        fun `add order item to order`() {
+            // given
+            val order = createOrder(
+                status = OrderStatus.PLACED,
+                orderItems = mutableListOf(),
+            )
+            val productId = 100L
+            val quantity = 2
+            val productName = "맥북 프로"
+            val unitPrice = Money.krw(2000000)
+
+            // when
+            order.addOrderItem(productId, quantity, productName, unitPrice)
+
+            // then
+            order.orderItems.first().run {
+                assertAll(
+                    { assertThat(this.productId).isEqualTo(productId) },
+                    { assertThat(this.quantity).isEqualTo(quantity) },
+                    { assertThat(this.productName).isEqualTo(productName) },
+                    { assertThat(this.unitPrice).isEqualTo(unitPrice) },
+                )
+            }
+        }
+
+        @DisplayName("여러 상품을 순차적으로 추가할 수 있다")
+        @Test
+        fun `add multiple order items sequentially`() {
+            // given
+            val order = createOrder(
+                status = OrderStatus.PLACED,
+                orderItems = mutableListOf(),
+            )
+
+            // when
+            addOrderItem(
+                productId = 1L,
+                order = order,
+            )
+            addOrderItem(
+                productId = 2L,
+                order = order,
+            )
+            addOrderItem(
+                productId = 3L,
+                order = order,
+            )
+            // then
+            assertThat(
+                order
+                    .orderItems
+                    .map { it.productId },
+            ).containsExactly(1L, 2L, 3L)
+        }
+
+        @DisplayName("상품 추가 시 총 금액이 계산된다")
+        @Test
+        fun `calculate total amount when adding order items`() {
+            // given
+            val order = createOrder(
+                status = OrderStatus.PLACED,
+                orderItems = mutableListOf(),
+            )
+
+            // when
+            addOrderItem(
+                order = order,
+                unitPrice = Money.krw(10000),
+            )
+            addOrderItem(
+                order = order,
+                unitPrice = Money.krw(5000),
+            )
+
+            // then
+            assertAll(
+                { assertThat(order.orderItems).hasSize(2) },
+                { assertThat(order.totalAmount).isEqualTo(Money.krw(15000)) },
+            )
+        }
+
+        @DisplayName("PLACED 상태가 아닐 때 상품 추가 시 예외가 발생한다")
+        @Test
+        fun `throws exception when adding item to non-PLACED order`() {
+            // given
+            val order = createOrder(status = OrderStatus.PAID)
 
             // when
             val exception = assertThrows<CoreException> {
-                Order.of(
-                    userId = 1L,
-                    totalAmount = Money.krw(10000),
-                    status = OrderStatus.PAID,
-                    orderItems = emptyOrderItems,
-                )
+                addOrderItem(order = order)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("PLACED 상태에서만 상품을 추가할 수 있습니다.")
+        }
+    }
+
+    @DisplayName("paid 테스트")
+    @Nested
+    inner class Paid {
+
+        @DisplayName("PLACED 상태의 주문이 PAID로 전환된다")
+        @Test
+        fun `transition from PLACED to PAID`() {
+            // given
+            val order = createOrder(
+                status = OrderStatus.PLACED,
+                totalAmount = Money.krw(20000),
+            )
+
+            // when
+            order.paid()
+
+            // then
+            assertThat(order.status).isEqualTo(OrderStatus.PAID)
+        }
+
+        @DisplayName("PLACED가 아닌 상태에서 paid() 호출 시 예외가 발생한다")
+        @Test
+        fun `throws exception when status is not PLACED`() {
+            // given
+            val order = createOrder(status = OrderStatus.PAID)
+
+            // when
+            val exception = assertThrows<CoreException> {
+                order.paid()
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("주문이 완료되지 않았습니다.")
+        }
+
+        @DisplayName("주문 상품이 없을 때 예외가 발생한다")
+        @Test
+        fun `throws exception when order items is empty`() {
+            // given
+            val order = createOrder(
+                status = OrderStatus.PLACED,
+                orderItems = mutableListOf(),
+            )
+
+            // when
+            val exception = assertThrows<CoreException> {
+                order.paid()
             }
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
             assertThat(exception.message).isEqualTo("주문 상품이 없을 수 없습니다.")
         }
+
+        @DisplayName("총 금액이 0 이하일 때 예외가 발생한다")
+        @Test
+        fun `throws exception when total amount is zero or negative`() {
+            // given
+            val order = createOrder(
+                status = OrderStatus.PLACED,
+                totalAmount = Money.ZERO_KRW,
+            )
+
+            // when
+            val exception = assertThrows<CoreException> {
+                order.paid()
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("주문 금액은 0보다 커야 합니다.")
+        }
     }
 
-    @DisplayName("주문 paid 테스트")
-    @Nested
-    inner class Paid {
-
-        @DisplayName("주문 상품들의 (단가 × 수량) 합계로 총 금액이 계산된다")
-        @Test
-        fun `calculate total amount from order items unit prices multiplied by quantity`() {
-            // given
-            val userId = 1L
-            val orderItems = mutableListOf(
-                createOrderItem(unitPrice = Money.krw(30000), quantity = 2),
-                createOrderItem(unitPrice = Money.krw(20000), quantity = 3),
-                createOrderItem(unitPrice = Money.krw(10000), quantity = 1),
-            )
-            val expectedTotalAmount = Money.krw(130000)
-
-            // when
-            val order = Order.paid(userId, orderItems)
-
-            // then
-            assertThat(order.totalAmount).isEqualTo(expectedTotalAmount)
-        }
-
-        @DisplayName("주문 상태가 PAID로 설정된다")
-        @Test
-        fun `set order status to PAID`() {
-            // given
-            val userId = 1L
-            val orderItems = mutableListOf(createOrderItem())
-
-            // when
-            val order = Order.paid(userId, orderItems)
-
-            // then
-            assertThat(order.status).isEqualTo(OrderStatus.PAID)
-        }
-
-        @DisplayName("주문 상품이 주문에 포함된다")
-        @Test
-        fun `include order items in order`() {
-            // given
-            val userId = 1L
-            val orderItems = mutableListOf(
-                createOrderItem(productId = 1L),
-                createOrderItem(productId = 2L),
-            )
-
-            // when
-            val order = Order.paid(userId, orderItems)
-
-            // then
-            assertThat(order.orderItems).hasSize(2)
-            assertThat(order.orderItems[0].productId).isEqualTo(1L)
-            assertThat(order.orderItems[1].productId).isEqualTo(2L)
-        }
+    private fun addOrderItem(
+        productId: Long = 1L,
+        quantity: Int = 1,
+        productName: String = "테스트 상품",
+        unitPrice: Money = Money.krw(10000),
+        order: Order,
+    ) {
+        order.addOrderItem(productId, quantity, productName, unitPrice)
     }
 
     private fun createOrderItem(
@@ -154,6 +287,20 @@ class OrderTest {
             quantity = quantity,
             productName = productName,
             unitPrice = unitPrice,
+        )
+    }
+
+    private fun createOrder(
+        userId: Long = 1L,
+        totalAmount: Money = Money.krw(10000),
+        status: OrderStatus = OrderStatus.PLACED,
+        orderItems: MutableList<OrderItem> = mutableListOf(createOrderItem()),
+    ): Order {
+        return Order.of(
+            userId = userId,
+            totalAmount = totalAmount,
+            status = status,
+            orderItems = orderItems,
         )
     }
 }

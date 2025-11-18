@@ -16,9 +16,11 @@ class ProductLikeService(
      */
     @Transactional
     fun addLike(userId: Long, productId: Long): ProductResult.AddLike {
-        val upsertResult = productLikeRepository.upsert(ProductLike.of(productId, userId))
-        if (upsertResult == 1) return ProductResult.AddLike(true)
-        return ProductResult.AddLike(false)
+        val result = productLikeRepository.save(ProductLike.of(productId, userId))
+        return when (result) {
+            ProductLikeRepository.SaveResult.AlreadyExists -> ProductResult.AddLike(false)
+            ProductLikeRepository.SaveResult.Created -> ProductResult.AddLike(true)
+        }
     }
 
     /**
@@ -30,10 +32,10 @@ class ProductLikeService(
      */
     @Transactional
     fun removeLike(userId: Long, productId: Long): ProductResult.RemoveLike {
-        val deletedCount = productLikeRepository.deleteByUserIdAndProductId(userId, productId)
-
-        if (deletedCount == 0L) return ProductResult.RemoveLike(false)
-
-        return ProductResult.RemoveLike(true)
+        val result = productLikeRepository.deleteByUserIdAndProductId(userId, productId)
+        return when (result) {
+            ProductLikeRepository.DeleteResult.NotExist -> ProductResult.RemoveLike(false)
+            ProductLikeRepository.DeleteResult.Deleted -> ProductResult.RemoveLike(true)
+        }
     }
 }

@@ -200,6 +200,6 @@ class PaymentTest {
         userId: Long = 1L,
         orderItems: MutableList<OrderItem> = mutableListOf(createOrderItem()),
     ): Order {
-        return Order.paid(userId, orderItems)
+        return Order.of(userId, Money.krw(10000), OrderStatus.PAID, orderItems)
     }
 }

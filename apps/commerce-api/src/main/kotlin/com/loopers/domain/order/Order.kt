@@ -54,18 +54,11 @@ class Order(
         if (totalAmount < Money.ZERO_KRW) {
             throw CoreException(ErrorType.BAD_REQUEST, "주문 금액은 0 이상이어야 합니다.")
         }
-
-        if (orderItems.count() == 0) {
-            throw CoreException(ErrorType.BAD_REQUEST, "주문 상품이 없을 수 없습니다.")
-        }
     }
 
     companion object {
-        fun paid(userId: Long, orderItems: MutableList<OrderItem>): Order {
-            val totalAmount = orderItems.fold(Money.ZERO_KRW) { acc, item ->
-                acc + (item.unitPrice * item.quantity)
-            }
-            return Order(userId, totalAmount, OrderStatus.PAID, orderItems)
+        fun place(userId: Long): Order {
+            return Order(userId, Money.ZERO_KRW, OrderStatus.PLACED)
         }
 
         fun of(
@@ -76,5 +69,31 @@ class Order(
         ): Order {
             return Order(userId, totalAmount, status, orderItems)
         }
+    }
+
+    fun addOrderItem(productId: Long, quantity: Int, productName: String, unitPrice: Money) {
+        if (status != OrderStatus.PLACED) {
+            throw CoreException(ErrorType.BAD_REQUEST, "PLACED 상태에서만 상품을 추가할 수 있습니다.")
+        }
+
+        orderItems.add(OrderItem.create(productId, quantity, productName, unitPrice))
+
+        totalAmount = orderItems.fold(Money.ZERO_KRW) { acc, item ->
+            acc + (item.unitPrice * item.quantity)
+        }
+    }
+
+    fun paid() {
+        if (status != OrderStatus.PLACED) {
+            throw CoreException(ErrorType.BAD_REQUEST, "주문이 완료되지 않았습니다.")
+        }
+        if (orderItems.count() == 0) {
+            throw CoreException(ErrorType.BAD_REQUEST, "주문 상품이 없을 수 없습니다.")
+        }
+        if (totalAmount <= Money.ZERO_KRW) {
+            throw CoreException(ErrorType.BAD_REQUEST, "주문 금액은 0보다 커야 합니다.")
+        }
+
+        status = OrderStatus.PAID
     }
 }
