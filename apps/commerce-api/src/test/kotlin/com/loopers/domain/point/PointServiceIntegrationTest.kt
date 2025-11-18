@@ -2,6 +2,7 @@ package com.loopers.domain.point
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -27,9 +28,9 @@ class PointServiceIntegrationTest @Autowired constructor(
     @DisplayName("포인트 계좌 생성 통합테스트")
     @Nested
     inner class Create {
-        @DisplayName("포인트 계좌를 생성할 수 있다.")
+        @DisplayName("포인트 계좌를 생성할 수 있다")
         @Test
-        fun createPointAccount_whenValidUserIdIsProvided() {
+        fun `create point account when valid user id is provided`() {
             // when
             val userId = 1L
             val pointAccount = pointService.createPointAccount(userId)
@@ -45,9 +46,9 @@ class PointServiceIntegrationTest @Autowired constructor(
     @DisplayName("포인트 충전 통합테스트")
     @Nested
     inner class Charge {
-        @DisplayName("존재하지 않는 유저 id로 충전을 할 수 없다.")
+        @DisplayName("존재하지 않는 유저 id로 충전할 수 없다")
         @Test
-        fun throwsException_whenInvalidUserIdIsProvided() {
+        fun `throw exception when invalid user id is provided`() {
             // when
             val invalidUserId = 999L
             val exception = assertThrows<CoreException> {
@@ -59,27 +60,95 @@ class PointServiceIntegrationTest @Autowired constructor(
             assertThat(exception.message).isEqualTo("[id = $invalidUserId] 유저를 찾을 수 없습니다.")
         }
 
-        @DisplayName("존재하는 유저 id로 포인트를 충전할 수 있다.")
+        @DisplayName("존재하는 유저 id로 포인트를 충전할 수 있다")
         @Test
-        fun chargePoint_whenValidUserIdIsProvided() {
+        fun `charge point when valid user id is provided`() {
             // given
             val currentBalance = Money.krw(2312312)
-            val createPointAccount = createPointAccount(
-                balance = currentBalance,
-            )
+            val pointAccount = createPointAccount(balance = currentBalance)
 
             // when
             val chargeAmount = Money.krw(1000)
             charge(
-                userId = createPointAccount.userId,
+                userId = pointAccount.userId,
                 amount = chargeAmount,
             )
 
             // then
-            val pointAccount = pointAccountRepository.findByUserId(createPointAccount.userId)
-            assertAll(
-                { assertThat(pointAccount?.balance).isEqualTo(currentBalance.plus(chargeAmount)) },
+            val updatedPointAccount = pointAccountRepository.findByUserId(pointAccount.userId)
+            assertThat(updatedPointAccount?.balance).isEqualTo(currentBalance.plus(chargeAmount))
+        }
+    }
+
+    @DisplayName("포인트 차감 통합테스트")
+    @Nested
+    inner class Deduct {
+        @DisplayName("존재하지 않는 유저 id로 차감할 수 없다")
+        @Test
+        fun `throw exception when invalid user id is provided`() {
+            // when
+            val invalidUserId = 999L
+            val exception = assertThrows<CoreException> {
+                deduct(invalidUserId)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+            assertThat(exception.message).isEqualTo("[id = $invalidUserId] 유저를 찾을 수 없습니다.")
+        }
+
+        @DisplayName("잔액이 부족하면 차감할 수 없다")
+        @Test
+        fun `throw exception when balance is insufficient`() {
+            // given
+            val pointAccount = createPointAccount(balance = Money.krw(5000))
+
+            // when
+            val exception = assertThrows<CoreException> {
+                deduct(
+                    userId = pointAccount.userId,
+                    amount = Money.krw(10000),
+                )
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+        }
+
+        @DisplayName("포인트를 차감할 수 있다")
+        @Test
+        fun `deduct point when balance is sufficient`() {
+            // given
+            val currentBalance = Money.krw(10000)
+            val pointAccount = createPointAccount(balance = currentBalance)
+
+            // when
+            val deductAmount = Money.krw(3000)
+            deduct(
+                userId = pointAccount.userId,
+                amount = deductAmount,
             )
+
+            // then
+            val updatedPointAccount = pointAccountRepository.findByUserId(pointAccount.userId)
+            assertThat(updatedPointAccount?.balance).isEqualTo(currentBalance.minus(deductAmount))
+        }
+
+        @DisplayName("여러 번 차감해도 정상적으로 동작한다")
+        @Test
+        fun `deduct point multiple times`() {
+            // given
+            val initialBalance = Money.krw(10000)
+            val pointAccount = createPointAccount(balance = initialBalance)
+
+            // when
+            deduct(userId = pointAccount.userId, amount = Money.krw(2000))
+            deduct(userId = pointAccount.userId, amount = Money.krw(3000))
+            deduct(userId = pointAccount.userId, amount = Money.krw(1000))
+
+            // then
+            val updatedPointAccount = pointAccountRepository.findByUserId(pointAccount.userId)
+            assertThat(updatedPointAccount?.balance).isEqualTo(Money.krw(4000))
         }
     }
 
@@ -87,6 +156,14 @@ class PointServiceIntegrationTest @Autowired constructor(
         userId: Long = 1L,
         amount: Money = Money.krw(1000),
     ): PointAccount = pointService.charge(
+        userId = userId,
+        amount = amount,
+    )
+
+    private fun deduct(
+        userId: Long = 1L,
+        amount: Money = Money.krw(1000),
+    ): PointAccount = pointService.deduct(
         userId = userId,
         amount = amount,
     )

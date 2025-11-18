@@ -2,6 +2,7 @@ package com.loopers.domain.point
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.values.Money
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -17,13 +18,25 @@ class PointService(
 
     @Transactional
     fun charge(userId: Long, amount: Money): PointAccount {
-        val pointAccount = pointAccountRepository.findByUserId(userId)
+        val pointAccount = pointAccountRepository.findByUserIdWithLock(userId)
             ?: throw CoreException(
                 errorType = ErrorType.NOT_FOUND,
                 customMessage = "[id = $userId] 유저를 찾을 수 없습니다.",
             )
 
         pointAccount.charge(amount)
+
+        return pointAccountRepository.save(pointAccount)
+    }
+
+    @Transactional
+    fun deduct(userId: Long, amount: Money): PointAccount {
+        val pointAccount = pointAccountRepository.findByUserIdWithLock(userId)
+            ?: throw CoreException(
+                errorType = ErrorType.NOT_FOUND,
+                customMessage = "[id = $userId] 유저를 찾을 수 없습니다.",
+            )
+        pointAccount.deduct(amount)
 
         return pointAccountRepository.save(pointAccount)
     }

@@ -1,4 +1,4 @@
-package com.loopers.domain.point
+package com.loopers.support.values
 
 import jakarta.persistence.Column
 import jakarta.persistence.Embeddable
@@ -6,7 +6,7 @@ import java.math.BigDecimal
 
 @Embeddable
 data class Money(
-    @Column(name = "amount", nullable = false, scale = 2)
+    @Column(name = "amount", nullable = false, scale = 2, precision = 15)
     val amount: BigDecimal,
 ) : Comparable<Money> {
 
@@ -37,8 +37,16 @@ data class Money(
         return amount.compareTo(other.amount)
     }
 
-    fun plus(other: Money): Money {
+    operator fun plus(other: Money): Money {
         return Money(amount.add(other.amount))
+    }
+
+    operator fun minus(other: Money): Money {
+        return Money(amount.subtract(other.amount))
+    }
+
+    operator fun times(multiplier: Int): Money {
+        return Money(amount.multiply(BigDecimal.valueOf(multiplier.toLong())))
     }
 
     /**
