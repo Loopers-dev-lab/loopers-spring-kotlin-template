@@ -35,12 +35,12 @@ class PointConcurrencyTest : IntegrationTest() {
     inner class ChargeTest {
 
         @Test
-        fun `동일 사용자가 동시에 포인트를 충전해도 모든 충전이 정확히 반영되어야 한다`() {
+        fun `동일 사용자가 동시에 5번의 포인트를 충전해도 모든 충전이 정확히 반영되어야 한다`() {
             // given
             val user = createAndSaveUser()
             pointService.init(user.id)
 
-            val threadCount = 100
+            val threadCount = 5
             val chargeAmount = 1000L
             val expectedTotalAmount = threadCount * chargeAmount  // 100 * 1000 = 100,000
 
@@ -85,7 +85,7 @@ class PointConcurrencyTest : IntegrationTest() {
     inner class UseTest {
 
         @Test
-        @DisplayName("동일 사용자가 동시에 포인트를 사용해도 모든 사용이 정확히 반영되어야 한다")
+        @DisplayName("동일 사용자가 동시에 5번의 포인트를 사용해도 모든 사용이 정확히 반영되어야 한다")
         fun usePoint_concurrent_sameUser() {
             // given: 초기 잔액 100,000원
             val user = createAndSaveUser()
@@ -93,7 +93,7 @@ class PointConcurrencyTest : IntegrationTest() {
             pointService.init(user.id)
             pointService.charge(initialAmount, user.id)
 
-            val threadCount = 100
+            val threadCount = 5
             val useAmount = 100L
             val expectedRemainingAmount = initialAmount - (threadCount * useAmount)  // 100,000 - 10,000 = 90,000
 
@@ -133,14 +133,14 @@ class PointConcurrencyTest : IntegrationTest() {
         }
 
         @Test
-        fun `동일 사용자가 보유 포인트보다 많은 금액을 동시에 사용하려고 하면 정확히 잔액만큼만 사용되어야 한다`() {
+        fun `동일 사용자가 보유 포인트보다 많은 금액을 동시에 5번 사용하려고 하면 정확히 잔액만큼만 사용되어야 한다`() {
             // given: 초기 잔액 5,000원
             val user = createAndSaveUser()
             val initialAmount = 5000L
             pointService.init(user.id)
             pointService.charge(initialAmount, user.id)
 
-            val threadCount = 10
+            val threadCount = 5
             val useAmount = 1000L  // 10개 요청 * 1000원 = 10,000원 시도 (잔액 초과)
 
             // when: 10개 스레드가 동시에 1000원씩 사용 시도

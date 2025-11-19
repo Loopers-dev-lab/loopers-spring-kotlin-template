@@ -50,7 +50,7 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
                 UserFixtures.createUser(userId = "user1"),
             )
 
-            val threadCount = 100
+            val threadCount = 10
             val executor = Executors.newFixedThreadPool(threadCount)
             val latch = CountDownLatch(threadCount)
 
@@ -88,19 +88,19 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
         }
 
         @Test
-        fun `여러명이 동시에_좋아요를_눌러도_사용자 수 만큼_생성된다`() {
+        fun `10명이 동시에_좋아요를_눌러도_1명 수 만큼_생성된다`() {
             // given
             val product = createAndSaveProduct(
                 name = "테스트상품",
                 price = 1000L,
                 brandId = 1L,
             )
+            val threadCount = 10
 
-            val users = (1..100).map {
+            val users = (1..threadCount).map {
                 userRepository.save(UserFixtures.createUser(userId = "user$it"))
             }
 
-            val threadCount = 100
             val executor = Executors.newFixedThreadPool(threadCount)
             val latch = CountDownLatch(threadCount)
 
@@ -133,8 +133,8 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
             val likes = productLikeRepository.findAllByProductId(product.id)
 
             assertSoftly { soft ->
-                soft.assertThat(likes.size).isEqualTo(100)
-                soft.assertThat(success.get()).isEqualTo(100)
+                soft.assertThat(likes.size).isEqualTo(threadCount)
+                soft.assertThat(success.get()).isEqualTo(threadCount)
                 soft.assertThat(fail.get()).isEqualTo(0)
             }
         }

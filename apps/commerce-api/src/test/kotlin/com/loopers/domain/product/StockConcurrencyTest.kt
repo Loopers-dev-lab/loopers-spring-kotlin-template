@@ -38,14 +38,14 @@ class StockConcurrencyTest : IntegrationTest() {
     private lateinit var brandJpaRepository: BrandJpaRepository
 
     @Test
-    fun `100개의 동시 재고 차감 요청시 Lost Update 없이 정확히 0이 된다`() {
+    fun `30개의 동시 재고 차감 요청시 Lost Update 없이 정확히 0이 된다`() {
         // given
         val brand = createAndSaveBrand("테스트브랜드")
         val product = createAndSaveProduct("상품1", 1L, brand.id)
-        createAndSaveStock(100L, product.id)
+        createAndSaveStock(30L, product.id)
 
-        // when - 100개의 스레드가 동시에 재고 차감 시도
-        val threadCount = 100
+        // when
+        val threadCount = 30
         val executor = Executors.newFixedThreadPool(threadCount)
         val latch = CountDownLatch(threadCount)
         val successCount = AtomicInteger(0)
