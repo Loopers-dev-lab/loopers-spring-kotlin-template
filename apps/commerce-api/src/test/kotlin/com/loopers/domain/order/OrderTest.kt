@@ -191,9 +191,9 @@ class OrderTest {
         }
     }
 
-    @DisplayName("paid 테스트")
+    @DisplayName("pay 테스트")
     @Nested
-    inner class Paid {
+    inner class Pay {
 
         @DisplayName("PLACED 상태의 주문이 PAID로 전환된다")
         @Test
@@ -205,7 +205,7 @@ class OrderTest {
             )
 
             // when
-            order.paid()
+            order.pay()
 
             // then
             assertThat(order.status).isEqualTo(OrderStatus.PAID)
@@ -219,7 +219,7 @@ class OrderTest {
 
             // when
             val exception = assertThrows<CoreException> {
-                order.paid()
+                order.pay()
             }
 
             // then
@@ -238,7 +238,7 @@ class OrderTest {
 
             // when
             val exception = assertThrows<CoreException> {
-                order.paid()
+                order.pay()
             }
 
             // then
@@ -257,7 +257,7 @@ class OrderTest {
 
             // when
             val exception = assertThrows<CoreException> {
-                order.paid()
+                order.pay()
             }
 
             // then

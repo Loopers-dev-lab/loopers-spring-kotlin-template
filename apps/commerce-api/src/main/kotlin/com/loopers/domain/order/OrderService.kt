@@ -18,11 +18,11 @@ class OrderService(
                 newOrder.addOrderItem(it.productId, it.quantity, it.productName, it.currentPrice)
             }
 
-        newOrder.paid()
+        newOrder.pay()
 
         val savedOrder = orderRepository.save(newOrder)
 
-        val paidPayment = Payment.paid(command.userId, savedOrder, command.usePoint)
+        val paidPayment = Payment.pay(command.userId, savedOrder, command.usePoint)
 
         paymentRepository.save(paidPayment)
 
