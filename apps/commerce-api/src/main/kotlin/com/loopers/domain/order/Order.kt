@@ -83,7 +83,7 @@ class Order(
         }
     }
 
-    fun paid() {
+    fun pay() {
         if (status != OrderStatus.PLACED) {
             throw CoreException(ErrorType.BAD_REQUEST, "주문이 완료되지 않았습니다.")
         }

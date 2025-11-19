@@ -11,9 +11,9 @@ import kotlin.test.Test
 
 class PaymentTest {
 
-    @DisplayName("paid 테스트")
+    @DisplayName("pay 테스트")
     @Nested
-    inner class Paid {
+    inner class Pay {
 
         @DisplayName("주문 정보로 결제가 생성된다")
         @Test
@@ -23,7 +23,7 @@ class PaymentTest {
             val order = createOrder(userId = userId)
 
             // when
-            val payment = Payment.paid(
+            val payment = Payment.pay(
                 userId = userId,
                 order = order,
                 usedPoint = order.totalAmount,
@@ -80,7 +80,7 @@ class PaymentTest {
 
             // when
             val exception = assertThrows<CoreException> {
-                Payment.paid(
+                Payment.pay(
                     userId = 1L,
                     order = order,
                     usedPoint = insufficientPoint,
@@ -105,7 +105,7 @@ class PaymentTest {
 
             // when
             val exception = assertThrows<CoreException> {
-                Payment.paid(
+                Payment.pay(
                     userId = 1L,
                     order = order,
                     usedPoint = excessPoint,
@@ -126,7 +126,7 @@ class PaymentTest {
 
             // when
             val exception = assertThrows<CoreException> {
-                Payment.paid(
+                Payment.pay(
                     userId = 1L,
                     order = order,
                     usedPoint = negativePoint,
@@ -175,7 +175,7 @@ class PaymentTest {
         userId: Long = 1L,
         order: Order = createOrder(),
     ): Payment {
-        return Payment.paid(
+        return Payment.pay(
             userId = userId,
             order = order,
             usedPoint = order.totalAmount,

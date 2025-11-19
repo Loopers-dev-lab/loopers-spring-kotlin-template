@@ -43,7 +43,7 @@ class Payment(
         private set
 
     companion object {
-        fun paid(
+        fun pay(
             userId: Long,
             order: Order,
             usedPoint: Money,
