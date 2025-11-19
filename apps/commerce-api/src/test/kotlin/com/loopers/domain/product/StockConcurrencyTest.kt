@@ -79,7 +79,8 @@ class StockConcurrencyTest : IntegrationTest() {
         assertSoftly { soft ->
             // Lost Update 발생 시 finalStock > 0
             soft.assertThat(finalStock).isEqualTo(0L)
-            soft.assertThat(successCount.get()).isEqualTo(100)
+            soft.assertThat(successCount.get()).isEqualTo(threadCount)
+            soft.assertThat(failCount.get()).isEqualTo(0)
         }
     }
 

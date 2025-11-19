@@ -181,6 +181,7 @@ class PointConcurrencyTest : IntegrationTest() {
                 soft.assertThat(successCount.get()).isEqualTo(expectedSuccessCount)
                 soft.assertThat(finalPoint).isEqualTo(expectedRemainingAmount)
                 soft.assertThat(finalPoint).isGreaterThanOrEqualTo(0)  // 음수 방지 검증
+                soft.assertThat(failCount.get()).isEqualTo(threadCount - expectedSuccessCount)  // 5개는 실패해야 함
             }
         }
     }

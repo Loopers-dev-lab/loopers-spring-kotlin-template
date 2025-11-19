@@ -40,7 +40,7 @@ classDiagram
         - Email email
         - BirthDate birthDate
         - Gender gender
-        + singUp(command) User
+        + signUp(command) User
     }
 
     class Gender {

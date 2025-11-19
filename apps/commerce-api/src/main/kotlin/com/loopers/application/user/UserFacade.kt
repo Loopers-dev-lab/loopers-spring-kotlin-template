@@ -25,7 +25,6 @@ class UserFacade(
     @Transactional(readOnly = true)
     fun getMyInfo(userId: String): UserResult {
         return userService.getMyInfo(userId)
-            ?.let { UserResult.from(it) }
-            ?: throw CoreException(ErrorType.NOT_FOUND, "유저를 찾을 수 없습니다: $userId")
+            .let { UserResult.from(it) }
     }
 }

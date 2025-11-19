@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import jakarta.persistence.Version
 import java.time.ZonedDateTime
 
@@ -15,6 +16,9 @@ import java.time.ZonedDateTime
     indexes = [
         Index(name = "idx_coupon_issue_user_id", columnList = "user_id"),
         Index(name = "idx_coupon_issue_coupon_id", columnList = "coupon_id"),
+    ],
+    uniqueConstraints = [
+        UniqueConstraint(name = "uk_coupon_issue_user_coupon", columnNames = ["user_id", "coupon_id"]),
     ],
 )
 class CouponIssue(
@@ -30,9 +34,9 @@ class CouponIssue(
     val issuedAt: ZonedDateTime = ZonedDateTime.now(),
 
     @Version
-    var version: Long = 0
+    var version: Long = 0,
 
-) : BaseEntity() {
+    ) : BaseEntity() {
     companion object {
         fun issue(couponId: Long, userId: Long): CouponIssue {
             return CouponIssue(

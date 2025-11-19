@@ -251,7 +251,7 @@ class OrderServiceTest() : IntegrationTest() {
             birthDate = "1990-01-01",
             gender = Gender.MALE,
         )
-        return userJpaRepository.save(User.singUp(command))
+        return userJpaRepository.save(User.signUp(command))
     }
 
     private fun createBrand(name: String = "브랜드_${System.nanoTime()}"): Brand {

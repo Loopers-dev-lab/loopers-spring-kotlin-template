@@ -37,7 +37,7 @@ class ProductJpaRepositoryTest @Autowired constructor(
         brand2 = brandJpaRepository.save(Brand(name = "브랜드B")).withId(2L)
 
         user1 = userJpaRepository.save(
-            User.singUp(
+            User.signUp(
                 UserCommand.SignUp(
                     userId = "user1",
                     email = "user1@test.com",
@@ -47,7 +47,7 @@ class ProductJpaRepositoryTest @Autowired constructor(
             ),
         ).withId(1L)
         user2 = userJpaRepository.save(
-            User.singUp(
+            User.signUp(
                 UserCommand.SignUp(
                     userId = "user2",
                     email = "user2@test.com",

@@ -18,7 +18,7 @@ class CouponService(
         }
 
         val coupon = couponRepository.findById(couponId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다: $userId")
+            ?: throw CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다: $couponId")
         val couponIssue = couponIssueRepository.findBy(userId, couponId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "사용자가 발급 받은 적 없는 쿠폰입니다. userId: $userId, couponId: $couponId")
 

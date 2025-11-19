@@ -11,7 +11,7 @@ object UserFixtures {
         birthDate: String = "1990-01-01",
         gender: Gender = Gender.MALE,
     ): User {
-        return User.singUp(
+        return User.signUp(
             UserCommand.SignUp(
                 userId = userId,
                 email = email,
@@ -28,7 +28,7 @@ object UserFixtures {
         birthDate: String = "1990-01-01",
         gender: Gender = Gender.MALE,
     ): User {
-        return User.singUp(
+        return User.signUp(
             UserCommand.SignUp(
                 userId = userId,
                 email = email,
