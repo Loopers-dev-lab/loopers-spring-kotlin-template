@@ -30,7 +30,7 @@ class LikeFacadeTest(
     inner class Like {
         @DisplayName("동일한 상품에 대하여, 사용자가 동시에 15개의 좋아요를 누른 경우, 정상적으로 호출된다.")
         @Test
-        fun likeSuccess_whenTenUsersLikeSameProductAtSameTime() {
+        fun likeSuccess_when15UsersLikeSameProductAtSameTime() {
             // arrange
             val numberOfThreads = 15
             val latch = CountDownLatch(numberOfThreads)
@@ -43,7 +43,6 @@ class LikeFacadeTest(
             }
             val testProduct = ProductModel.create(
                 name = "testProduct",
-                stock = 100,
                 price = Money(BigDecimal.valueOf(5000L)),
                 refBrandId = 12,
             )

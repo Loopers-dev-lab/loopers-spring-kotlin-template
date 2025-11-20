@@ -45,7 +45,6 @@ class LikeServiceTest(
 
             val testProduct = ProductModel.create(
                 name = "testProduct",
-                stock = 100,
                 price = Money(BigDecimal.valueOf(5000L)),
                 refBrandId = 12,
             )

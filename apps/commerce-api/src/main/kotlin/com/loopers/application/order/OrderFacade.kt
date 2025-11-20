@@ -1,5 +1,6 @@
 package com.loopers.application.order
 
+import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderModel
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.point.PointService
@@ -12,12 +13,15 @@ class OrderFacade(
     private val orderService: OrderService,
     private val pointService: PointService,
     private val productService: ProductService,
+    private val couponService: CouponService,
 ) {
 
     @Transactional
-    fun order(userId: Long, command: OrderCommand): OrderModel {
+    fun order(userId: Long, couponId: Long, command: OrderCommand): OrderModel {
         val totalPrice = command.orderItems.sumOf { it.productPrice * it.quantity.toBigDecimal() }
-        pointService.pay(userId, totalPrice)
+        val discountPrice = couponService.calculateDiscountPrice(couponId, totalPrice)
+
+        pointService.pay(userId, discountPrice)
 
         productService.occupyStocks(command)
         // 주문 생성
