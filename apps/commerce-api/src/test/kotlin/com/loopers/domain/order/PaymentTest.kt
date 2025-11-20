@@ -89,7 +89,7 @@ class PaymentTest {
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("사용 포인트가 주문 금액과 일치하지 않습니다.")
+            assertThat(exception.message).isEqualTo("사용 포인트가 결제 금액과 일치하지 않습니다.")
         }
 
         @DisplayName("사용 포인트가 주문 금액을 초과하면 예외가 발생한다")
@@ -114,7 +114,7 @@ class PaymentTest {
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("사용 포인트가 주문 금액과 일치하지 않습니다.")
+            assertThat(exception.message).isEqualTo("사용 포인트가 결제 금액과 일치하지 않습니다.")
         }
 
         @DisplayName("사용 포인트가 음수이면 예외가 발생한다")
@@ -136,6 +136,116 @@ class PaymentTest {
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
             assertThat(exception.message).isEqualTo("사용 포인트는 0 이상이어야 합니다.")
+        }
+
+        @DisplayName("쿠폰 할인을 적용하여 결제가 생성된다")
+        @Test
+        fun `create payment with coupon discount`() {
+            // given
+            val order = createOrder(
+                orderItems = mutableListOf(
+                    createOrderItem(unitPrice = Money.krw(10000)),
+                ),
+            )
+            val couponDiscount = Money.krw(3000)
+            val usedPoint = Money.krw(7000)
+            val issuedCouponId = 100L
+
+            // when
+            val payment = Payment.pay(
+                userId = 1L,
+                order = order,
+                usedPoint = usedPoint,
+                issuedCouponId = issuedCouponId,
+                couponDiscount = couponDiscount,
+            )
+
+            // then
+            assertThat(payment.totalAmount).isEqualTo(Money.krw(10000))
+            assertThat(payment.couponDiscount).isEqualTo(couponDiscount)
+            assertThat(payment.usedPoint).isEqualTo(usedPoint)
+            assertThat(payment.issuedCouponId).isEqualTo(issuedCouponId)
+        }
+
+        @DisplayName("쿠폰 없이 결제가 생성되면 쿠폰 할인이 0원이다")
+        @Test
+        fun `create payment without coupon has zero discount`() {
+            // given
+            val order = createOrder(
+                orderItems = mutableListOf(
+                    createOrderItem(unitPrice = Money.krw(10000)),
+                ),
+            )
+
+            // when
+            val payment = Payment.pay(
+                userId = 1L,
+                order = order,
+                usedPoint = order.totalAmount,
+            )
+
+            // then
+            assertThat(payment.couponDiscount).isEqualTo(Money.ZERO_KRW)
+            assertThat(payment.issuedCouponId).isNull()
+            assertThat(payment.usedPoint).isEqualTo(order.totalAmount)
+        }
+
+        @DisplayName("쿠폰 할인 적용 시 사용 포인트가 (주문 금액 - 쿠폰 할인)과 일치하지 않으면 예외가 발생한다")
+        @Test
+        fun `throws exception when used point does not match total amount minus coupon discount`() {
+            // given
+            val order = createOrder(
+                orderItems = mutableListOf(
+                    createOrderItem(unitPrice = Money.krw(10000)),
+                ),
+            )
+            val couponDiscount = Money.krw(3000)
+
+            // 잘못된 포인트: 10000 - 3000 = 7000이어야 하는데 5000
+            val incorrectPoint = Money.krw(5000)
+
+            // when
+            val exception = assertThrows<CoreException> {
+                Payment.pay(
+                    userId = 1L,
+                    order = order,
+                    usedPoint = incorrectPoint,
+                    issuedCouponId = 100L,
+                    couponDiscount = couponDiscount,
+                )
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("사용 포인트가 결제 금액과 일치하지 않습니다.")
+        }
+
+        @DisplayName("쿠폰 할인이 주문 금액과 같으면 포인트는 0원이어야 한다")
+        @Test
+        fun `used point should be zero when coupon discount equals order amount`() {
+            // given
+            val order = createOrder(
+                orderItems = mutableListOf(
+                    createOrderItem(unitPrice = Money.krw(10000)),
+                ),
+            )
+
+            // 쿠폰 할인이 주문 금액과 같음
+            val couponDiscount = Money.krw(10000)
+
+            // when
+            val payment = Payment.pay(
+                userId = 1L,
+                order = order,
+                usedPoint = Money.ZERO_KRW,
+                issuedCouponId = 100L,
+                couponDiscount = couponDiscount,
+            )
+
+            // then
+            assertThat(payment.usedPoint).isEqualTo(Money.ZERO_KRW)
+            assertThat(payment.couponDiscount).isEqualTo(couponDiscount)
+            assertThat(payment.totalAmount).isEqualTo(Money.krw(10000))
         }
     }
 

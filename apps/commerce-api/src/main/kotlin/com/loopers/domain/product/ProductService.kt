@@ -82,7 +82,20 @@ class ProductService(
 
     @Transactional(readOnly = true)
     fun findAllByIds(ids: List<Long>): List<Product> {
-        return productRepository.findAllByIds(ids)
+        val products = productRepository.findAllByIds(ids)
+
+        // 요청한 ID와 조회된 ID 비교
+        val foundIds = products.map { it.id }.toSet()
+        val notFoundIds = ids.filterNot { it in foundIds }
+
+        if (notFoundIds.isNotEmpty()) {
+            throw CoreException(
+                ErrorType.NOT_FOUND,
+                "존재하지 않는 상품입니다: ${notFoundIds.joinToString()}",
+            )
+        }
+
+        return products
     }
 
     @Transactional

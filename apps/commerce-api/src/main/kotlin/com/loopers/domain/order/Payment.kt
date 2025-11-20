@@ -20,6 +20,8 @@ class Payment(
     totalAmount: Money,
     usedPoint: Money,
     status: PaymentStatus,
+    issuedCouponId: Long? = null,
+    couponDiscount: Money = Money.ZERO_KRW,
 ) : BaseEntity() {
     var orderId: Long = orderId
         private set
@@ -37,6 +39,15 @@ class Payment(
     var usedPoint: Money = usedPoint
         private set
 
+    @Column(name = "issued_coupon_id")
+    var issuedCouponId: Long? = issuedCouponId
+        private set
+
+    @Embedded
+    @AttributeOverride(name = "amount", column = Column(name = "coupon_discount", nullable = false))
+    var couponDiscount: Money = couponDiscount
+        private set
+
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
     var status: PaymentStatus = status
@@ -47,13 +58,18 @@ class Payment(
             userId: Long,
             order: Order,
             usedPoint: Money,
+            issuedCouponId: Long? = null,
+            couponDiscount: Money = Money.ZERO_KRW,
         ): Payment {
             if (usedPoint < Money.ZERO_KRW) {
                 throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트는 0 이상이어야 합니다.")
             }
 
-            if (usedPoint != order.totalAmount) {
-                throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트가 주문 금액과 일치하지 않습니다.")
+            // 주문 금액에서 쿠폰 할인을 뺀 금액이 포인트로 결제되어야 함
+            val expectedPayment = order.totalAmount - couponDiscount
+
+            if (usedPoint != expectedPayment) {
+                throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트가 결제 금액과 일치하지 않습니다.")
             }
 
             return Payment(
@@ -62,6 +78,8 @@ class Payment(
                 totalAmount = order.totalAmount,
                 usedPoint = usedPoint,
                 status = PaymentStatus.PAID,
+                issuedCouponId = issuedCouponId,
+                couponDiscount = couponDiscount,
             )
         }
 
@@ -71,6 +89,8 @@ class Payment(
             totalAmount: Money,
             usedPoint: Money,
             status: PaymentStatus,
+            issuedCouponId: Long? = null,
+            couponDiscount: Money = Money.ZERO_KRW,
         ): Payment {
             return Payment(
                 orderId = orderId,
@@ -78,6 +98,8 @@ class Payment(
                 totalAmount = totalAmount,
                 usedPoint = usedPoint,
                 status = status,
+                issuedCouponId = issuedCouponId,
+                couponDiscount = couponDiscount,
             )
         }
     }

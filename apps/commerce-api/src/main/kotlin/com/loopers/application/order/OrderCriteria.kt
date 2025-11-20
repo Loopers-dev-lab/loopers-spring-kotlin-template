@@ -8,6 +8,7 @@ class OrderCriteria {
         val userId: Long,
         val usePoint: Money,
         val items: List<PlaceOrderItem>,
+        val issuedCouponId: Long?,
     ) {
         fun to(): ProductCommand.DecreaseStocks {
             return ProductCommand.DecreaseStocks(
