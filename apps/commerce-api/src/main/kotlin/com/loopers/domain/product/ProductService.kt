@@ -2,14 +2,15 @@ package com.loopers.domain.product
 
 import com.loopers.application.order.OrderCommand
 import com.loopers.application.product.ProductInfo
-import jakarta.transaction.Transactional
+import com.loopers.domain.product.stock.StockRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 @Component
-class ProductService(private val productRepository: ProductRepository) {
+class ProductService(private val productRepository: ProductRepository, private val stockRepository: StockRepository) {
 
     fun getProducts(sort: String, direction: String, page: Int, size: Int): Page<ProductInfo> {
         val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sort))
@@ -17,7 +18,7 @@ class ProductService(private val productRepository: ProductRepository) {
         val convertedPageable = if (pageable.sort.isSorted) {
             val convertedSort = pageable.sort.map { order ->
                 when (order.property) {
-                    "likeCount" -> Sort.Order(order.direction, "s.likeCount")
+                    "likeCount" -> Sort.Order(order.direction, "pts.likeCount")
                     else -> order
                 }
             }.let { Sort.by(it.toList()) }
@@ -32,8 +33,10 @@ class ProductService(private val productRepository: ProductRepository) {
     @Transactional
     fun occupyStocks(command: OrderCommand) {
         command.orderItems.forEach {
-            val product = productRepository.getProductBy(it.productId)
-            product.occupyStock(it.quantity)
+            val stock = stockRepository.getStockByProductIdWithPessimisticLock(it.productId)
+            stock.occupy(it.quantity)
+
+            stockRepository.save(stock)
         }
     }
 }

@@ -13,15 +13,16 @@ interface ProductJpaRepository : JpaRepository<ProductModel, Long> {
           SELECT new com.loopers.application.product.ProductInfo(
               p.id,
               p.name,
-              p.stock,
+              COALESCE(st.amount, 0),
               p.price,
-              COALESCE(s.likeCount, 0),
+              COALESCE(pts.likeCount, 0),
               p.refBrandId,
               b.name
           )
           FROM ProductModel p
-          LEFT JOIN ProductTotalSignalModel s ON s.refProductId = p.id
+          LEFT JOIN ProductTotalSignalModel pts ON pts.refProductId = p.id
           LEFT JOIN BrandModel b ON b.id = p.refBrandId
+          LEFT JOIN StockModel st ON st.refProductId = p.id
       """,
     )
     fun findAllProductInfos(pageable: Pageable): Page<ProductInfo>
