@@ -1,6 +1,7 @@
 package com.loopers.domain.point
 
 import com.loopers.domain.common.vo.Money
+import com.loopers.support.error.CoreException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -81,7 +82,7 @@ class PointModelTest {
             val pointModel = PointFixture.create(userId = 1L, balance = BigDecimal.valueOf(1000))
 
             // act & assert
-            val exception = assertThrows<IllegalArgumentException> {
+            val exception = assertThrows<CoreException> {
                 pointModel.pay(Money(BigDecimal.ZERO))
             }
             assertThat(exception.message).isEqualTo("사용 금액은 0보다 커야 합니다.")
@@ -94,7 +95,7 @@ class PointModelTest {
             val pointModel = PointFixture.create(userId = 1L, balance = BigDecimal.valueOf(1000))
 
             // act & assert
-            val exception = assertThrows<IllegalArgumentException> {
+            val exception = assertThrows<CoreException> {
                 pointModel.pay(Money(BigDecimal.valueOf(1500)))
             }
             assertThat(exception.message).isEqualTo("잔액이 부족합니다.")
@@ -107,7 +108,7 @@ class PointModelTest {
             val pointModel = PointFixture.create(userId = 1L, balance = BigDecimal.ZERO)
 
             // act & assert
-            val exception = assertThrows<IllegalArgumentException> {
+            val exception = assertThrows<CoreException> {
                 pointModel.pay(Money(BigDecimal.valueOf(100)))
             }
             assertThat(exception.message).isEqualTo("잔액이 부족합니다.")

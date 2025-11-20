@@ -7,4 +7,6 @@ interface PointRepository {
     fun findByUserId(userId: Long): PointModel?
 
     fun getUserBy(userId: Long): PointModel
+
+    fun getUserByUserIdWithPessimisticLock(userId: Long): PointModel
 }

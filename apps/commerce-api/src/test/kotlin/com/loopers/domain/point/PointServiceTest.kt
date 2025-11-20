@@ -92,7 +92,7 @@ class PointServiceTest(
                     pointService.charge(notExistUserId, BigDecimal.valueOf(10))
                 }
 
-            assertThat(exception.message).isEqualTo("유저가 존재하지 않습니다.")
+            assertThat(exception.message).isEqualTo("해당 유저에 대한 포인트가 존재하지 않습니다.")
         }
 
         @DisplayName("존재하는 유저 ID 로 충전량을 0원으로 충전할 경우, 실패한다")
@@ -148,7 +148,7 @@ class PointServiceTest(
                     pointService.pay(notExistUserId, BigDecimal.valueOf(100))
                 }
 
-            assertThat(exception.message).isEqualTo("유저가 존재하지 않습니다.")
+            assertThat(exception.message).isEqualTo("해당 유저에 대한 포인트가 존재하지 않습니다.")
         }
 
         @DisplayName("결제 금액이 0원인 경우, 실패한다.")
@@ -164,7 +164,7 @@ class PointServiceTest(
 
             // act, assert
             val exception =
-                assertThrows<IllegalArgumentException> {
+                assertThrows<CoreException> {
                     pointService.pay(user.id, BigDecimal.ZERO)
                 }
 
@@ -184,7 +184,7 @@ class PointServiceTest(
 
             // act, assert
             val exception =
-                assertThrows<IllegalArgumentException> {
+                assertThrows<CoreException> {
                     pointService.pay(user.id, BigDecimal.valueOf(500))
                 }
 
