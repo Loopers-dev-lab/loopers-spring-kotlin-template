@@ -33,7 +33,7 @@ class PointV1ApiE2ETest @Autowired constructor(
         databaseCleanUp.truncateAllTables()
     }
 
-    @DisplayName("GET /api/v1/points/balance")
+    @DisplayName("GET /api/v1/points")
     @Nested
     inner class GetBalance {
 
@@ -127,7 +127,7 @@ class PointV1ApiE2ETest @Autowired constructor(
         }
 
         return testRestTemplate.exchange(
-            "/api/v1/points/balance",
+            "/api/v1/points",
             HttpMethod.GET,
             HttpEntity(null, headers),
             object : ParameterizedTypeReference<ApiResponse<PointV1Response.GetBalance>>() {},

@@ -25,7 +25,7 @@ class PointV1Controller(
             .let { ApiResponse.success(it) }
     }
 
-    @GetMapping("/balance")
+    @GetMapping
     override fun getPointBalance(
         @RequestHeader("X-USER-ID") userId: Long,
     ): ApiResponse<PointV1Response.GetBalance> {
