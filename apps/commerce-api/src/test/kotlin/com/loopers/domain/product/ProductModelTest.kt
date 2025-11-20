@@ -1,12 +1,12 @@
 package com.loopers.domain.product
 
-import com.loopers.domain.common.vo.Money
+import com.loopers.domain.product.stock.StockModel
+import com.loopers.support.error.CoreException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.math.BigDecimal
 
 class ProductModelTest {
 
@@ -17,31 +17,27 @@ class ProductModelTest {
         @DisplayName("요청한 수량만큼 재고가 감소한다")
         @Test
         fun decreaseStockSuccess() {
-            val product = ProductModel.create(
-                name = "Test product",
-                stock = 100,
-                price = Money(BigDecimal.valueOf(10000)),
-                refBrandId = 1,
+            val stock = StockModel.create(
+                refProductId = 1L,
+                amount = 100,
             )
 
-            product.occupyStock(1)
-            assertThat(product.stock).isEqualTo(99)
+            stock.occupy(1)
+            assertThat(stock.amount).isEqualTo(99)
         }
 
         @DisplayName("음수 수량으로 재고를 감소할 수 없다")
         @Test
         fun decreaseStockFails_whenQuantityIsLessThanZero() {
-            val product = ProductModel.create(
-                name = "Test product",
-                stock = 100,
-                price = Money(BigDecimal.valueOf(10000)),
-                refBrandId = 1,
+            val stock = StockModel.create(
+                refProductId = 1L,
+                amount = 100,
             )
 
-            val exception = assertThrows<IllegalArgumentException> {
-                product.occupyStock(-1)
+            val exception = assertThrows<CoreException> {
+                stock.occupy(-1)
             }
-            assertThat(exception.message).isEqualTo("감소 수량은 0보다 커야 합니다.")
+            assertThat(exception.message).isEqualTo("차감 수량은 0보다 커야 합니다.")
         }
     }
 }
