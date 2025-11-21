@@ -7,6 +7,7 @@ import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Component
 class OrderFacade(
@@ -17,11 +18,14 @@ class OrderFacade(
 ) {
 
     @Transactional
-    fun order(userId: Long, couponId: Long, command: OrderCommand): OrderModel {
+    fun order(userId: Long, couponId: Long?, command: OrderCommand): OrderModel {
         val totalPrice = command.orderItems.sumOf { it.productPrice * it.quantity.toBigDecimal() }
-        val discountPrice = couponService.calculateDiscountPrice(couponId, totalPrice)
 
-        pointService.pay(userId, discountPrice)
+        val discountPrice = couponId?.let {
+            couponService.calculateDiscountPrice(it, totalPrice)
+        } ?: BigDecimal.ZERO
+
+        pointService.pay(userId, totalPrice.minus(discountPrice))
 
         productService.occupyStocks(command)
         // 주문 생성
