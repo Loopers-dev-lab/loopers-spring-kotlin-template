@@ -1,7 +1,7 @@
 package com.loopers.domain.product.stock
 
 interface StockRepository {
-    fun getStockByProductIdWithPessimisticLock(productId: Long): StockModel
+    fun getStockByRefProductIdWithPessimisticLock(productId: Long): StockModel
 
     fun save(stockModel: StockModel): StockModel
 

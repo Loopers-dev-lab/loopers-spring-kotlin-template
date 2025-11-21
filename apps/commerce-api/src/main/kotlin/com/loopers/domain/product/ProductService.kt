@@ -33,7 +33,7 @@ class ProductService(private val productRepository: ProductRepository, private v
     @Transactional
     fun occupyStocks(command: OrderCommand) {
         command.orderItems.forEach {
-            val stock = stockRepository.getStockByProductIdWithPessimisticLock(it.productId)
+            val stock = stockRepository.getStockByRefProductIdWithPessimisticLock(it.productId)
             stock.occupy(it.quantity)
 
             stockRepository.save(stock)
