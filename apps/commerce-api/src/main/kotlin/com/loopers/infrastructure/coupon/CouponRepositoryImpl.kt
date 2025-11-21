@@ -8,12 +8,11 @@ import org.springframework.stereotype.Component
 
 @Component
 class CouponRepositoryImpl(private val couponJpaRepository: CouponJpaRepository) : CouponRepository {
-    override fun getNotUsedByCouponIdWithPessimisticLock(couponId: Long): CouponModel {
-        return couponJpaRepository.findNotUsedByCouponIdWithPessimisticLock(couponId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "사용 가능한 쿠폰이 존재하지 않습니다.")
-    }
+    override fun getNotUsedByCouponIdWithPessimisticLock(
+        couponId: Long,
+        userId: Long,
+    ): CouponModel = couponJpaRepository.findNotUsedByCouponIdWithPessimisticLock(couponId, userId)
+        ?: throw CoreException(ErrorType.NOT_FOUND, "사용 가능한 쿠폰이 존재하지 않습니다.")
 
-    override fun save(couponModel: CouponModel): CouponModel {
-        return couponJpaRepository.save(couponModel)
-    }
+    override fun save(couponModel: CouponModel): CouponModel = couponJpaRepository.save(couponModel)
 }

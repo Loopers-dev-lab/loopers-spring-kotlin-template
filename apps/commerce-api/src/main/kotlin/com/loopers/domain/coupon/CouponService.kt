@@ -8,8 +8,8 @@ import java.math.BigDecimal
 class CouponService(private val couponRepository: CouponRepository) {
 
     @Transactional
-    fun calculateDiscountPrice(couponId: Long, totalPrice: BigDecimal): BigDecimal {
-        val coupon = couponRepository.getNotUsedByCouponIdWithPessimisticLock(couponId)
+    fun calculateDiscountPrice(couponId: Long, userId: Long, totalPrice: BigDecimal): BigDecimal {
+        val coupon = couponRepository.getNotUsedByCouponIdWithPessimisticLock(couponId, userId)
 
         coupon.updateUsed()
         couponRepository.save(coupon)

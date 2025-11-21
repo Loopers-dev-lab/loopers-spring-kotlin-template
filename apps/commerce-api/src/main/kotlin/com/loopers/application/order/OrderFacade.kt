@@ -22,7 +22,7 @@ class OrderFacade(
         val totalPrice = command.orderItems.sumOf { it.productPrice * it.quantity.toBigDecimal() }
 
         val discountPrice = couponId?.let {
-            couponService.calculateDiscountPrice(it, totalPrice)
+            couponService.calculateDiscountPrice(it, userId, totalPrice)
         } ?: BigDecimal.ZERO
 
         pointService.pay(userId, totalPrice.minus(discountPrice))

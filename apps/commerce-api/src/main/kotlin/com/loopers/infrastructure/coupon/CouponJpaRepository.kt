@@ -9,6 +9,6 @@ import org.springframework.data.jpa.repository.Query
 interface CouponJpaRepository : JpaRepository<CouponModel, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT c FROM CouponModel c WHERE c.id = :couponId AND c.isUsed = false")
-    fun findNotUsedByCouponIdWithPessimisticLock(couponId: Long): CouponModel?
+    @Query("SELECT c FROM CouponModel c WHERE c.id = :couponId AND c.refUserId = :userId AND c.isUsed = false")
+    fun findNotUsedByCouponIdWithPessimisticLock(couponId: Long, userId: Long): CouponModel?
 }
