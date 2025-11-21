@@ -50,7 +50,7 @@ class CouponServiceTest(
             val totalPrice = BigDecimal.valueOf(10000)
 
             // act
-            val discountPrice = couponService.calculateDiscountPrice(coupon.id, totalPrice)
+            val discountPrice = couponService.calculateDiscountPrice(coupon.id, user.id, totalPrice)
 
             // assert
             val updatedCoupon = couponRepository.findById(coupon.id).get()
@@ -79,7 +79,7 @@ class CouponServiceTest(
 
             // act & assert
             val exception = assertThrows<CoreException> {
-                couponService.calculateDiscountPrice(coupon.id, totalPrice)
+                couponService.calculateDiscountPrice(coupon.id, user.id, totalPrice)
             }
 
             assertThat(exception.message).isEqualTo("할인 금액이 주문보다 클 수 없습니다.")
@@ -108,7 +108,7 @@ class CouponServiceTest(
             val totalPrice = BigDecimal.valueOf(10000)
 
             // act
-            val discountPrice = couponService.calculateDiscountPrice(coupon.id, totalPrice)
+            val discountPrice = couponService.calculateDiscountPrice(coupon.id, user.id, totalPrice)
 
             // assert
             val updatedCoupon = couponRepository.findById(coupon.id).get()
@@ -136,7 +136,7 @@ class CouponServiceTest(
             val totalPrice = BigDecimal.valueOf(20000)
 
             // act
-            val discountPrice = couponService.calculateDiscountPrice(coupon.id, totalPrice)
+            val discountPrice = couponService.calculateDiscountPrice(coupon.id, user.id, totalPrice)
 
             // assert
             assertAll(
@@ -153,12 +153,15 @@ class CouponServiceTest(
         @Test
         fun calculateDiscountPriceFails_whenCouponNotExists() {
             // arrange
+            val user = UserFixture.create()
+            userRepository.save(user)
+
             val nonExistentCouponId = 999L
             val totalPrice = BigDecimal.valueOf(10000)
 
             // act & assert
             val exception = assertThrows<CoreException> {
-                couponService.calculateDiscountPrice(nonExistentCouponId, totalPrice)
+                couponService.calculateDiscountPrice(nonExistentCouponId, user.id, totalPrice)
             }
 
             assertThat(exception.message).isEqualTo("사용 가능한 쿠폰이 존재하지 않습니다.")
@@ -182,11 +185,11 @@ class CouponServiceTest(
             val totalPrice = BigDecimal.valueOf(10000)
 
             // 첫 번째 사용
-            couponService.calculateDiscountPrice(coupon.id, totalPrice)
+            couponService.calculateDiscountPrice(coupon.id, user.id, totalPrice)
 
             // act & assert - 두 번째 사용 시도
             val exception = assertThrows<CoreException> {
-                couponService.calculateDiscountPrice(coupon.id, totalPrice)
+                couponService.calculateDiscountPrice(coupon.id, user.id, totalPrice)
             }
 
             assertThat(exception.message).isEqualTo("사용 가능한 쿠폰이 존재하지 않습니다.")
@@ -218,7 +221,7 @@ class CouponServiceTest(
             val futures = (1..2).map {
                 CompletableFuture.supplyAsync {
                     try {
-                        couponService.calculateDiscountPrice(coupon.id, totalPrice)
+                        couponService.calculateDiscountPrice(coupon.id, user.id, totalPrice)
                         true // 성공
                     } catch (e: Exception) {
                         false // 실패
@@ -232,8 +235,8 @@ class CouponServiceTest(
 
             // assert
             assertAll(
-                { assertThat(successCount).isEqualTo(1) }, // 한 번만 성공
-                { assertThat(updatedCoupon.isUsed).isTrue() }, // 쿠폰이 사용됨
+                { assertThat(successCount).isEqualTo(1) },
+                { assertThat(updatedCoupon.isUsed).isTrue() },
             )
         }
 
@@ -266,7 +269,7 @@ class CouponServiceTest(
             val futures = listOf(
                 CompletableFuture.supplyAsync {
                     try {
-                        couponService.calculateDiscountPrice(coupon1.id, totalPrice)
+                        couponService.calculateDiscountPrice(coupon1.id, user.id, totalPrice)
                         true
                     } catch (e: Exception) {
                         false
@@ -274,7 +277,7 @@ class CouponServiceTest(
                 },
                 CompletableFuture.supplyAsync {
                     try {
-                        couponService.calculateDiscountPrice(coupon2.id, totalPrice)
+                        couponService.calculateDiscountPrice(coupon2.id, user.id, totalPrice)
                         true
                     } catch (e: Exception) {
                         false
@@ -290,7 +293,8 @@ class CouponServiceTest(
 
             // assert
             assertAll(
-                { assertThat(successCount).isEqualTo(2) }, // 둘 다 성공
+                // 둘 다 성공
+                { assertThat(successCount).isEqualTo(2) },
                 { assertThat(updatedCoupon1.isUsed).isTrue() },
                 { assertThat(updatedCoupon2.isUsed).isTrue() },
             )

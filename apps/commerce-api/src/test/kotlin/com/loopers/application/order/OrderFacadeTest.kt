@@ -369,9 +369,12 @@ class OrderFacadeTest(
 
             // assert
             assertAll(
-                { assertThat(successCount).isEqualTo(1) }, // 한 주문만 성공
-                { assertThat(orders.size).isEqualTo(1) }, // 주문도 한 건만 생성
-                { assertThat(updatedCoupon.isUsed).isTrue() }, // 쿠폰이 사용됨
+                // 한 주문만 성공
+                { assertThat(successCount).isEqualTo(1) },
+                // 주문도 한 건만 생성
+                { assertThat(orders.size).isEqualTo(1) },
+                // 쿠폰이 사용됨
+                { assertThat(updatedCoupon.isUsed).isTrue() },
             )
         }
     }
