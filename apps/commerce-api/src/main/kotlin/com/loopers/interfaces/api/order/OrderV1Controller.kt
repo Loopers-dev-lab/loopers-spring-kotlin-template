@@ -28,6 +28,7 @@ class OrderV1Controller(
                     quantity = item.quantity,
                 )
             },
+            couponId = request.couponId,
         )
         return ApiResponse.success(OrderResponse.OrderInfoDto.from(order))
     }
