@@ -14,10 +14,10 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/products")
 class ProductV1Controller(
     private val productFacade: ProductFacade,
-) {
+) : ProductV1ApiSpec {
 
     @GetMapping
-    fun getProducts(
+    override fun getProducts(
         @RequestParam(required = false) brandId: Long?,
         @RequestParam(required = false) sort: ProductSortType?,
         @RequestParam(required = false) page: Int?,
@@ -35,7 +35,7 @@ class ProductV1Controller(
     }
 
     @GetMapping("/{productId}")
-    fun getProduct(
+    override fun getProduct(
         @PathVariable productId: Long,
     ): ApiResponse<ProductV1Response.GetProduct> {
         return productFacade.findProductById(productId)

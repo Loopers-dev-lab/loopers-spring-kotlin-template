@@ -16,10 +16,10 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/issued-coupons")
 class IssuedCouponV1Controller(
     private val couponFacade: CouponFacade,
-) {
+) : IssuedCouponV1ApiSpec {
 
     @PostMapping("/{couponId}")
-    fun issueCoupon(
+    override fun issueCoupon(
         @RequestHeader("X-USER-ID") userId: Long,
         @PathVariable couponId: Long,
     ): ApiResponse<IssuedCouponV1Response.Issue> {
@@ -29,7 +29,7 @@ class IssuedCouponV1Controller(
     }
 
     @GetMapping
-    fun getIssuedCoupons(
+    override fun getIssuedCoupons(
         @RequestHeader("X-USER-ID") userId: Long,
         @RequestParam(required = false) page: Int?,
         @RequestParam(required = false) size: Int?,

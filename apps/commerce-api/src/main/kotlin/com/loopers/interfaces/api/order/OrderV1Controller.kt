@@ -12,10 +12,10 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/orders")
 class OrderV1Controller(
     private val orderFacade: OrderFacade,
-) {
+) : OrderV1ApiSpec {
 
     @PostMapping
-    fun placeOrder(
+    override fun placeOrder(
         @RequestHeader("X-USER-ID") userId: Long,
         @RequestBody request: OrderV1Request.PlaceOrder,
     ): ApiResponse<OrderV1Response.PlaceOrder> {
