@@ -7,7 +7,6 @@ import jakarta.persistence.Column
 import jakarta.persistence.Embeddable
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
-import kotlin.math.min
 
 @Embeddable
 data class DiscountAmount(
@@ -35,14 +34,10 @@ data class DiscountAmount(
      * @return 계산된 할인 금액 (주문 금액을 초과하지 않음)
      */
     fun calculate(orderAmount: Money): Money {
-        val amount = orderAmount.amount.toLong()
         val discountedAmount = when (type) {
-            DiscountType.FIXED_AMOUNT -> min(value, amount)
-            DiscountType.RATE -> {
-                val discountAmount = amount * value / 100
-                min(discountAmount, amount)
-            }
+            DiscountType.FIXED_AMOUNT -> Money.krw(value)
+            DiscountType.RATE -> orderAmount.applyPercentage(value)
         }
-        return Money.krw(discountedAmount)
+        return discountedAmount.min(orderAmount).round(0)
     }
 }
