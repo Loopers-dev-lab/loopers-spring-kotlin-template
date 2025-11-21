@@ -1,5 +1,6 @@
 package com.loopers.domain.order
 
+import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.member.MemberRepository
 import com.loopers.domain.product.ProductRepository
 import com.loopers.infrastructure.order.ExternalOrderService
@@ -13,33 +14,45 @@ class OrderService(
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
     private val memberRepository: MemberRepository,
+    private val couponService: CouponService,
     private val externalOrderService: ExternalOrderService,
 ) {
     @Transactional
     fun createOrder(command: CreateOrderCommand): Order {
-        // 1. 상품 조회
-        val productIds = command.items.map { it.productId }
-        val productMap = productRepository.findAllByIdIn(productIds)
-            .associateBy { it.id!! }
+        // 상품 조회 (비관적 락 적용 - 재고 동시성 제어)
+        val productMap = productRepository.findAllByIdInWithLock(
+            command.items.map { it.productId }
+        ).associateBy { it.id }
 
-        // 2. 회원 조회
-        val member = memberRepository.findByMemberIdOrThrow(command.memberId)
+        // 회원 조회 (비관적 락 적용 - 포인트 동시성 제어)
+        val member = memberRepository.findByMemberIdWithLockOrThrow(command.memberId)
 
-        // 3. Order 생성 (상품 검증 및 OrderItem 생성 로직은 Order.create()에 위임)
-        val order = Order.create(command.memberId, command.items, productMap)
+        // 쿠폰 할인 계산 및 사용 처리
+        val discountAmount = couponService.applyAndUseCouponForOrder(
+            memberId = command.memberId,
+            couponId = command.couponId,
+            orderItems = command.items,
+            productMap = productMap
+        )
 
-        // 4. 재고 차감
-        order.items.forEach { item ->
-            item.product.decreaseStock(item.quantity)
-        }
+        // Order 생성 (상품 검증 및 OrderItem 생성 로직은 Order.create()에 위임)
+        val order = Order.create(
+            memberId = command.memberId,
+            orderItems = command.items,
+            productMap = productMap,
+            discountAmount = discountAmount,
+        )
 
-        // 5. 회원 결제 처리 (포인트 검증 및 차감)
-        member.pay(order.totalAmount)
+        // 재고 차감
+        order.decreaseProductStocks()
 
-        // 6. 주문 저장
+        // 회원 결제 처리 (포인트 검증 및 차감)
+        order.processPayment(member)
+
+        // 주문 저장
         val savedOrder = orderRepository.save(order)
 
-        // 7. 외부 시스템 연동
+        // 외부 시스템 연동
         externalOrderService.processOrder(savedOrder)
         savedOrder.complete()
 
