@@ -93,6 +93,7 @@ class CouponService(
      * @return 할인 금액
      * @throws CoreException 쿠폰을 보유하지 않았거나 이미 사용된 경우
      */
+    @Transactional
     fun useCoupon(userId: Long, issuedCouponId: Long, orderAmount: Money): Money {
         val issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "보유하지 않은 쿠폰입니다")
