@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -18,7 +19,7 @@ class MemberV1Controller(
     private val memberFacade: MemberFacade,
 ) : MemberV1ApiSpec {
 
-    @PostMapping("/join")
+    @PostMapping
     override fun join(
         @Valid @RequestBody request: JoinMemberRequest
     ): ApiResponse<MemberV1Dto.MemberResponse> {
@@ -28,9 +29,9 @@ class MemberV1Controller(
             .let { ApiResponse.success(it) }
     }
 
-    @GetMapping("/{memberId}")
-    override fun getMemberByMemberId(
-        @PathVariable memberId: String,
+    @GetMapping("/me")
+    override fun getMe(
+        @RequestHeader("X-USER-ID") memberId: String
     ): ApiResponse<MemberV1Dto.MemberResponse> {
         return memberFacade.getMemberByMemberId(memberId)
             ?.let { MemberV1Dto.MemberResponse.from(it) }
