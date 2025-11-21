@@ -2,10 +2,13 @@ package com.loopers.application.order
 
 import com.loopers.IntegrationTestSupport
 import com.loopers.domain.common.vo.Money
+import com.loopers.domain.coupon.CouponModel
+import com.loopers.domain.coupon.DiscountType
 import com.loopers.domain.point.PointModel
 import com.loopers.domain.product.ProductModel
 import com.loopers.domain.product.stock.StockModel
 import com.loopers.domain.user.UserFixture
+import com.loopers.infrastructure.coupon.CouponJpaRepository
 import com.loopers.infrastructure.order.OrderJpaRepository
 import com.loopers.infrastructure.point.PointJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
@@ -30,6 +33,7 @@ class OrderFacadeTest(
     private val productRepository: ProductJpaRepository,
     private val orderRepository: OrderJpaRepository,
     private val stockRepository: StockJpaRepository,
+    private val couponRepository: CouponJpaRepository,
     private val orderFacade: OrderFacade,
 ) : IntegrationTestSupport() {
 
@@ -68,7 +72,7 @@ class OrderFacadeTest(
             val command = OrderCommand(listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(500L))))
 
             // act & assert
-            orderFacade.order(user.id, command)
+            orderFacade.order(user.id, null, command)
 
             val orders = orderRepository.findAll()
             val point = pointRepository.findById(testPoint.id).get()
@@ -78,6 +82,45 @@ class OrderFacadeTest(
                 { assertThat(orders.size).isEqualTo(1) },
                 { assertThat(point.balance.amount).isEqualByComparingTo(BigDecimal.valueOf(5000L)) },
                 { assertThat(stock.amount).isEqualTo(990L) },
+            )
+        }
+
+        @DisplayName("쿠폰이 존재하지 않는 경우 , 주문은 실패한다.")
+        @Test
+        fun orderFails_whenCouponDoesNotExist() {
+            // arrange
+            val user = UserFixture.create()
+            userRepository.save(user)
+
+            val testPoint = PointModel(
+                user.id,
+                Money(BigDecimal.valueOf(10000L)),
+            )
+            pointRepository.save(testPoint)
+
+            val testProduct = ProductModel.create(
+                "상품 123",
+                Money(BigDecimal.valueOf(10000L)),
+                1L,
+            )
+            productRepository.save(testProduct)
+
+            val testStock = StockModel.create(testProduct.id, 100L)
+            stockRepository.save(testStock)
+
+            val nonExistentCouponId = 999L
+            val command = OrderCommand(listOf(OrderItemCommand(testProduct.id, 1L, BigDecimal.valueOf(10000L))))
+
+            // act & assert
+            val exception = assertThrows<CoreException> {
+                orderFacade.order(user.id, nonExistentCouponId, command)
+            }
+
+            val orders = orderRepository.findAll()
+
+            assertAll(
+                { assertThat(exception.message).contains("쿠폰") },
+                { assertThat(orders).isEmpty() },
             )
         }
 
@@ -108,6 +151,7 @@ class OrderFacadeTest(
             val exception = assertThrows<CoreException> {
                 orderFacade.order(
                     user.id,
+                    null,
                     OrderCommand(
                         listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(500L))),
                     ),
@@ -152,6 +196,7 @@ class OrderFacadeTest(
             val exception = assertThrows<CoreException> {
                 orderFacade.order(
                     user.id,
+                    null,
                     OrderCommand(
                         listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(500L))),
                     ),
@@ -202,7 +247,7 @@ class OrderFacadeTest(
                     val command = OrderCommand(
                         listOf(OrderItemCommand(product.id, 1L, BigDecimal.valueOf(5000L))),
                     )
-                    orderFacade.order(user.id, command)
+                    orderFacade.order(user.id, null, command)
                 }
             }
 
@@ -251,7 +296,7 @@ class OrderFacadeTest(
                     val command = OrderCommand(
                         listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(1000L))),
                     )
-                    orderFacade.order(user.id, command)
+                    orderFacade.order(user.id, null, command)
                 }
             }
 
@@ -263,6 +308,70 @@ class OrderFacadeTest(
             assertAll(
                 { assertThat(successCount).isEqualTo(10) },
                 { assertThat(stock.amount).isEqualTo(0L) },
+            )
+        }
+
+        @DisplayName("동일한 쿠폰으로 여러 기기에서 동시에 주문해도, 쿠폰은 단 한번만 사용되어야 한다.")
+        @Test
+        fun onlyOneOrderSuccess_whenMultipleOrdersWithSameCoupon() {
+            // arrange
+            val users = (1..2).map { i ->
+                val user = UserFixture.create(
+                    loginId = "coupon$i",
+                )
+                userRepository.save(user)
+
+                val point = PointModel(
+                    user.id,
+                    Money(BigDecimal.valueOf(10000L)),
+                )
+                pointRepository.save(point)
+            }
+
+            val testProduct = ProductModel.create(
+                "테스트 상품",
+                Money(BigDecimal.valueOf(5000L)),
+                1L,
+            )
+            productRepository.save(testProduct)
+
+            val testStock = StockModel.create(testProduct.id, 100L)
+            stockRepository.save(testStock)
+
+            // 1000원 정액 할인 쿠폰 생성 (유저 1에게 발급)
+            val testCoupon = CouponModel.create(
+                refUserId = users[0].id,
+                name = "1000원 할인 쿠폰",
+                discountType = DiscountType.FIXED_AMOUNT,
+                discountValue = BigDecimal.valueOf(1000),
+            )
+            couponRepository.save(testCoupon)
+
+            // act - 두 유저가 동시에 같은 쿠폰으로 주문 시도
+            val futures = users.map { user ->
+                CompletableFuture.supplyAsync {
+                    try {
+                        val command = OrderCommand(
+                            listOf(OrderItemCommand(testProduct.id, 1L, BigDecimal.valueOf(5000L))),
+                        )
+                        orderFacade.order(user.id, testCoupon.id, command)
+                        true // 성공
+                    } catch (e: Exception) {
+                        false // 실패
+                    }
+                }
+            }
+
+            val results = futures.map { it.join() }
+            val successCount = results.count { it }
+            val orders = orderRepository.findAll()
+            val updatedCoupon = couponRepository.findById(testCoupon.id).get()
+
+            // assert
+            assertAll(
+                { assertThat(successCount).isEqualTo(1) }, // 한 주문만 성공
+                { assertThat(orders.size).isEqualTo(1) }, // 주문도 한 건만 생성
+                { assertThat(updatedCoupon.isUsed).isTrue() }, // 쿠폰이 사용됨
             )
         }
     }
