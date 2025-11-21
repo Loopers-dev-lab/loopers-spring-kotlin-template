@@ -36,27 +36,6 @@ class CouponService(
     }
 
     /**
-     * 사용자의 보유 쿠폰 목록을 조회합니다.
-     *
-     * @param userId 사용자 ID
-     * @return 보유 쿠폰 정보 목록
-     */
-    @Transactional(readOnly = true)
-    fun getUserCoupons(userId: Long): List<IssuedCouponView> {
-        val issuedCoupons = issuedCouponRepository.findAllByUserId(userId)
-
-        return issuedCoupons.mapNotNull { issuedCoupon ->
-            val coupon = couponRepository.findById(issuedCoupon.couponId)
-                ?: return@mapNotNull null
-
-            IssuedCouponView(
-                issuedCoupon = issuedCoupon,
-                coupon = coupon,
-            )
-        }
-    }
-
-    /**
      * 사용자의 보유 쿠폰 목록을 페이징 조회합니다.
      *
      * @param command 조회 조건 (userId, page, size, sort)

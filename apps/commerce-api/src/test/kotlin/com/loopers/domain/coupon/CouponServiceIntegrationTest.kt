@@ -85,64 +85,6 @@ class CouponServiceIntegrationTest @Autowired constructor(
         }
     }
 
-    @DisplayName("보유 쿠폰 조회 통합테스트")
-    @Nested
-    inner class GetUserCoupons {
-
-        @DisplayName("사용자가 보유한 쿠폰 목록을 조회할 수 있다")
-        @Test
-        fun `get user coupons successfully`() {
-            // given
-            val userId = 1L
-            val coupon1 = createCoupon()
-            val coupon2 = createCoupon()
-            createIssuedCoupon(userId = userId, coupon = coupon1)
-            createIssuedCoupon(userId = userId, coupon = coupon2)
-
-            // when
-            val coupons = couponService.getUserCoupons(userId)
-
-            // then
-            assertThat(coupons).hasSize(2)
-            assertThat(coupons.map { it.coupon.id }).containsExactlyInAnyOrder(coupon1.id, coupon2.id)
-            assertThat(coupons.map { it.issuedCoupon.status }).allMatch { it == UsageStatus.AVAILABLE }
-        }
-
-        @DisplayName("보유한 쿠폰이 없으면 빈 목록을 반환한다")
-        @Test
-        fun `return empty list when user has no coupons`() {
-            // given
-            val userId = 1L
-
-            // when
-            val coupons = couponService.getUserCoupons(userId)
-
-            // then
-            assertThat(coupons).isEmpty()
-        }
-
-        @DisplayName("사용된 쿠폰도 목록에 포함된다")
-        @Test
-        fun `include used coupons in the list`() {
-            // given
-            val userId = 1L
-            val coupon = createCoupon()
-            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
-
-            // 쿠폰 사용
-            val couponEntity = couponRepository.findById(coupon.id)!!
-            issuedCoupon.use(couponEntity, Money.krw(10000))
-            issuedCouponRepository.save(issuedCoupon)
-
-            // when
-            val coupons = couponService.getUserCoupons(userId)
-
-            // then
-            assertThat(coupons).hasSize(1)
-            assertThat(coupons[0].issuedCoupon.status).isEqualTo(UsageStatus.USED)
-        }
-    }
-
     @DisplayName("보유 쿠폰 조회 (페이지네이션) 통합테스트")
     @Nested
     inner class FindUserCoupons {

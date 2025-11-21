@@ -64,11 +64,6 @@ class IssuedCouponRdbRepository(
     }
 
     @Transactional(readOnly = true)
-    override fun findAllByUserId(userId: Long): List<IssuedCoupon> {
-        return issuedCouponJpaRepository.findAllByUserId(userId)
-    }
-
-    @Transactional(readOnly = true)
     override fun findById(id: Long): IssuedCoupon? {
         return issuedCouponJpaRepository.findByIdOrNull(id)
     }
