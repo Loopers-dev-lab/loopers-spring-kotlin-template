@@ -7,6 +7,7 @@ import com.loopers.domain.product.stock.StockRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 @Component
 class ProductDetailService(
@@ -16,6 +17,7 @@ class ProductDetailService(
     private val stockRepository: StockRepository,
 ) {
 
+    @Transactional(readOnly = true)
     fun getProductDetailBy(productId: Long): ProductDetailResult {
         val product = productRepository.findById(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "해당 상품은 존재하지 않습니다.")

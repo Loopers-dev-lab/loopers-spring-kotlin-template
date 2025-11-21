@@ -29,6 +29,8 @@ class StockModel(
 
     companion object {
         fun create(refProductId: Long, amount: Long): StockModel =
-            StockModel(refProductId, amount)
+            StockModel(refProductId, amount).apply {
+                require(amount >= 0) { "재고 수량은 0 이상이어야 합니다." }
+            }
     }
 }
