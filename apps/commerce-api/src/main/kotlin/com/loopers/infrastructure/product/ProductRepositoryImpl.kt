@@ -51,4 +51,17 @@ class ProductRepositoryImpl(
     override fun findAllByIdIn(ids: List<Long>): List<Product> {
         return productJpaRepository.findAllById(ids)
     }
+
+    override fun findByIdWithLock(id: Long): Product? {
+        return productJpaRepository.findByIdWithLock(id)
+    }
+
+    override fun findByIdWithLockOrThrow(id: Long): Product {
+        return findByIdWithLock(id)
+            ?: throw CoreException(ErrorType.PRODUCT_NOT_FOUND, "상품을 찾을 수 없습니다. id: $id")
+    }
+
+    override fun findAllByIdInWithLock(ids: List<Long>): List<Product> {
+        return productJpaRepository.findAllByIdInWithLock(ids)
+    }
 }

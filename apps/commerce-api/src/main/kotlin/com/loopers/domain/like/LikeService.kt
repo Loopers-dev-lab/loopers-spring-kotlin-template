@@ -15,15 +15,17 @@ class LikeService(
 ) {
 
     @Transactional
-    fun addLike(memberId: Long, productId: Long): Like {
-        // 이미 좋아요가 있으면 기존 것 반환
-        val existingLike = likeRepository.findByMemberIdAndProductId(memberId, productId)
+    fun addLike(memberId: String, productId: Long): Like {
+        val member = memberRepository.findByMemberIdOrThrow(memberId)
+
+        // 이미 좋아요가 있으면 기존 것 반환 (멱등성 보장)
+        val existingLike = likeRepository.findByMemberIdAndProductId(member.id, productId)
         if (existingLike != null) {
             return existingLike
         }
 
-        val member = memberRepository.findByIdOrThrow(memberId)
-        val product = productRepository.findByIdOrThrow(productId)
+        // 비관적 락 적용 - likesCount 동시성 제어
+        val product = productRepository.findByIdWithLockOrThrow(productId)
 
         val like = Like.of(member, product)
         product.increaseLikesCount()
@@ -32,19 +34,23 @@ class LikeService(
     }
 
     @Transactional
-    fun cancelLike(memberId: Long, productId: Long) {
-        // 좋아요가 없으면 그냥 리턴
-        val like = likeRepository.findByMemberIdAndProductId(memberId, productId)
+    fun cancelLike(memberId: String, productId: Long) {
+        val member = memberRepository.findByMemberIdOrThrow(memberId)
+
+        // 좋아요가 없으면 그냥 리턴 (멱등성 보장)
+        val like = likeRepository.findByMemberIdAndProductId(member.id, productId)
             ?: return
 
-        val product = productRepository.findByIdOrThrow(productId)
+        // 비관적 락 적용 - likesCount 동시성 제어
+        val product = productRepository.findByIdWithLockOrThrow(productId)
         product.decreaseLikesCount()
 
-        likeRepository.deleteByMemberIdAndProductId(memberId, productId)
+        likeRepository.deleteByMemberIdAndProductId(member.id, productId)
     }
 
     @Transactional(readOnly = true)
-    fun getMyLikes(memberId: Long, pageable: Pageable): Page<Like> {
-        return likeRepository.findByMemberId(memberId, pageable)
+    fun getMyLikes(memberId: String, pageable: Pageable): Page<Like> {
+        val member = memberRepository.findByMemberIdOrThrow(memberId)
+        return likeRepository.findByMemberId(member.id, pageable)
     }
 }
