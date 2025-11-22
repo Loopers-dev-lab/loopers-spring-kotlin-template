@@ -1,5 +1,6 @@
 package com.loopers.application.order
 
+import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderItem
 import com.loopers.domain.order.OrderQueryService
 import com.loopers.domain.order.OrderService
@@ -26,6 +27,7 @@ class OrderFacadeTest {
     private val productQueryService: ProductQueryService = mockk(relaxed = true)
     private val stockService: StockService = mockk(relaxed = true)
     private val pointService: PointService = mockk(relaxed = true)
+    private val couponService: CouponService = mockk(relaxed = true)
 
     private val orderFacade = OrderFacade(
         orderService,
@@ -33,6 +35,7 @@ class OrderFacadeTest {
         productQueryService,
         stockService,
         pointService,
+        couponService,
     )
 
     @Test

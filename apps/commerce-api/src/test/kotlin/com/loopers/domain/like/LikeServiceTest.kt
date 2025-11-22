@@ -1,20 +1,31 @@
 package com.loopers.domain.like
 
+import com.ninjasquad.springmockk.MockkBean
+import io.mockk.Runs
 import io.mockk.every
-import io.mockk.mockk
+import io.mockk.just
 import io.mockk.verify
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
 
+@SpringBootTest
+@ActiveProfiles("test")
 class LikeServiceTest {
-    private val likeRepository: LikeRepository = mockk(relaxed = true)
-    private val likeService = LikeService(likeRepository)
+    @Autowired
+    private lateinit var likeService: LikeService
+
+    @MockkBean
+    private lateinit var likeRepository: LikeRepository
 
     @Test
     fun `좋아요를 등록할 수 있다`() {
         // given
         val userId = 1L
         val productId = 100L
-        every { likeRepository.findByUserIdAndProductIdWithLock(userId, productId) } returns null
+        every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns false
+        every { likeRepository.save(any()) } returns Like(userId = userId, productId = productId)
 
         // when
         likeService.addLike(userId, productId)
@@ -28,8 +39,7 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
-        val existingLike = Like(userId = userId, productId = productId)
-        every { likeRepository.findByUserIdAndProductIdWithLock(userId, productId) } returns existingLike
+        every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns true
 
         // when
         likeService.addLike(userId, productId)
@@ -43,6 +53,7 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
+        every { likeRepository.deleteByUserIdAndProductId(userId, productId) } just Runs
 
         // when
         likeService.removeLike(userId, productId)
@@ -56,6 +67,7 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
+        every { likeRepository.deleteByUserIdAndProductId(userId, productId) } just Runs
 
         // when
         likeService.removeLike(userId, productId)
