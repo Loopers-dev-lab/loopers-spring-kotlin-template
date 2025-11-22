@@ -8,6 +8,7 @@ interface LikeRepository {
     fun countByProductId(productId: Long): Long
     fun countByProductIdIn(productIds: List<Long>): Map<Long, Long>
     fun save(like: Like): Like
+    fun saveAll(likes: List<Like>): List<Like>
     fun deleteByUserIdAndProductId(userId: Long, productId: Long)
     fun findByUserId(userId: Long, pageable: Pageable): Page<Like>
     fun findValidLikesByUserId(userId: Long, pageable: Pageable): Page<Like>

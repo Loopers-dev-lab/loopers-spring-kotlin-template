@@ -17,4 +17,5 @@ class StockRepositoryImpl(
     ): Stock? = stockJpaRepository.findByProductIdWithLock(productId)
 
     override fun save(stock: Stock): Stock = stockJpaRepository.save(stock)
+    override fun saveAll(stocks: List<Stock>) = stockJpaRepository.saveAll(stocks)
 }

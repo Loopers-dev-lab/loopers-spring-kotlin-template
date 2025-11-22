@@ -1,5 +1,6 @@
 package com.loopers.domain.product
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestProduct
 import com.loopers.support.error.CoreException
@@ -10,12 +11,20 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.redis.core.RedisTemplate
 import java.math.BigDecimal
 
 class ProductQueryServiceTest {
     private val productRepository: ProductRepository = mockk()
     private val stockRepository: StockRepository = mockk()
-    private val productQueryService = ProductQueryService(productRepository, stockRepository)
+    private val redisTemplate: RedisTemplate<String, String> = mockk(relaxed = true)
+    private val objectMapper: ObjectMapper = mockk(relaxed = true)
+    private val productQueryService = ProductQueryService(
+        productRepository,
+        stockRepository,
+        redisTemplate,
+        objectMapper,
+    )
 
     @Test
     fun `상품 목록을 조회할 수 있다`() {
@@ -27,6 +36,7 @@ class ProductQueryServiceTest {
         val products = PageImpl(listOf(product1, product2))
         val pageable = PageRequest.of(0, 20)
 
+        every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findAll(null, "latest", pageable) } returns products
 
         // when
@@ -48,6 +58,7 @@ class ProductQueryServiceTest {
         val pageable = PageRequest.of(0, 20)
         val brandId = 1L
 
+        every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findAll(brandId, "latest", pageable) } returns products
 
         // when
@@ -68,6 +79,7 @@ class ProductQueryServiceTest {
         val products = PageImpl(listOf(product1, product2))
         val pageable = PageRequest.of(0, 20)
 
+        every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findAll(null, "price_asc", pageable) } returns products
 
         // when
@@ -86,6 +98,7 @@ class ProductQueryServiceTest {
         val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val stock = Stock(productId = 100L, quantity = 50)
 
+        every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findById(100L) } returns product
         every { stockRepository.findByProductId(100L) } returns stock
 
@@ -118,6 +131,7 @@ class ProductQueryServiceTest {
     @Test
     fun `존재하지 않는 상품 조회 시 예외가 발생한다`() {
         // given
+        every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findById(999L) } returns null
 
         // when & then
@@ -133,6 +147,7 @@ class ProductQueryServiceTest {
         val brand = createTestBrand(id = 1L, name = "나이키")
         val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
 
+        every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findById(100L) } returns product
         every { stockRepository.findByProductId(100L) } returns null
 

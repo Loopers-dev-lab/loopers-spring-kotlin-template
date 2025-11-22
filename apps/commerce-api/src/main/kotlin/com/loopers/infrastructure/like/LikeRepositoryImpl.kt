@@ -24,6 +24,7 @@ class LikeRepositoryImpl(
             .associate { it.getProductId() to it.getLikeCount() }
 
     override fun save(like: Like): Like = likeJpaRepository.save(like)
+    override fun saveAll(likes: List<Like>): List<Like> = likeJpaRepository.saveAll(likes)
 
     override fun deleteByUserIdAndProductId(userId: Long, productId: Long) {
         likeJpaRepository.deleteByUserIdAndProductId(userId, productId)

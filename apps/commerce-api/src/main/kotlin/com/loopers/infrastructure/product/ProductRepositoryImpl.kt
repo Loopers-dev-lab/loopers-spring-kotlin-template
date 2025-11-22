@@ -63,6 +63,7 @@ class ProductRepositoryImpl(
     }
 
     override fun save(product: Product): Product = productJpaRepository.save(product)
+    override fun saveAll(products: List<Product>): List<Product> = productJpaRepository.saveAll(products)
 
     override fun existsById(id: Long): Boolean = productJpaRepository.existsById(id)
 
