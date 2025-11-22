@@ -12,12 +12,20 @@ import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
 import jakarta.persistence.ForeignKey
+import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 
 @Entity
-@Table(name = "products")
+@Table(
+    name = "products",
+    indexes = [
+        Index(name = "idx_brand_id_like_count", columnList = "brand_id,like_count DESC"),
+        Index(name = "idx_brand_id_price", columnList = "brand_id,price_amount"),
+        Index(name = "idx_like_count", columnList = "like_count DESC"),
+    ],
+)
 class Product(
     name: String,
     price: Price,
@@ -40,6 +48,10 @@ class Product(
     var brand: Brand = brand
         protected set
 
+    @Column(name = "like_count", nullable = false)
+    var likeCount: Long = 0L
+        protected set
+
     init {
         if (name.isBlank()) {
             throw CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.")
@@ -55,5 +67,23 @@ class Product(
             throw CoreException(ErrorType.BAD_REQUEST, "상품명은 비어있을 수 없습니다.")
         }
         this.name = newName
+    }
+
+    fun incrementLikeCount() {
+        this.likeCount += 1
+    }
+
+    fun decrementLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount -= 1
+        }
+    }
+
+    /**
+     * 좋아요 수를 직접 설정합니다.
+     * 주의: 이 메서드는 배치 작업이나 데이터 동기화 시에만 사용해야 합니다.
+     */
+    internal fun setLikeCount(count: Long) {
+        this.likeCount = maxOf(0, count)
     }
 }

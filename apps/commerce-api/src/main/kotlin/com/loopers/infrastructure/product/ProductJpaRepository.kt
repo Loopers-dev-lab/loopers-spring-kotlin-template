@@ -14,12 +14,10 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
     @Query(
         """
         SELECT p FROM Product p
-        LEFT JOIN Like l ON l.productId = p.id
-        GROUP BY p
-        ORDER BY COUNT(l) DESC
+        ORDER BY p.likeCount DESC, p.id DESC
     """,
     countQuery = """
-        SELECT COUNT(DISTINCT p) FROM Product p
+        SELECT COUNT(p) FROM Product p
     """,
     )
     fun findAllOrderByLikeCount(pageable: Pageable): Page<Product>
@@ -27,13 +25,11 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
     @Query(
         """
         SELECT p FROM Product p
-        LEFT JOIN Like l ON l.productId = p.id
         WHERE p.brand.id = :brandId
-        GROUP BY p
-        ORDER BY COUNT(l) DESC
+        ORDER BY p.likeCount DESC, p.id DESC
     """,
     countQuery = """
-        SELECT COUNT(DISTINCT p) FROM Product p
+        SELECT COUNT(p) FROM Product p
         WHERE p.brand.id = :brandId
     """,
     )
