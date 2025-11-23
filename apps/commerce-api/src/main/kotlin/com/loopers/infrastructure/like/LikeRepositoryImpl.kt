@@ -26,8 +26,8 @@ class LikeRepositoryImpl(
     override fun save(like: Like): Like = likeJpaRepository.save(like)
     override fun saveAll(likes: List<Like>): List<Like> = likeJpaRepository.saveAll(likes)
 
-    override fun deleteByUserIdAndProductId(userId: Long, productId: Long) {
-        likeJpaRepository.deleteByUserIdAndProductId(userId, productId)
+    override fun deleteByUserIdAndProductId(userId: Long, productId: Long): Long {
+        return likeJpaRepository.deleteByUserIdAndProductId(userId, productId)
     }
 
     override fun findByUserId(

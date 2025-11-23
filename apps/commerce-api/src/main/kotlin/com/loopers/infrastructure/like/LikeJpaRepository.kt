@@ -14,7 +14,7 @@ interface ProductLikeCount {
 interface LikeJpaRepository : JpaRepository<Like, Long> {
     fun existsByUserIdAndProductId(userId: Long, productId: Long): Boolean
     fun countByProductId(productId: Long): Long
-    fun deleteByUserIdAndProductId(userId: Long, productId: Long)
+    fun deleteByUserIdAndProductId(userId: Long, productId: Long): Long
     fun findByUserId(userId: Long, pageable: Pageable): Page<Like>
 
     @Query(

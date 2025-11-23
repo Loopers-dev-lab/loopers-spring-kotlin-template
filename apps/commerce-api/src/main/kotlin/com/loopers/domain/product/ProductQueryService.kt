@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.redis.core.RedisTemplate
@@ -28,21 +29,27 @@ class ProductQueryService(
         private const val PRODUCT_LIST_CACHE_PREFIX = "product:list:"
         private val PRODUCT_DETAIL_TTL = Duration.ofMinutes(10)
         private val PRODUCT_LIST_TTL = Duration.ofMinutes(5)
+        private val logger = LoggerFactory.getLogger(ProductQueryService::class.java)
     }
 
     fun findProducts(brandId: Long?, sort: String, pageable: Pageable): Page<Product> {
         val cacheKey = buildProductListCacheKey(brandId, sort, pageable)
 
-        // 1. Redis에서 먼저 조회
-        val cached = redisTemplate.opsForValue().get(cacheKey)
-        if (cached != null) {
-            val products: Page<Product> = objectMapper.readValue(cached)
-            // 캐시된 데이터라도 최신 좋아요 수를 Redis에서 가져와서 반영
-            products.content.forEach { product ->
-                val likeCount = productLikeCountService.getLikeCount(product.id)
-                product.setLikeCount(likeCount)
+        // 1. Redis에서 먼저 조회 (예외 처리로 fallback 보장)
+        try {
+            val cached = redisTemplate.opsForValue().get(cacheKey)
+            if (cached != null) {
+                val products: Page<Product> = objectMapper.readValue(cached)
+                // 캐시된 데이터라도 최신 좋아요 수를 Redis에서 가져와서 반영
+                products.content.forEach { product ->
+                    val likeCount = productLikeCountService.getLikeCount(product.id)
+                    product.setLikeCount(likeCount)
+                }
+                return products
             }
-            return products
+        } catch (e: Exception) {
+            logger.error("Failed to read product list from Redis cache, falling back to DB: cacheKey=$cacheKey", e)
+            // 캐시 실패 시 DB로 fallback
         }
 
         // 2. DB 조회
@@ -54,9 +61,14 @@ class ProductQueryService(
             product.setLikeCount(likeCount)
         }
 
-        // 4. Redis에 캐시 저장 (5분 TTL)
-        val cacheValue = objectMapper.writeValueAsString(products)
-        redisTemplate.opsForValue().set(cacheKey, cacheValue, PRODUCT_LIST_TTL)
+        // 4. Redis에 캐시 저장 (5분 TTL, 실패해도 응답에 영향 없음)
+        try {
+            val cacheValue = objectMapper.writeValueAsString(products)
+            redisTemplate.opsForValue().set(cacheKey, cacheValue, PRODUCT_LIST_TTL)
+        } catch (e: Exception) {
+            logger.error("Failed to write product list to Redis cache: cacheKey=$cacheKey", e)
+            // 캐시 쓰기 실패는 무시하고 계속 진행
+        }
 
         return products
     }
@@ -69,14 +81,19 @@ class ProductQueryService(
     fun getProductDetail(productId: Long): ProductDetailData {
         val cacheKey = "$PRODUCT_DETAIL_CACHE_PREFIX$productId"
 
-        // 1. Redis에서 먼저 조회
-        val cached = redisTemplate.opsForValue().get(cacheKey)
-        if (cached != null) {
-            val productDetailData: ProductDetailData = objectMapper.readValue(cached)
-            // 캐시된 데이터라도 최신 좋아요 수를 Redis에서 가져와서 반영
-            val likeCount = productLikeCountService.getLikeCount(productId)
-            productDetailData.product.setLikeCount(likeCount)
-            return productDetailData
+        // 1. Redis에서 먼저 조회 (예외 처리로 fallback 보장)
+        try {
+            val cached = redisTemplate.opsForValue().get(cacheKey)
+            if (cached != null) {
+                val productDetailData: ProductDetailData = objectMapper.readValue(cached)
+                // 캐시된 데이터라도 최신 좋아요 수를 Redis에서 가져와서 반영
+                val likeCount = productLikeCountService.getLikeCount(productId)
+                productDetailData.product.setLikeCount(likeCount)
+                return productDetailData
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to read product detail from Redis cache, falling back to DB: productId=$productId", e)
+            // 캐시 실패 시 DB로 fallback
         }
 
         // 2. DB 조회
@@ -92,9 +109,14 @@ class ProductQueryService(
 
         val productDetailData = ProductDetailData(product, stock)
 
-        // 4. Redis에 캐시 저장 (10분 TTL)
-        val cacheValue = objectMapper.writeValueAsString(productDetailData)
-        redisTemplate.opsForValue().set(cacheKey, cacheValue, PRODUCT_DETAIL_TTL)
+        // 4. Redis에 캐시 저장 (10분 TTL, 실패해도 응답에 영향 없음)
+        try {
+            val cacheValue = objectMapper.writeValueAsString(productDetailData)
+            redisTemplate.opsForValue().set(cacheKey, cacheValue, PRODUCT_DETAIL_TTL)
+        } catch (e: Exception) {
+            logger.error("Failed to write product detail to Redis cache: productId=$productId", e)
+            // 캐시 쓰기 실패는 무시하고 계속 진행
+        }
 
         return productDetailData
     }

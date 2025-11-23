@@ -56,8 +56,8 @@ class ProductLikeCountSyncScheduler(
                         return@forEach
                     }
 
-                    // DB 업데이트
-                    val product = productRepository.findById(productId)
+                    // DB 업데이트 (비관적 락 사용)
+                    val product = productRepository.findByIdWithLock(productId)
                     if (product != null) {
                         product.setLikeCount(redisCount)
                         productRepository.save(product)

@@ -3,6 +3,7 @@ package com.loopers.domain.product
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -22,10 +23,64 @@ class ProductLikeCountService(
     companion object {
         private const val LIKE_COUNT_KEY_PREFIX = "product:like:count:"
         private val logger = LoggerFactory.getLogger(ProductLikeCountService::class.java)
+
+        /**
+         * Redis에서 원자적으로 증가하는 Lua 스크립트 (키가 존재하는 경우)
+         * KEYS[1]: 카운터 키
+         * 반환값: 증가 후의 값, 또는 키가 없으면 -1
+         */
+        private val INCREMENT_IF_EXISTS_SCRIPT = RedisScript.of(
+            """
+            local current = redis.call('GET', KEYS[1])
+            if current == false then
+                return -1
+            end
+            redis.call('INCR', KEYS[1])
+            return tonumber(current) + 1
+            """.trimIndent(),
+            Long::class.java,
+        )
+
+        /**
+         * Redis에서 원자적으로 초기화 후 증가하는 Lua 스크립트
+         * KEYS[1]: 카운터 키
+         * ARGV[1]: 초기값
+         * 반환값: 증가 후의 값
+         */
+        private val INIT_AND_INCREMENT_SCRIPT = RedisScript.of(
+            """
+            redis.call('SET', KEYS[1], ARGV[1])
+            redis.call('INCR', KEYS[1])
+            return tonumber(ARGV[1]) + 1
+            """.trimIndent(),
+            Long::class.java,
+        )
+
+        /**
+         * Redis에서 원자적으로 감소하되 0 이하로 내려가지 않도록 하는 Lua 스크립트
+         * KEYS[1]: 카운터 키
+         * 반환값: 감소 후의 값 (0 이하면 감소하지 않고 0 반환)
+         */
+        private val DECREMENT_IF_POSITIVE_SCRIPT = RedisScript.of(
+            """
+            local current = redis.call('GET', KEYS[1])
+            if current == false then
+                return 0
+            end
+            current = tonumber(current)
+            if current <= 0 then
+                return 0
+            end
+            redis.call('DECR', KEYS[1])
+            return current - 1
+            """.trimIndent(),
+            Long::class.java,
+        )
     }
 
     /**
      * 좋아요 수를 원자적으로 증가시킵니다.
+     * Lua 스크립트를 사용하여 원자적으로 증가하며, 키가 없으면 DB에서 초기값을 가져옵니다.
      * Redis 장애 시 DB로 fallback 처리합니다.
      * @return 증가 후의 좋아요 수
      */
@@ -34,13 +89,19 @@ class ProductLikeCountService(
         try {
             val key = getLikeCountKey(productId)
 
-            // Redis에 키가 없으면 DB에서 가져와서 초기화
-            if (!redisTemplate.hasKey(key)) {
-                initializeLikeCount(productId)
+            // 1단계: 키가 존재하면 바로 증가 (대부분의 경우)
+            val result = redisTemplate.execute(INCREMENT_IF_EXISTS_SCRIPT, listOf(key))
+            if (result != null && result != -1L) {
+                return result
             }
 
-            // Redis에서 원자적으로 증가
-            return redisTemplate.opsForValue().increment(key) ?: 0L
+            // 2단계: 키가 없으면 DB에서 초기값을 가져와 초기화 후 증가
+            val initialValue = productRepository.findById(productId)?.likeCount ?: 0L
+            return redisTemplate.execute(
+                INIT_AND_INCREMENT_SCRIPT,
+                listOf(key),
+                initialValue.toString(),
+            ) ?: 0L
         } catch (e: RedisConnectionFailureException) {
             logger.warn("Redis connection failed, falling back to DB for increment: productId=$productId", e)
             return fallbackToDbIncrement(productId)
@@ -52,6 +113,7 @@ class ProductLikeCountService(
 
     /**
      * 좋아요 수를 원자적으로 감소시킵니다.
+     * Lua 스크립트를 사용하여 원자적으로 감소하되 0 이하로 내려가지 않도록 보장합니다.
      * Redis 장애 시 DB로 fallback 처리합니다.
      * @return 감소 후의 좋아요 수 (0 이하로 내려가지 않음)
      */
@@ -60,18 +122,12 @@ class ProductLikeCountService(
         try {
             val key = getLikeCountKey(productId)
 
-            // Redis에 키가 없으면 DB에서 가져와서 초기화
-            if (!redisTemplate.hasKey(key)) {
-                initializeLikeCount(productId)
-            }
-
-            // Redis에서 원자적으로 감소 (0 이하로 내려가지 않도록 보장)
-            val currentCount = getLikeCount(productId)
-            if (currentCount <= 0) {
-                return 0L
-            }
-
-            return redisTemplate.opsForValue().decrement(key)?.coerceAtLeast(0L) ?: 0L
+            // Lua 스크립트를 사용하여 원자적으로 감소 (0 이하로 내려가지 않음)
+            // 키가 없거나 0이면 0을 반환
+            return redisTemplate.execute(
+                DECREMENT_IF_POSITIVE_SCRIPT,
+                listOf(key),
+            ) ?: 0L
         } catch (e: RedisConnectionFailureException) {
             logger.warn("Redis connection failed, falling back to DB for decrement: productId=$productId", e)
             return fallbackToDbDecrement(productId)
@@ -112,11 +168,12 @@ class ProductLikeCountService(
      * Redis의 좋아요 수를 DB에 동기화합니다.
      * @return 동기화 성공 여부
      */
+    @Transactional
     fun syncToDatabase(productId: Long): Boolean {
         val key = getLikeCountKey(productId)
         val redisCount = redisTemplate.opsForValue().get(key)?.toLongOrNull() ?: return false
 
-        val product = productRepository.findById(productId) ?: return false
+        val product = productRepository.findByIdWithLock(productId) ?: return false
         product.setLikeCount(redisCount)
         productRepository.save(product)
 

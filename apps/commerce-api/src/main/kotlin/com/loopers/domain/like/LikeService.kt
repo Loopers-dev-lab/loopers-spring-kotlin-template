@@ -51,23 +51,22 @@ class LikeService(
 
     @Transactional
     fun removeLike(userId: Long, productId: Long) {
-        // 좋아요가 존재하는지 확인
-        if (!likeRepository.existsByUserIdAndProductId(userId, productId)) {
-            return
-        }
-
         // 상품 존재 여부 확인
         if (!productRepository.existsById(productId)) {
             throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
         }
 
-        likeRepository.deleteByUserIdAndProductId(userId, productId)
+        // 삭제 시도 및 삭제된 행 수 확인
+        val deletedCount = likeRepository.deleteByUserIdAndProductId(userId, productId)
 
-        // Redis에서 좋아요 수 감소 (atomic 연산)
-        productLikeCountService.decrement(productId)
+        // 실제로 삭제된 경우에만 Redis 감소 및 캐시 무효화
+        if (deletedCount > 0) {
+            // Redis에서 좋아요 수 감소 (atomic 연산)
+            productLikeCountService.decrement(productId)
 
-        // 캐시 무효화
-        evictProductCache(productId)
+            // 캐시 무효화
+            evictProductCache(productId)
+        }
     }
 
     private fun evictProductCache(productId: Long) {
