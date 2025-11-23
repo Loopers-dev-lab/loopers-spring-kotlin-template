@@ -1,17 +1,21 @@
 package com.loopers.domain.like
 
+import com.loopers.domain.product.ProductLikeCountService
 import com.loopers.domain.product.ProductRepository
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestProduct
 import com.ninjasquad.springmockk.MockkBean
-import io.mockk.Runs
 import io.mockk.every
-import io.mockk.just
+import io.mockk.justRun
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.data.redis.connection.RedisConnection
+import org.springframework.data.redis.core.Cursor
+import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.ScanOptions
 import org.springframework.test.context.ActiveProfiles
 import java.math.BigDecimal
 
@@ -28,6 +32,9 @@ class LikeServiceTest {
     private lateinit var productRepository: ProductRepository
 
     @MockkBean
+    private lateinit var productLikeCountService: ProductLikeCountService
+
+    @MockkBean
     private lateinit var redisTemplate: RedisTemplate<String, String>
 
     @Test
@@ -35,21 +42,21 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
-        val brand = createTestBrand(id = 1L, name = "테스트")
-        val product = createTestProduct(id = productId, name = "상품", price = BigDecimal("10000"), brand = brand)
 
         every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns false
-        every { productRepository.findById(productId) } returns product
+        every { productRepository.existsById(productId) } returns true
         every { likeRepository.save(any()) } returns Like(userId = userId, productId = productId)
+        every { productLikeCountService.increment(productId) } returns 1L
         every { redisTemplate.delete(any<String>()) } returns true
-        every { redisTemplate.keys(any<String>()) } returns emptySet()
+        every { redisTemplate.execute(any<RedisCallback<*>>()) } returns null
 
         // when
         likeService.addLike(userId, productId)
 
         // then
         verify { likeRepository.save(any()) }
-        verify { productRepository.findById(productId) }
+        verify { productRepository.existsById(productId) }
+        verify { productLikeCountService.increment(productId) }
     }
 
     @Test
@@ -71,21 +78,20 @@ class LikeServiceTest {
         // given
         val userId = 1L
         val productId = 100L
-        val brand = createTestBrand(id = 1L, name = "테스트")
-        val product = createTestProduct(id = productId, name = "상품", price = BigDecimal("10000"), brand = brand)
 
-        every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns true
-        every { productRepository.findById(productId) } returns product
-        every { likeRepository.deleteByUserIdAndProductId(userId, productId) } just Runs
+        every { productRepository.existsById(productId) } returns true
+        every { likeRepository.deleteByUserIdAndProductId(userId, productId) } returns 1
+        every { productLikeCountService.decrement(productId) } returns 0L
         every { redisTemplate.delete(any<String>()) } returns true
-        every { redisTemplate.keys(any<String>()) } returns emptySet()
+        every { redisTemplate.execute(any<RedisCallback<*>>()) } returns null
 
         // when
         likeService.removeLike(userId, productId)
 
         // then
         verify { likeRepository.deleteByUserIdAndProductId(userId, productId) }
-        verify { productRepository.findById(productId) }
+        verify { productRepository.existsById(productId) }
+        verify { productLikeCountService.decrement(productId) }
     }
 
     @Test
@@ -94,13 +100,15 @@ class LikeServiceTest {
         val userId = 1L
         val productId = 100L
 
-        every { likeRepository.existsByUserIdAndProductId(userId, productId) } returns false
+        every { productRepository.existsById(productId) } returns true
+        every { likeRepository.deleteByUserIdAndProductId(userId, productId) } returns 0
 
         // when
         likeService.removeLike(userId, productId)
 
-        // then (예외 발생 없이 early return)
-        verify(exactly = 0) { likeRepository.deleteByUserIdAndProductId(userId, productId) }
-        verify(exactly = 0) { productRepository.findById(any()) }
+        // then (예외 발생 없이 early return, 실제 삭제가 없으면 Redis 감소도 호출되지 않음)
+        verify { likeRepository.deleteByUserIdAndProductId(userId, productId) }
+        verify { productRepository.existsById(productId) }
+        verify(exactly = 0) { productLikeCountService.decrement(any()) }
     }
 }
