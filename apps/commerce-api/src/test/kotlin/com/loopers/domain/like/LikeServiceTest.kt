@@ -2,22 +2,15 @@ package com.loopers.domain.like
 
 import com.loopers.domain.product.ProductLikeCountService
 import com.loopers.domain.product.ProductRepository
-import com.loopers.fixtures.createTestBrand
-import com.loopers.fixtures.createTestProduct
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
-import io.mockk.justRun
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.data.redis.connection.RedisConnection
-import org.springframework.data.redis.core.Cursor
 import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.data.redis.core.ScanOptions
 import org.springframework.test.context.ActiveProfiles
-import java.math.BigDecimal
 
 @SpringBootTest
 @ActiveProfiles("test")

@@ -9,16 +9,19 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.user.Gender
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserRepository
+import com.loopers.testcontainers.RedisTestContainersConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ContextConfiguration
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.LocalDate
 
 @SpringBootTest
+@ContextConfiguration(initializers = [RedisTestContainersConfig::class])
 @Transactional
 class LikeServiceIntegrationTest {
     @Autowired
