@@ -116,8 +116,8 @@ class ProductLikeCountService(
 
     private fun initializeFromDatabase(productId: Long, key: String): Long {
         val likeCount = getFromDatabase(productId)
-        redisTemplate.opsForValue().set(key, likeCount.toString())
-        return likeCount
+        redisTemplate.opsForValue().setIfAbsent(key, likeCount.toString())
+        return redisTemplate.opsForValue().get(key)?.toLongOrNull() ?: likeCount
     }
 
     private fun incrementInDatabase(productId: Long): Long =
