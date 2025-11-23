@@ -1,11 +1,13 @@
 package com.loopers.domain.product
 
+import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestProduct
 import com.loopers.support.error.CoreException
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -156,5 +158,52 @@ class ProductQueryServiceTest {
             productQueryService.getProductDetail(100L)
         }.isInstanceOf(CoreException::class.java)
             .hasMessageContaining("재고 정보를 찾을 수 없습니다")
+    }
+
+    @Test
+    fun `상품 목록 조회 시 캐시가 있으면 DB 접근이 발생하지 않는다`() {
+        // given
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product1 = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
+        val product2 = createTestProduct(id = 101L, name = "티셔츠", price = BigDecimal("50000"), brand = brand)
+
+        val pageable = PageRequest.of(0, 20)
+        val products = PageImpl(listOf(product1, product2), pageable, 2)
+
+        val cachedJson = """{"content":[{"id":100},{"id":101}]}"""
+        every { redisTemplate.opsForValue().get(any()) } returns cachedJson
+        every { objectMapper.readValue(cachedJson, any<TypeReference<*>>()) } returns products
+
+        // when
+        val result = productQueryService.findProducts(null, "latest", pageable)
+
+        // then
+        assertThat(result.content).hasSize(2)
+        assertThat(result.content[0].id).isEqualTo(100L)
+        assertThat(result.content[1].id).isEqualTo(101L)
+        verify(exactly = 0) { productRepository.findAll(any(), any(), any()) }
+    }
+
+    @Test
+    fun `상품 상세 조회 시 캐시가 있으면 DB 접근이 발생하지 않는다`() {
+        // given
+        val brand = createTestBrand(id = 1L, name = "나이키")
+        val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
+        val stock = Stock(productId = 100L, quantity = 50)
+        val productDetailData = ProductDetailData(product, stock)
+
+        val cachedJson = """{"product":{"id":100},"stock":{"quantity":50}}"""
+        every { redisTemplate.opsForValue().get(any()) } returns cachedJson
+        every { objectMapper.readValue(cachedJson, any<TypeReference<*>>()) } returns productDetailData
+
+        // when
+        val result = productQueryService.getProductDetail(100L)
+
+        // then
+        assertThat(result.product.id).isEqualTo(100L)
+        assertThat(result.product.name).isEqualTo("운동화")
+        assertThat(result.stock.quantity).isEqualTo(50)
+        verify(exactly = 0) { productRepository.findById(any()) }
+        verify(exactly = 0) { stockRepository.findByProductId(any()) }
     }
 }
