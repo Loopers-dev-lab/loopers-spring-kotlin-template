@@ -2,6 +2,7 @@ package com.loopers.domain.product
 
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.RedisConnectionFailureException
+import org.springframework.data.redis.RedisSystemException
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Service
@@ -185,7 +186,7 @@ class ProductLikeCountService(
         } catch (e: RedisConnectionFailureException) {
             logger.warn("Redis connection failed, falling back to DB: productId=$productId", e)
             fallback()
-        } catch (e: Exception) {
+        } catch (e: RedisSystemException) {
             logger.error("Redis operation failed, falling back to DB: productId=$productId", e)
             fallback()
         }
