@@ -46,9 +46,25 @@ class ProductLikeCountService(
             """
             local current = redis.call('GET', KEYS[1])
             if current == false then
-                return 0
+                return -1
             end
             current = tonumber(current)
+            if current <= 0 then
+                return 0
+            end
+            redis.call('DECR', KEYS[1])
+            return current - 1
+            """.trimIndent(),
+            Long::class.java,
+        )
+
+        private val INIT_AND_DECREMENT_IF_POSITIVE_SCRIPT = RedisScript.of(
+            """
+            local exists = redis.call('EXISTS', KEYS[1])
+            if exists == 0 then
+                redis.call('SET', KEYS[1], ARGV[1])
+            end
+            local current = tonumber(redis.call('GET', KEYS[1]))
             if current <= 0 then
                 return 0
             end
@@ -95,7 +111,13 @@ class ProductLikeCountService(
 
     private fun decrementInRedis(productId: Long): Long {
         val key = buildKey(productId)
-        return redisTemplate.execute(DECREMENT_IF_POSITIVE_SCRIPT, listOf(key)) ?: 0L
+        val result = redisTemplate.execute(DECREMENT_IF_POSITIVE_SCRIPT, listOf(key))
+
+        return if (isKeyExists(result)) {
+            result!!
+        } else {
+            initializeAndDecrement(productId, key)
+        }
     }
 
     private fun getFromRedisOrInitialize(productId: Long): Long {
@@ -109,6 +131,15 @@ class ProductLikeCountService(
         val initialValue = getFromDatabase(productId)
         return redisTemplate.execute(
             INIT_AND_INCREMENT_SCRIPT,
+            listOf(key),
+            initialValue.toString(),
+        ) ?: 0L
+    }
+
+    private fun initializeAndDecrement(productId: Long, key: String): Long {
+        val initialValue = getFromDatabase(productId)
+        return redisTemplate.execute(
+            INIT_AND_DECREMENT_IF_POSITIVE_SCRIPT,
             listOf(key),
             initialValue.toString(),
         ) ?: 0L
