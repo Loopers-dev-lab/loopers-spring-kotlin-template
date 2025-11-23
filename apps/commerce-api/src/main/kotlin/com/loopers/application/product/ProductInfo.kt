@@ -14,10 +14,10 @@ data class ProductInfo(
     val brandName: String,
 ) {
     companion object {
-        fun from(product: ProductModel, brand: BrandModel, likeCount: Long): ProductInfo = ProductInfo(
+        fun from(product: ProductModel, brand: BrandModel, likeCount: Long, stockAmount: Long): ProductInfo = ProductInfo(
             product.id,
             product.name,
-            product.stock,
+            stockAmount,
             product.price.amount,
             likeCount,
             brand.id,

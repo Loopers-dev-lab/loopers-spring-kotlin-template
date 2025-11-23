@@ -6,9 +6,11 @@ import com.loopers.application.order.OrderItemCommand
 import com.loopers.domain.brand.BrandModel
 import com.loopers.domain.common.vo.Money
 import com.loopers.domain.product.signal.ProductTotalSignalModel
+import com.loopers.domain.product.stock.StockModel
 import com.loopers.infrastructure.brand.BrandJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
 import com.loopers.infrastructure.product.signal.ProductTotalSignalJpaRepository
+import com.loopers.infrastructure.product.stock.StockJpaRepository
 import com.loopers.support.error.CoreException
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
@@ -25,6 +27,7 @@ class ProductServiceTest(
     private val brandRepository: BrandJpaRepository,
     private val productRepository: ProductJpaRepository,
     private val productTotalSignalRepository: ProductTotalSignalJpaRepository,
+    private val stockRepository: StockJpaRepository,
 ) : IntegrationTestSupport() {
 
     @AfterEach
@@ -45,27 +48,27 @@ class ProductServiceTest(
 
             val product1 = ProductModel.create(
                 name = "First Product",
-                stock = 100,
                 price = Money(BigDecimal.valueOf(10000)),
                 refBrandId = brand.id,
             )
             productRepository.save(product1)
+            stockRepository.save(StockModel.create(product1.id, 100))
 
             val product2 = ProductModel.create(
                 name = "Second Product",
-                stock = 50,
                 price = Money(BigDecimal.valueOf(20000)),
                 refBrandId = brand.id,
             )
             productRepository.save(product2)
+            stockRepository.save(StockModel.create(product2.id, 50))
 
             val product3 = ProductModel.create(
                 name = "Third Product",
-                stock = 30,
                 price = Money(BigDecimal.valueOf(15000)),
                 refBrandId = brand.id,
             )
             productRepository.save(product3)
+            stockRepository.save(StockModel.create(product3.id, 30))
 
             // ProductTotalSignal 생성
             productTotalSignalRepository.save(ProductTotalSignalModel(refProductId = product1.id))
@@ -92,25 +95,27 @@ class ProductServiceTest(
 
             val product1 = ProductModel.create(
                 name = "Expensive Product",
-                stock = 10,
                 price = Money(BigDecimal.valueOf(50000)),
                 refBrandId = brand.id,
             )
+            productRepository.save(product1)
+            stockRepository.save(StockModel.create(product1.id, 10))
+
             val product2 = ProductModel.create(
                 name = "Cheap Product",
-                stock = 100,
                 price = Money(BigDecimal.valueOf(10000)),
                 refBrandId = brand.id,
             )
+            productRepository.save(product2)
+            stockRepository.save(StockModel.create(product2.id, 100))
+
             val product3 = ProductModel.create(
                 name = "Medium Product",
-                stock = 50,
                 price = Money(BigDecimal.valueOf(30000)),
                 refBrandId = brand.id,
             )
-            productRepository.save(product1)
-            productRepository.save(product2)
             productRepository.save(product3)
+            stockRepository.save(StockModel.create(product3.id, 50))
 
             // ProductTotalSignal 생성
             productTotalSignalRepository.save(ProductTotalSignalModel(refProductId = product1.id))
@@ -139,25 +144,27 @@ class ProductServiceTest(
 
             val product1 = ProductModel.create(
                 name = "Unpopular Product",
-                stock = 100,
                 price = Money(BigDecimal.valueOf(20000)),
                 refBrandId = brand.id,
             )
+            productRepository.save(product1)
+            stockRepository.save(StockModel.create(product1.id, 100))
+
             val product2 = ProductModel.create(
                 name = "Popular Product",
-                stock = 50,
                 price = Money(BigDecimal.valueOf(25000)),
                 refBrandId = brand.id,
             )
+            productRepository.save(product2)
+            stockRepository.save(StockModel.create(product2.id, 50))
+
             val product3 = ProductModel.create(
                 name = "Medium Popular Product",
-                stock = 70,
                 price = Money(BigDecimal.valueOf(22000)),
                 refBrandId = brand.id,
             )
-            productRepository.save(product1)
-            productRepository.save(product2)
             productRepository.save(product3)
+            stockRepository.save(StockModel.create(product3.id, 70))
 
             // ProductTotalSignal 생성 및 좋아요 수 설정
             val signal1 = ProductTotalSignalModel(refProductId = product1.id).apply {
@@ -212,11 +219,13 @@ class ProductServiceTest(
 
             val product = ProductModel.create(
                 name = "Test Product",
-                stock = 100,
                 price = Money(BigDecimal.valueOf(10000)),
                 refBrandId = brand.id,
             )
             productRepository.save(product)
+
+            val stock = StockModel.create(product.id, 100)
+            stockRepository.save(stock)
 
             val orderCommand = OrderCommand(
                 orderItems = listOf(
@@ -232,8 +241,8 @@ class ProductServiceTest(
             productService.occupyStocks(orderCommand)
 
             // assert
-            val updatedProduct = productRepository.findById(product.id).get()
-            assertThat(updatedProduct.stock).isEqualTo(70)
+            val updatedStock = stockRepository.findByRefProductId(product.id)!!
+            assertThat(updatedStock.amount).isEqualTo(70)
         }
 
         @DisplayName("여러 상품의 재고를 동시에 점유할 수 있다.")
@@ -245,18 +254,19 @@ class ProductServiceTest(
 
             val product1 = ProductModel.create(
                 name = "Product 1",
-                stock = 100,
                 price = Money(BigDecimal.valueOf(10000)),
                 refBrandId = brand.id,
             )
+            productRepository.save(product1)
+            stockRepository.save(StockModel.create(product1.id, 100))
+
             val product2 = ProductModel.create(
                 name = "Product 2",
-                stock = 50,
                 price = Money(BigDecimal.valueOf(20000)),
                 refBrandId = brand.id,
             )
-            productRepository.save(product1)
             productRepository.save(product2)
+            stockRepository.save(StockModel.create(product2.id, 50))
 
             val orderCommand = OrderCommand(
                 orderItems = listOf(
@@ -269,10 +279,10 @@ class ProductServiceTest(
             productService.occupyStocks(orderCommand)
 
             // assert
-            val updatedProduct1 = productRepository.findById(product1.id).get()
-            val updatedProduct2 = productRepository.findById(product2.id).get()
-            assertThat(updatedProduct1.stock).isEqualTo(90)
-            assertThat(updatedProduct2.stock).isEqualTo(45)
+            val updatedStock1 = stockRepository.findByRefProductId(product1.id)!!
+            val updatedStock2 = stockRepository.findByRefProductId(product2.id)!!
+            assertThat(updatedStock1.amount).isEqualTo(90)
+            assertThat(updatedStock2.amount).isEqualTo(45)
         }
 
         @DisplayName("재고가 부족한 경우, 예외가 발생한다.")
@@ -284,11 +294,13 @@ class ProductServiceTest(
 
             val product = ProductModel.create(
                 name = "Low Stock Product",
-                stock = 5,
                 price = Money(BigDecimal.valueOf(10000)),
                 refBrandId = brand.id,
             )
             productRepository.save(product)
+
+            val stock = StockModel.create(product.id, 5)
+            stockRepository.save(stock)
 
             val orderCommand = OrderCommand(
                 orderItems = listOf(
@@ -297,7 +309,7 @@ class ProductServiceTest(
             )
 
             // act, assert
-            val exception = assertThrows<IllegalArgumentException> {
+            val exception = assertThrows<CoreException> {
                 productService.occupyStocks(orderCommand)
             }
             assertThat(exception.message).isEqualTo("재고가 부족합니다.")
@@ -318,7 +330,7 @@ class ProductServiceTest(
             val exception = assertThrows<CoreException> {
                 productService.occupyStocks(orderCommand)
             }
-            assertThat(exception.message).isEqualTo("존재하지 않는 상품입니다.")
+            assertThat(exception.message).isEqualTo("재고가 존재하지 않습니다.")
         }
 
         @DisplayName("0 이하의 수량으로 재고 점유 시도 시, 예외가 발생한다.")
@@ -330,11 +342,13 @@ class ProductServiceTest(
 
             val product = ProductModel.create(
                 name = "Test Product",
-                stock = 100,
                 price = Money(BigDecimal.valueOf(10000)),
                 refBrandId = brand.id,
             )
             productRepository.save(product)
+
+            val stock = StockModel.create(product.id, 100)
+            stockRepository.save(stock)
 
             val orderCommand = OrderCommand(
                 orderItems = listOf(
@@ -343,10 +357,10 @@ class ProductServiceTest(
             )
 
             // act, assert
-            val exception = assertThrows<IllegalArgumentException> {
+            val exception = assertThrows<CoreException> {
                 productService.occupyStocks(orderCommand)
             }
-            assertThat(exception.message).isEqualTo("감소 수량은 0보다 커야 합니다.")
+            assertThat(exception.message).isEqualTo("차감 수량은 0보다 커야 합니다.")
         }
     }
 }

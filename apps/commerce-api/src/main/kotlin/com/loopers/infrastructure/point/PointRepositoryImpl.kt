@@ -14,4 +14,8 @@ class PointRepositoryImpl(private val pointJpaRepository: PointJpaRepository) : 
 
     override fun getUserBy(userId: Long): PointModel =
         pointJpaRepository.findByRefUserId(userId) ?: throw CoreException(ErrorType.NOT_FOUND, "유저가 존재하지 않습니다.")
+
+    override fun getUserByUserIdWithPessimisticLock(userId: Long): PointModel =
+        pointJpaRepository.getUserByUserIdWithPessimisticLock(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "해당 유저에 대한 포인트가 존재하지 않습니다.")
 }

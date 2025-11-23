@@ -15,10 +15,10 @@ class PointService(private val pointRepository: PointRepository) {
     }
 
     @Transactional
-    fun charge(userId: Long, amount: BigDecimal): PointModel = pointRepository.getUserBy(userId)
-        .also { it.charge(Money(amount)) }
+    fun charge(userId: Long, amount: BigDecimal): PointModel =
+        pointRepository.getUserByUserIdWithPessimisticLock(userId).also { it.charge(Money(amount)) }
 
     @Transactional
-    fun pay(userId: Long, amount: BigDecimal): PointModel = pointRepository.getUserBy(userId)
-        .also { it.pay(Money(amount)) }
+    fun pay(userId: Long, amount: BigDecimal): PointModel =
+        pointRepository.getUserByUserIdWithPessimisticLock(userId).also { it.pay(Money(amount)) }
 }

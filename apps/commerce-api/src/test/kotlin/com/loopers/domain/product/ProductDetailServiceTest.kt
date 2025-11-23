@@ -5,7 +5,9 @@ import com.loopers.domain.brand.BrandModel
 import com.loopers.domain.brand.BrandRepository
 import com.loopers.domain.common.vo.Money
 import com.loopers.domain.product.signal.ProductTotalSignalModel
+import com.loopers.domain.product.stock.StockModel
 import com.loopers.infrastructure.product.signal.ProductTotalSignalJpaRepository
+import com.loopers.infrastructure.product.stock.StockJpaRepository
 import com.loopers.support.error.CoreException
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions
@@ -22,6 +24,7 @@ class ProductDetailServiceTest(
     private val productRepository: ProductRepository,
     private val brandRepository: BrandRepository,
     private val productTotalSignalRepository: ProductTotalSignalJpaRepository,
+    private val stockRepository: StockJpaRepository,
 ) : IntegrationTestSupport() {
 
     @AfterEach
@@ -40,11 +43,13 @@ class ProductDetailServiceTest(
 
         val product = ProductModel.create(
             name = "Lebron23",
-            stock = 100,
             price = Money(BigDecimal.valueOf(10000)),
             refBrandId = brand.id,
         )
         productRepository.save(product)
+
+        val stock = StockModel.create(product.id, 100)
+        stockRepository.save(stock)
 
         val productTotalSignal = ProductTotalSignalModel(refProductId = product.id)
         productTotalSignalRepository.save(productTotalSignal)
@@ -73,11 +78,13 @@ class ProductDetailServiceTest(
     fun getProductDetailFails_whenBrandIsNotExists() {
         val product = ProductModel.create(
             name = "Lebron23",
-            stock = 100,
             price = Money(BigDecimal.valueOf(5000)),
             refBrandId = 1,
         )
         productRepository.save(product)
+
+        val stock = StockModel.create(product.id, 100)
+        stockRepository.save(stock)
 
         val exception = assertThrows<CoreException> {
             productDetailService.getProductDetailBy(1)
