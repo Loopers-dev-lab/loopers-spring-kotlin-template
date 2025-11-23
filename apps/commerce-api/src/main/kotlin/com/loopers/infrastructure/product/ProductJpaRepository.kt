@@ -12,10 +12,9 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
     @Query(
         value = """
         SELECT p FROM Product p 
-        LEFT JOIN ProductLike pl ON p.id = pl.productId
+        LEFT JOIN ProductLikeCount plc ON p.id = plc.productId
         WHERE p.brandId = :brandId
-        GROUP BY p.id
-        ORDER BY COUNT(pl.id) DESC
+        ORDER BY plc.likeCount DESC
     """,
         countQuery = """
         SELECT COUNT(DISTINCT p.id) FROM Product p 
@@ -30,9 +29,8 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
     @Query(
         value = """
         SELECT p FROM Product p 
-        LEFT JOIN ProductLike pl ON p.id = pl.productId
-        GROUP BY p.id
-        ORDER BY COUNT(pl.id) DESC
+        LEFT JOIN ProductLikeCount plc ON p.id = plc.productId
+        ORDER BY plc.likeCount DESC
     """,
         countQuery = """
         SELECT COUNT(p) FROM Product p

@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.like
 
 import com.loopers.domain.like.ProductLike
+import com.loopers.domain.like.ProductLikeCount
 import com.loopers.domain.like.ProductLikeRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -9,12 +10,21 @@ import org.springframework.stereotype.Repository
 @Repository
 class ProductLikeRepositoryImpl(
     private val productLikeJpaRepository: ProductLikeJpaRepository,
+    private val productLikeCountJpaRepository: ProductLikeCountJpaRepository,
 ) : ProductLikeRepository {
     override fun findAllBy(productIds: List<Long>): List<ProductLike> =
         productLikeJpaRepository.findAllByProductIdIn(productIds)
 
+    override fun findCountAllBy(productIds: List<Long>): List<ProductLikeCount> {
+        return productLikeCountJpaRepository.findAllByProductIdIn(productIds)
+    }
+
     override fun findAllBy(productId: Long): List<ProductLike> =
         productLikeJpaRepository.findAllByProductId(productId)
+
+    override fun findCountBy(productId: Long): ProductLikeCount {
+        return productLikeCountJpaRepository.findByProductId(productId)
+    }
 
     override fun findAllBy(
         userId: Long,
@@ -39,4 +49,16 @@ class ProductLikeRepositoryImpl(
         productId: Long,
         userId: Long,
     ) = productLikeJpaRepository.deleteBy(productId, userId)
+
+    override fun saveCount(productLikeCount: ProductLikeCount): ProductLikeCount {
+        return productLikeCountJpaRepository.save(productLikeCount)
+    }
+
+    override fun increaseCount(productId: Long): Int {
+        return productLikeCountJpaRepository.increase(productId)
+    }
+
+    override fun decreaseCount(productId: Long): Int {
+        return productLikeCountJpaRepository.decrease(productId)
+    }
 }

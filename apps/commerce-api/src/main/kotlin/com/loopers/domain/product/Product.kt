@@ -11,6 +11,8 @@ import jakarta.persistence.Table
     name = "product",
     indexes = [
         Index(name = "idx_product_brand_id", columnList = "ref_brand_id"),
+        Index(name = "idx_product_brand_id_created_at_id", columnList = "ref_brand_id, created_at DESC, id"),
+        Index(name = "idx_product_brand_id_price_id", columnList = "ref_brand_id, price, id"),
     ],
 )
 class Product(

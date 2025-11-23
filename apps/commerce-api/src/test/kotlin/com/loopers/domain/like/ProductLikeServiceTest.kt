@@ -37,11 +37,12 @@ class ProductLikeServiceTest {
 
             // then
             verify(exactly = 1) { productLikeRepository.existsBy(productId, userId) }
+            verify(exactly = 0) { productLikeRepository.increaseCount(productId) }
             verify(exactly = 0) { productLikeRepository.save(any()) }
         }
 
         @Test
-        fun `좋아요가 존재하지 않으면 save를 호출한다`() {
+        fun `좋아요가 존재하지 않고 카운트가 존재하면 increaseCount와 save를 호출한다`() {
             // given
             val productId = 1L
             val userId = 100L
@@ -51,6 +52,7 @@ class ProductLikeServiceTest {
             every { product.id } returns productId
             every { user.id } returns userId
             every { productLikeRepository.existsBy(productId, userId) } returns false
+            every { productLikeRepository.increaseCount(productId) } returns 1
             every { productLikeRepository.save(any()) } returns mockk()
 
             // when
@@ -58,6 +60,33 @@ class ProductLikeServiceTest {
 
             // then
             verify(exactly = 1) { productLikeRepository.existsBy(productId, userId) }
+            verify(exactly = 1) { productLikeRepository.increaseCount(productId) }
+            verify(exactly = 0) { productLikeRepository.saveCount(any()) }
+            verify(exactly = 1) { productLikeRepository.save(any()) }
+        }
+
+        @Test
+        fun `좋아요가 존재하지 않고 카운트가 없으면 saveCount, save를 호출한다`() {
+            // given
+            val productId = 1L
+            val userId = 100L
+            val product = mockk<Product>()
+            val user = mockk<User>()
+
+            every { product.id } returns productId
+            every { user.id } returns userId
+            every { productLikeRepository.existsBy(productId, userId) } returns false
+            every { productLikeRepository.increaseCount(productId) } returns 0
+            every { productLikeRepository.saveCount(any()) } returns mockk()
+            every { productLikeRepository.save(any()) } returns mockk()
+
+            // when
+            productLikeService.like(product, user)
+
+            // then
+            verify(exactly = 1) { productLikeRepository.existsBy(productId, userId) }
+            verify(exactly = 1) { productLikeRepository.increaseCount(productId) }
+            verify(exactly = 1) { productLikeRepository.saveCount(any()) }
             verify(exactly = 1) { productLikeRepository.save(any()) }
         }
     }
@@ -67,7 +96,7 @@ class ProductLikeServiceTest {
     inner class Unlike {
 
         @Test
-        fun `좋아요가 존재하면 deleteBy를 호출한다`() {
+        fun `좋아요가 존재하면 decreaseCount와 deleteBy를 호출한다`() {
             // given
             val productId = 1L
             val userId = 100L
@@ -78,6 +107,7 @@ class ProductLikeServiceTest {
             every { product.id } returns productId
             every { user.id } returns userId
             every { productLikeRepository.findBy(productId, userId) } returns existingProductLike
+            every { productLikeRepository.decreaseCount(productId) } returns 0
             justRun { productLikeRepository.deleteBy(productId, userId) }
 
             // when
@@ -85,6 +115,7 @@ class ProductLikeServiceTest {
 
             // then
             verify(exactly = 1) { productLikeRepository.findBy(productId, userId) }
+            verify(exactly = 1) { productLikeRepository.decreaseCount(productId) }
             verify(exactly = 1) { productLikeRepository.deleteBy(productId, userId) }
         }
 
@@ -105,6 +136,7 @@ class ProductLikeServiceTest {
 
             // then
             verify(exactly = 1) { productLikeRepository.findBy(productId, userId) }
+            verify(exactly = 0) { productLikeRepository.decreaseCount(productId) }
             verify(exactly = 0) { productLikeRepository.deleteBy(any(), any()) }
         }
     }
