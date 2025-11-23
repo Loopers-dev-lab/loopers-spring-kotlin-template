@@ -69,19 +69,9 @@ class Product(
         this.name = newName
     }
 
-    fun incrementLikeCount() {
-        this.likeCount += 1
-    }
-
-    fun decrementLikeCount() {
-        if (this.likeCount > 0) {
-            this.likeCount -= 1
-        }
-    }
-
     /**
      * 좋아요 수를 직접 설정합니다.
-     * 주의: 이 메서드는 배치 작업이나 데이터 동기화 시에만 사용해야 합니다.
+     * 주의: 이 메서드는 Redis와 DB 동기화 시에만 사용해야 합니다.
      */
     internal fun setLikeCount(count: Long) {
         this.likeCount = maxOf(0, count)

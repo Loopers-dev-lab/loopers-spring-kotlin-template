@@ -19,11 +19,13 @@ import java.math.BigDecimal
 class ProductQueryServiceTest {
     private val productRepository: ProductRepository = mockk()
     private val stockRepository: StockRepository = mockk()
+    private val productLikeCountService: ProductLikeCountService = mockk(relaxed = true)
     private val redisTemplate: RedisTemplate<String, String> = mockk(relaxed = true)
     private val objectMapper: ObjectMapper = mockk(relaxed = true)
     private val productQueryService = ProductQueryService(
         productRepository,
         stockRepository,
+        productLikeCountService,
         redisTemplate,
         objectMapper,
     )
@@ -40,6 +42,8 @@ class ProductQueryServiceTest {
 
         every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findAll(null, "latest", pageable) } returns products
+        every { productLikeCountService.getLikeCount(100L) } returns 0L
+        every { productLikeCountService.getLikeCount(101L) } returns 0L
 
         // when
         val result = productQueryService.findProducts(null, "latest", pageable)
@@ -62,6 +66,7 @@ class ProductQueryServiceTest {
 
         every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findAll(brandId, "latest", pageable) } returns products
+        every { productLikeCountService.getLikeCount(100L) } returns 0L
 
         // when
         val result = productQueryService.findProducts(brandId, "latest", pageable)
@@ -83,6 +88,8 @@ class ProductQueryServiceTest {
 
         every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findAll(null, "price_asc", pageable) } returns products
+        every { productLikeCountService.getLikeCount(100L) } returns 0L
+        every { productLikeCountService.getLikeCount(101L) } returns 0L
 
         // when
         val result = productQueryService.findProducts(null, "price_asc", pageable)
@@ -103,6 +110,7 @@ class ProductQueryServiceTest {
         every { redisTemplate.opsForValue().get(any()) } returns null
         every { productRepository.findById(100L) } returns product
         every { stockRepository.findByProductId(100L) } returns stock
+        every { productLikeCountService.getLikeCount(100L) } returns 0L
 
         // when
         val result = productQueryService.getProductDetail(100L)

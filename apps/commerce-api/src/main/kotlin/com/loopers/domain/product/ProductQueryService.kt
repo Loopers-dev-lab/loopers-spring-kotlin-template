@@ -19,6 +19,7 @@ data class ProductDetailData(
 class ProductQueryService(
     private val productRepository: ProductRepository,
     private val stockRepository: StockRepository,
+    private val productLikeCountService: ProductLikeCountService,
     private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,
 ) {
@@ -35,13 +36,25 @@ class ProductQueryService(
         // 1. Redis에서 먼저 조회
         val cached = redisTemplate.opsForValue().get(cacheKey)
         if (cached != null) {
-            return objectMapper.readValue(cached)
+            val products: Page<Product> = objectMapper.readValue(cached)
+            // 캐시된 데이터라도 최신 좋아요 수를 Redis에서 가져와서 반영
+            products.content.forEach { product ->
+                val likeCount = productLikeCountService.getLikeCount(product.id)
+                product.setLikeCount(likeCount)
+            }
+            return products
         }
 
         // 2. DB 조회
         val products = productRepository.findAll(brandId, sort, pageable)
 
-        // 3. Redis에 캐시 저장 (5분 TTL)
+        // 3. 최신 좋아요 수를 Redis에서 가져와서 반영
+        products.content.forEach { product ->
+            val likeCount = productLikeCountService.getLikeCount(product.id)
+            product.setLikeCount(likeCount)
+        }
+
+        // 4. Redis에 캐시 저장 (5분 TTL)
         val cacheValue = objectMapper.writeValueAsString(products)
         redisTemplate.opsForValue().set(cacheKey, cacheValue, PRODUCT_LIST_TTL)
 
@@ -59,7 +72,11 @@ class ProductQueryService(
         // 1. Redis에서 먼저 조회
         val cached = redisTemplate.opsForValue().get(cacheKey)
         if (cached != null) {
-            return objectMapper.readValue(cached)
+            val productDetailData: ProductDetailData = objectMapper.readValue(cached)
+            // 캐시된 데이터라도 최신 좋아요 수를 Redis에서 가져와서 반영
+            val likeCount = productLikeCountService.getLikeCount(productId)
+            productDetailData.product.setLikeCount(likeCount)
+            return productDetailData
         }
 
         // 2. DB 조회
@@ -69,9 +86,13 @@ class ProductQueryService(
         val stock = stockRepository.findByProductId(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: $productId")
 
+        // 3. 최신 좋아요 수를 Redis에서 가져와서 반영
+        val likeCount = productLikeCountService.getLikeCount(productId)
+        product.setLikeCount(likeCount)
+
         val productDetailData = ProductDetailData(product, stock)
 
-        // 3. Redis에 캐시 저장 (10분 TTL)
+        // 4. Redis에 캐시 저장 (10분 TTL)
         val cacheValue = objectMapper.writeValueAsString(productDetailData)
         redisTemplate.opsForValue().set(cacheKey, cacheValue, PRODUCT_DETAIL_TTL)
 

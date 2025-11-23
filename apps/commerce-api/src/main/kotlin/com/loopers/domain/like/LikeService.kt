@@ -1,5 +1,6 @@
 package com.loopers.domain.like
 
+import com.loopers.domain.product.ProductLikeCountService
 import com.loopers.domain.product.ProductRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 class LikeService(
     private val likeRepository: LikeRepository,
     private val productRepository: ProductRepository,
+    private val productLikeCountService: ProductLikeCountService,
     private val redisTemplate: RedisTemplate<String, String>,
 ) {
     companion object {
@@ -22,7 +24,7 @@ class LikeService(
      * 좋아요를 등록한다
      * UniqueConstraint를 활용하여 멱등성 보장
      * 이미 존재하는 경우 별도 처리 없이 반환 (멱등성)
-     * 동시성 경합 상황에서 UniqueConstraint 위반이 발생할 수 있으므로 호출하는 쪽에서 DataIntegrityViolationException 처리 필요
+     * Redis의 atomic 연산을 통해 동시성 문제 해결
      */
     @Transactional
     fun addLike(userId: Long, productId: Long) {
@@ -31,14 +33,17 @@ class LikeService(
             return
         }
 
-        // 상품 조회 및 좋아요 수 증가
-        val product = productRepository.findById(productId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
-        product.incrementLikeCount()
+        // 상품 존재 여부 확인
+        if (!productRepository.existsById(productId)) {
+            throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
+        }
 
         // 저장 시도
         val like = Like(userId = userId, productId = productId)
         likeRepository.save(like)
+
+        // Redis에서 좋아요 수 증가 (atomic 연산)
+        productLikeCountService.increment(productId)
 
         // 캐시 무효화
         evictProductCache(productId)
@@ -51,12 +56,15 @@ class LikeService(
             return
         }
 
-        // 상품 조회 및 좋아요 수 감소
-        val product = productRepository.findById(productId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
-        product.decrementLikeCount()
+        // 상품 존재 여부 확인
+        if (!productRepository.existsById(productId)) {
+            throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
+        }
 
         likeRepository.deleteByUserIdAndProductId(userId, productId)
+
+        // Redis에서 좋아요 수 감소 (atomic 연산)
+        productLikeCountService.decrement(productId)
 
         // 캐시 무효화
         evictProductCache(productId)

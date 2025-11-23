@@ -67,6 +67,8 @@ class ProductRepositoryImpl(
 
     override fun existsById(id: Long): Boolean = productJpaRepository.existsById(id)
 
+    override fun findByIdWithLock(id: Long): Product? = productJpaRepository.findByIdWithLock(id)
+
     private fun Pageable.withSort(
         sort: Sort,
     ): Pageable = org.springframework.data.domain.PageRequest.of(
