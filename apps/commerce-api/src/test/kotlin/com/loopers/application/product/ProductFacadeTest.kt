@@ -1,7 +1,6 @@
 package com.loopers.application.product
 
 import com.loopers.domain.brand.BrandService
-import com.loopers.domain.like.ProductLike
 import com.loopers.domain.like.ProductLikeService
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductService
@@ -12,8 +11,8 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.fixtures.BrandFixtures.createBrand
 import com.loopers.support.fixtures.ProductFixtures.createProduct
-import com.loopers.support.fixtures.ProductLikeFixtures
 import com.loopers.support.fixtures.ProductLikeFixtures.createProductLike
+import com.loopers.support.fixtures.ProductLikeFixtures.createProductLikeCount
 import com.loopers.support.fixtures.UserFixtures.createUser
 import io.mockk.every
 import io.mockk.mockk
@@ -47,7 +46,6 @@ class ProductFacadeTest {
         fun `상품 목록 조회 시 모든 서비스 메서드가 순서대로 호출된다`() {
             // given
             val brandId = 1L
-            val userId = 1L
             val sort = ProductSort.LATEST
 
             val brand = createBrand(brandId, "브랜드A")
@@ -58,12 +56,12 @@ class ProductFacadeTest {
             val products = listOf(product1, product2)
             val productPage: Page<Product> = PageImpl(products, pageable, products.size.toLong())
 
-            val productLike1 = ProductLikeFixtures.createProductLike(1L, product1.id, userId)
-            val productLike2 = ProductLikeFixtures.createProductLike(2L, product2.id, userId)
-            val productLikes = listOf(productLike1, productLike2)
+            val productLikeCount1 = createProductLikeCount(product1.id, 5L)
+            val productLikeCount2 = createProductLikeCount(product2.id, 3L)
+            val productLikeCounts = listOf(productLikeCount1, productLikeCount2)
 
             every { productService.getProducts(brandId, sort, pageable) } returns productPage
-            every { productLikeService.getAllBy(listOf(1L, 2L)) } returns productLikes
+            every { productLikeService.getCountAllBy(listOf(1L, 2L)) } returns productLikeCounts
             every { brandService.getAllBrand(listOf(brandId)) } returns brands
 
             // when
@@ -71,12 +69,14 @@ class ProductFacadeTest {
 
             // then
             verify(exactly = 1) { productService.getProducts(brandId, sort, pageable) }
-            verify(exactly = 1) { productLikeService.getAllBy(listOf(1L, 2L)) }
+            verify(exactly = 1) { productLikeService.getCountAllBy(listOf(1L, 2L)) }
             verify(exactly = 1) { brandService.getAllBrand(listOf(brandId)) }
 
             assertSoftly { softly ->
                 softly.assertThat(result.content).hasSize(2)
                 softly.assertThat(result.totalElements).isEqualTo(2)
+                softly.assertThat(result.content[0].likeCount).isEqualTo(5L)
+                softly.assertThat(result.content[1].likeCount).isEqualTo(3L)
             }
         }
 
@@ -94,7 +94,7 @@ class ProductFacadeTest {
 
             // then
             verify(exactly = 1) { productService.getProducts(brandId, sort, pageable) }
-            verify(exactly = 0) { productLikeService.getAllBy(any<List<Long>>()) }
+            verify(exactly = 0) { productLikeService.getCountAllBy(any()) }
             verify(exactly = 0) { brandService.getAllBrand(any()) }
 
             assertSoftly { softly ->
@@ -117,8 +117,12 @@ class ProductFacadeTest {
             val products = listOf(product1, product2)
             val productPage: Page<Product> = PageImpl(products, pageable, products.size.toLong())
 
+            val productLikeCount1 = createProductLikeCount(product1.id, 5L)
+            val productLikeCount2 = createProductLikeCount(product2.id, 3L)
+            val productLikeCounts = listOf(productLikeCount1, productLikeCount2)
+
             every { productService.getProducts(null, sort, pageable) } returns productPage
-            every { productLikeService.getAllBy(listOf(1L, 2L)) } returns emptyList()
+            every { productLikeService.getCountAllBy(listOf(1L, 2L)) } returns productLikeCounts
             every { brandService.getAllBrand(listOf(brandId)) } returns brands
 
             // when
@@ -139,15 +143,19 @@ class ProductFacadeTest {
             val productId = 1L
             val brandId = 1L
             val userId = "1"
+            val userIdLong = 1L
 
             val product = createProduct(productId, "상품1", 10000L, brandId)
             val brand = createBrand(brandId, "브랜드A")
-            val productLike = createProductLike(1L, productId, userId.toLong())
-            val productLikes = listOf(productLike)
+            val user = createUser(userIdLong, "testUser", "test@example.com", "1990-01-01", Gender.MALE)
+            val productLikeCount = createProductLikeCount(productId, 10L)
+            val productLike = createProductLike(1L, productId, userIdLong)
 
             every { productService.getProduct(productId) } returns product
             every { brandService.getBrand(brandId) } returns brand
-            every { productLikeService.getAllBy(productId) } returns productLikes
+            every { productLikeService.getCountBy(productId) } returns productLikeCount
+            every { userService.getMyInfo(userId) } returns user
+            every { productLikeService.getBy(productId, userIdLong) } returns productLike
 
             // when
             val result = productFacade.getProduct(productId, userId)
@@ -155,13 +163,15 @@ class ProductFacadeTest {
             // then
             verify(exactly = 1) { productService.getProduct(productId) }
             verify(exactly = 1) { brandService.getBrand(brandId) }
-            verify(exactly = 1) { productLikeService.getAllBy(productId) }
+            verify(exactly = 1) { productLikeService.getCountBy(productId) }
+            verify(exactly = 1) { userService.getMyInfo(userId) }
+            verify(exactly = 1) { productLikeService.getBy(productId, userIdLong) }
 
             assertSoftly { softly ->
                 softly.assertThat(result.id).isEqualTo(productId)
                 softly.assertThat(result.name).isEqualTo("상품1")
                 softly.assertThat(result.brandName).isEqualTo("브랜드A")
-                softly.assertThat(result.likeCount).isEqualTo(1L)
+                softly.assertThat(result.likeCount).isEqualTo(10L)
                 softly.assertThat(result.likedByMe).isTrue()
             }
         }
@@ -189,18 +199,51 @@ class ProductFacadeTest {
 
             val product = createProduct(productId, "상품1", 10000L, brandId)
             val brand = createBrand(brandId, "브랜드A")
+            val productLikeCount = createProductLikeCount(productId, 5L)
 
             every { productService.getProduct(productId) } returns product
             every { brandService.getBrand(brandId) } returns brand
-            every { productLikeService.getAllBy(productId) } returns emptyList()
+            every { productLikeService.getCountBy(productId) } returns productLikeCount
 
             // when
             val result = productFacade.getProduct(productId, null)
 
             // then
+            verify(exactly = 0) { userService.getMyInfo(any()) }
+            verify(exactly = 0) { productLikeService.getBy(any(), any()) }
+
             assertSoftly { softly ->
                 softly.assertThat(result.likedByMe).isFalse()
-                softly.assertThat(result.likeCount).isEqualTo(0L)
+                softly.assertThat(result.likeCount).isEqualTo(5L)
+            }
+        }
+
+        @Test
+        fun `사용자가 좋아요하지 않은 상품은 likedByMe가 false다`() {
+            // given
+            val productId = 1L
+            val brandId = 1L
+            val userId = "1"
+            val userIdLong = 1L
+
+            val product = createProduct(productId, "상품1", 10000L, brandId)
+            val brand = createBrand(brandId, "브랜드A")
+            val user = createUser(userIdLong, "testUser", "test@example.com", "1990-01-01", Gender.MALE)
+            val productLikeCount = createProductLikeCount(productId, 5L)
+
+            every { productService.getProduct(productId) } returns product
+            every { brandService.getBrand(brandId) } returns brand
+            every { productLikeService.getCountBy(productId) } returns productLikeCount
+            every { userService.getMyInfo(userId) } returns user
+            every { productLikeService.getBy(productId, userIdLong) } returns null
+
+            // when
+            val result = productFacade.getProduct(productId, userId)
+
+            // then
+            assertSoftly { softly ->
+                softly.assertThat(result.likedByMe).isFalse()
+                softly.assertThat(result.likeCount).isEqualTo(5L)
             }
         }
     }
@@ -228,7 +271,8 @@ class ProductFacadeTest {
             val productLike1 = createProductLike(1L, product1.id, userIdLong)
             val productLike2 = createProductLike(2L, product2.id, userIdLong)
             val productLikes = listOf(productLike1, productLike2)
-            val productLikePage: Page<ProductLike> = PageImpl(productLikes, pageable, productLikes.size.toLong())
+            val productLikePage: Page<com.loopers.domain.like.ProductLike> =
+                PageImpl(productLikes, pageable, productLikes.size.toLong())
 
             every { userService.getMyInfo(userId) } returns user
             every { productLikeService.getAllBy(userIdLong, pageable) } returns productLikePage
@@ -260,7 +304,7 @@ class ProductFacadeTest {
             val userIdLong = 1L
 
             val user = createUser(userIdLong, "userId", "test@example.com", "1990-01-01", Gender.MALE)
-            val emptyPage: Page<ProductLike> = PageImpl(emptyList(), pageable, 0L)
+            val emptyPage: Page<com.loopers.domain.like.ProductLike> = PageImpl(emptyList(), pageable, 0L)
 
             every { userService.getMyInfo(userId) } returns user
             every { productLikeService.getAllBy(userIdLong, pageable) } returns emptyPage

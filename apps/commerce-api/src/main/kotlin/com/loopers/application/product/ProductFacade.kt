@@ -20,11 +20,7 @@ class ProductFacade(
     private val userService: UserService,
 ) {
     @Transactional(readOnly = true)
-    fun getProducts(
-        brandId: Long?,
-        sort: ProductSort,
-        pageable: Pageable,
-    ): Page<ProductResult.ListInfo> {
+    fun getProducts(brandId: Long?, sort: ProductSort, pageable: Pageable): Page<ProductResult.ListInfo> {
         // 1. 상품 리스트 조회
         val productPage = productService.getProducts(brandId, sort, pageable)
 
@@ -39,35 +35,38 @@ class ProductFacade(
         val productIds = products.map { it.id }
         val brandIds = products.map { it.brandId }.distinct()
 
-        // 4. 좋아요 정보 일괄 조회
-        val productLikes = productLikeService.getAllBy(productIds)
+        // 4. 좋아요 정보 수 조회
+        val productLikeCounts = productLikeService.getCountAllBy(productIds)
 
         // 5. 브랜드 정보 일괄 조회
         val brands = brandService.getAllBrand(brandIds)
 
         // 6. 상품 정보 변환
         return productPage.map { product ->
-            ProductResult.ListInfo.from(product, productLikes, brands)
+            ProductResult.ListInfo.from(product, productLikeCounts, brands)
         }
     }
 
     @Transactional(readOnly = true)
-    fun getProduct(
-        productId: Long,
-        userId: String?,
-    ): ProductResult.DetailInfo {
+    fun getProduct(productId: Long, userId: String?): ProductResult.DetailInfo {
+
         // 1. 상품 조회
         val product =
             productService.getProduct(productId) ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
 
         // 2. 상품의 브랜드 조회
         val brand = brandService.getBrand(product.brandId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다: $product.brandId")
 
-        // 3. 상품의 좋아요 정보 조회
-        val productLikes = productLikeService.getAllBy(product.id)
+        // 3. 상품의 좋아요 수 정보 조회
+        val productLikeCount = productLikeService.getCountBy(product.id)
 
-        return ProductResult.DetailInfo.from(product, productLikes, brand, userId)
+        // 4. 유저가 좋아요 했는지 조회
+        val userLiked = if (userId == null) false else {
+            val user = userService.getMyInfo(userId)
+            productLikeService.getBy(product.id, user.id) != null
+        }
+
+        return ProductResult.DetailInfo.from(product, userLiked, productLikeCount.likeCount, brand)
     }
 
     @Transactional(readOnly = true)
