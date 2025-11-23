@@ -1,8 +1,8 @@
 package com.loopers.domain.product
 
+import com.loopers.fixtures.TestFixtures
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestProduct
-import com.loopers.fixtures.TestFixtures
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -24,9 +24,6 @@ class StockConcurrencyTest {
     private lateinit var stockService: StockService
 
     @Autowired
-    private lateinit var stockRepository: StockRepository
-
-    @Autowired
     private lateinit var testFixtures: TestFixtures
 
     private var productId by Delegates.notNull<Long>()
@@ -40,7 +37,7 @@ class StockConcurrencyTest {
         productId = product.id
 
         // 초기 재고 100개 설정
-        val stock = testFixtures.saveStock(
+        testFixtures.saveStock(
             Stock(
                 productId = productId,
                 quantity = 100,

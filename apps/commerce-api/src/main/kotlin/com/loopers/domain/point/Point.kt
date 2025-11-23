@@ -56,7 +56,7 @@ class Point(
         if (amount.amount <= BigDecimal.ZERO) {
             throw CoreException(ErrorType.BAD_REQUEST, "충전 금액은 0보다 커야 합니다.")
         }
-        this.balance = this.balance + amount
+        this.balance += amount
     }
 
     fun deduct(amount: Money) {
@@ -66,7 +66,7 @@ class Point(
         if (!canDeduct(amount)) {
             throw CoreException(ErrorType.BAD_REQUEST, "포인트 부족: 현재 잔액 ${balance.amount}, 차감 요청 ${amount.amount}")
         }
-        this.balance = this.balance - amount
+        this.balance -= amount
     }
 
     fun canDeduct(amount: Money): Boolean = this.balance.isGreaterThanOrEqual(amount)

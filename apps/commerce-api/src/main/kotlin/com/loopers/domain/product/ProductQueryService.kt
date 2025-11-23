@@ -35,93 +35,96 @@ class ProductQueryService(
     fun findProducts(brandId: Long?, sort: String, pageable: Pageable): Page<Product> {
         val cacheKey = buildProductListCacheKey(brandId, sort, pageable)
 
-        // 1. Redis에서 먼저 조회 (예외 처리로 fallback 보장)
-        try {
-            val cached = redisTemplate.opsForValue().get(cacheKey)
-            if (cached != null) {
-                val products: Page<Product> = objectMapper.readValue(cached)
-                // 캐시된 데이터라도 최신 좋아요 수를 Redis에서 가져와서 반영
-                products.content.forEach { product ->
-                    val likeCount = productLikeCountService.getLikeCount(product.id)
-                    product.setLikeCount(likeCount)
-                }
-                return products
-            }
-        } catch (e: Exception) {
-            logger.error("Failed to read product list from Redis cache, falling back to DB: cacheKey=$cacheKey", e)
-            // 캐시 실패 시 DB로 fallback
-        }
-
-        // 2. DB 조회
-        val products = productRepository.findAll(brandId, sort, pageable)
-
-        // 3. 최신 좋아요 수를 Redis에서 가져와서 반영
-        products.content.forEach { product ->
-            val likeCount = productLikeCountService.getLikeCount(product.id)
-            product.setLikeCount(likeCount)
-        }
-
-        // 4. Redis에 캐시 저장 (5분 TTL, 실패해도 응답에 영향 없음)
-        try {
-            val cacheValue = objectMapper.writeValueAsString(products)
-            redisTemplate.opsForValue().set(cacheKey, cacheValue, PRODUCT_LIST_TTL)
-        } catch (e: Exception) {
-            logger.error("Failed to write product list to Redis cache: cacheKey=$cacheKey", e)
-            // 캐시 쓰기 실패는 무시하고 계속 진행
-        }
-
-        return products
-    }
-
-    private fun buildProductListCacheKey(brandId: Long?, sort: String, pageable: Pageable): String {
-        val brand = brandId ?: "all"
-        return "${PRODUCT_LIST_CACHE_PREFIX}brand:$brand:sort:$sort:page:${pageable.pageNumber}:size:${pageable.pageSize}"
+        return getWithCache(
+            cacheKey = cacheKey,
+            ttl = PRODUCT_LIST_TTL,
+            fetchFromDb = { fetchProductsFromDatabase(brandId, sort, pageable) },
+            syncLikeCounts = { products ->
+                syncLikeCountsForProducts(products.content)
+                products
+            },
+        )
     }
 
     fun getProductDetail(productId: Long): ProductDetailData {
         val cacheKey = "$PRODUCT_DETAIL_CACHE_PREFIX$productId"
 
-        // 1. Redis에서 먼저 조회 (예외 처리로 fallback 보장)
-        try {
-            val cached = redisTemplate.opsForValue().get(cacheKey)
-            if (cached != null) {
-                val productDetailData: ProductDetailData = objectMapper.readValue(cached)
-                // 캐시된 데이터라도 최신 좋아요 수를 Redis에서 가져와서 반영
-                val likeCount = productLikeCountService.getLikeCount(productId)
-                productDetailData.product.setLikeCount(likeCount)
-                return productDetailData
-            }
-        } catch (e: Exception) {
-            logger.error("Failed to read product detail from Redis cache, falling back to DB: productId=$productId", e)
-            // 캐시 실패 시 DB로 fallback
+        return getWithCache(
+            cacheKey = cacheKey,
+            ttl = PRODUCT_DETAIL_TTL,
+            fetchFromDb = { fetchProductDetailFromDatabase(productId) },
+            syncLikeCounts = { detail ->
+                syncLikeCountForProduct(detail.product)
+                detail
+            },
+        )
+    }
+
+    fun getProductsByIds(productIds: List<Long>): List<Product> =
+        productRepository.findByIdInAndDeletedAtIsNull(productIds)
+
+    private inline fun <reified T> getWithCache(
+        cacheKey: String,
+        ttl: Duration,
+        fetchFromDb: () -> T,
+        syncLikeCounts: (T) -> T,
+    ): T {
+        val cachedData = getFromCache<T>(cacheKey)
+        if (cachedData != null) {
+            return syncLikeCounts(cachedData)
         }
 
-        // 2. DB 조회
+        val freshData = fetchFromDb()
+        val dataWithLikeCounts = syncLikeCounts(freshData)
+        saveToCache(cacheKey, dataWithLikeCounts, ttl)
+
+        return dataWithLikeCounts
+    }
+
+    private inline fun <reified T> getFromCache(cacheKey: String): T? =
+        runCatching {
+            redisTemplate.opsForValue().get(cacheKey)?.let { cached ->
+                objectMapper.readValue<T>(cached)
+            }
+        }.onFailure { e ->
+            logger.error("Failed to read from Redis cache: cacheKey=$cacheKey", e)
+        }.getOrNull()
+
+    private fun <T> saveToCache(cacheKey: String, data: T, ttl: Duration) {
+        runCatching {
+            val cacheValue = objectMapper.writeValueAsString(data)
+            redisTemplate.opsForValue().set(cacheKey, cacheValue, ttl)
+        }.onFailure { e ->
+            logger.error("Failed to write to Redis cache: cacheKey=$cacheKey", e)
+        }
+    }
+
+    private fun fetchProductsFromDatabase(brandId: Long?, sort: String, pageable: Pageable): Page<Product> =
+        productRepository.findAll(brandId, sort, pageable)
+
+    private fun fetchProductDetailFromDatabase(productId: Long): ProductDetailData {
         val product = productRepository.findById(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다: $productId")
 
         val stock = stockRepository.findByProductId(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: $productId")
 
-        // 3. 최신 좋아요 수를 Redis에서 가져와서 반영
-        val likeCount = productLikeCountService.getLikeCount(productId)
-        product.setLikeCount(likeCount)
-
-        val productDetailData = ProductDetailData(product, stock)
-
-        // 4. Redis에 캐시 저장 (10분 TTL, 실패해도 응답에 영향 없음)
-        try {
-            val cacheValue = objectMapper.writeValueAsString(productDetailData)
-            redisTemplate.opsForValue().set(cacheKey, cacheValue, PRODUCT_DETAIL_TTL)
-        } catch (e: Exception) {
-            logger.error("Failed to write product detail to Redis cache: productId=$productId", e)
-            // 캐시 쓰기 실패는 무시하고 계속 진행
-        }
-
-        return productDetailData
+        return ProductDetailData(product, stock)
     }
 
-    fun getProductsByIds(productIds: List<Long>): List<Product> {
-        return productRepository.findByIdInAndDeletedAtIsNull(productIds)
+    private fun syncLikeCountsForProducts(products: List<Product>) {
+        products.forEach { product ->
+            syncLikeCountForProduct(product)
+        }
+    }
+
+    private fun syncLikeCountForProduct(product: Product) {
+        val likeCount = productLikeCountService.getLikeCount(product.id)
+        product.setLikeCount(likeCount)
+    }
+
+    private fun buildProductListCacheKey(brandId: Long?, sort: String, pageable: Pageable): String {
+        val brand = brandId ?: "all"
+        return "${PRODUCT_LIST_CACHE_PREFIX}brand:$brand:sort:$sort:page:${pageable.pageNumber}:size:${pageable.pageSize}"
     }
 }

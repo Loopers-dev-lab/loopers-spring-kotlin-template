@@ -150,7 +150,6 @@ class OrderFacadeTest {
     fun `다른 사용자의 주문 조회 시 예외가 발생한다`() {
         // given
         val userId = 1L
-        val otherUserId = 2L
         val orderId = 1L
 
         every { orderQueryService.getOrderDetail(userId, orderId) } throws CoreException(

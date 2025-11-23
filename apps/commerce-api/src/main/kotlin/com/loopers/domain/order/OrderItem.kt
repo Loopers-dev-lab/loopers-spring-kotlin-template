@@ -29,22 +29,16 @@ class OrderItem(
     @Column(name = "brand_description", columnDefinition = "TEXT")
     val brandDescription: String?,
 
-    quantity: Int,
+    @Column(nullable = false, updatable = false) val quantity: Int,
 
-    priceAtOrder: Price,
-) : BaseEntity() {
-    @Column(nullable = false, updatable = false)
-    val quantity: Int = quantity
-
-    @Embedded
-    @AttributeOverrides(
+    @Embedded @AttributeOverrides(
         AttributeOverride(
             name = "amount",
             column = Column(name = "price_at_order", nullable = false, precision = 15, scale = 2, updatable = false),
         ),
         AttributeOverride(name = "currency", column = Column(name = "currency", nullable = false, length = 3, updatable = false)),
-    )
-    val priceAtOrder: Price = priceAtOrder
+    ) val priceAtOrder: Price,
+) : BaseEntity() {
 
     init {
         if (quantity <= 0) {
