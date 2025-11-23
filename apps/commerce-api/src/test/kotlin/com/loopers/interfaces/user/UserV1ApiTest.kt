@@ -29,7 +29,7 @@ class UserV1ApiTest(
         const val ENDPOINT_GET_ME = "/api/v1/users/me"
     }
 
-    @DisplayName("SingUp /api/v1/users")
+    @DisplayName("SignUp /api/v1/users")
     @Nested
     inner class SignUp {
         @Test

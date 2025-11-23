@@ -1,26 +1,33 @@
 package com.loopers.application.order
 
 import com.loopers.domain.brand.BrandService
+import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
 import com.loopers.domain.order.OrderCommand.OrderDetailCommand
 import com.loopers.domain.order.OrderService
-import com.loopers.domain.order.OrderTotalAmountCalculator
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.UserService
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
 class OrderFacade(
+    private val couponService: CouponService,
     private val orderService: OrderService,
     private val userService: UserService,
     private val brandService: BrandService,
     private val productService: ProductService,
     private val pointService: PointService,
 ) {
+
+    private val log = LoggerFactory.getLogger(OrderFacade::class.java)
 
     @Transactional(readOnly = true)
     fun getOrders(userId: String, pageable: Pageable): Page<OrderResult.ListInfo> {
@@ -42,7 +49,7 @@ class OrderFacade(
     }
 
     @Transactional
-    fun createOrder(userId: String, items: List<OrderDetailCommand>) {
+    fun placeOrder(userId: String, couponId: Long?, items: List<OrderDetailCommand>) {
         val user = userService.getMyInfo(userId)
 
         // 1. 상품 조회
@@ -56,23 +63,34 @@ class OrderFacade(
         val brandIds = products.map { it.brandId }.distinct()
         val brands = brandService.getAllBrand(brandIds)
 
-        // 4. 재고 조회
-        val stocks = productService.getStocksBy(productIds)
+        // 4. 총 주문 금액 계산
+        val totalAmount = orderService.calculateTotalAmount(items, products)
 
-        // 5. 총 주문 금액 계산
-        val totalAmount = OrderTotalAmountCalculator.calculate(items, products)
+        // 5. 쿠폰 할인 금액 계산 (쿠폰 사용 중복 발생시 exception을 catch하여 예외를 던짐)
+        val discountAmount = try {
+            couponService.applyCoupon(user.id, couponId, totalAmount)
+        } catch (e: ObjectOptimisticLockingFailureException) {
+            log.debug("쿠폰 중복 사용 시도 무시: user=${user.id}, couponId=${couponId}")
+            throw CoreException(ErrorType.COUPON_ALREADY_USED, "이미 사용된 쿠폰입니다")
+        }
 
-        // 6. 포인트 사용
-        pointService.use(user.id, totalAmount)
+        // 6. 최종 결제 금액 계산
+        val finalAmount = totalAmount - discountAmount
 
-        // 7. 재고 감소
-        productService.deductAllStock(items, stocks)
+        // 7. 포인트 사용
+        pointService.use(
+            userId = user.id,
+            amount = finalAmount,
+        )
 
-        // 8. 주문 생성
+        // 8. 재고 감소
+        productService.deductAllStock(items)
+
+        // 9. 주문 생성
         orderService.createOrder(
             OrderCommand.Create(
                 userId = user.id,
-                totalAmount = totalAmount,
+                totalAmount = finalAmount,
                 items = items,
                 brands = brands,
                 products = products,

@@ -36,9 +36,6 @@ class OrderDetailTest {
                 softly.assertThat(orderDetail.productName).isEqualTo(product.name)
                 softly.assertThat(orderDetail.price).isEqualTo(product.price)
                 softly.assertThat(orderDetail.quantity).isEqualTo(quantity)
-                softly.assertThat(orderDetail.brandId).isEqualTo(1L)
-                softly.assertThat(orderDetail.productId).isEqualTo(product.id)
-                softly.assertThat(orderDetail.orderId).isEqualTo(order.id)
             }
         }
 

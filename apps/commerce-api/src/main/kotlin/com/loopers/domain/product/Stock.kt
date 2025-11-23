@@ -5,10 +5,16 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 
 @Entity
-@Table(name = "stock")
+@Table(
+    name = "stock",
+    indexes = [
+        Index(name = "idx_stock_product_id", columnList = "ref_product_id"),
+    ],
+)
 class Stock(
 
     @Column(nullable = false)

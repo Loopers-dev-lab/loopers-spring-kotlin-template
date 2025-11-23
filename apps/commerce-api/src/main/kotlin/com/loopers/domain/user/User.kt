@@ -28,7 +28,7 @@ class User(
 
     companion object {
 
-        fun create(command: UserCommand.SignUp): User {
+        fun signUp(command: UserCommand.SignUp): User {
             return User(
                 userId = UserId(command.userId),
                 email = Email(command.email),

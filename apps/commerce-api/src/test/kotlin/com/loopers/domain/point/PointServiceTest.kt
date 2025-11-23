@@ -32,7 +32,7 @@ class PointServiceTest : IntegrationTest() {
         @Test
         fun `포인트 충전에 성공한다`() {
             // given
-            val user = userJpaRepository.save(User.create(createSignUpCommand()))
+            val user = userJpaRepository.save(User.signUp(createSignUpCommand()))
             val userId = 1L
 
             // when
@@ -60,11 +60,11 @@ class PointServiceTest : IntegrationTest() {
         @Test
         fun `포인트가 충분할 때 사용에 성공한다`() {
             // given
-            val user = userJpaRepository.save(User.create(createSignUpCommand()))
+            val user = userJpaRepository.save(User.signUp(createSignUpCommand()))
             pointService.charge(amount = 5000L, userId = user.id)
 
             // when
-            pointService.use(amount = 2000L, userId = user.id)
+            pointService.use(userId = user.id, amount = 2000L)
 
             // then
             val point = pointService.getBy(user.id)
@@ -75,11 +75,11 @@ class PointServiceTest : IntegrationTest() {
         @MethodSource("com.loopers.domain.point.PointServiceTest#useAmountProvider")
         fun `다양한 금액으로 사용 시 정확히 차감된다`(chargeAmount: Long, useAmount: Long, expectedBalance: Long) {
             // given
-            val user = userJpaRepository.save(User.create(createSignUpCommand()))
+            val user = userJpaRepository.save(User.signUp(createSignUpCommand()))
             pointService.charge(amount = chargeAmount, userId = user.id)
 
             // when
-            pointService.use(amount = useAmount, userId = user.id)
+            pointService.use(userId = user.id, amount = useAmount)
 
             // then
             val point = pointService.getBy(user.id)
@@ -89,13 +89,13 @@ class PointServiceTest : IntegrationTest() {
         @Test
         fun `여러 번 사용하여 잔액이 누적 차감된다`() {
             // given
-            val user = userJpaRepository.save(User.create(createSignUpCommand()))
+            val user = userJpaRepository.save(User.signUp(createSignUpCommand()))
             pointService.charge(amount = 10000L, userId = user.id)
 
             // when
-            pointService.use(amount = 2000L, userId = user.id)
-            pointService.use(amount = 3000L, userId = user.id)
-            pointService.use(amount = 1000L, userId = user.id)
+            pointService.use(userId = user.id, amount = 2000L)
+            pointService.use(userId = user.id, amount = 3000L)
+            pointService.use(userId = user.id, amount = 1000L)
 
             // then
             val point = pointService.getBy(user.id)
@@ -105,12 +105,12 @@ class PointServiceTest : IntegrationTest() {
         @Test
         fun `포인트가 부족하면 사용에 실패한다`() {
             // given
-            val user = userJpaRepository.save(User.create(createSignUpCommand()))
+            val user = userJpaRepository.save(User.signUp(createSignUpCommand()))
             pointService.charge(amount = 1000L, userId = user.id)
 
             // when & then
             assertThatThrownBy {
-                pointService.use(amount = 2000L, userId = user.id)
+                pointService.use(userId = user.id, amount = 2000L)
             }.isInstanceOf(CoreException::class.java)
         }
     }
@@ -132,7 +132,7 @@ class PointServiceTest : IntegrationTest() {
         @Test
         fun `해당 ID 의 회원이 존재할 경우, 보유 포인트가 반환된다`() {
             // given
-            val user = userJpaRepository.save(User.create(createSignUpCommand()))
+            val user = userJpaRepository.save(User.signUp(createSignUpCommand()))
             pointService.charge(
                 amount = 1000L,
                 userId = user.id,

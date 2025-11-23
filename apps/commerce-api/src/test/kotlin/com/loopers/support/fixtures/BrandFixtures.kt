@@ -5,6 +5,13 @@ import java.time.ZonedDateTime
 
 object BrandFixtures {
     fun createBrand(
+        name: String = "name",
+    ): Brand {
+        return Brand.create(name = name)
+            .withCreatedAt(ZonedDateTime.now())
+    }
+
+    fun createBrand(
         id: Long = 1L,
         name: String = "name",
     ): Brand {

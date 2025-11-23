@@ -23,7 +23,7 @@ class UserServiceTest : IntegrationTest() {
     @Autowired
     private lateinit var userService: UserService
 
-    @DisplayName("UserService SingUp")
+    @DisplayName("UserService SignUp")
     @Nested
     inner class SignUp {
         @Test

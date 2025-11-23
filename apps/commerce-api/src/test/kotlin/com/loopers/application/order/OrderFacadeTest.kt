@@ -1,20 +1,25 @@
 package com.loopers.application.order
 
 import com.loopers.domain.brand.BrandService
+import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.Order
+import com.loopers.domain.order.OrderCommand
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.Gender
 import com.loopers.domain.user.UserService
+import com.loopers.support.fixtures.BrandFixtures
 import com.loopers.support.fixtures.BrandFixtures.createBrand
 import com.loopers.support.fixtures.OrderFixtures.createOrder
 import com.loopers.support.fixtures.OrderFixtures.createOrderDetail
+import com.loopers.support.fixtures.ProductFixtures
 import com.loopers.support.fixtures.ProductFixtures.createProduct
 import com.loopers.support.fixtures.UserFixtures
 import com.loopers.support.fixtures.UserFixtures.createUser
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
 import org.assertj.core.api.SoftAssertions.assertSoftly
@@ -29,12 +34,13 @@ import org.springframework.data.domain.Pageable
 @DisplayName("OrderFacade 단위 테스트")
 class OrderFacadeTest {
 
+    private val couponService: CouponService = mockk()
     private val orderService: OrderService = mockk()
     private val userService: UserService = mockk()
     private val brandService: BrandService = mockk()
     private val productService: ProductService = mockk()
     private val pointService: PointService = mockk()
-    private val orderFacade = OrderFacade(orderService, userService, brandService, productService, pointService)
+    private val orderFacade = OrderFacade(couponService, orderService, userService, brandService, productService, pointService)
 
     private val pageable: Pageable = PageRequest.of(0, 20)
 
@@ -140,6 +146,51 @@ class OrderFacadeTest {
                 softly.assertThat(result.items[0].brandName).isEqualTo("브랜드A")
                 softly.assertThat(result.items[0].productName).isEqualTo("상품1")
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("주문 생성")
+    inner class PlaceOrder {
+
+        @Test
+        fun `주문 생성 시 모든 서비스가 올바른 순서로 호출된다`() {
+            // given
+            val userId = "user123"
+            val userIdLong = 1L
+            val couponId = 100L
+
+            val user = UserFixtures.createUser(id = userIdLong)
+            val brand = BrandFixtures.createBrand(id = 1L)
+            val product = ProductFixtures.createProduct(id = 1L, brandId = 1L)
+            val items = listOf(OrderCommand.OrderDetailCommand(productId = 1L, quantity = 1))
+            val totalAmount = 10000L
+            val discountAmount = 1000L
+            val finalTotalAmount = 9000L
+
+            every { userService.getMyInfo(userId) } returns user
+            every { productService.getProducts(any()) } returns listOf(product)
+            justRun { productService.validateProductsExist(any(), any()) }
+            every { brandService.getAllBrand(any()) } returns listOf(brand)
+            every { orderService.calculateTotalAmount(any(), any()) } returns totalAmount
+            every { couponService.applyCoupon(any(), any(), any()) } returns discountAmount
+            justRun { pointService.use(any(), any()) }
+            justRun { productService.deductAllStock(any()) }
+            justRun { orderService.createOrder(any()) }
+
+            // when
+            orderFacade.placeOrder(userId, couponId, items)
+
+            // then - 호출 순서 검증
+            verify(exactly = 1) { userService.getMyInfo(userId) }
+            verify(exactly = 1) { productService.getProducts(any()) }
+            verify(exactly = 1) { productService.validateProductsExist(any(), any()) }
+            verify(exactly = 1) { brandService.getAllBrand(any()) }
+            verify(exactly = 1) { orderService.calculateTotalAmount(any(), any()) }
+            verify(exactly = 1) { couponService.applyCoupon(userIdLong, couponId, totalAmount) }
+            verify(exactly = 1) { pointService.use(userIdLong, finalTotalAmount) }
+            verify(exactly = 1) { productService.deductAllStock(items) }
+            verify(exactly = 1) { orderService.createOrder(any()) }
         }
     }
 }

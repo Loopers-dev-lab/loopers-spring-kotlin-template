@@ -50,8 +50,8 @@ class ProductRepositoryImpl(
         }
     }
 
-    override fun findStockAllBy(productIds: List<Long>): List<Stock> {
-        return stockJpaRepository.findAllByProductIdIn(productIds)
+    override fun findStockAllByWithLock(productIds: List<Long>): List<Stock> {
+        return stockJpaRepository.findAllByProductIdInWithLock(productIds)
     }
 
     private fun sortPageable(pageable: Pageable, sort: Sort): Pageable {

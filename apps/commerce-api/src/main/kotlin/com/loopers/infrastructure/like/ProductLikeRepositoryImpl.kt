@@ -28,6 +28,10 @@ class ProductLikeRepositoryImpl(
     ): ProductLike? =
         productLikeJpaRepository.findBy(productId, userId)
 
+    override fun existsBy(productId: Long, userId: Long): Boolean {
+        return productLikeJpaRepository.existsByProductIdAndUserId(productId, userId)
+    }
+
     override fun save(productLike: ProductLike): ProductLike =
         productLikeJpaRepository.save(productLike)
 

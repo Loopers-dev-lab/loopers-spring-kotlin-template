@@ -12,7 +12,7 @@ class PointService(
 
     @Transactional
     fun charge(amount: Long, userId: Long): Point {
-        val point = pointRepository.getBy(userId) ?: return pointRepository.save(Point.create(amount, userId))
+        val point = pointRepository.findByWithLock(userId) ?: return pointRepository.save(Point.create(amount, userId))
         point.charge(amount)
         return point
     }
@@ -23,14 +23,14 @@ class PointService(
     }
 
     @Transactional
-    fun use(amount: Long, userId: Long) {
-        val point = pointRepository.getBy(userId)
-            ?: throw CoreException(ErrorType.NOT_FOUND)
+    fun use(userId: Long, amount: Long) {
+        val point = pointRepository.findByWithLock(userId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "유저의 포인트를 찾을 수 없습니다 userId: $userId")
         point.use(amount)
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun getBy(userId: Long): Point? {
-        return pointRepository.getBy(userId)
+        return pointRepository.findByWithLock(userId)
     }
 }
