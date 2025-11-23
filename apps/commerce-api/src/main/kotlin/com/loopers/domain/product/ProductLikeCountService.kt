@@ -46,12 +46,19 @@ class ProductLikeCountService(
          * KEYS[1]: 카운터 키
          * ARGV[1]: 초기값
          * 반환값: 증가 후의 값
+         *
+         * EXISTS를 통해 키가 없을 때만 SET하여 동시성 경합 조건을 방지합니다.
+         * 이미 다른 스레드가 키를 생성했다면 기존 값에 대해 INCR만 수행합니다.
          */
         private val INIT_AND_INCREMENT_SCRIPT = RedisScript.of(
             """
-            redis.call('SET', KEYS[1], ARGV[1])
+            local exists = redis.call('EXISTS', KEYS[1])
+            if exists == 0 then
+                redis.call('SET', KEYS[1], ARGV[1])
+            end
             redis.call('INCR', KEYS[1])
-            return tonumber(ARGV[1]) + 1
+            local result = redis.call('GET', KEYS[1])
+            return tonumber(result)
             """.trimIndent(),
             Long::class.java,
         )
