@@ -2,6 +2,7 @@ package com.loopers.infrastructure.product
 
 import com.loopers.domain.product.ProductLikeCountRedisRepository
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.ScanOptions
 import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Component
 
@@ -122,8 +123,9 @@ class ProductLikeCountRedisRepositoryImpl(
         return redisTemplate.opsForValue().get(key)?.toLongOrNull()
     }
 
-    override fun getAllKeys(): Set<String>? =
-        redisTemplate.keys("$LIKE_COUNT_KEY_PREFIX*")
+    override fun getAllKeys(): Set<String> = redisTemplate.scan(
+        ScanOptions.scanOptions().match("$LIKE_COUNT_KEY_PREFIX*").build(),
+    ).use { cursor -> cursor.asSequence().toSet() }
 
     override fun extractProductId(key: String): Long? =
         key.removePrefix(LIKE_COUNT_KEY_PREFIX).toLongOrNull()

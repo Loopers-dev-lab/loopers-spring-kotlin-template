@@ -8,7 +8,7 @@ interface ProductLikeCountRedisRepository {
     fun get(productId: Long): Long?
     fun setIfAbsent(productId: Long, value: Long): Boolean
     fun getAfterSetIfAbsent(productId: Long): Long?
-    fun getAllKeys(): Set<String>?
+    fun getAllKeys(): Set<String>
     fun extractProductId(key: String): Long?
 
     companion object {

@@ -19,7 +19,7 @@ class ProductLikeCountSyncScheduler(
     @Transactional
     fun syncLikeCountsToDatabase() {
         runCatching {
-            val keys = getAllLikeCountKeys() ?: return
+            val keys = getAllLikeCountKeys()
             if (keys.isEmpty()) return
 
             val result = syncAllKeys(keys)
@@ -29,7 +29,7 @@ class ProductLikeCountSyncScheduler(
         }
     }
 
-    private fun getAllLikeCountKeys(): Set<String>? =
+    private fun getAllLikeCountKeys(): Set<String> =
         productLikeCountRedisRepository.getAllKeys()
 
     private fun syncAllKeys(keys: Set<String>): SyncResult {
