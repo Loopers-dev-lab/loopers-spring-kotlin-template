@@ -1,15 +1,15 @@
 package com.loopers.domain.like
 
+import com.loopers.domain.product.ProductCacheRepository
 import com.loopers.domain.product.ProductLikeCountService
 import com.loopers.domain.product.ProductRepository
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.data.redis.core.RedisCallback
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.test.context.ActiveProfiles
 
 @SpringBootTest
@@ -28,7 +28,7 @@ class LikeServiceTest {
     private lateinit var productLikeCountService: ProductLikeCountService
 
     @MockkBean
-    private lateinit var redisTemplate: RedisTemplate<String, String>
+    private lateinit var productCacheRepository: ProductCacheRepository
 
     @Test
     fun `좋아요를 등록할 수 있다`() {
@@ -40,8 +40,10 @@ class LikeServiceTest {
         every { productRepository.existsById(productId) } returns true
         every { likeRepository.save(any()) } returns Like(userId = userId, productId = productId)
         every { productLikeCountService.increment(productId) } returns 1L
-        every { redisTemplate.delete(any<String>()) } returns true
-        every { redisTemplate.execute(any<RedisCallback<*>>()) } returns null
+        every { productCacheRepository.buildProductDetailCacheKey(productId) } returns "product:detail:$productId"
+        justRun { productCacheRepository.delete(any()) }
+        every { productCacheRepository.getProductListCachePattern() } returns "product:list:*"
+        justRun { productCacheRepository.deleteByPattern(any()) }
 
         // when
         likeService.addLike(userId, productId)
@@ -75,8 +77,10 @@ class LikeServiceTest {
         every { productRepository.existsById(productId) } returns true
         every { likeRepository.deleteByUserIdAndProductId(userId, productId) } returns 1
         every { productLikeCountService.decrement(productId) } returns 0L
-        every { redisTemplate.delete(any<String>()) } returns true
-        every { redisTemplate.execute(any<RedisCallback<*>>()) } returns null
+        every { productCacheRepository.buildProductDetailCacheKey(productId) } returns "product:detail:$productId"
+        justRun { productCacheRepository.delete(any()) }
+        every { productCacheRepository.getProductListCachePattern() } returns "product:list:*"
+        justRun { productCacheRepository.deleteByPattern(any()) }
 
         // when
         likeService.removeLike(userId, productId)
