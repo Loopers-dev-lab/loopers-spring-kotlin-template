@@ -4,9 +4,9 @@ import com.loopers.domain.product.ProductLikeCountRedisRepository
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ScanOptions
 import org.springframework.data.redis.core.script.RedisScript
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 
-@Component
+@Repository
 class ProductLikeCountRedisRepositoryImpl(
     private val redisTemplate: RedisTemplate<String, String>,
 ) : ProductLikeCountRedisRepository {

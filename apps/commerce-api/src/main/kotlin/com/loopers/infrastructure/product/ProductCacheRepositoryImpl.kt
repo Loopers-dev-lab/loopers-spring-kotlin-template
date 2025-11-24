@@ -6,10 +6,10 @@ import com.loopers.domain.product.ProductCacheRepository
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ScanOptions
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 import java.time.Duration
 
-@Component
+@Repository
 class ProductCacheRepositoryImpl(
     private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,

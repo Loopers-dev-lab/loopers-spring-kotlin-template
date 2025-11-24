@@ -4,9 +4,9 @@ import com.loopers.domain.like.Like
 import com.loopers.domain.like.LikeRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 
-@Component
+@Repository
 class LikeRepositoryImpl(
     private val likeJpaRepository: LikeJpaRepository,
 ) : LikeRepository {
