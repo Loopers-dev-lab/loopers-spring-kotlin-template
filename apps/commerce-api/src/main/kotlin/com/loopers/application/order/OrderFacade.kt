@@ -9,15 +9,20 @@ import org.springframework.stereotype.Component
 class OrderFacade(
     private val orderService: OrderService,
 ) {
+    /**
+     * 주문 생성
+     */
     fun createOrder(request: CreateOrderRequest): OrderInfo {
-        val command = CreateOrderCommand(
-            memberId = request.memberId,
-            items = request.items.map {
-                OrderItemCommand(it.productId, it.quantity)
-            }
+        val order = orderService.createOrder(
+            CreateOrderCommand(
+                memberId = request.memberId,
+                items = request.items.map {
+                    OrderItemCommand(it.productId, it.quantity)
+                },
+                couponId = request.couponId
+            )
         )
 
-        val order = orderService.createOrder(command)
         return OrderInfo.from(order)
     }
 

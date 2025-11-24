@@ -24,4 +24,12 @@ enum class ErrorType(val status: HttpStatus, val code: String, val message: Stri
 
     ORDER_PROCESSING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ORDER_002", "주문 처리 중 오류가 발생했습니다."),
     INVALID_ORDER_STATUS(HttpStatus.BAD_REQUEST, "ORDER_003", "유효하지 않은 주문 상태입니다."),
+
+    // 쿠폰 관련 에러
+    COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_001", "쿠폰을 찾을 수 없습니다."),
+    COUPON_ALREADY_USED(HttpStatus.BAD_REQUEST, "COUPON_002", "이미 사용된 쿠폰입니다."),
+    COUPON_NOT_AVAILABLE(HttpStatus.BAD_REQUEST, "COUPON_003", "사용할 수 없는 쿠폰입니다."),
+    COUPON_ALREADY_ISSUED(HttpStatus.BAD_REQUEST, "COUPON_004", "이미 발급받은 쿠폰입니다."),
+    INVALID_COUPON_DISCOUNT(HttpStatus.BAD_REQUEST, "COUPON_005", "잘못된 쿠폰 할인 정보입니다."),
+
 }

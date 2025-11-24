@@ -48,10 +48,10 @@ class LikeFacadeIntegrationTest @Autowired constructor(
             Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand)
         )
 
-        val result = likeFacade.addLike(member.id!!, product.id!!)
+        val result = likeFacade.addLike(member.memberId.value, product.id!!)
 
         assertThat(result).isNotNull
-        assertThat(result.memberId).isEqualTo(member.id)
+        assertThat(result.memberId).isEqualTo(member.memberId.value)
         assertThat(result.product.id).isEqualTo(product.id)
 
         // 좋아요 수 증가 확인
@@ -71,10 +71,10 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
 
         // 첫 번째 좋아요
-        likeFacade.addLike(member.id!!, product.id!!)
+        likeFacade.addLike(member.memberId.value, product.id!!)
 
         // 두 번째 좋아요 시도
-        val result = likeFacade.addLike(member.id!!, product.id!!)
+        val result = likeFacade.addLike(member.memberId.value, product.id!!)
 
         assertThat(result).isNotNull
         // 좋아요가 중복 생성되지 않았는지 확인
@@ -98,10 +98,10 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
 
         // 좋아요 추가
-        likeFacade.addLike(member.id!!, product.id!!)
+        likeFacade.addLike(member.memberId.value, product.id!!)
 
         // 좋아요 취소
-        likeFacade.cancelLike(member.id!!, product.id!!)
+        likeFacade.cancelLike(member.memberId.value, product.id!!)
 
         // 좋아요가 삭제되었는지 확인
         val likes = likeJpaRepository.findAll()
@@ -124,7 +124,7 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
 
         // 좋아요 없이 취소 시도
-        likeFacade.cancelLike(member.id!!, product.id!!)
+        likeFacade.cancelLike(member.memberId.value, product.id!!)
 
         // 에러가 발생하지 않고 정상 처리됨
         val likes = likeJpaRepository.findAll()
@@ -143,12 +143,12 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand))
 
         // 좋아요 추가
-        likeFacade.addLike(member.id!!, product1.id!!)
-        likeFacade.addLike(member.id!!, product2.id!!)
-        likeFacade.addLike(member.id!!, product3.id!!)
+        likeFacade.addLike(member.memberId.value, product1.id!!)
+        likeFacade.addLike(member.memberId.value, product2.id!!)
+        likeFacade.addLike(member.memberId.value, product3.id!!)
 
         val pageable = PageRequest.of(0, 10)
-        val result = likeFacade.getMyLikes(member.id!!, pageable)
+        val result = likeFacade.getMyLikes(member.memberId.value, pageable)
 
         assertThat(result.content).hasSize(3)
         assertThat(result.totalElements).isEqualTo(3)
@@ -165,12 +165,12 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand))
         val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand))
 
-        likeFacade.addLike(member.id!!, product1.id!!)
-        likeFacade.addLike(member.id!!, product2.id!!)
-        likeFacade.addLike(member.id!!, product3.id!!)
+        likeFacade.addLike(member.memberId.value, product1.id!!)
+        likeFacade.addLike(member.memberId.value, product2.id!!)
+        likeFacade.addLike(member.memberId.value, product3.id!!)
 
         val pageable = PageRequest.of(0, 2)
-        val result = likeFacade.getMyLikes(member.id!!, pageable)
+        val result = likeFacade.getMyLikes(member.memberId.value, pageable)
 
         assertThat(result.content).hasSize(2)
         assertThat(result.totalElements).isEqualTo(3)

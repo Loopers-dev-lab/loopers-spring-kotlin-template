@@ -17,10 +17,10 @@ interface MemberV1ApiSpec {
     ): ApiResponse<MemberV1Dto.MemberResponse>
 
     @Operation(
-        summary = "회원 정보 조회",
+        summary = "내 정보 조회",
         description = "ID로 회원 정보를 조회합니다.",
     )
-    fun getMemberByMemberId(
+    fun getMe(
         @Schema(name = "회원 ID", description = "조회할 회원의 ID")
         memberId: String,
     ): ApiResponse<MemberV1Dto.MemberResponse>

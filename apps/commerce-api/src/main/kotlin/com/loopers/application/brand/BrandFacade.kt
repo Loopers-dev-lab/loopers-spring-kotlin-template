@@ -10,12 +10,14 @@ import org.springframework.stereotype.Component
 class BrandFacade(
     private val brandService: BrandService,
 ) {
-    fun getBrand(brandId: Long): Brand {
+    fun getBrand(brandId: Long): BrandInfo {
         return brandService.getBrand(brandId)
+            .let { BrandInfo.from(it) }
     }
 
-    fun getBrands(pageable: Pageable): Page<Brand> {
+    fun getBrands(pageable: Pageable): Page<BrandInfo> {
         return brandService.getBrands(pageable)
+            .map { BrandInfo.from(it) }
     }
 
 }

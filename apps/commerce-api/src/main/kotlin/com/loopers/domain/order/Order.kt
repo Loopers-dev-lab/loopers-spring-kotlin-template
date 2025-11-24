@@ -1,6 +1,7 @@
 package com.loopers.domain.order
 
 import com.loopers.domain.BaseEntity
+import com.loopers.domain.member.Member
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.Quantity
 import com.loopers.domain.shared.Money
@@ -20,6 +21,7 @@ import jakarta.persistence.Table
 class Order(
     memberId: String,
     items: List<OrderItem> = emptyList(),
+    discountAmount: Money = Money.zero(),
 ) : BaseEntity() {
 
     @Column(name = "member_id", nullable = false, length = 50)
@@ -36,6 +38,16 @@ class Order(
     var totalAmount: Money = Money.zero()
         protected set
 
+    @Embedded
+    @AttributeOverride(name = "amount", column = Column(name = "discount_amount", nullable = false))
+    var discountAmount: Money = discountAmount
+        protected set
+
+    @Embedded
+    @AttributeOverride(name = "amount", column = Column(name = "final_amount", nullable = false))
+    var finalAmount: Money = Money.zero()
+        protected set
+
     @OneToMany(mappedBy = "order", cascade = [jakarta.persistence.CascadeType.ALL], orphanRemoval = true)
     protected val mutableItems: MutableList<OrderItem> = items.toMutableList()
 
@@ -45,6 +57,7 @@ class Order(
     init {
         items.forEach { it.assignOrder(this) }
         this.totalAmount = calculateTotalAmount()
+        this.finalAmount = this.totalAmount.minus(this.discountAmount)
     }
 
     fun addItem(items: OrderItem) {
@@ -89,11 +102,22 @@ class Order(
         status = OrderStatus.CANCELLED
     }
 
+    fun decreaseProductStocks() {
+        items.forEach { item ->
+            item.product.decreaseStock(item.quantity)
+        }
+    }
+
+    fun processPayment(member: Member) {
+        member.pay(finalAmount)
+    }
+
     companion object {
         fun create(
             memberId: String,
             orderItems: List<OrderItemCommand>,
-            productMap: Map<Long, Product>
+            productMap: Map<Long, Product>,
+            discountAmount: Money = Money.zero(),
         ): Order {
             val items = orderItems.map { itemCommand ->
                 val product = productMap[itemCommand.productId]
@@ -110,7 +134,7 @@ class Order(
                 OrderItem.of(product, quantity)
             }
 
-            return Order(memberId, items)
+            return Order(memberId, items, discountAmount)
         }
     }
 }

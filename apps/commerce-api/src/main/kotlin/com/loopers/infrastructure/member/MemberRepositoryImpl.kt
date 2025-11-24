@@ -18,6 +18,10 @@ class MemberRepositoryImpl(
         return memberJpaRepository.findByMemberId(memberId)
     }
 
+    override fun findByMemberIdWithLock(memberId: String): Member? {
+        return memberJpaRepository.findByMemberIdWithLock(memberId)
+    }
+
     override fun save(member: Member): Member {
         return memberJpaRepository.save(member)
     }

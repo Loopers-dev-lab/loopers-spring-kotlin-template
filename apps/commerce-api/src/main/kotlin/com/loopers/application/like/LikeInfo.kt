@@ -5,7 +5,7 @@ import com.loopers.domain.like.Like
 
 data class LikeInfo(
     val id: Long,
-    val memberId: Long,
+    val memberId: String,
     val product: ProductInfo,
     val createdAt: String,
 ) {
@@ -14,7 +14,7 @@ data class LikeInfo(
         fun from(like: Like): LikeInfo {
             return LikeInfo(
                 id = like.id,
-                memberId = like.member.id,
+                memberId = like.member.memberId.value,
                 product = ProductInfo.from(like.product),
                 createdAt = like.createdAt.toString()
             )
