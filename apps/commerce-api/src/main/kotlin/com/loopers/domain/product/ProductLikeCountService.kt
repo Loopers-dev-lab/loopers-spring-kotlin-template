@@ -92,7 +92,12 @@ class ProductLikeCountService(
 
     private fun initializeFromDatabase(productId: Long): Long {
         val likeCount = getFromDatabase(productId)
-        productLikeCountRedisRepository.setIfAbsent(productId, likeCount)
+        val setResult = productLikeCountRedisRepository.setIfAbsent(productId, likeCount)
+
+        if (setResult == null) {
+            logger.warn("Redis setIfAbsent returned null, cache initialization may have failed: productId=$productId")
+        }
+
         return productLikeCountRedisRepository.getAfterSetIfAbsent(productId) ?: likeCount
     }
 

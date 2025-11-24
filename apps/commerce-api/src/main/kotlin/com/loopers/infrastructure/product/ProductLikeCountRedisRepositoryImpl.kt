@@ -113,9 +113,9 @@ class ProductLikeCountRedisRepositoryImpl(
     override fun setIfAbsent(
         productId: Long,
         value: Long,
-    ): Boolean {
+    ): Boolean? {
         val key = buildKey(productId)
-        return redisTemplate.opsForValue().setIfAbsent(key, value.toString()) ?: false
+        return redisTemplate.opsForValue().setIfAbsent(key, value.toString())
     }
 
     override fun getAfterSetIfAbsent(productId: Long): Long? {
