@@ -2,6 +2,7 @@ package com.loopers.application.product
 
 import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.product.ProductQueryService
+import com.loopers.domain.product.SortType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -12,7 +13,8 @@ class ProductFacade(
     private val likeQueryService: LikeQueryService,
 ) {
     fun getProducts(brandId: Long?, sort: String, pageable: Pageable): Page<ProductListInfo> {
-        val products = productQueryService.findProducts(brandId, sort, pageable)
+        val sortType = SortType.from(sort)
+        val products = productQueryService.findProducts(brandId, sortType, pageable)
 
         return products.map { product ->
             ProductListInfo.from(product, product.likeCount)

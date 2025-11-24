@@ -2,7 +2,9 @@ package com.loopers.infrastructure.product
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.loopers.domain.product.CacheResult
 import com.loopers.domain.product.ProductCacheRepository
+import com.loopers.domain.product.SortType
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ScanOptions
@@ -20,14 +22,19 @@ class ProductCacheRepositoryImpl(
         private val logger = LoggerFactory.getLogger(ProductCacheRepositoryImpl::class.java)
     }
 
-    override fun <T> get(cacheKey: String, typeReference: TypeReference<T>): T? =
-        runCatching {
-            redisTemplate.opsForValue().get(cacheKey)?.let { cached ->
-                objectMapper.readValue(cached, typeReference)
+    override fun <T> get(cacheKey: String, typeReference: TypeReference<T>): CacheResult<T> =
+        try {
+            val cached = redisTemplate.opsForValue().get(cacheKey)
+            if (cached != null) {
+                val value = objectMapper.readValue(cached, typeReference)
+                CacheResult.Hit(value)
+            } else {
+                CacheResult.Miss
             }
-        }.onFailure { e ->
+        } catch (e: Exception) {
             logger.error("Failed to read from Redis cache: cacheKey=$cacheKey", e)
-        }.getOrNull()
+            CacheResult.Error(e)
+        }
 
     override fun <T> set(
         cacheKey: String,
@@ -58,12 +65,12 @@ class ProductCacheRepositoryImpl(
 
     override fun buildProductListCacheKey(
         brandId: Long?,
-        sort: String,
+        sort: SortType,
         pageNumber: Int,
         pageSize: Int,
     ): String {
         val brand = brandId ?: "all"
-        return "${PRODUCT_LIST_CACHE_PREFIX}brand:$brand:sort:$sort:page:$pageNumber:size:$pageSize"
+        return "${PRODUCT_LIST_CACHE_PREFIX}brand:$brand:sort:${sort.value}:page:$pageNumber:size:$pageSize"
     }
 
     override fun getProductListCachePattern(): String = "$PRODUCT_LIST_CACHE_PREFIX*"

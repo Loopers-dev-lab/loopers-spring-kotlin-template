@@ -3,6 +3,7 @@ package com.loopers.application.product
 import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.product.ProductDetailData
 import com.loopers.domain.product.ProductQueryService
+import com.loopers.domain.product.SortType
 import com.loopers.domain.product.Stock
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestLike
@@ -36,7 +37,7 @@ class ProductFacadeTest {
 
         val products = PageImpl(listOf(product))
 
-        every { productQueryService.findProducts(null, "latest", pageable) } returns products
+        every { productQueryService.findProducts(null, SortType.LATEST, pageable) } returns products
 
         // when
         val result = productFacade.getProducts(null, "latest", pageable)

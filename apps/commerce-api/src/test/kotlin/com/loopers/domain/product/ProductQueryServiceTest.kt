@@ -36,13 +36,13 @@ class ProductQueryServiceTest {
         val products = PageImpl(listOf(product1, product2))
         val pageable = PageRequest.of(0, 20)
 
-        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns null
-        every { productRepository.findAll(null, "latest", pageable) } returns products
+        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns CacheResult.Miss
+        every { productRepository.findAll(null, SortType.LATEST, pageable) } returns products
         every { productLikeCountService.getLikeCount(100L) } returns 0L
         every { productLikeCountService.getLikeCount(101L) } returns 0L
 
         // when
-        val result = productQueryService.findProducts(null, "latest", pageable)
+        val result = productQueryService.findProducts(null, SortType.LATEST, pageable)
 
         // then
         assertThat(result.content).hasSize(2)
@@ -60,12 +60,12 @@ class ProductQueryServiceTest {
         val pageable = PageRequest.of(0, 20)
         val brandId = 1L
 
-        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns null
-        every { productRepository.findAll(brandId, "latest", pageable) } returns products
+        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns CacheResult.Miss
+        every { productRepository.findAll(brandId, SortType.LATEST, pageable) } returns products
         every { productLikeCountService.getLikeCount(100L) } returns 0L
 
         // when
-        val result = productQueryService.findProducts(brandId, "latest", pageable)
+        val result = productQueryService.findProducts(brandId, SortType.LATEST, pageable)
 
         // then
         assertThat(result.content).hasSize(1)
@@ -82,13 +82,13 @@ class ProductQueryServiceTest {
         val products = PageImpl(listOf(product1, product2))
         val pageable = PageRequest.of(0, 20)
 
-        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns null
-        every { productRepository.findAll(null, "price_asc", pageable) } returns products
+        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns CacheResult.Miss
+        every { productRepository.findAll(null, SortType.PRICE_ASC, pageable) } returns products
         every { productLikeCountService.getLikeCount(100L) } returns 0L
         every { productLikeCountService.getLikeCount(101L) } returns 0L
 
         // when
-        val result = productQueryService.findProducts(null, "price_asc", pageable)
+        val result = productQueryService.findProducts(null, SortType.PRICE_ASC, pageable)
 
         // then
         assertThat(result.content).hasSize(2)
@@ -103,7 +103,7 @@ class ProductQueryServiceTest {
         val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
         val stock = Stock(productId = 100L, quantity = 50)
 
-        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns null
+        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns CacheResult.Miss
         every { productRepository.findById(100L) } returns product
         every { stockRepository.findByProductId(100L) } returns stock
         every { productLikeCountService.getLikeCount(100L) } returns 0L
@@ -137,7 +137,7 @@ class ProductQueryServiceTest {
     @Test
     fun `존재하지 않는 상품 조회 시 예외가 발생한다`() {
         // given
-        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns null
+        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns CacheResult.Miss
         every { productRepository.findById(999L) } returns null
 
         // when & then
@@ -153,7 +153,7 @@ class ProductQueryServiceTest {
         val brand = createTestBrand(id = 1L, name = "나이키")
         val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
 
-        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns null
+        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns CacheResult.Miss
         every { productRepository.findById(100L) } returns product
         every { stockRepository.findByProductId(100L) } returns null
 
@@ -174,12 +174,12 @@ class ProductQueryServiceTest {
         val pageable = PageRequest.of(0, 20)
         val products = PageImpl(listOf(product1, product2), pageable, 2)
 
-        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns products
+        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns CacheResult.Hit(products)
         every { productLikeCountService.getLikeCount(100L) } returns 0L
         every { productLikeCountService.getLikeCount(101L) } returns 0L
 
         // when
-        val result = productQueryService.findProducts(null, "latest", pageable)
+        val result = productQueryService.findProducts(null, SortType.LATEST, pageable)
 
         // then
         assertThat(result.content).hasSize(2)
@@ -196,7 +196,7 @@ class ProductQueryServiceTest {
         val stock = Stock(productId = 100L, quantity = 50)
         val productDetailData = ProductDetailData(product, stock)
 
-        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns productDetailData
+        every { productCacheRepository.get(any(), any<TypeReference<*>>()) } returns CacheResult.Hit(productDetailData)
         every { productLikeCountService.getLikeCount(100L) } returns 0L
 
         // when

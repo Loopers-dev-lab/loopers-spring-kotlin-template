@@ -65,12 +65,29 @@ class ProductLikeCountService(
 
     private fun initializeAndIncrement(productId: Long): Long {
         val initialValue = getFromDatabase(productId)
-        return productLikeCountRedisRepository.initAndIncrement(productId, initialValue)
+        val result = productLikeCountRedisRepository.initAndIncrement(productId, initialValue)
+
+        return if (result != null && isKeyExists(result)) {
+            result
+        } else {
+            logger.warn("Redis initAndIncrement returned null or KEY_NOT_FOUND, falling back to DB: productId=$productId")
+            incrementInDatabase(productId)
+        }
     }
 
     private fun initializeAndDecrement(productId: Long): Long {
         val initialValue = getFromDatabase(productId)
-        return productLikeCountRedisRepository.initAndDecrementIfPositive(productId, initialValue)
+        val result = productLikeCountRedisRepository.initAndDecrementIfPositive(productId, initialValue)
+
+        return if (result != null && isKeyExists(result)) {
+            result
+        } else {
+            logger.warn(
+                "Redis initAndDecrementIfPositive returned null or KEY_NOT_FOUND, " +
+                    "falling back to DB: productId=$productId",
+            )
+            decrementInDatabase(productId)
+        }
     }
 
     private fun initializeFromDatabase(productId: Long): Long {

@@ -79,13 +79,13 @@ class ProductLikeCountRedisRepositoryImpl(
     override fun initAndIncrement(
         productId: Long,
         initialValue: Long,
-    ): Long {
+    ): Long? {
         val key = buildKey(productId)
         return redisTemplate.execute(
             INIT_AND_INCREMENT_SCRIPT,
             listOf(key),
             initialValue.toString(),
-        ) ?: 0L
+        )
     }
 
     override fun decrementIfPositive(productId: Long): Long? {
@@ -96,13 +96,13 @@ class ProductLikeCountRedisRepositoryImpl(
     override fun initAndDecrementIfPositive(
         productId: Long,
         initialValue: Long,
-    ): Long {
+    ): Long? {
         val key = buildKey(productId)
         return redisTemplate.execute(
             INIT_AND_DECREMENT_IF_POSITIVE_SCRIPT,
             listOf(key),
             initialValue.toString(),
-        ) ?: 0L
+        )
     }
 
     override fun get(productId: Long): Long? {
