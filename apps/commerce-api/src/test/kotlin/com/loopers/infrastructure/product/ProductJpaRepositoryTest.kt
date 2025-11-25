@@ -175,7 +175,6 @@ class ProductJpaRepositoryTest @Autowired constructor(
             productLikeJpaRepository.save(ProductLike(productId = product2.id, userId = user2.id))
             productLikeCountJpaRepository.save(ProductLikeCount(productId = product2.id, likeCount = 2L))
 
-
             val pageable = PageRequest.of(0, 10)
 
             // when

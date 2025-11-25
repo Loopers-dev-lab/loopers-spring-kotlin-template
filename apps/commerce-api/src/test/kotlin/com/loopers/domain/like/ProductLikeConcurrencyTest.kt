@@ -171,7 +171,6 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
                 brandId = 1L,
             )
 
-
             // 유저 50명 생성 + 모두 좋아요
             val users = (1..50).map { idx ->
                 val user = userRepository.save(
@@ -239,7 +238,7 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
         return productLikeCountRepository.save(
             ProductLikeFixtures.createProductLikeCount(
                 productId = productId,
-                likeCount = likeCount
+                likeCount = likeCount,
             ),
         )
     }

@@ -42,7 +42,7 @@ class PointConcurrencyTest : IntegrationTest() {
 
             val threadCount = 5
             val chargeAmount = 1000L
-            val expectedTotalAmount = threadCount * chargeAmount  // 100 * 1000 = 100,000
+            val expectedTotalAmount = threadCount * chargeAmount // 100 * 1000 = 100,000
 
             // when: 100개 스레드가 동시에 1000원씩 충전
             val executor = Executors.newFixedThreadPool(threadCount)
@@ -95,7 +95,7 @@ class PointConcurrencyTest : IntegrationTest() {
 
             val threadCount = 5
             val useAmount = 100L
-            val expectedRemainingAmount = initialAmount - (threadCount * useAmount)  // 100,000 - 10,000 = 90,000
+            val expectedRemainingAmount = initialAmount - (threadCount * useAmount) // 100,000 - 10,000 = 90,000
 
             // when: 100개 스레드가 동시에 100원씩 사용
             val executor = Executors.newFixedThreadPool(threadCount)
@@ -141,7 +141,7 @@ class PointConcurrencyTest : IntegrationTest() {
             pointService.charge(initialAmount, user.id)
 
             val threadCount = 5
-            val useAmount = 1000L  // 10개 요청 * 1000원 = 10,000원 시도 (잔액 초과)
+            val useAmount = 1000L // 10개 요청 * 1000원 = 10,000원 시도 (잔액 초과)
 
             // when: 10개 스레드가 동시에 1000원씩 사용 시도
             val executor = Executors.newFixedThreadPool(threadCount)
@@ -158,7 +158,7 @@ class PointConcurrencyTest : IntegrationTest() {
                         successCount.incrementAndGet()
                         log.info("[$threadName] 포인트 사용 성공")
                     } catch (e: CoreException) {
-                        failCount.incrementAndGet()  // 잔액 부족 예외
+                        failCount.incrementAndGet() // 잔액 부족 예외
                         log.info("[$threadName] 포인트 부족으로 실패")
                     } catch (e: Exception) {
                         log.warn("[$threadName] 예상치 못한 예외: ${e.message}")
@@ -174,14 +174,14 @@ class PointConcurrencyTest : IntegrationTest() {
             // then: 5번만 성공하고, 나머지는 실패해야 함 (음수 방지)
             val finalPoint = pointJpaRepository.findByIdOrNull(user.id)!!.amount.value
 
-            val expectedSuccessCount = (initialAmount / useAmount).toInt()  // 5,000 / 1,000 = 5
-            val expectedRemainingAmount = initialAmount - (expectedSuccessCount * useAmount)  // 5,000 - 5,000 = 0
+            val expectedSuccessCount = (initialAmount / useAmount).toInt() // 5,000 / 1,000 = 5
+            val expectedRemainingAmount = initialAmount - (expectedSuccessCount * useAmount) // 5,000 - 5,000 = 0
 
             assertSoftly { soft ->
                 soft.assertThat(successCount.get()).isEqualTo(expectedSuccessCount)
                 soft.assertThat(finalPoint).isEqualTo(expectedRemainingAmount)
-                soft.assertThat(finalPoint).isGreaterThanOrEqualTo(0)  // 음수 방지 검증
-                soft.assertThat(failCount.get()).isEqualTo(threadCount - expectedSuccessCount)  // 5개는 실패해야 함
+                soft.assertThat(finalPoint).isGreaterThanOrEqualTo(0) // 음수 방지 검증
+                soft.assertThat(failCount.get()).isEqualTo(threadCount - expectedSuccessCount) // 5개는 실패해야 함
             }
         }
     }
@@ -200,8 +200,8 @@ class PointConcurrencyTest : IntegrationTest() {
 
             val numberOfCharges = 50
             val numberOfUses = 30
-            val chargeAmount = 2000L  // 50번 * 2,000 = +100,000원
-            val useAmount = 1000L     // 30번 * 1,000 = -30,000원
+            val chargeAmount = 2000L // 50번 * 2,000 = +100,000원
+            val useAmount = 1000L // 30번 * 1,000 = -30,000원
 
             // 예상: 10,000 + 100,000 - 30,000 = 80,000원
             val expectedFinalAmount = initialAmount +

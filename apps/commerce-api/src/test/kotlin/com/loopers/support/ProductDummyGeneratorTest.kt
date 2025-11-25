@@ -43,7 +43,7 @@ import kotlin.random.Random
 @SpringBootTest
 @ActiveProfiles("local")
 @Disabled("상품 데이터 더미 생성")
-class ProductDummyDateGeneratorTest {
+class ProductDummyGeneratorTest {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -153,7 +153,7 @@ class ProductDummyDateGeneratorTest {
             val productLikeCounts = productIdBatch.map { productId ->
                 ProductLikeCount.create(
                     productId = productId,
-                    likeCount = likeCountMap[productId] ?: 0L
+                    likeCount = likeCountMap[productId] ?: 0L,
                 )
             }
 

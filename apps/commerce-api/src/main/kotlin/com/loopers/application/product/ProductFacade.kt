@@ -1,5 +1,6 @@
 package com.loopers.application.product
 
+import com.loopers.application.dto.PageResult
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.like.ProductLikeService
 import com.loopers.domain.product.ProductService
@@ -7,6 +8,7 @@ import com.loopers.domain.product.ProductSort
 import com.loopers.domain.user.UserService
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.util.TransactionUtils
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -61,7 +63,9 @@ class ProductFacade(
         val productLikeCount = productLikeService.getCountBy(product.id)
 
         // 4. 유저가 좋아요 했는지 조회
-        val userLiked = if (userId == null) false else {
+        val userLiked = if (userId == null) {
+            false
+        } else {
             val user = userService.getMyInfo(userId)
             productLikeService.getBy(product.id, user.id) != null
         }

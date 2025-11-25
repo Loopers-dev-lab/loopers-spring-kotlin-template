@@ -24,7 +24,7 @@ class ProductResultTest {
             val brand = Brand.create("테스트 브랜드").withId(1L)
             val product = Product.create("테스트 상품", 10000, brand.id).withId(1L)
             val productLikeCounts = listOf(
-                ProductLikeCount.create(product.id, 5L)
+                ProductLikeCount.create(product.id, 5L),
             )
 
             // when
@@ -51,7 +51,7 @@ class ProductResultTest {
             val brand = Brand.create("테스트 브랜드").withId(1L)
             val product = Product.create("테스트 상품", 10000, brand.id).withId(1L)
             val productLikeCounts = listOf(
-                ProductLikeCount.create(product.id, likeCount)
+                ProductLikeCount.create(product.id, likeCount),
             )
 
             // when
