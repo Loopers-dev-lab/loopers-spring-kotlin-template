@@ -31,9 +31,10 @@ class ProductRepositoryImpl(
     ): Page<Product> {
         return when (sort) {
             ProductSort.LIKE_DESC -> {
+                val unsortedPageable = unsortPageable(pageable)
                 brandId?.let {
-                    productJpaRepository.findAllByBrandIdOrderByLikesDesc(it, pageable)
-                } ?: productJpaRepository.findAllOrderByLikesDesc(pageable)
+                    productJpaRepository.findAllByBrandIdOrderByLikesDesc(it, unsortedPageable)
+                } ?: productJpaRepository.findAllOrderByLikesDesc(unsortedPageable)
             }
 
             ProductSort.LATEST -> {
@@ -56,5 +57,9 @@ class ProductRepositoryImpl(
 
     private fun sortPageable(pageable: Pageable, sort: Sort): Pageable {
         return PageRequest.of(pageable.pageNumber, pageable.pageSize, sort)
+    }
+
+    private fun unsortPageable(pageable: Pageable): Pageable {
+        return PageRequest.of(pageable.pageNumber, pageable.pageSize)
     }
 }

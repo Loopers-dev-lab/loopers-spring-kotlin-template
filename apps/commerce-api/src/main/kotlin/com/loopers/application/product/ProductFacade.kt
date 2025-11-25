@@ -20,9 +20,13 @@ class ProductFacade(
     private val productService: ProductService,
     private val productLikeService: ProductLikeService,
     private val userService: UserService,
+    private val productCache: ProductCache,
 ) {
     @Transactional(readOnly = true)
     fun getProducts(brandId: Long?, sort: ProductSort, pageable: Pageable): Page<ProductResult.ListInfo> {
+        // 캐시 조회
+        productCache.getProductList(brandId, sort, pageable)?.let { return it.toPage(pageable) }
+
         // 1. 상품 리스트 조회
         val productPage = productService.getProducts(brandId, sort, pageable)
 
@@ -44,13 +48,22 @@ class ProductFacade(
         val brands = brandService.getAllBrand(brandIds)
 
         // 6. 상품 정보 변환
-        return productPage.map { product ->
+        val result = productPage.map { product ->
             ProductResult.ListInfo.from(product, productLikeCounts, brands)
         }
+
+        // 트랜잭션 커밋 후 캐시 저장
+        TransactionUtils.executeAfterCommit {
+            productCache.setProductList(brandId, sort, pageable, PageResult.from(result))
+        }
+
+        return result
     }
 
     @Transactional(readOnly = true)
     fun getProduct(productId: Long, userId: String?): ProductResult.DetailInfo {
+        // 캐시 조회
+        productCache.getProductDetail(productId, userId)?.let { return it }
 
         // 1. 상품 조회
         val product =
@@ -70,11 +83,25 @@ class ProductFacade(
             productLikeService.getBy(product.id, user.id) != null
         }
 
-        return ProductResult.DetailInfo.from(product, userLiked, productLikeCount.likeCount, brand)
+        val result = ProductResult.DetailInfo.from(product, userLiked, productLikeCount.likeCount, brand)
+
+        // 트랜잭션 커밋 후 캐시 저장
+        TransactionUtils.executeAfterCommit {
+            productCache.setProductDetail(
+                productId,
+                userId,
+                result,
+            )
+        }
+
+        return result
     }
 
     @Transactional(readOnly = true)
     fun getLikedProducts(userId: String, pageable: Pageable): Page<ProductResult.LikedInfo> {
+        // 캐시 조회
+        productCache.getLikedProductList(userId, pageable)?.let { return it.toPage(pageable) }
+
         // 1. 사용자 존재 여부 확인
         val user = userService.getMyInfo(userId)
 
@@ -99,8 +126,15 @@ class ProductFacade(
         val brands = brandService.getAllBrand(brandIds)
 
         // 7. ProductLike 순서대로 결과 생성
-        return productLikePage.map { like ->
+        val result = productLikePage.map { like ->
             ProductResult.LikedInfo.from(like, products, brands)
         }
+
+        // 트랜잭션 커밋 후 캐시 저장
+        TransactionUtils.executeAfterCommit {
+            productCache.setLikedProductList(userId, pageable, PageResult.from(result))
+        }
+
+        return result
     }
 }
