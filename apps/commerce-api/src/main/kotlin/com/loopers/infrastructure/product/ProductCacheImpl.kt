@@ -20,9 +20,9 @@ class ProductCacheImpl(
     private val log = LoggerFactory.getLogger(ProductCacheImpl::class.java)
 
     companion object {
-        private const val CACHE_DETAIL_TTL_MINUTE = 5L
-        private const val CACHE_LIST_TTL_MINUTE = 5L
-        private const val CACHE_LIKE_LIST_TTL_MINUTE = 5L
+        private const val CACHE_DETAIL_TTL_MINUTE = 30L
+        private const val CACHE_LIST_TTL_MINUTE = 30L
+        private const val CACHE_LIKE_LIST_TTL_MINUTE = 3L
         private const val VERSION = 1L
         private const val MAX_CACHEABLE_PAGE = 4
     }
