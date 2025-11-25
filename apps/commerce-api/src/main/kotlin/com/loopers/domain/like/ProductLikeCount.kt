@@ -19,7 +19,7 @@ class ProductLikeCount(
     @Column(name = "ref_product_id", nullable = false)
     val productId: Long,
 
-    @Column(name = "ref_user_id", nullable = false)
+    @Column(name = "like_count", nullable = false)
     val likeCount: Long,
 
     ) : BaseEntity() {
