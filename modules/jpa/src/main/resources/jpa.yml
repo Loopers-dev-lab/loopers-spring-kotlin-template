@@ -38,6 +38,17 @@ spring:
     show-sql: true
     hibernate:
       ddl-auto: create
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: always
+      data-locations:
+        - classpath:db/seed_data_brands.sql
+        - classpath:db/seed_data_products.sql
+        - classpath:db/seed_data_stocks.sql
+        - classpath:db/seed_data_product_signals.sql
+      encoding: UTF-8
+      continue-on-error: true
 
 datasource:
   mysql-jpa:
