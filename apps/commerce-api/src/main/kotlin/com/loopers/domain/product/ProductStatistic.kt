@@ -3,6 +3,7 @@ package com.loopers.domain.product
 import com.loopers.domain.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 
@@ -13,6 +14,12 @@ import jakarta.persistence.UniqueConstraint
         UniqueConstraint(
             name = "uk_product_statistic_product",
             columnNames = ["product_id"],
+        ),
+    ],
+    indexes = [
+        Index(
+            name = "idx_product_statistics_like_count_product_id",
+            columnList = "like_count DESC, product_id DESC",
         ),
     ],
 )

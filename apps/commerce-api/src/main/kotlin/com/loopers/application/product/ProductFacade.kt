@@ -12,6 +12,7 @@ class ProductFacade(
         return ProductInfo.FindProductById.from(productView)
     }
 
+    // TODO(toong): 응답객체를 coupon findUserCoupons를 참고해서 수정
     fun findProducts(criteria: ProductCriteria.FindProducts): ProductInfo.FindProducts {
         val slice = productService.findProducts(criteria.to())
         return ProductInfo.FindProducts.from(slice)

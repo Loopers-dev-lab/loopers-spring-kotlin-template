@@ -17,12 +17,12 @@ import jakarta.persistence.Table
     name = "products",
     indexes = [
         Index(
-            name = "idx_product_brand_price",
-            columnList = "brand_id, price",
+            name = "idx_products_price",
+            columnList = "price ASC, id DESC",
         ),
         Index(
-            name = "idx_product_brand_id",
-            columnList = "brand_id, id DESC",
+            name = "idx_products_brand_id",
+            columnList = "brand_id",
         ),
     ],
 )
@@ -52,6 +52,7 @@ class Product(
         private set
 
     @Column(name = "stock", nullable = false)
+    @AttributeOverride(name = "amount", column = Column(name = "stock", nullable = false))
     var stock: Stock = stock
         private set
 
