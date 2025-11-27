@@ -4,16 +4,10 @@ import com.loopers.domain.BaseEntity
 import com.loopers.domain.common.vo.Money
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.Index
 import jakarta.persistence.Table
 
 @Entity
-@Table(
-    name = "products",
-    indexes = [
-        Index(name = "idx_products_brand_created", columnList = "ref_brand_id,created_at"),
-    ],
-)
+@Table(name = "products")
 open class ProductModel(
     @Column
     var name: String,

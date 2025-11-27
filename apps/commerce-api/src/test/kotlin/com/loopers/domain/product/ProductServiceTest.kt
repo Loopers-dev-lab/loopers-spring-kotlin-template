@@ -19,8 +19,6 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Sort
 import java.math.BigDecimal
 
 class ProductServiceTest(
@@ -40,165 +38,6 @@ class ProductServiceTest(
     @DisplayName("리스트 조회")
     @Nested
     inner class GetAllProducts {
-
-        @DisplayName("브랜드 필터로 조회된다.")
-        @Test
-        fun getAllProductsSuccess_filterByBrand() {
-            // arrange
-            val brand1 = BrandModel("Nike")
-            val brand2 = BrandModel("Adidas")
-            brandRepository.save(brand1)
-            brandRepository.save(brand2)
-
-            // Nike 상품 3개
-            val nikeProduct1 = ProductModel.create(
-                name = "Nike Air Max",
-                price = Money(BigDecimal.valueOf(150000)),
-                refBrandId = brand1.id,
-            )
-            val nikeProduct2 = ProductModel.create(
-                name = "Nike Jordan",
-                price = Money(BigDecimal.valueOf(200000)),
-                refBrandId = brand1.id,
-            )
-            val nikeProduct3 = ProductModel.create(
-                name = "Nike Dunk",
-                price = Money(BigDecimal.valueOf(120000)),
-                refBrandId = brand1.id,
-            )
-            productRepository.save(nikeProduct1)
-            productRepository.save(nikeProduct2)
-            productRepository.save(nikeProduct3)
-
-            // Adidas 상품 2개
-            val adidasProduct1 = ProductModel.create(
-                name = "Adidas Superstar",
-                price = Money(BigDecimal.valueOf(100000)),
-                refBrandId = brand2.id,
-            )
-            val adidasProduct2 = ProductModel.create(
-                name = "Adidas Stan Smith",
-                price = Money(BigDecimal.valueOf(90000)),
-                refBrandId = brand2.id,
-            )
-            productRepository.save(adidasProduct1)
-            productRepository.save(adidasProduct2)
-
-            // 재고 및 시그널 생성
-            listOf(nikeProduct1, nikeProduct2, nikeProduct3, adidasProduct1, adidasProduct2).forEach { product ->
-                stockRepository.save(StockModel.create(product.id, 100))
-                productTotalSignalRepository.save(ProductTotalSignalModel(refProductId = product.id))
-            }
-
-            // act - Nike 브랜드만 필터링
-            val result = productService.getProducts(
-                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt")),
-                brand1.id,
-            )
-
-            // assert
-            assertThat(result.content).hasSize(3)
-            assertThat(result.totalElements).isEqualTo(3)
-            assertThat(result.content).allMatch { it.brandId == brand1.id }
-            assertThat(result.content.map { it.name }).containsExactlyInAnyOrder(
-                "Nike Air Max",
-                "Nike Jordan",
-                "Nike Dunk",
-            )
-        }
-
-        @DisplayName("브랜드 필터 + 좋아요 내림차순으로 조회된다")
-        @Test
-        fun getAllProductsSuccess_filterByBrandAndSortByLikes() {
-            // arrange
-            val brand1 = BrandModel("Nike")
-            val brand2 = BrandModel("Adidas")
-            brandRepository.save(brand1)
-            brandRepository.save(brand2)
-
-            // Nike 상품 3개
-            val nikeProduct1 = ProductModel.create(
-                name = "Nike Air Max",
-                price = Money(BigDecimal.valueOf(150000)),
-                refBrandId = brand1.id,
-            )
-            val nikeProduct2 = ProductModel.create(
-                name = "Nike Jordan",
-                price = Money(BigDecimal.valueOf(200000)),
-                refBrandId = brand1.id,
-            )
-            val nikeProduct3 = ProductModel.create(
-                name = "Nike Dunk",
-                price = Money(BigDecimal.valueOf(120000)),
-                refBrandId = brand1.id,
-            )
-            productRepository.save(nikeProduct1)
-            productRepository.save(nikeProduct2)
-            productRepository.save(nikeProduct3)
-
-            // Adidas 상품 2개
-            val adidasProduct1 = ProductModel.create(
-                name = "Adidas Superstar",
-                price = Money(BigDecimal.valueOf(100000)),
-                refBrandId = brand2.id,
-            )
-            val adidasProduct2 = ProductModel.create(
-                name = "Adidas Stan Smith",
-                price = Money(BigDecimal.valueOf(90000)),
-                refBrandId = brand2.id,
-            )
-            productRepository.save(adidasProduct1)
-            productRepository.save(adidasProduct2)
-
-            // 재고 생성
-            listOf(nikeProduct1, nikeProduct2, nikeProduct3, adidasProduct1, adidasProduct2).forEach { product ->
-                stockRepository.save(StockModel.create(product.id, 100))
-            }
-
-            // ProductTotalSignal 생성 및 좋아요 수 설정
-            // Nike Air Max: 10개 (가장 많음)
-            val nikeSignal1 = ProductTotalSignalModel(refProductId = nikeProduct1.id).apply {
-                repeat(10) { incrementLikeCount() }
-            }
-            // Nike Jordan: 3개
-            val nikeSignal2 = ProductTotalSignalModel(refProductId = nikeProduct2.id).apply {
-                repeat(3) { incrementLikeCount() }
-            }
-            // Nike Dunk: 7개
-            val nikeSignal3 = ProductTotalSignalModel(refProductId = nikeProduct3.id).apply {
-                repeat(7) { incrementLikeCount() }
-            }
-            // Adidas 상품들 (필터링되어 결과에 포함되지 않음)
-            val adidasSignal1 = ProductTotalSignalModel(refProductId = adidasProduct1.id).apply {
-                repeat(15) { incrementLikeCount() } // Nike보다 많지만 필터링됨
-            }
-            val adidasSignal2 = ProductTotalSignalModel(refProductId = adidasProduct2.id).apply {
-                repeat(5) { incrementLikeCount() }
-            }
-            productTotalSignalRepository.save(nikeSignal1)
-            productTotalSignalRepository.save(nikeSignal2)
-            productTotalSignalRepository.save(nikeSignal3)
-            productTotalSignalRepository.save(adidasSignal1)
-            productTotalSignalRepository.save(adidasSignal2)
-
-            // act - Nike 브랜드만 필터링 + 좋아요 내림차순
-            val result = productService.getProducts(
-                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "likeCount")),
-                brand1.id,
-            )
-
-            // assert
-            assertThat(result.content).hasSize(3)
-            assertThat(result.totalElements).isEqualTo(3)
-            assertThat(result.content).allMatch { it.brandId == brand1.id }
-            // 좋아요 순서: Nike Air Max (10) > Nike Dunk (7) > Nike Jordan (3)
-            assertThat(result.content[0].name).isEqualTo("Nike Air Max")
-            assertThat(result.content[0].likeCount).isEqualTo(10)
-            assertThat(result.content[1].name).isEqualTo("Nike Dunk")
-            assertThat(result.content[1].likeCount).isEqualTo(7)
-            assertThat(result.content[2].name).isEqualTo("Nike Jordan")
-            assertThat(result.content[2].likeCount).isEqualTo(3)
-        }
 
         @DisplayName("상품 목록이 최신순(latest)으로 조회된다")
         @Test
@@ -237,10 +76,7 @@ class ProductServiceTest(
             productTotalSignalRepository.save(ProductTotalSignalModel(refProductId = product3.id))
 
             // act
-            val result = productService.getProducts(
-                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt")),
-                null,
-            )
+            val result = productService.getProducts("createdAt", "desc", 0, 10)
 
             // assert
             assertThat(result.content).hasSize(3)
@@ -287,10 +123,7 @@ class ProductServiceTest(
             productTotalSignalRepository.save(ProductTotalSignalModel(refProductId = product3.id))
 
             // act
-            val result = productService.getProducts(
-                PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "price")),
-                null,
-            )
+            val result = productService.getProducts("price", "asc", 0, 10)
 
             // assert
             assertThat(result.content).hasSize(3)
@@ -348,10 +181,7 @@ class ProductServiceTest(
             productTotalSignalRepository.save(signal3)
 
             // act
-            val result = productService.getProducts(
-                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "likeCount")),
-                null,
-            )
+            val result = productService.getProducts("likeCount", "desc", 0, 10)
 
             // assert
             assertThat(result.content).hasSize(3)
@@ -367,10 +197,7 @@ class ProductServiceTest(
         @Test
         fun getAllProductsSuccess_whenEmpty() {
             // act
-            val result = productService.getProducts(
-                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt")),
-                null,
-            )
+            val result = productService.getProducts("createdAt", "desc", 0, 10)
 
             // assert
             assertThat(result.content).isEmpty()
