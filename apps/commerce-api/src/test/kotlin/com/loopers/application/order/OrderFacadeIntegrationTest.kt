@@ -1,5 +1,8 @@
 package com.loopers.application.order
 
+import com.fasterxml.jackson.core.type.TypeReference
+import com.loopers.application.product.ProductCacheKeys
+import com.loopers.cache.CacheTemplate
 import com.loopers.domain.coupon.Coupon
 import com.loopers.domain.coupon.CouponRepository
 import com.loopers.domain.coupon.DiscountAmount
@@ -17,11 +20,13 @@ import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
+import com.loopers.domain.product.ProductView
 import com.loopers.domain.product.Stock
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
+import com.loopers.utils.RedisCleanUp
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -43,7 +48,9 @@ class OrderFacadeIntegrationTest @Autowired constructor(
     private val pointAccountRepository: PointAccountRepository,
     private val couponRepository: CouponRepository,
     private val issuedCouponRepository: IssuedCouponRepository,
+    private val cacheTemplate: CacheTemplate,
     private val databaseCleanUp: DatabaseCleanUp,
+    private val redisCleanUp: RedisCleanUp,
 ) {
     companion object {
         private val FIXED_TIME = java.time.ZonedDateTime.parse("2025-01-15T10:00:00+09:00[Asia/Seoul]")
@@ -52,6 +59,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
+        redisCleanUp.truncateAll()
     }
 
     @DisplayName("주문 생성 통합테스트")
@@ -480,6 +488,81 @@ class OrderFacadeIntegrationTest @Autowired constructor(
                 { assertThat(payment.totalAmount).isEqualTo(Money.krw(10000)) },
             )
         }
+
+        @DisplayName("주문 생성 시 재고가 변경된 상품의 캐시가 갱신된다")
+        @Test
+        fun `update product cache when order is placed`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(10000), stock = Stock.of(100))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            val cacheKey = ProductCacheKeys.ProductDetail(productId = product.id)
+
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(50000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 5),
+                ),
+                issuedCouponId = null,
+            )
+
+            // when - 주문 생성
+            orderFacade.placeOrder(criteria)
+
+            // then - Redis에서 직접 조회해서 최신 재고가 캐시에 반영되었는지 확인
+            val cachedValue = cacheTemplate.get(
+                cacheKey,
+                object : TypeReference<ProductView>() {},
+            )
+
+            assertThat(cachedValue).isNotNull
+            assertThat(cachedValue!!.product.id).isEqualTo(product.id)
+            assertThat(cachedValue.product.stock.amount).isEqualTo(95)
+        }
+
+        @DisplayName("주문 실패 시 캐시가 갱신되지 않는다")
+        @Test
+        fun `do not update cache when order fails`() {
+            // given
+            val userId = 1L
+            val product = createProduct(stock = Stock.of(5))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            // when 주문 실패 (재고 부족)
+            val criteria = createPlaceOrderCriteria(
+                items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 10)),
+            )
+            assertThrows<CoreException> {
+                orderFacade.placeOrder(criteria)
+            }
+
+            // then
+            val cacheKey = ProductCacheKeys.ProductDetail(productId = product.id)
+            val cachedValue = cacheTemplate.get(
+                cacheKey,
+                object : TypeReference<ProductView>() {},
+            )
+
+            assertThat(cachedValue).isNull()
+        }
+    }
+
+    private fun createPlaceOrderCriteria(
+        userId: Long = 1L,
+        usePoint: Money = Money.krw(10000),
+        items: List<OrderCriteria.PlaceOrderItem> = listOf(
+            OrderCriteria.PlaceOrderItem(productId = 1, quantity = 10),
+        ),
+        issuedCouponId: Long? = null,
+    ): OrderCriteria.PlaceOrder {
+        return OrderCriteria.PlaceOrder(
+            userId = userId,
+            usePoint = usePoint,
+            items = items,
+            issuedCouponId = issuedCouponId,
+        )
     }
 
     private fun createProduct(

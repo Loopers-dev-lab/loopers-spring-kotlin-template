@@ -246,6 +246,83 @@ class ProductServiceIntegrationTest @Autowired constructor(
         }
     }
 
+    @DisplayName("여러 상품 상세 조회 통합테스트")
+    @Nested
+    inner class FindAllProductViewByIds {
+
+        @DisplayName("여러 상품을 조회하면 모든 상품의 상세 정보가 반환된다")
+        @Test
+        fun `return all product views when products exist`() {
+            // given
+            val product1 = createProduct(name = "상품1")
+            val product2 = createProduct(name = "상품2")
+            val product3 = createProduct(name = "상품3")
+            val productIds = listOf(product1.id, product2.id, product3.id)
+
+            // when
+            val productViews = productService.findAllProductViewByIds(productIds)
+
+            // then
+            assertThat(productViews).hasSize(3)
+            assertThat(productViews.map { it.product.id }).containsExactlyInAnyOrder(
+                product1.id,
+                product2.id,
+                product3.id,
+            )
+            productViews.forEach { productView ->
+                assertAll(
+                    { assertThat(productView.product).isNotNull },
+                    { assertThat(productView.statistic).isNotNull },
+                    { assertThat(productView.brand).isNotNull },
+                )
+            }
+        }
+
+        @DisplayName("빈 리스트를 전달하면 빈 리스트가 반환된다")
+        @Test
+        fun `return empty list when ids is empty`() {
+            // when
+            val productViews = productService.findAllProductViewByIds(emptyList())
+
+            // then
+            assertThat(productViews).isEmpty()
+        }
+
+        @DisplayName("존재하지 않는 상품이 포함되면 예외가 발생한다")
+        @Test
+        fun `throw exception when some products not exist`() {
+            // given
+            val product1 = createProduct(name = "상품1")
+            val nonExistentId = 999L
+            val productIds = listOf(product1.id, nonExistentId)
+
+            // when
+            val exception = assertThrows<CoreException> {
+                productService.findAllProductViewByIds(productIds)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+            assertThat(exception.message).contains("존재하지 않는 상품입니다")
+            assertThat(exception.message).contains(nonExistentId.toString())
+        }
+
+        @DisplayName("중복된 ID를 전달하면 중복 없이 조회된다")
+        @Test
+        fun `handle duplicate ids correctly`() {
+            // given
+            val product = createProduct(name = "상품")
+            val productIds = listOf(product.id, product.id, product.id)
+
+            // when
+            val productViews = productService.findAllProductViewByIds(productIds)
+
+            // then
+            assertThat(productViews).hasSize(1)
+            assertThat(productViews[0].product.id).isEqualTo(product.id)
+        }
+    }
+
     @DisplayName("상품 좋아요 수 증가 통합테스트")
     @Nested
     inner class IncreaseProductLikeCount {

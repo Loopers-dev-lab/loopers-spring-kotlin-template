@@ -98,6 +98,49 @@ class ProductService(
         return products
     }
 
+    @Transactional(readOnly = true)
+    fun findAllProductViewByIds(ids: List<Long>): List<ProductView> {
+        if (ids.isEmpty()) return emptyList()
+
+        val products = productRepository.findAllByIds(ids)
+
+        // 요청한 ID와 조회된 ID 비교
+        val foundIds = products.map { it.id }.toSet()
+        val notFoundIds = ids.filterNot { it in foundIds }
+
+        if (notFoundIds.isNotEmpty()) {
+            throw CoreException(
+                ErrorType.NOT_FOUND,
+                "존재하지 않는 상품입니다: ${notFoundIds.joinToString()}",
+            )
+        }
+
+        val productStatisticsToMap = productStatisticRepository
+            .findAllByProductIds(ids)
+            .associateBy { it.productId }
+
+        val brandIds = products.map { it.brandId }.distinct()
+        val brandsToMap = brandRepository
+            .findAllByIds(brandIds)
+            .associateBy { it.id }
+
+        return products.map { product ->
+            ProductView(
+                product = product,
+                statistic = productStatisticsToMap[product.id]
+                    ?: throw CoreException(
+                        errorType = ErrorType.INTERNAL_ERROR,
+                        customMessage = "[productId = ${product.id}] 상품의 통계를 찾을 수 없습니다.",
+                    ),
+                brand = brandsToMap[product.brandId]
+                    ?: throw CoreException(
+                        errorType = ErrorType.INTERNAL_ERROR,
+                        customMessage = "[brandId = ${product.brandId}] 상품의 브랜드를 찾을 수 없습니다.",
+                    ),
+            )
+        }
+    }
+
     @Transactional
     fun decreaseStocks(command: ProductCommand.DecreaseStocks) {
         val decreaseStockMap = command.units.associateBy { it.productId }
