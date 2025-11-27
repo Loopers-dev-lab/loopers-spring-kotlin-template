@@ -8,6 +8,7 @@ import jakarta.persistence.Embeddable
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 
+// TODO(toong): strategy pattern을 통해 확장성을 염두한 구현을 하면 좋을듯
 @Embeddable
 data class DiscountAmount(
     @Enumerated(EnumType.STRING)

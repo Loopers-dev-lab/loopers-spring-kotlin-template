@@ -81,6 +81,7 @@ class IssuedCoupon(
     }
 
     companion object {
+        // TODO(toong): IssuedCoupon.issue 보다는 coupon.issue가 더 명시적인 시그니처로 보임.
         fun issue(userId: Long, coupon: Coupon): IssuedCoupon {
             return IssuedCoupon(userId, coupon.id)
         }
