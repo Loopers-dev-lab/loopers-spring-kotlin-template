@@ -21,6 +21,10 @@ class CouponServiceIntegrationTest @Autowired constructor(
     private val issuedCouponRepository: IssuedCouponRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
+    companion object {
+        private val FIXED_TIME = java.time.ZonedDateTime.parse("2025-01-15T10:00:00+09:00[Asia/Seoul]")
+    }
+
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
@@ -99,7 +103,7 @@ class CouponServiceIntegrationTest @Autowired constructor(
 
             // 쿠폰 사용
             val couponEntity = couponRepository.findById(coupon.id)!!
-            issuedCoupon.use(couponEntity, Money.krw(10000))
+            issuedCoupon.use(userId, couponEntity, Money.krw(10000), FIXED_TIME)
             issuedCouponRepository.save(issuedCoupon)
 
             // when
@@ -271,7 +275,7 @@ class CouponServiceIntegrationTest @Autowired constructor(
             }
 
             // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
             assertThat(exception.message).contains("보유하지 않은 쿠폰입니다")
         }
 
@@ -289,7 +293,7 @@ class CouponServiceIntegrationTest @Autowired constructor(
 
             // 쿠폰을 먼저 사용
             val couponEntity = couponRepository.findById(coupon.id)!!
-            issuedCoupon.use(couponEntity, Money.krw(10000))
+            issuedCoupon.use(userId, couponEntity, Money.krw(10000), FIXED_TIME)
             issuedCouponRepository.save(issuedCoupon)
 
             // when & then

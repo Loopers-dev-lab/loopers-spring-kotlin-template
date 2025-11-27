@@ -7,11 +7,14 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.ZonedDateTime
 
 @Component
 class CouponService(
     private val couponRepository: CouponRepository,
     private val issuedCouponRepository: IssuedCouponRepository,
+    private val clock: Clock,
 ) {
     @Transactional
     fun issueCoupon(userId: Long, couponId: Long): IssuedCoupon {
@@ -77,14 +80,10 @@ class CouponService(
         val issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "보유하지 않은 쿠폰입니다")
 
-        if (issuedCoupon.userId != userId) {
-            throw CoreException(ErrorType.NOT_FOUND, "보유하지 않은 쿠폰입니다")
-        }
-
         val coupon = couponRepository.findById(issuedCoupon.couponId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "쿠폰 정의를 찾을 수 없습니다")
 
-        val discountAmount = issuedCoupon.use(coupon, orderAmount)
+        val discountAmount = issuedCoupon.use(userId, coupon, orderAmount, ZonedDateTime.now(clock))
 
         issuedCouponRepository.save(issuedCoupon)
 

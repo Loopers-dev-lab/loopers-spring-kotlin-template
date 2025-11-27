@@ -60,12 +60,18 @@ class IssuedCoupon(
     /**
      * 쿠폰을 사용하고 할인 금액을 반환합니다.
      *
+     * @param userId 쿠폰을 사용하려는 사용자 ID
      * @param coupon 사용할 쿠폰 정의
      * @param orderAmount 주문 금액
+     * @param usedAt 쿠폰 사용 시각
      * @return 할인 금액
-     * @throws CoreException 쿠폰 정보가 일치하지 않거나 이미 사용된 쿠폰인 경우
+     * @throws CoreException 사용자가 일치하지 않거나, 쿠폰 정보가 일치하지 않거나, 이미 사용된 쿠폰인 경우
      */
-    fun use(coupon: Coupon, orderAmount: Money): Money {
+    fun use(userId: Long, coupon: Coupon, orderAmount: Money, usedAt: ZonedDateTime): Money {
+        if (this.userId != userId) {
+            throw CoreException(ErrorType.BAD_REQUEST, "보유하지 않은 쿠폰입니다")
+        }
+
         if (coupon.id != couponId) {
             throw CoreException(ErrorType.BAD_REQUEST, "쿠폰 정보가 일치하지 않습니다")
         }
@@ -75,7 +81,7 @@ class IssuedCoupon(
         }
 
         status = UsageStatus.USED
-        usedAt = ZonedDateTime.now()
+        this.usedAt = usedAt
 
         return coupon.calculateDiscount(orderAmount)
     }

@@ -10,9 +10,14 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 import org.springframework.test.util.ReflectionTestUtils
+import java.time.ZonedDateTime
 
 @DisplayName("IssuedCoupon 단위 테스트")
 class IssuedCouponTest {
+
+    companion object {
+        private val FIXED_TIME = ZonedDateTime.parse("2025-01-15T10:00:00+09:00[Asia/Seoul]")
+    }
 
     @DisplayName("쿠폰 발급")
     @Nested
@@ -46,12 +51,13 @@ class IssuedCouponTest {
         @Test
         fun `use available coupon successfully`() {
             // given
+            val userId = 1L
             val coupon = createCoupon(discountValue = 5000)
-            val issuedCoupon = createIssuedCoupon(coupon = coupon)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
             val orderAmount = Money.krw(10000)
 
             // when
-            val discountAmount = issuedCoupon.use(coupon, orderAmount)
+            val discountAmount = issuedCoupon.use(userId, coupon, orderAmount, FIXED_TIME)
 
             // then
             assertAll(
@@ -65,15 +71,16 @@ class IssuedCouponTest {
         @Test
         fun `use rate coupon and return correct discount amount`() {
             // given
+            val userId = 1L
             val coupon = createCoupon(
                 discountType = DiscountType.RATE,
                 discountValue = 10,
             )
-            val issuedCoupon = createIssuedCoupon(coupon = coupon)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
             val orderAmount = Money.krw(50000)
 
             // when
-            val discountAmount = issuedCoupon.use(coupon, orderAmount)
+            val discountAmount = issuedCoupon.use(userId, coupon, orderAmount, FIXED_TIME)
 
             // then
             assertThat(discountAmount).isEqualTo(Money.krw(5000))
@@ -83,15 +90,16 @@ class IssuedCouponTest {
         @Test
         fun `throw exception when using already used coupon`() {
             // given
+            val userId = 1L
             val coupon = createCoupon()
-            val issuedCoupon = createIssuedCoupon(coupon = coupon)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
 
             // 쿠폰을 먼저 사용
-            issuedCoupon.use(coupon, Money.krw(10000))
+            issuedCoupon.use(userId, coupon, Money.krw(10000), FIXED_TIME)
 
             // when
             val exception = assertThrows<CoreException> {
-                issuedCoupon.use(coupon, Money.krw(10000))
+                issuedCoupon.use(userId, coupon, Money.krw(10000), FIXED_TIME)
             }
 
             // then
@@ -103,13 +111,14 @@ class IssuedCouponTest {
         @Test
         fun `throw exception when using different coupon`() {
             // given
+            val userId = 1L
             val coupon = createCoupon(couponId = 100L)
-            val issuedCoupon = createIssuedCoupon(coupon = coupon)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
             val differentCoupon = createCoupon(couponId = 200L)
 
             // when & then
             val exception = assertThrows<CoreException> {
-                issuedCoupon.use(differentCoupon, Money.krw(10000))
+                issuedCoupon.use(userId, differentCoupon, Money.krw(10000), FIXED_TIME)
             }
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
             assertThat(exception.message).contains("쿠폰 정보가 일치하지 않습니다")
@@ -124,12 +133,13 @@ class IssuedCouponTest {
         @Test
         fun `discount amount cannot exceed order amount`() {
             // given
+            val userId = 1L
             val coupon = createCoupon(discountValue = 20000)
-            val issuedCoupon = createIssuedCoupon(coupon = coupon)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
             val orderAmount = Money.krw(10000)
 
             // when
-            val discountAmount = issuedCoupon.use(coupon, orderAmount)
+            val discountAmount = issuedCoupon.use(userId, coupon, orderAmount, FIXED_TIME)
 
             // then
             assertThat(discountAmount).isEqualTo(Money.krw(10000))
@@ -139,15 +149,16 @@ class IssuedCouponTest {
         @Test
         fun `100 percent rate coupon discounts full amount`() {
             // given
+            val userId = 1L
             val coupon = createCoupon(
                 discountType = DiscountType.RATE,
                 discountValue = 100,
             )
-            val issuedCoupon = createIssuedCoupon(coupon = coupon)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
             val orderAmount = Money.krw(25000)
 
             // when
-            val discountAmount = issuedCoupon.use(coupon, orderAmount)
+            val discountAmount = issuedCoupon.use(userId, coupon, orderAmount, FIXED_TIME)
 
             // then
             assertThat(discountAmount).isEqualTo(Money.krw(25000))
