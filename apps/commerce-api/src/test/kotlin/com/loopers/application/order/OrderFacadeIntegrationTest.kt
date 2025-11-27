@@ -1,5 +1,12 @@
 package com.loopers.application.order
 
+import com.loopers.domain.coupon.Coupon
+import com.loopers.domain.coupon.CouponRepository
+import com.loopers.domain.coupon.DiscountAmount
+import com.loopers.domain.coupon.DiscountType
+import com.loopers.domain.coupon.IssuedCoupon
+import com.loopers.domain.coupon.IssuedCouponRepository
+import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.PaymentRepository
 import com.loopers.domain.point.PointAccount
@@ -34,8 +41,14 @@ class OrderFacadeIntegrationTest @Autowired constructor(
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
+    private val couponRepository: CouponRepository,
+    private val issuedCouponRepository: IssuedCouponRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
+    companion object {
+        private val FIXED_TIME = java.time.ZonedDateTime.parse("2025-01-15T10:00:00+09:00[Asia/Seoul]")
+    }
+
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
@@ -61,6 +74,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
                     OrderCriteria.PlaceOrderItem(productId = product1.id, quantity = 2),
                     OrderCriteria.PlaceOrderItem(productId = product2.id, quantity = 1),
                 ),
+                issuedCouponId = null,
             )
 
             // when
@@ -95,6 +109,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
                     OrderCriteria.PlaceOrderItem(productId = product1.id, quantity = 2),
                     OrderCriteria.PlaceOrderItem(productId = product2.id, quantity = 1),
                 ),
+                issuedCouponId = null,
             )
 
             // when
@@ -122,6 +137,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
                     OrderCriteria.PlaceOrderItem(productId = normalStock.id, quantity = 2),
                     OrderCriteria.PlaceOrderItem(productId = insufficientStock.id, quantity = 10),
                 ),
+                issuedCouponId = null,
             )
 
             // when
@@ -158,6 +174,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
                 items = listOf(
                     OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
                 ),
+                issuedCouponId = null,
             )
 
             // when
@@ -191,6 +208,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
                     OrderCriteria.PlaceOrderItem(productId = product2.id, quantity = 3),
                     OrderCriteria.PlaceOrderItem(productId = product3.id, quantity = 2),
                 ),
+                issuedCouponId = null,
             )
 
             // when
@@ -222,6 +240,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
                 items = listOf(
                     OrderCriteria.PlaceOrderItem(productId = notExistProductId, quantity = 1),
                 ),
+                issuedCouponId = null,
             )
 
             // when
@@ -230,8 +249,236 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             }
 
             // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.INTERNAL_ERROR)
-            assertThat(exception.message).contains("상품을 찾을 수 없습니다")
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+            assertThat(exception.message).contains("존재하지 않는 상품입니다")
+        }
+
+        @DisplayName("정액 쿠폰을 적용하여 주문하면 쿠폰 할인이 적용된다")
+        @Test
+        fun `apply fixed amount coupon discount when place order`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(20000))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            val coupon = createCoupon(
+                discountType = DiscountType.FIXED_AMOUNT,
+                discountValue = 5000,
+            )
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(15000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = issuedCoupon.id,
+            )
+
+            // when
+            val orderInfo = orderFacade.placeOrder(criteria)
+
+            // then
+            val payment = paymentRepository.findByOrderId(orderInfo.orderId)!!
+            val updatedIssuedCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
+
+            assertAll(
+                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(5000)) },
+                { assertThat(payment.issuedCouponId).isEqualTo(issuedCoupon.id) },
+                { assertThat(payment.totalAmount).isEqualTo(Money.krw(20000)) },
+                { assertThat(payment.usedPoint).isEqualTo(Money.krw(15000)) },
+                { assertThat(updatedIssuedCoupon.status).isEqualTo(UsageStatus.USED) },
+            )
+        }
+
+        @DisplayName("정률 쿠폰을 적용하여 주문하면 쿠폰 할인이 적용된다")
+        @Test
+        fun `apply rate coupon discount when place order`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(50000))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            val coupon = createCoupon(
+                discountType = DiscountType.RATE,
+                discountValue = 10,
+            )
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(45000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = issuedCoupon.id,
+            )
+
+            // when
+            val orderInfo = orderFacade.placeOrder(criteria)
+
+            // then
+            val payment = paymentRepository.findByOrderId(orderInfo.orderId)!!
+            val updatedIssuedCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
+
+            assertAll(
+                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(5000)) },
+                { assertThat(payment.issuedCouponId).isEqualTo(issuedCoupon.id) },
+                { assertThat(payment.totalAmount).isEqualTo(Money.krw(50000)) },
+                { assertThat(payment.usedPoint).isEqualTo(Money.krw(45000)) },
+                { assertThat(updatedIssuedCoupon.status).isEqualTo(UsageStatus.USED) },
+            )
+        }
+
+        @DisplayName("할인 금액이 주문 금액보다 크면 주문 금액으로 제한된다")
+        @Test
+        fun `coupon discount is capped at order amount`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(10000))
+            createPointAccount(userId = userId, balance = Money.krw(10000))
+
+            val coupon = createCoupon(
+                discountType = DiscountType.FIXED_AMOUNT,
+                discountValue = 20000,
+            )
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.ZERO_KRW,
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = issuedCoupon.id,
+            )
+
+            // when
+            val orderInfo = orderFacade.placeOrder(criteria)
+
+            // then
+            val payment = paymentRepository.findByOrderId(orderInfo.orderId)!!
+
+            assertAll(
+                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(10000)) },
+                { assertThat(payment.totalAmount).isEqualTo(Money.krw(10000)) },
+                { assertThat(payment.usedPoint).isEqualTo(Money.ZERO_KRW) },
+            )
+        }
+
+        @DisplayName("이미 사용된 쿠폰으로 주문하면 예외가 발생하고 트랜잭션이 롤백된다")
+        @Test
+        fun `throw exception and rollback when using already used coupon`() {
+            // given
+            val userId = 1L
+            val product = createProduct(stock = Stock.of(100))
+            val pointAccount = createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            val coupon = createCoupon()
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            // 쿠폰을 먼저 사용 처리
+            val couponEntity = couponRepository.findById(coupon.id)!!
+            issuedCoupon.use(userId, couponEntity, Money.krw(10000), FIXED_TIME)
+            issuedCouponRepository.save(issuedCoupon)
+
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(10000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = issuedCoupon.id,
+            )
+
+            // when
+            val exception = assertThrows<CoreException> {
+                orderFacade.placeOrder(criteria)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+
+            // 재고와 포인트가 롤백되어야 함
+            val unchangedProduct = productRepository.findById(product.id)!!
+            val unchangedPointAccount = pointAccountRepository.findByUserId(userId)!!
+
+            assertAll(
+                { assertThat(unchangedProduct.stock.amount).isEqualTo(100) },
+                { assertThat(unchangedPointAccount.balance).isEqualTo(pointAccount.balance) },
+            )
+        }
+
+        @DisplayName("쿠폰 사용 후 포인트 부족 시 쿠폰과 재고가 롤백된다")
+        @Test
+        fun `rollback coupon and stock when point is insufficient after coupon discount`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(20000), stock = Stock.of(100))
+            createPointAccount(userId = userId, balance = Money.krw(10000)) // 부족한 포인트
+
+            val coupon = createCoupon(
+                discountType = DiscountType.FIXED_AMOUNT,
+                discountValue = 5000,
+            )
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(20000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = issuedCoupon.id,
+            )
+
+            // when
+            val exception = assertThrows<CoreException> {
+                orderFacade.placeOrder(criteria)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+
+            // 쿠폰 상태, 재고, 포인트 모두 롤백되어야 함
+            val unchangedIssuedCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
+            val unchangedProduct = productRepository.findById(product.id)!!
+
+            assertAll(
+                { assertThat(unchangedIssuedCoupon.status).isEqualTo(UsageStatus.AVAILABLE) },
+                { assertThat(unchangedProduct.stock.amount).isEqualTo(100) },
+            )
+        }
+
+        @DisplayName("쿠폰 없이 주문하면 쿠폰 할인이 적용되지 않는다")
+        @Test
+        fun `no coupon discount when order without coupon`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(10000))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(10000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = null,
+            )
+
+            // when
+            val orderInfo = orderFacade.placeOrder(criteria)
+
+            // then
+            val payment = paymentRepository.findByOrderId(orderInfo.orderId)!!
+
+            assertAll(
+                { assertThat(payment.couponDiscount).isEqualTo(Money.ZERO_KRW) },
+                { assertThat(payment.issuedCouponId).isNull() },
+                { assertThat(payment.totalAmount).isEqualTo(Money.krw(10000)) },
+            )
         }
     }
 
@@ -257,5 +504,26 @@ class OrderFacadeIntegrationTest @Autowired constructor(
     ): PointAccount {
         val account = PointAccount.of(userId, balance)
         return pointAccountRepository.save(account)
+    }
+
+    private fun createCoupon(
+        name: String = "테스트 쿠폰",
+        discountType: DiscountType = DiscountType.FIXED_AMOUNT,
+        discountValue: Long = 5000,
+    ): Coupon {
+        val discountAmount = DiscountAmount(
+            type = discountType,
+            value = discountValue,
+        )
+        val coupon = Coupon.of(name = name, discountAmount = discountAmount)
+        return couponRepository.save(coupon)
+    }
+
+    private fun createIssuedCoupon(
+        userId: Long,
+        coupon: Coupon,
+    ): IssuedCoupon {
+        val issuedCoupon = IssuedCoupon.issue(userId = userId, coupon = coupon)
+        return issuedCouponRepository.save(issuedCoupon)
     }
 }

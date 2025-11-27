@@ -16,9 +16,13 @@ data class PageQuery(
         if (size <= 0) {
             throw CoreException(ErrorType.BAD_REQUEST, "size는 1 이상이어야 합니다.")
         }
+        if (size > MAX_SIZE) {
+            throw CoreException(ErrorType.BAD_REQUEST, "size는 최대 ${MAX_SIZE}까지 가능합니다.")
+        }
     }
 
     companion object {
+        private const val MAX_SIZE = 100
         private const val DEFAULT_PAGE = 0
         private const val DEFAULT_SIZE = 20
         private val DEFAULT_SORT = ProductSortType.LATEST

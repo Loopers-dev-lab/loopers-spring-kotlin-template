@@ -77,6 +77,20 @@ class PageQueryTest {
             assertEquals("size는 1 이상이어야 합니다.", exception.message)
         }
 
+        @ParameterizedTest
+        @ValueSource(ints = [101, 200, 1000])
+        @DisplayName("size가 최댓값(100)을 초과하면 CoreException을 던진다")
+        fun `throws CoreException when size exceeds max size`(invalidSize: Int) {
+            // when
+            val exception = assertThrows<CoreException> {
+                PageQuery.of(size = invalidSize)
+            }
+
+            // then
+            assertEquals(ErrorType.BAD_REQUEST, exception.errorType)
+            assertEquals("size는 최대 100까지 가능합니다.", exception.message)
+        }
+
         @Test
         @DisplayName("모든 ProductSortType을 sort로 사용할 수 있다")
         fun `creates PageQuery with all ProductSortType values`() {

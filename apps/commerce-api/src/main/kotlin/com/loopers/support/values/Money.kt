@@ -1,8 +1,11 @@
 package com.loopers.support.values
 
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Embeddable
 import java.math.BigDecimal
+import java.math.RoundingMode
 
 @Embeddable
 data class Money(
@@ -11,18 +14,21 @@ data class Money(
 ) : Comparable<Money> {
 
     companion object {
+        private const val CALCULATION_SCALE = 2
+        private val ROUNDING_MODE = RoundingMode.HALF_UP
+
         val ZERO_KRW = Money(BigDecimal.ZERO)
 
         fun krw(amount: BigDecimal): Money {
-            return Money(amount)
+            return Money(amount.setScale(CALCULATION_SCALE, ROUNDING_MODE))
         }
 
         fun krw(amount: Long): Money {
-            return Money(BigDecimal.valueOf(amount))
+            return krw(BigDecimal.valueOf(amount))
         }
 
         fun krw(amount: Int): Money {
-            return Money(BigDecimal.valueOf(amount.toLong()))
+            return krw(BigDecimal.valueOf(amount.toLong()))
         }
     }
 
@@ -46,7 +52,45 @@ data class Money(
     }
 
     operator fun times(multiplier: Int): Money {
-        return Money(amount.multiply(BigDecimal.valueOf(multiplier.toLong())))
+        val bigDecimal = BigDecimal.valueOf(multiplier.toLong())
+        return times(bigDecimal)
+    }
+
+    operator fun times(multiplier: BigDecimal): Money {
+        return Money(
+            amount.multiply(multiplier)
+                .setScale(CALCULATION_SCALE, ROUNDING_MODE),
+        )
+    }
+
+    operator fun div(divisor: Int): Money {
+        if (divisor == 0) {
+            throw CoreException(ErrorType.BAD_REQUEST, "0으로 나눌 수 없습니다.")
+        }
+        return Money(
+            amount.divide(
+                BigDecimal.valueOf(divisor.toLong()),
+                CALCULATION_SCALE,
+                ROUNDING_MODE,
+            ),
+        )
+    }
+
+    fun applyPercentage(percentage: Long): Money {
+        if (percentage !in 0..100) {
+            throw CoreException(ErrorType.BAD_REQUEST, "할인율은 0에서 100 사이여야 합니다")
+        }
+
+        return Money(
+            amount.multiply(BigDecimal.valueOf(percentage))
+                .divide(BigDecimal.valueOf(100), CALCULATION_SCALE, ROUNDING_MODE),
+        )
+    }
+
+    fun min(other: Money): Money = if (this <= other) this else other
+
+    fun round(scale: Int = 0): Money {
+        return Money(amount.setScale(scale, ROUNDING_MODE))
     }
 
     /**

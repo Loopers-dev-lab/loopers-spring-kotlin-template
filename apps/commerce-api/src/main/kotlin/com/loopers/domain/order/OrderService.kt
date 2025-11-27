@@ -18,14 +18,29 @@ class OrderService(
                 newOrder.addOrderItem(it.productId, it.quantity, it.productName, it.currentPrice)
             }
 
-        newOrder.pay()
+        return orderRepository.save(newOrder)
+    }
 
-        val savedOrder = orderRepository.save(newOrder)
+    @Transactional
+    fun pay(command: OrderCommand.Pay): Payment {
+        val order = orderRepository.findById(command.orderId)
+            ?: throw com.loopers.support.error.CoreException(
+                com.loopers.support.error.ErrorType.NOT_FOUND,
+                "주문을 찾을 수 없습니다.",
+            )
 
-        val paidPayment = Payment.pay(command.userId, savedOrder, command.usePoint)
+        order.pay()
 
-        paymentRepository.save(paidPayment)
+        orderRepository.save(order)
 
-        return savedOrder
+        val payment = Payment.pay(
+            userId = command.userId,
+            order = order,
+            usedPoint = command.usePoint,
+            issuedCouponId = command.issuedCouponId,
+            couponDiscount = command.couponDiscount,
+        )
+
+        return paymentRepository.save(payment)
     }
 }

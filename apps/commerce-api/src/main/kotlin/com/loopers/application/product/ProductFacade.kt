@@ -8,10 +8,12 @@ class ProductFacade(
     private val productService: ProductService,
 ) {
     fun findProductById(id: Long): ProductInfo.FindProductById {
-        return ProductInfo.FindProductById(productService.findProductViewById(id))
+        val productView = productService.findProductViewById(id)
+        return ProductInfo.FindProductById.from(productView)
     }
 
     fun findProducts(criteria: ProductCriteria.FindProducts): ProductInfo.FindProducts {
-        return ProductInfo.FindProducts(productService.findProducts(criteria.to()))
+        val slice = productService.findProducts(criteria.to())
+        return ProductInfo.FindProducts.from(slice)
     }
 }

@@ -27,9 +27,9 @@ class OrderServiceIntegrationTest @Autowired constructor(
     @Nested
     inner class Place {
 
-        @DisplayName("주문을 생성하면 Order와 Payment가 모두 저장된다")
+        @DisplayName("주문을 생성하면 Order가 PLACED 상태로 저장된다")
         @Test
-        fun `save order and payment when place order`() {
+        fun `save order when place order`() {
             // given
             val userId = 1L
             val command = createPlaceOrderCommand(userId = userId)
@@ -39,22 +39,20 @@ class OrderServiceIntegrationTest @Autowired constructor(
 
             // then
             val foundOrder = orderRepository.findById(savedOrder.id)
-            val foundPayment = paymentRepository.findByOrderId(savedOrder.id)
 
             assertAll(
                 { assertThat(foundOrder).isNotNull() },
-                { assertThat(foundPayment).isNotNull() },
-                { assertThat(foundPayment?.orderId).isEqualTo(savedOrder.id) },
+                { assertThat(foundOrder?.userId).isEqualTo(userId) },
+                { assertThat(foundOrder?.status).isEqualTo(OrderStatus.PLACED) },
             )
         }
 
-        @DisplayName("주문 금액이 올바르게 계산되어 PAID 상태로 저장된다")
+        @DisplayName("주문 금액이 올바르게 계산된다")
         @Test
-        fun `calculate and save total amount correctly`() {
+        fun `calculate total amount correctly`() {
             // given
             val command = OrderCommand.PlaceOrder(
                 userId = 1L,
-                usePoint = Money.krw(50000),
                 items = listOf(
                     createPlaceOrderItem(quantity = 2, currentPrice = Money.krw(10000)),
                     createPlaceOrderItem(quantity = 3, currentPrice = Money.krw(10000)),
@@ -66,7 +64,6 @@ class OrderServiceIntegrationTest @Autowired constructor(
 
             // then
             assertThat(savedOrder.totalAmount).isEqualTo(Money.krw(50000))
-            assertThat(savedOrder.status).isEqualTo(OrderStatus.PAID)
         }
 
         @DisplayName("주문 상품이 OrderItem으로 저장된다")
@@ -75,7 +72,6 @@ class OrderServiceIntegrationTest @Autowired constructor(
             // given
             val command = OrderCommand.PlaceOrder(
                 userId = 1L,
-                usePoint = Money.krw(20000),
                 items = listOf(
                     createPlaceOrderItem(
                         productId = 1L,
@@ -97,42 +93,78 @@ class OrderServiceIntegrationTest @Autowired constructor(
                 { assertThat(foundOrder?.orderItems?.get(0)?.unitPrice).isEqualTo(Money.krw(10000)) },
             )
         }
+    }
 
-        @DisplayName("결제 정보가 올바르게 생성된다")
+    @DisplayName("결제 처리 통합테스트")
+    @Nested
+    inner class Pay {
+
+        @DisplayName("주문을 결제하면 Payment가 생성되고 Order 상태가 PAID로 변경된다")
         @Test
-        fun `create payment with correct information`() {
+        fun `create payment and update order status when pay`() {
             // given
             val userId = 1L
-            val usePoint = Money.krw(30000)
-            val command = OrderCommand.PlaceOrder(
+            val order = createOrder(userId = userId)
+
+            val payCommand = OrderCommand.Pay(
+                orderId = order.id,
                 userId = userId,
-                usePoint = usePoint,
-                items = listOf(
-                    createPlaceOrderItem(quantity = 3, currentPrice = Money.krw(10000)),
-                ),
+                usePoint = Money.krw(10000),
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // when
-            val savedOrder = orderService.place(command)
+            val payment = orderService.pay(payCommand)
 
             // then
-            val foundPayment = paymentRepository.findByOrderId(savedOrder.id)
+            val updatedOrder = orderRepository.findById(order.id)
+            val foundPayment = paymentRepository.findByOrderId(order.id)
+
             assertAll(
+                { assertThat(updatedOrder?.status).isEqualTo(OrderStatus.PAID) },
+                { assertThat(foundPayment).isNotNull() },
+                { assertThat(foundPayment?.orderId).isEqualTo(order.id) },
                 { assertThat(foundPayment?.userId).isEqualTo(userId) },
-                { assertThat(foundPayment?.totalAmount).isEqualTo(Money.krw(30000)) },
-                { assertThat(foundPayment?.usedPoint).isEqualTo(usePoint) },
+                { assertThat(foundPayment?.totalAmount).isEqualTo(Money.krw(10000)) },
+                { assertThat(foundPayment?.usedPoint).isEqualTo(Money.krw(10000)) },
                 { assertThat(foundPayment?.status).isEqualTo(PaymentStatus.PAID) },
+            )
+        }
+
+        @DisplayName("결제 시 쿠폰 할인이 적용된다")
+        @Test
+        fun `apply coupon discount when pay`() {
+            // given
+            val userId = 1L
+            val order = createOrder(userId = userId)
+
+            val payCommand = OrderCommand.Pay(
+                orderId = order.id,
+                userId = userId,
+                usePoint = Money.krw(5000),
+                issuedCouponId = 100L,
+                couponDiscount = Money.krw(5000),
+            )
+
+            // when
+            val payment = orderService.pay(payCommand)
+
+            // then
+            assertAll(
+                { assertThat(payment.totalAmount).isEqualTo(Money.krw(10000)) },
+                { assertThat(payment.usedPoint).isEqualTo(Money.krw(5000)) },
+                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(5000)) },
+                { assertThat(payment.issuedCouponId).isEqualTo(100L) },
             )
         }
     }
 
     private fun createPlaceOrderCommand(
         userId: Long = 1L,
-        usePoint: Money = Money.krw(10000),
     ): OrderCommand.PlaceOrder {
         return OrderCommand.PlaceOrder(
             userId = userId,
-            usePoint = usePoint,
             items = listOf(
                 createPlaceOrderItem(),
             ),
@@ -150,5 +182,25 @@ class OrderServiceIntegrationTest @Autowired constructor(
             quantity = quantity,
             currentPrice = currentPrice,
         )
+    }
+
+    private fun createOrder(
+        userId: Long = 1L,
+        totalAmount: Money = Money.krw(10000),
+        status: OrderStatus = OrderStatus.PLACED,
+    ): Order {
+        val orderItem = OrderItem.create(
+            productId = 1L,
+            quantity = 1,
+            productName = "테스트 상품",
+            unitPrice = Money.krw(10000),
+        )
+        val order = Order.of(
+            userId = userId,
+            totalAmount = totalAmount,
+            status = status,
+            orderItems = mutableListOf(orderItem),
+        )
+        return orderRepository.save(order)
     }
 }

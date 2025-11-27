@@ -5,7 +5,6 @@ import com.loopers.support.values.Money
 class OrderCommand {
     data class PlaceOrder(
         val userId: Long,
-        val usePoint: Money,
         val items: List<PlaceOrderItem>,
     )
 
@@ -14,5 +13,13 @@ class OrderCommand {
         val productName: String,
         val quantity: Int,
         val currentPrice: Money,
+    )
+
+    data class Pay(
+        val orderId: Long,
+        val userId: Long,
+        val usePoint: Money,
+        val issuedCouponId: Long?,
+        val couponDiscount: Money,
     )
 }
