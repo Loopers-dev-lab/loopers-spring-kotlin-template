@@ -14,6 +14,10 @@ import jakarta.persistence.Table
             name = "product_total_signal_ref_product_idx",
             columnList = "ref_product_id",
         ),
+        Index(
+            name = "product_total_signal_like_count_idx",
+            columnList = "like_count,ref_product_id",
+        ),
     ],
 )
 class ProductTotalSignalModel(
