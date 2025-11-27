@@ -1,7 +1,6 @@
 package com.loopers.interfaces.api.product
 
 import com.loopers.application.product.ProductInfo
-import com.loopers.domain.product.ProductView
 
 class ProductV1Response {
     data class GetProducts(
@@ -11,8 +10,8 @@ class ProductV1Response {
         companion object {
             fun from(info: ProductInfo.FindProducts): GetProducts {
                 return GetProducts(
-                    products = info.products.content.map { ProductDto.from(it) },
-                    hasNext = info.products.hasNext(),
+                    products = info.products.map { ProductDto.from(it) },
+                    hasNext = info.hasNext,
                 )
             }
         }
@@ -24,7 +23,7 @@ class ProductV1Response {
         companion object {
             fun from(info: ProductInfo.FindProductById): GetProduct {
                 return GetProduct(
-                    product = ProductDto.from(info.product),
+                    product = ProductDto.from(info),
                 )
             }
         }
@@ -40,15 +39,27 @@ class ProductV1Response {
         val likeCount: Long,
     ) {
         companion object {
-            fun from(view: ProductView): ProductDto {
+            fun from(info: ProductInfo.FindProductById): ProductDto {
                 return ProductDto(
-                    id = view.product.id,
-                    name = view.product.name,
-                    price = view.product.price.amount.toInt(),
-                    stock = view.product.stock.amount,
-                    brandId = view.brand.id,
-                    brandName = view.brand.name,
-                    likeCount = view.statistic.likeCount,
+                    id = info.productId,
+                    name = info.name,
+                    price = info.price.amount.toInt(),
+                    stock = info.stock.amount,
+                    brandId = info.brandId,
+                    brandName = info.brandName,
+                    likeCount = info.likeCount,
+                )
+            }
+
+            fun from(unit: ProductInfo.FindProductsUnit): ProductDto {
+                return ProductDto(
+                    id = unit.productId,
+                    name = unit.name,
+                    price = unit.price.amount.toInt(),
+                    stock = unit.stock.amount,
+                    brandId = unit.brandId,
+                    brandName = unit.brandName,
+                    likeCount = unit.likeCount,
                 )
             }
         }
