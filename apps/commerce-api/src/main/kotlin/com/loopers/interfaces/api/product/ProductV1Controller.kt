@@ -6,6 +6,7 @@ import com.loopers.interfaces.api.ApiResponse
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -30,7 +31,7 @@ class ProductV1Controller(
     }
 
     @GetMapping("/{productId}")
-    override fun getProduct(productId: Long): ApiResponse<ProductV1Dto.ProductResponse> {
+    override fun getProduct(@PathVariable productId: Long): ApiResponse<ProductV1Dto.ProductResponse> {
         return productFacade.getProduct(productId)
             .let { ProductV1Dto.ProductResponse.from(it) }
             .let { ApiResponse.success(it) }
