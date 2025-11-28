@@ -1,10 +1,13 @@
 package com.loopers.application.product
 
+import com.loopers.domain.product.PageQuery
 import com.loopers.domain.product.ProductSortType
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.time.Duration
 
 class ProductCacheKeysTest {
@@ -17,21 +20,18 @@ class ProductCacheKeysTest {
         @DisplayName("캐시 키가 올바르게 생성된다")
         fun `generate cache key correctly`() {
             // given
-            val sort = ProductSortType.LATEST
-            val brandId = 100L
-            val page = 0
-            val size = 20
-
-            // when
-            val cacheKey = ProductCacheKeys.ProductList(
-                sort = sort,
-                brandId = brandId,
-                page = page,
-                size = size,
+            val pageQuery = createPageQuery(
+                sort = ProductSortType.LATEST,
+                brandId = 100L,
+                page = 0,
+                size = 20,
             )
 
+            // when
+            val cacheKey = ProductCacheKeys.ProductList.from(pageQuery)
+
             // then
-            assertThat(cacheKey.key).isEqualTo("product-list:v1:LATEST:brand_100:0:20")
+            assertThat(cacheKey.key).isEqualTo("product-list:v1:LATEST:100:0:20")
             assertThat(cacheKey.traceKey).isEqualTo("product-list")
             assertThat(cacheKey.ttl).isEqualTo(Duration.ofSeconds(60))
         }
@@ -39,59 +39,47 @@ class ProductCacheKeysTest {
         @Test
         @DisplayName("brandId가 null이면 '_'로 표시된다")
         fun `use underscore when brandId is null`() {
-            // when
-            val cacheKey = ProductCacheKeys.ProductList(
+            // given
+            val pageQuery = createPageQuery(
                 sort = ProductSortType.LIKES_DESC,
                 brandId = null,
                 page = 1,
                 size = 20,
             )
 
+            // when
+            val cacheKey = ProductCacheKeys.ProductList.from(pageQuery)
+
             // then
             assertThat(cacheKey.key).isEqualTo("product-list:v1:LIKES_DESC:_:1:20")
         }
 
-        @Test
-        @DisplayName("sort가 null이면 '_'로 표시된다")
-        fun `use underscore when sort is null`() {
-            // when
-            val cacheKey = ProductCacheKeys.ProductList(
-                sort = null,
-                brandId = 200L,
-                page = 2,
-                size = 10,
-            )
-
-            // then
-            assertThat(cacheKey.key).isEqualTo("product-list:v1:_:brand_200:2:10")
-        }
-
-        @Test
+        @ParameterizedTest
+        @ValueSource(ints = [0, 1, 2])
         @DisplayName("page가 0, 1, 2일 때 shouldCache()가 true를 반환한다")
-        fun `return true when page is 0, 1, or 2`() {
-            // when & then
-            assertThat(ProductCacheKeys.ProductList(null, null, 0, 20).shouldCache()).isTrue
-            assertThat(ProductCacheKeys.ProductList(null, null, 1, 20).shouldCache()).isTrue
-            assertThat(ProductCacheKeys.ProductList(null, null, 2, 20).shouldCache()).isTrue
-        }
+        fun `return true when page is within cache threshold`(page: Int) {
+            // given
+            val cacheKey = createProductListCacheKey(page = page)
 
-        @Test
-        @DisplayName("page가 3 이상일 때 shouldCache()가 false를 반환한다")
-        fun `return false when page is 3 or more`() {
-            // when & then
-            assertThat(ProductCacheKeys.ProductList(null, null, 3, 20).shouldCache()).isFalse
-            assertThat(ProductCacheKeys.ProductList(null, null, 10, 20).shouldCache()).isFalse
-        }
-
-        @Test
-        @DisplayName("page가 null일 때 0으로 간주하여 shouldCache()가 true를 반환한다")
-        fun `treat null page as 0 and return true`() {
             // when
-            val cacheKey = ProductCacheKeys.ProductList(null, null, null, 20)
+            val shouldCache = cacheKey.shouldCache()
 
             // then
-            assertThat(cacheKey.shouldCache()).isTrue
-            assertThat(cacheKey.key).contains(":0:")
+            assertThat(shouldCache).isTrue
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = [3, 4, 10, 100])
+        @DisplayName("page가 3 이상일 때 shouldCache()가 false를 반환한다")
+        fun `return false when page exceeds cache threshold`(page: Int) {
+            // given
+            val cacheKey = createProductListCacheKey(page = page)
+
+            // when
+            val shouldCache = cacheKey.shouldCache()
+
+            // then
+            assertThat(shouldCache).isFalse
         }
     }
 
@@ -124,5 +112,35 @@ class ProductCacheKeysTest {
             // then
             assertThat(key1.key).isNotEqualTo(key2.key)
         }
+    }
+
+    private fun createPageQuery(
+        sort: ProductSortType = ProductSortType.LATEST,
+        brandId: Long? = null,
+        page: Int = 0,
+        size: Int = 20,
+    ): PageQuery {
+        return PageQuery.of(
+            page = page,
+            size = size,
+            sort = sort,
+            brandId = brandId,
+        )
+    }
+
+    private fun createProductListCacheKey(
+        sort: ProductSortType = ProductSortType.LATEST,
+        brandId: Long? = null,
+        page: Int = 0,
+        size: Int = 20,
+    ): ProductCacheKeys.ProductList {
+        return ProductCacheKeys.ProductList.from(
+            createPageQuery(
+                sort = sort,
+                brandId = brandId,
+                page = page,
+                size = size,
+            ),
+        )
     }
 }

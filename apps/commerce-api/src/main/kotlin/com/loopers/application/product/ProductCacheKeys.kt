@@ -1,6 +1,7 @@
 package com.loopers.application.product
 
 import com.loopers.cache.CacheKey
+import com.loopers.domain.product.PageQuery
 import com.loopers.domain.product.ProductSortType
 import java.time.Duration
 
@@ -8,24 +9,28 @@ sealed class ProductCacheKeys(override val ttl: Duration) : CacheKey {
     abstract override val key: String
     abstract override val traceKey: String
 
-    /**
-     * 상품 목록 조회 캐시
-     *
-     * 키 패턴: product-list:v1:{sort}:{filter}:{page}:{size}
-     * TTL: 60초
-     * 캐싱 조건: page 0, 1, 2만 (3페이지 이내)
-     */
     data class ProductList(
-        private val sort: ProductSortType?,
+        private val sort: ProductSortType,
         private val brandId: Long?,
-        private val page: Int?,
-        private val size: Int?,
+        private val page: Int,
+        private val size: Int,
     ) : ProductCacheKeys(ttl = Duration.ofSeconds(60)) {
         override val key: String =
-            "product-list:v1:${sort?.name ?: "_"}:${brandId?.let { "brand_$it" } ?: "_"}:${page ?: 0}:${size ?: 20}"
+            "product-list:v1:${sort.name}:${brandId ?: "_"}:$page:$size"
         override val traceKey: String = "product-list"
 
-        fun shouldCache(): Boolean = (page ?: 0) <= 2
+        fun shouldCache(): Boolean = page <= 2
+
+        companion object {
+            fun from(pageQuery: PageQuery): ProductList {
+                return ProductList(
+                    sort = pageQuery.sort,
+                    brandId = pageQuery.brandId,
+                    page = pageQuery.page,
+                    size = pageQuery.size,
+                )
+            }
+        }
     }
 
     /**

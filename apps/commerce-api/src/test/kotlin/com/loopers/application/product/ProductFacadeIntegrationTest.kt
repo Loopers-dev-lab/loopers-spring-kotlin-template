@@ -185,11 +185,13 @@ class ProductFacadeIntegrationTest @Autowired constructor(
                 sort = ProductSortType.LATEST,
                 brandId = null,
             )
-            val cacheKey = ProductCacheKeys.ProductList(
-                sort = ProductSortType.LATEST,
-                brandId = null,
-                page = 0,
-                size = 20,
+            val cacheKey = ProductCacheKeys.ProductList.from(
+                com.loopers.domain.product.PageQuery.of(
+                    page = 0,
+                    size = 20,
+                    sort = ProductSortType.LATEST,
+                    brandId = null,
+                ),
             )
 
             // when - 상품 목록 조회 (캐시 저장)
@@ -229,6 +231,92 @@ class ProductFacadeIntegrationTest @Autowired constructor(
             // then
             assertThat(result.products).hasSize(2)
             assertThat(result.products.map { it.brandId }).containsOnly(brand1.id)
+        }
+
+        @Test
+        @DisplayName("목록 캐시 히트 시 detail 캐시를 먼저 조회하고 없는 것만 DB에서 가져온다")
+        fun `use detail cache and fetch missing from db when list cache hits`() {
+            // given - 상품 3개 생성
+            val product1 = createProduct(name = "상품1", price = Money.krw(1000))
+            val product2 = createProduct(name = "상품2", price = Money.krw(2000))
+            val product3 = createProduct(name = "상품3", price = Money.krw(3000))
+
+            val criteria = ProductCriteria.FindProducts(
+                page = 0,
+                size = 20,
+                sort = ProductSortType.LATEST,
+                brandId = null,
+            )
+
+            // given - 첫 번째 조회 (목록 캐시 + detail 캐시 3개 저장)
+            val firstResult = productFacade.findProducts(criteria)
+            assertThat(firstResult.products).hasSizeGreaterThanOrEqualTo(3)
+
+            // given - product2의 detail 캐시만 삭제
+            val product2CacheKey = ProductCacheKeys.ProductDetail(productId = product2.id)
+            cacheTemplate.evict(product2CacheKey)
+
+            // given - product2의 재고 변경
+            val originalStock = product2.stock
+            product2.decreaseStock(10)
+            productRepository.save(product2)
+
+            // when - 두 번째 조회 (목록 캐시 히트, detail 캐시 부분 히트)
+            val secondResult = productFacade.findProducts(criteria)
+
+            // then - product1, product3는 캐시에서 가져오고 product2는 DB에서 가져옴
+            val resultProduct1 = secondResult.products.find { it.productId == product1.id }
+            val resultProduct2 = secondResult.products.find { it.productId == product2.id }
+            val resultProduct3 = secondResult.products.find { it.productId == product3.id }
+
+            assertThat(resultProduct1).isNotNull()
+            assertThat(resultProduct1!!.price).isEqualTo(Money.krw(1000)) // 캐시된 값
+
+            assertThat(resultProduct2).isNotNull()
+            assertThat(resultProduct2!!.stock.amount).isEqualTo(originalStock.amount - 10) // DB에서 가져온 값 (재고 감소 확인)
+
+            assertThat(resultProduct3).isNotNull()
+            assertThat(resultProduct3!!.price).isEqualTo(Money.krw(3000)) // 캐시된 값
+
+            // then - product2의 detail 캐시가 다시 저장되었는지 확인
+            val product2CachedAgain = cacheTemplate.get(
+                product2CacheKey,
+                object : com.fasterxml.jackson.core.type.TypeReference<com.loopers.domain.product.ProductView>() {},
+            )
+            assertThat(product2CachedAgain).isNotNull()
+            assertThat(product2CachedAgain!!.product.stock.amount).isEqualTo(originalStock.amount - 10)
+        }
+
+        @Test
+        @DisplayName("목록 캐시 히트 시 상품 순서가 유지된다")
+        fun `maintain product order when list cache hits with partial detail cache`() {
+            // given - 상품 3개 생성 (최신순)
+            val product1 = createProduct(name = "첫번째")
+            Thread.sleep(10)
+            val product2 = createProduct(name = "두번째")
+            Thread.sleep(10)
+            val product3 = createProduct(name = "세번째")
+
+            val criteria = ProductCriteria.FindProducts(
+                page = 0,
+                size = 20,
+                sort = ProductSortType.LATEST,
+                brandId = null,
+            )
+
+            // given - 첫 번째 조회
+            val firstResult = productFacade.findProducts(criteria)
+            val firstOrderIds = firstResult.products.take(3).map { it.productId }
+
+            // given - product2의 detail 캐시만 삭제
+            cacheTemplate.evict(ProductCacheKeys.ProductDetail(productId = product2.id))
+
+            // when - 두 번째 조회
+            val secondResult = productFacade.findProducts(criteria)
+            val secondOrderIds = secondResult.products.take(3).map { it.productId }
+
+            // then - 순서가 동일하게 유지됨
+            assertThat(secondOrderIds).isEqualTo(firstOrderIds)
         }
     }
 
