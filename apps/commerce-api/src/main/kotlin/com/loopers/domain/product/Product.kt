@@ -1,7 +1,6 @@
 package com.loopers.domain.product
 
 import com.loopers.domain.BaseEntity
-import com.loopers.domain.brand.Brand
 import com.loopers.domain.shared.Money
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -9,19 +8,22 @@ import jakarta.persistence.AttributeOverride
 import jakarta.persistence.Column
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
-import jakarta.persistence.FetchType
-import jakarta.persistence.JoinColumn
-import jakarta.persistence.ManyToOne
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 
 @Entity
-@Table(name = "products")
+@Table(name = "products",
+    indexes = [
+        Index(name = "idx_products_brand_likes", columnList = "brand_id, likes_count DESC"),
+        Index(name = "idx_products_deleted_likes", columnList = "deleted_at, likes_count DESC")
+    ]
+)
 class Product(
     name: String,
     description: String?,
     price: Money,
     stock: Stock,
-    brand: Brand,
+    brandId: Long,
 ) : BaseEntity() {
 
     @Column(name = "name", nullable = false, length = 200)
@@ -42,10 +44,9 @@ class Product(
     var stock: Stock = stock
         protected set
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "brand_id", nullable = false)
-    var brand: Brand = brand
-        private set
+    @Column(name = "brand_id", nullable = false)
+    var brandId: Long = brandId
+        protected set
 
     @Column(name = "likes_count", nullable = false)
     var likesCount: Int = 0
@@ -74,11 +75,6 @@ class Product(
                 "재고가 부족합니다. 상품: $name (요청: ${quantity.value}, 재고: ${stock.quantity})"
             )
         }
-    }
-
-    fun decreaseStockWithValidation(quantity: Quantity) {
-        validateStock(quantity)
-        decreaseStock(quantity)
     }
 
 }
