@@ -159,7 +159,7 @@ CREATE INDEX idx_products_brand_id ON products (brand_id);
 | 캐시    | 키 패턴                                            | 값                    | TTL |
 |-------|-------------------------------------------------|----------------------|-----|
 | 상품 목록 | `product-list:v1:{sort}:{filter}:{page}:{size}` | `List<Long>`         | 60초 |
-| 상품 상세 | `product-detail:{productId}`                    | `ProductView` (JSON) | 60초 |
+| 상품 상세 | `product-detail:v1:{productId}`                 | `ProductView` (JSON) | 60초 |
 
 #### 캐싱 범위
 
