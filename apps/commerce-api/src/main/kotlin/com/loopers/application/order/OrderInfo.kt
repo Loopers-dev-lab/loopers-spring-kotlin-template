@@ -16,7 +16,7 @@ data class OrderInfo(
     companion object {
         fun from(order: Order): OrderInfo {
             return OrderInfo(
-                id = order.id!!,
+                id = order.id,
                 memberId = order.memberId,
                 status = order.status,
                 totalAmount = order.totalAmount.amount,
@@ -42,9 +42,9 @@ data class OrderItemInfo(
     companion object {
         fun from(orderItem: OrderItem): OrderItemInfo {
             return OrderItemInfo(
-                id = orderItem.id!!,
-                productId = orderItem.product.id!!,
-                productName = orderItem.product.name,
+                id = orderItem.id,
+                productId = orderItem.productId,
+                productName = orderItem.productName,
                 quantity = orderItem.quantity.value,
                 price = orderItem.price.amount,
                 subtotal = orderItem.subtotal.amount,

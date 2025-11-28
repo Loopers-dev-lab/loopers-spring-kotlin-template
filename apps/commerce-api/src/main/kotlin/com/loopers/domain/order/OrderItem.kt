@@ -1,7 +1,6 @@
 package com.loopers.domain.order
 
 import com.loopers.domain.BaseEntity
-import com.loopers.domain.product.Product
 import com.loopers.domain.product.Quantity
 import com.loopers.domain.shared.Money
 import jakarta.persistence.*
@@ -9,7 +8,9 @@ import jakarta.persistence.*
 @Entity
 @Table(name = "order_items")
 class OrderItem(
-    product: Product,
+    productId: Long,
+    productName: String,
+    price: Money,
     quantity: Quantity,
 ) : BaseEntity() {
 
@@ -18,9 +19,12 @@ class OrderItem(
     var order: Order? = null
         protected set
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    var product: Product = product
+    @Column(name = "product_id", nullable = false)
+    var productId: Long = productId
+        protected set
+
+    @Column(name = "product_name", nullable = false, length = 200)
+    var productName: String = productName
         protected set
 
     @Embedded
@@ -30,7 +34,7 @@ class OrderItem(
 
     @Embedded
     @AttributeOverride(name = "amount", column = Column(name = "price", nullable = false))
-    var price: Money = product.price
+    var price: Money = price
         protected set
 
     @Embedded
@@ -47,8 +51,8 @@ class OrderItem(
     }
 
     companion object {
-        fun of(product: Product, quantity: Quantity): OrderItem {
-            return OrderItem(product, quantity)
+        fun of(productId: Long, productName: String, price: Money, quantity: Quantity): OrderItem {
+            return OrderItem(productId, productName, price, quantity)
         }
     }
 }

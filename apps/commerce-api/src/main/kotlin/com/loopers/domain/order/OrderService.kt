@@ -2,8 +2,11 @@ package com.loopers.domain.order
 
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.member.MemberRepository
+import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductRepository
 import com.loopers.infrastructure.order.ExternalOrderService
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -44,7 +47,7 @@ class OrderService(
         )
 
         // 재고 차감
-        order.decreaseProductStocks()
+        decreaseProductStocks(order, productMap)
 
         // 회원 결제 처리 (포인트 검증 및 차감)
         order.processPayment(member)
@@ -57,6 +60,17 @@ class OrderService(
         savedOrder.complete()
 
         return savedOrder
+    }
+
+    private fun decreaseProductStocks(order: Order, productMap: Map<Long, Product>) {
+        order.items.forEach { item ->
+            val product = productMap[item.productId]
+                ?: throw CoreException(
+                    ErrorType.PRODUCT_NOT_FOUND,
+                    "상품을 찾을 수 없습니다. id: ${item.productId}"
+                )
+            product.decreaseStock(item.quantity)
+        }
     }
 
     @Transactional(readOnly = true)
