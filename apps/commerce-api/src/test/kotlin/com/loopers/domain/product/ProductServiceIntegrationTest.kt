@@ -271,9 +271,9 @@ class ProductServiceIntegrationTest @Autowired constructor(
             )
             productViews.forEach { productView ->
                 assertAll(
-                    { assertThat(productView.product).isNotNull },
-                    { assertThat(productView.statistic).isNotNull },
-                    { assertThat(productView.brand).isNotNull },
+                    { assertThat(productView.product).isNotNull() },
+                    { assertThat(productView.statistic).isNotNull() },
+                    { assertThat(productView.brand).isNotNull() },
                 )
             }
         }

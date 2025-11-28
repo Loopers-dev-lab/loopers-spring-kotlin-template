@@ -63,7 +63,7 @@ class IssuedCouponTest {
             assertAll(
                 { assertThat(discountAmount).isEqualTo(Money.krw(5000)) },
                 { assertThat(issuedCoupon.status).isEqualTo(UsageStatus.USED) },
-                { assertThat(issuedCoupon.usedAt).isNotNull },
+                { assertThat(issuedCoupon.usedAt).isNotNull() },
             )
         }
 

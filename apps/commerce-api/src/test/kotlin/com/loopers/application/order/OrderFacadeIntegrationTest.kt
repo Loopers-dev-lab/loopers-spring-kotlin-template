@@ -517,7 +517,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
                 object : TypeReference<ProductView>() {},
             )
 
-            assertThat(cachedValue).isNotNull
+            assertThat(cachedValue).isNotNull()
             assertThat(cachedValue!!.product.id).isEqualTo(product.id)
             assertThat(cachedValue.product.stock.amount).isEqualTo(95)
         }

@@ -128,9 +128,9 @@ CREATE INDEX ix_product_statistics_like_count_product_id
     ON product_statistics (like_count DESC, product_id DESC);
 ```
 
-```kotlin
-// QueryDSL ORDER BY 수정
-.orderBy(productStatistics.likeCount.desc(), productStatistics.productId.desc())
+```sql
+-- ORDER BY 수정: 단일 테이블 컬럼으로 변경
+ORDER BY product_statistics.like_count DESC, product_statistics.product_id DESC
 ```
 
 #### 개선 2: PRICE_ASC 정렬 인덱스 추가
