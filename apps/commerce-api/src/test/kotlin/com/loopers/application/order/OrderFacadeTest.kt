@@ -4,6 +4,7 @@ import com.loopers.common.fixture.BrandFixture
 import com.loopers.common.fixture.ProductFixture
 import com.loopers.common.fixture.StockFixture
 import com.loopers.domain.brand.BrandService
+import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.point.PointService
@@ -31,6 +32,7 @@ class OrderFacadeTest {
     private val pointService: PointService = mockk()
     private val orderService: OrderService = mockk(relaxed = true)
     private val paymentService: PaymentService = mockk()
+    private val couponService: CouponService = mockk()
     private lateinit var orderFacade: OrderFacade
 
     @BeforeEach
@@ -43,6 +45,7 @@ class OrderFacadeTest {
             pointService = pointService,
             orderService = orderService,
             paymentService = paymentService,
+            couponService = couponService,
         )
     }
 

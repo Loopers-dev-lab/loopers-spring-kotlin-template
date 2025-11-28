@@ -1,6 +1,7 @@
 package com.loopers.application.order
 
 import com.loopers.domain.brand.BrandService
+import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.CreateOrderCommand
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderService
@@ -22,17 +23,31 @@ class OrderFacade(
     private val pointService: PointService,
     private val orderService: OrderService,
     private val paymentService: PaymentService,
+    private val couponService: CouponService,
 ) {
 
     @Transactional
-    fun createOrder(userId: Long, items: List<OrderItemCommand>): Order {
+    fun createOrder(userId: Long, items: List<OrderItemCommand>, couponId: Long? = null): Order {
+        val orderProducts = deductStock(items)
+        val totalAmount = calculateTotalAmount(orderProducts)
+        val finalAmount = applyCoupon(couponId, totalAmount)
+        pointService.deductPoint(userId, finalAmount)
+
+        val order = orderService.createOrder(userId, finalAmount)
+        orderService.createOrderItems(order.id, orderProducts)
+        paymentService.createPayment(order.id, userId, finalAmount)
+
+        return order
+    }
+
+    private fun deductStock(items: List<OrderItemCommand>): List<CreateOrderCommand> {
         val productIds = items.map { it.productId }
         val productMap = productService.getProductById(productIds)
 
         val brandIds = productMap.values.map { it.brandId }.distinct()
         val brandMap = brandService.getBrandById(brandIds)
 
-        val orderCommands = items.map { item ->
+        return items.map { item ->
             val product = productMap[item.productId]
                 ?: throw CoreException(ErrorType.NOT_FOUND, "존재하지 않는 상품입니다. [productId: ${item.productId}]")
 
@@ -49,16 +64,15 @@ class OrderFacade(
                 quantity = item.quantity,
             )
         }
+    }
 
-        val totalAmount = orderCommands.sumOf { it.price.multiply(BigDecimal(it.quantity)) }
+    private fun calculateTotalAmount(orderCommands: List<CreateOrderCommand>): BigDecimal {
+        return orderCommands.sumOf { it.price.multiply(BigDecimal(it.quantity)) }
+    }
 
-        pointService.deductPoint(userId, totalAmount)
-
-        val order = orderService.createOrder(userId, totalAmount)
-        orderService.createOrderItems(order.id, orderCommands)
-
-        paymentService.createPayment(order.id, userId, totalAmount)
-
-        return order
+    private fun applyCoupon(couponId: Long?, totalAmount: BigDecimal): BigDecimal {
+        return couponId?.let {
+            couponService.useCouponAndCalculateFinalAmount(it, totalAmount)
+        } ?: totalAmount
     }
 }
