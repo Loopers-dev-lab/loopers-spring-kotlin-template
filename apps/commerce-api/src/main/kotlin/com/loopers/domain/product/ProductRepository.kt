@@ -14,6 +14,7 @@ interface ProductRepository {
         sort: ProductSortType,
         pageable: Pageable,
     ) : Page<Product>
+    fun count(brandId: Long?): Long
     fun findAllByIdIn(ids: List<Long>): List<Product>
     fun findAllByIdInWithLock(ids: List<Long>): List<Product>
 }
