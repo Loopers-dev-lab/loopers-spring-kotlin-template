@@ -5,11 +5,17 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import java.math.BigDecimal
 
 @Entity
-@Table(name = "loopers_product")
+@Table(
+    name = "loopers_product",
+    indexes = [
+        Index(name = "idx_product_brand_id", columnList = "brand_id"),
+    ],
+)
 class Product(
     @Column(nullable = false, length = 200)
     var name: String,
