@@ -50,7 +50,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
 
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
         val request = CreateOrderRequest(
@@ -92,8 +92,8 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         memberJpaRepository.save(member)
 
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
-        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), brand))
-        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand))
+        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), 1L))
+        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), 1L))
 
         val request = CreateOrderRequest(
             memberId = "member1",
@@ -127,7 +127,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
     fun failToCreateOrderWithNonExistentMember() {
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
         val request = CreateOrderRequest(
@@ -174,7 +174,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
 
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(5), brand)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(5), 1L)
         )
 
         val request = CreateOrderRequest(
@@ -200,7 +200,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
 
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
         val request = CreateOrderRequest(

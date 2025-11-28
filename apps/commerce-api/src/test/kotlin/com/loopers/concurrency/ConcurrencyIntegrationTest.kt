@@ -217,7 +217,7 @@ class ConcurrencyIntegrationTest @Autowired constructor(
                 description = "설명",
                 price = Money(price),
                 stock = Stock(stock),
-                brand = brand
+                brandId = brand.id
             )
         )
     }

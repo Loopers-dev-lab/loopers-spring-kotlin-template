@@ -37,10 +37,10 @@ class ProductFacadeIntegrationTest @Autowired constructor(
     fun getProduct() {
         val brand = brandJpaRepository.save(Brand("테스트브랜드", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
-        val result = productFacade.getProduct(product.id!!)
+        val result = productFacade.getProduct(product.id)
 
         assertThat(result).isNotNull
         assertThat(result.name).isEqualTo("상품1")
@@ -61,9 +61,9 @@ class ProductFacadeIntegrationTest @Autowired constructor(
     @Test
     fun getProducts() {
         val brand = brandJpaRepository.save(Brand("테스트브랜드", "설명"))
-        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), brand))
-        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand))
-        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand))
+        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), 1L))
+        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), 1L))
+        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), 1L))
 
         val pageable = PageRequest.of(0, 10)
         val result = productFacade.getProducts(null, ProductSortType.LATEST, pageable)
@@ -78,9 +78,9 @@ class ProductFacadeIntegrationTest @Autowired constructor(
         val brand1 = brandJpaRepository.save(Brand("브랜드1", "설명1"))
         val brand2 = brandJpaRepository.save(Brand("브랜드2", "설명2"))
 
-        productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), brand1))
-        productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand1))
-        productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand2))
+        productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), brand1.id!!))
+        productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand1.id!!))
+        productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand2.id!!))
 
         val pageable = PageRequest.of(0, 10)
         val result = productFacade.getProducts(brand1.id, ProductSortType.LATEST, pageable)
@@ -93,9 +93,9 @@ class ProductFacadeIntegrationTest @Autowired constructor(
     @Test
     fun getProductsWithPageSize() {
         val brand = brandJpaRepository.save(Brand("테스트브랜드", "설명"))
-        productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), brand))
-        productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand))
-        productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand))
+        productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), 1L))
+        productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), 1L))
+        productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), 1L))
 
         val pageable = PageRequest.of(0, 2)
         val result = productFacade.getProducts(null, ProductSortType.LATEST, pageable)
