@@ -14,6 +14,9 @@ data class PageRequestDto(
         example = "[{\"field\": \"createdAt\", \"direction\": \"DESC\"}]",
     )
     val sort: List<SortCondition> = emptyList(),
+
+    @get:Schema(description = "브랜드 ID 필터", example = "1")
+    val brandId: Long? = null,
 ) {
     init {
         require(pageNumber >= 0) { "페이지 번호는 0 이상이어야 합니다." }

@@ -4,6 +4,7 @@ data class PageCommand(
     val pageNumber: Long,
     val pageSize: Long,
     val sort: List<SortCondition> = emptyList(),
+    val brandId: Long? = null,
 ) {
     init {
         require(pageNumber >= 0) { "페이지 번호는 0 이상이어야 합니다." }

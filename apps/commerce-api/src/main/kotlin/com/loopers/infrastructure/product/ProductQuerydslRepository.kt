@@ -3,7 +3,6 @@ package com.loopers.infrastructure.product
 import com.loopers.domain.brand.QBrand.brand
 import com.loopers.domain.common.PageCommand
 import com.loopers.domain.common.PageResult
-import com.loopers.domain.like.QLike.like
 import com.loopers.domain.product.QProduct.product
 import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.jpa.impl.JPAQueryFactory
@@ -18,7 +17,10 @@ class ProductQuerydslRepository(
         val totalCount = queryFactory
             .select(product.count())
             .from(product)
-            .where(product.deletedAt.isNull)
+            .where(
+                pageCommand.brandId?.let { product.brandId.eq(it) },
+                product.deletedAt.isNull,
+            )
             .fetchOne() ?: 0L
 
         val items = queryFactory
@@ -29,7 +31,7 @@ class ProductQuerydslRepository(
                     product.price,
                     brand.id,
                     brand.name,
-                    like.count(),
+                    product.likeCount,
                     product.createdAt,
                     product.updatedAt,
                 ),
@@ -39,20 +41,9 @@ class ProductQuerydslRepository(
             .on(
                 product.brandId.eq(brand.id),
             )
-            .leftJoin(like)
-            .on(
-                product.id.eq(like.productId),
-                like.deletedAt.isNull,
-            )
-            .where(product.deletedAt.isNull)
-            .groupBy(
-                product.id,
-                product.name,
-                product.price,
-                brand.id,
-                brand.name,
-                product.createdAt,
-                product.updatedAt,
+            .where(
+                product.deletedAt.isNull,
+                pageCommand.brandId?.let { product.brandId.eq(it) },
             )
             .orderBy(*createOrderSpecifier(pageCommand.sort))
             .offset(pageCommand.offset)
@@ -74,7 +65,7 @@ class ProductQuerydslRepository(
                 val path = when (field) {
                     "createdAt" -> product.createdAt
                     "price" -> product.price
-                    "likeCount" -> like.count()
+                    "likeCount" -> product.likeCount
                     "name" -> product.name
                     else -> product.createdAt
                 }
