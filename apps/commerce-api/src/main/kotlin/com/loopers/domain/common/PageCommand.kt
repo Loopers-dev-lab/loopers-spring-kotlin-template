@@ -14,6 +14,10 @@ data class PageCommand(
 
     val offset: Long = pageNumber * pageSize
 
+    fun cacheKey(): String {
+        return "${brandId}_${pageNumber}_${pageSize}_$sort"
+    }
+
     fun hasNext(totalCount: Long): Boolean {
         return (this.pageNumber + 1) * this.pageSize < totalCount
     }
