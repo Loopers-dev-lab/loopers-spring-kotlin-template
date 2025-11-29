@@ -4,6 +4,9 @@ import com.loopers.domain.common.PageCommand
 import com.loopers.domain.common.PageResult
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Cacheable
+import org.springframework.cache.annotation.Caching
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -13,6 +16,10 @@ class ProductService(
     private val productRepository: ProductRepository,
 ) {
 
+    @Cacheable(
+        cacheNames = ["Product"],
+        key = "#id",
+    )
     @Transactional(readOnly = true)
     fun getProduct(id: Long): Product {
         return productRepository.findById(id)
@@ -24,11 +31,20 @@ class ProductService(
         return productRepository.findByIdIn(ids).associateBy { it.id }
     }
 
+    @Cacheable(
+        cacheNames = ["Products"],
+        key = "#pageCommand.cacheKey()",
+    )
     @Transactional(readOnly = true)
     fun getProductById(pageCommand: PageCommand): PageResult<ProductResult.ProductInfo> {
         return productRepository.getProducts(pageCommand)
     }
 
+    @Caching(
+        evict = [
+            CacheEvict(cacheNames = ["Products"], allEntries = true),
+        ],
+    )
     @Transactional
     fun createProduct(name: String, price: BigDecimal, brandId: Long): Product {
         val product = Product.of(
@@ -39,6 +55,12 @@ class ProductService(
         return productRepository.save(product)
     }
 
+    @Caching(
+        evict = [
+            CacheEvict(cacheNames = ["Products"], allEntries = true),
+            CacheEvict(cacheNames = ["Product"], key = "#id"),
+        ],
+    )
     @Transactional
     fun updateProduct(id: Long, name: String?, price: BigDecimal?, brandId: Long?): Product {
         val product = getProduct(id)

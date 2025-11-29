@@ -21,9 +21,8 @@ class ProductFacade(
     fun getProductInfo(productId: Long): ProductResult.ProductInfo {
         val product = productService.getProduct(productId)
         val brand = brandService.getBrand(product.brandId)
-        val likeCount = likeService.countLikesByProductId(productId)
-
-        return ProductResult.ProductInfo.of(product, brand, likeCount)
+        val productInfo = ProductResult.ProductInfo.of(product, brand, product.likeCount)
+        return productInfo
     }
 
     @Transactional(readOnly = true)
@@ -35,7 +34,6 @@ class ProductFacade(
     fun createProduct(name: String, price: BigDecimal, brandId: Long): ProductResult.ProductInfo {
         val brand = brandService.getBrand(brandId)
         val product = productService.createProduct(name, price, brandId)
-
         return ProductResult.ProductInfo.of(product, brand)
     }
 
@@ -50,9 +48,8 @@ class ProductFacade(
 
         val product = productService.updateProduct(productId, name, price, brandId)
         val brand = brandService.getBrand(product.brandId)
-        val likeCount = likeService.countLikesByProductId(productId)
-
-        return ProductResult.ProductInfo.of(product, brand, likeCount)
+        val productInfo = ProductResult.ProductInfo.of(product, brand, product.likeCount)
+        return productInfo
     }
 
     @Transactional

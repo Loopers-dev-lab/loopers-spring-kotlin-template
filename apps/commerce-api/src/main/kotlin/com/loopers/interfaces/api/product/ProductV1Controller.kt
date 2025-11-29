@@ -68,6 +68,7 @@ class ProductV1Controller(
                     },
                 )
             },
+            brandId = request.brandId,
         )
 
         val productInfoPageResult = productFacade.getProducts(command)
