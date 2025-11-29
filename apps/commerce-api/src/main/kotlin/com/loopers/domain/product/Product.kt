@@ -14,6 +14,7 @@ import java.math.BigDecimal
     name = "loopers_product",
     indexes = [
         Index(name = "idx_product_brand_id", columnList = "brand_id"),
+        Index(name = "idx_product_like_count", columnList = "like_count"),
     ],
 )
 class Product(
@@ -25,11 +26,24 @@ class Product(
 
     @Column(nullable = false)
     var brandId: Long,
+
+    @Column(nullable = false)
+    var likeCount: Long = 0,
 ) : BaseEntity() {
 
     init {
         validateName(name)
         validatePrice(price)
+    }
+
+    fun incrementLikeCount() {
+        this.likeCount++
+    }
+
+    fun decrementLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--
+        }
     }
 
     fun update(name: String?, price: BigDecimal?, brandId: Long?) {
