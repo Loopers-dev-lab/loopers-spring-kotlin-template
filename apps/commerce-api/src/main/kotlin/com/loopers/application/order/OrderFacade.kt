@@ -1,16 +1,20 @@
 package com.loopers.application.order
 
+import com.loopers.application.payment.PaymentFacade
+import com.loopers.application.payment.PaymentRequest
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.Money
 import com.loopers.domain.order.OrderItem
 import com.loopers.domain.order.OrderQueryService
 import com.loopers.domain.order.OrderService
+import com.loopers.domain.payment.PaymentMethod
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductQueryService
 import com.loopers.domain.product.StockService
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -25,7 +29,10 @@ class OrderFacade(
     private val stockService: StockService,
     private val pointService: PointService,
     private val couponService: CouponService,
+    private val paymentFacade: PaymentFacade,
 ) {
+    private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
+
     @Transactional
     fun createOrder(userId: Long, request: OrderCreateRequest): OrderCreateInfo {
         val orderItems = validateAndCreateOrderItems(request)
@@ -34,14 +41,56 @@ class OrderFacade(
         val discountAmount = applyCoupon(userId, request.couponId, totalMoney)
         val finalAmount = totalMoney - discountAmount
 
-        pointService.validateUserPoint(userId, finalAmount)
+        val paymentMethod = PaymentMethod.valueOf(request.paymentMethod)
 
-        val order = orderService.createOrder(userId, orderItems)
+        // 결제 방식에 따라 처리 순서 다름
+        when (paymentMethod) {
+            PaymentMethod.POINT -> {
+                // 포인트 결제: 포인트 검증 → 재고 차감 → 주문 생성 → 포인트 차감
+                pointService.validateUserPoint(userId, finalAmount)
 
-        deductStocks(request.items)
-        pointService.deductPoint(userId, finalAmount)
+                val order = orderService.createOrder(userId, orderItems)
+                deductStocks(request.items)
+                pointService.deductPoint(userId, finalAmount)
 
-        return OrderCreateInfo.from(order)
+                logger.info("포인트 결제 완료: orderId=${order.id}, amount=${finalAmount.amount}")
+                return OrderCreateInfo.from(order)
+            }
+            PaymentMethod.CARD -> {
+                // 카드 결제: 재고 차감 → 주문 생성 → PG 결제 요청
+                if (request.cardType == null || request.cardNo == null) {
+                    throw CoreException(ErrorType.BAD_REQUEST, "카드 결제 시 카드 정보는 필수입니다.")
+                }
+
+                deductStocks(request.items)
+                val order = orderService.createOrder(userId, orderItems)
+
+                val paymentRequest = PaymentRequest(
+                    userId = userId,
+                    orderId = order.id!!,
+                    amount = finalAmount.amount.toLong(),
+                    cardType = request.cardType,
+                    cardNo = request.cardNo,
+                )
+
+                try {
+                    val paymentInfo = paymentFacade.requestCardPayment(paymentRequest)
+                    logger.info("카드 결제 요청 완료: orderId=${order.id}, transactionKey=${paymentInfo.transactionKey}")
+                } catch (e: Exception) {
+                    logger.error("카드 결제 요청 실패: orderId=${order.id}", e)
+                    // 재고 복구
+                    request.items.forEach { item ->
+                        stockService.increaseStock(item.productId, item.quantity)
+                    }
+                    throw CoreException(ErrorType.INTERNAL_ERROR, "결제 처리에 실패했습니다: ${e.message}")
+                }
+
+                return OrderCreateInfo.from(order)
+            }
+            PaymentMethod.MIXED -> {
+                throw CoreException(ErrorType.BAD_REQUEST, "혼합 결제는 아직 지원하지 않습니다.")
+            }
+        }
     }
 
     private fun applyCoupon(userId: Long, couponId: Long?, totalAmount: Money): Money {

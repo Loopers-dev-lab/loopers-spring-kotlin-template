@@ -162,9 +162,9 @@ class OrderServiceIntegrationTest {
     @Test
     fun `포인트가 부족하면 주문이 실패하고 트랜잭션이 롤백된다`() {
         // given
-        // 포인트를 적게 설정
+        // 포인트를 적게 설정 (100,000원의 상품을 주문하기엔 부족한 금액)
         val point = pointRepository.findByUserIdWithLock(user.id)!!
-        point.deduct(Money(BigDecimal("950000"), Currency.KRW))
+        point.deduct(Money(BigDecimal("999000"), Currency.KRW)) // 1,000원만 남김
         pointRepository.save(point)
 
         val request = OrderCreateRequest(
