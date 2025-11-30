@@ -9,7 +9,7 @@ interface ProductRepository {
 
     fun save(product: ProductModel): ProductModel
 
-    fun findAllProductInfos(pageable: Pageable): Page<ProductInfo>
+    fun findAllProductInfos(pageable: Pageable, brandId: Long?): Page<ProductInfo>
 
     fun getProductBy(productId: Long): ProductModel
 }
