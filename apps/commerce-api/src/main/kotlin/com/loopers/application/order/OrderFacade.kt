@@ -80,7 +80,8 @@ class OrderFacade(
                 } catch (e: Exception) {
                     logger.error("카드 결제 요청 실패: orderId=${order.id}", e)
 
-                    // 별도 트랜잭션으로 주문 취소 및 재고 복구 (REQUIRES_NEW)
+                    // 별도 트랜잭션으로 주문 취소 상태 저장 (REQUIRES_NEW)
+                    // 재고는 메인 트랜잭션 롤백으로 자동 복구됨
                     orderService.cancelOrderForPaymentFailure(order)
 
                     throw CoreException(ErrorType.INTERNAL_ERROR, "결제 처리에 실패했습니다: ${e.message}")

@@ -27,11 +27,7 @@ class OrderService(
     fun cancelOrderForPaymentFailure(order: Order) {
         order.cancel()
         orderRepository.save(order)
-
-        // 재고 복구
-        order.items.forEach { item ->
-            stockService.increaseStock(item.productId, item.quantity)
-        }
+        // 재고는 메인 트랜잭션 롤백으로 자동 복구됨 (double-restoration 방지)
     }
 
     @Transactional(timeout = 10)
