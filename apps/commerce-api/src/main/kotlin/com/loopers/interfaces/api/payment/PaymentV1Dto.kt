@@ -4,6 +4,8 @@ import com.loopers.application.payment.PaymentCallbackRequest
 import com.loopers.application.payment.PaymentDetailInfo
 import com.loopers.application.payment.PaymentInfo
 import com.loopers.infrastructure.payment.client.TransactionStatusDto
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 
 object PaymentV1Dto {
     data class CardPaymentRequest(
@@ -37,9 +39,19 @@ object PaymentV1Dto {
         val reason: String?,
     ) {
         fun toApplicationRequest(): com.loopers.application.payment.PaymentCallbackRequest {
+            // TransactionStatusDto를 안전하게 파싱
+            val transactionStatus = try {
+                TransactionStatusDto.valueOf(status)
+            } catch (e: IllegalArgumentException) {
+                throw CoreException(
+                    ErrorType.BAD_REQUEST,
+                    "유효하지 않은 결제 상태입니다: $status. 허용된 값: ${TransactionStatusDto.values().joinToString()}",
+                )
+            }
+
             return com.loopers.application.payment.PaymentCallbackRequest(
                 transactionKey = transactionKey,
-                status = TransactionStatusDto.valueOf(status),
+                status = transactionStatus,
                 reason = reason,
             )
         }

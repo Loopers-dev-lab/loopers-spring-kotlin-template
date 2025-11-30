@@ -27,8 +27,8 @@ class PaymentFacade(
         val transactionKey = try {
             paymentService.requestPgPayment(payment)
         } catch (e: Exception) {
-            // 결제 실패 처리
-            payment.fail(e.message ?: "PG 결제 요청 실패")
+            // 결제 실패를 별도 트랜잭션에 저장하여 롤백 시에도 실패 기록이 유지되도록 함
+            paymentService.savePaymentFailure(payment.id!!, e.message ?: "PG 결제 요청 실패")
             throw e
         }
 

@@ -79,11 +79,8 @@ class OrderFacade(
                     logger.info("카드 결제 요청 완료: orderId=${order.id}, transactionKey=${paymentInfo.transactionKey}")
                 } catch (e: Exception) {
                     logger.error("카드 결제 요청 실패: orderId=${order.id}", e)
-                    // 재고 복구
-                    request.items.forEach { item ->
-                        stockService.increaseStock(item.productId, item.quantity)
-                    }
-                    throw CoreException(ErrorType.INTERNAL_ERROR, "결제 처리에 실패했습니다: ${e.message}", e)
+                    // 트랜잭션 롤백으로 재고 복구가 자동으로 이루어지므로 명시적 복구는 불필요
+                    throw CoreException(ErrorType.INTERNAL_ERROR, "결제 처리에 실패했습니다: ${e.message}")
                 }
 
                 return OrderCreateInfo.from(order)

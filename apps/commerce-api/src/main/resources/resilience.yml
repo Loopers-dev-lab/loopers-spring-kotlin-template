@@ -61,5 +61,6 @@ feign:
         logger-level: FULL
 
 # PG Simulator URL
+# 환경변수 PG_BASE_URL로 설정 가능 (기본값: http://localhost:8082)
 pg:
-  base-url: http://localhost:8082
+  base-url: ${PG_BASE_URL:http://localhost:8082}
