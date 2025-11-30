@@ -20,6 +20,8 @@ class OrderService(
         return orderRepository.save(order)
     }
 
+    fun save(order: Order): Order = orderRepository.save(order)
+
     @Transactional(timeout = 10)
     @Retryable(
         retryFor = [PessimisticLockException::class, CannotAcquireLockException::class],

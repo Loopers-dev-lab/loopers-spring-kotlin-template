@@ -33,7 +33,7 @@ class OrderFacade(
 ) {
     private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
 
-    @Transactional
+    @Transactional(noRollbackFor = [CoreException::class])
     fun createOrder(userId: Long, request: OrderCreateRequest): OrderCreateInfo {
         val orderItems = validateAndCreateOrderItems(request)
         val totalMoney = calculateTotalAmount(orderItems)
@@ -79,7 +79,16 @@ class OrderFacade(
                     logger.info("카드 결제 요청 완료: orderId=${order.id}, transactionKey=${paymentInfo.transactionKey}")
                 } catch (e: Exception) {
                     logger.error("카드 결제 요청 실패: orderId=${order.id}", e)
-                    // 트랜잭션 롤백으로 재고 복구가 자동으로 이루어지므로 명시적 복구는 불필요
+
+                    // 주문을 취소 상태로 변경
+                    order.cancel()
+                    orderService.save(order)
+
+                    // 재고 복구 (트랜잭션 롤백에 의존하지 않음)
+                    request.items.forEach { item ->
+                        stockService.increaseStock(item.productId, item.quantity)
+                    }
+
                     throw CoreException(ErrorType.INTERNAL_ERROR, "결제 처리에 실패했습니다: ${e.message}")
                 }
 
