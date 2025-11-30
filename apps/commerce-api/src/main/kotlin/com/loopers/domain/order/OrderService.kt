@@ -8,6 +8,7 @@ import org.springframework.dao.CannotAcquireLockException
 import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -21,6 +22,17 @@ class OrderService(
     }
 
     fun save(order: Order): Order = orderRepository.save(order)
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun cancelOrderForPaymentFailure(order: Order) {
+        order.cancel()
+        orderRepository.save(order)
+
+        // 재고 복구
+        order.items.forEach { item ->
+            stockService.increaseStock(item.productId, item.quantity)
+        }
+    }
 
     @Transactional(timeout = 10)
     @Retryable(
