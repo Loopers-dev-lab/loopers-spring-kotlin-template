@@ -1,0 +1,65 @@
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      pgCircuit:
+        base-config: default
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 50
+
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - feign.RetryableException
+          - java.net.SocketTimeoutException
+          - java.io.IOException
+    instances:
+      pgRetry:
+        base-config: default
+        max-attempts: 3
+        wait-duration: 1s
+
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 3s
+        cancel-running-future: true
+    instances:
+      pgTimeLimiter:
+        base-config: default
+        timeout-duration: 3s
+
+# Feign Client 설정
+feign:
+  client:
+    config:
+      default:
+        connect-timeout: 1000
+        read-timeout: 3000
+        logger-level: FULL
+      pg-client:
+        connect-timeout: 1000
+        read-timeout: 3000
+        logger-level: FULL
+
+# PG Simulator URL
+pg:
+  base-url: http://localhost:8082
