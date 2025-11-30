@@ -6,7 +6,7 @@ import com.loopers.support.error.ErrorType
 data class OrderCreateRequest(
     val items: List<OrderItemRequest>,
     val couponId: Long? = null,
-    // POINT or CARD
+    // POINT, CARD or MIXED
     val paymentMethod: String = "POINT",
     val cardType: String? = null,
     val cardNo: String? = null,
