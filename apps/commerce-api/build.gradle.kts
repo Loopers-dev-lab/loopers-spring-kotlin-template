@@ -2,6 +2,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.jpa")
 }
 
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "io.github.resilience4j") {
+                useVersion("2.3.0")
+                because("Force resilience4j version to 2.3.0 to avoid Spring Cloud BOM downgrade")
+            }
+        }
+    }
+}
+
 dependencies {
     // add-ons
     implementation(project(":modules:jpa"))
@@ -19,6 +30,7 @@ dependencies {
     implementation("org.springframework.retry:spring-retry")
     implementation("org.springframework:spring-aspects")
     implementation("io.github.resilience4j:resilience4j-spring-boot3:2.3.0")
+    implementation("io.github.resilience4j:resilience4j-rxjava3:2.3.0")
     implementation("org.springframework.boot:spring-boot-starter-aop")
 
     // feign client
