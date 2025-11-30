@@ -3,9 +3,9 @@ package com.loopers.infrastructure.example
 import com.loopers.domain.example.ExampleModel
 import com.loopers.domain.example.ExampleRepository
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 
-@Component
+@Repository
 class ExampleRepositoryImpl(
     private val exampleJpaRepository: ExampleJpaRepository,
 ) : ExampleRepository {

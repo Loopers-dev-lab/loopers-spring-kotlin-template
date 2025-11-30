@@ -2,9 +2,9 @@ package com.loopers.infrastructure.point
 
 import com.loopers.domain.point.Point
 import com.loopers.domain.point.PointRepository
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 
-@Component
+@Repository
 class PointRepositoryImpl(
     private val pointJpaRepository: PointJpaRepository,
 ) : PointRepository {

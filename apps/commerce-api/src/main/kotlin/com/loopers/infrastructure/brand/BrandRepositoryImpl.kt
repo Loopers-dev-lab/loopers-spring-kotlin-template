@@ -3,9 +3,9 @@ package com.loopers.infrastructure.brand
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.brand.BrandRepository
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 
-@Component
+@Repository
 class BrandRepositoryImpl(
     private val brandJpaRepository: BrandJpaRepository,
 ) : BrandRepository {

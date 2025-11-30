@@ -3,6 +3,7 @@ package com.loopers.application.product
 import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.product.ProductDetailData
 import com.loopers.domain.product.ProductQueryService
+import com.loopers.domain.product.SortType
 import com.loopers.domain.product.Stock
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestLike
@@ -31,12 +32,12 @@ class ProductFacadeTest {
         // given
         val brand = createTestBrand(id = 1L, name = "나이키")
         val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
+        product.setLikeCount(10L)
         val pageable = PageRequest.of(0, 20)
 
         val products = PageImpl(listOf(product))
 
-        every { productQueryService.findProducts(null, "latest", pageable) } returns products
-        every { likeQueryService.countByProductIdIn(listOf(100L)) } returns mapOf(100L to 10L)
+        every { productQueryService.findProducts(null, SortType.LATEST, pageable) } returns products
 
         // when
         val result = productFacade.getProducts(null, "latest", pageable)
@@ -54,11 +55,11 @@ class ProductFacadeTest {
         // given
         val brand = createTestBrand(id = 1L, name = "나이키")
         val product = createTestProduct(id = 100L, name = "운동화", price = BigDecimal("100000"), brand = brand)
+        product.setLikeCount(10L)
         val stock = Stock(productId = 100L, quantity = 50)
 
         val productDetailData = ProductDetailData(product, stock)
         every { productQueryService.getProductDetail(100L) } returns productDetailData
-        every { likeQueryService.countByProductId(100L) } returns 10L
 
         // when
         val result = productFacade.getProductDetail(100L)

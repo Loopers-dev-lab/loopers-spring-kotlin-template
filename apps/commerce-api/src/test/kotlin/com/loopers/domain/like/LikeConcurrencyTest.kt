@@ -3,6 +3,7 @@ package com.loopers.domain.like
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestProduct
 import com.loopers.fixtures.TestFixtures
+import com.loopers.testcontainers.RedisTestContainersConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.ContextConfiguration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -17,6 +19,7 @@ import kotlin.properties.Delegates
 
 @SpringBootTest
 @ActiveProfiles("test")
+@ContextConfiguration(initializers = [RedisTestContainersConfig::class])
 @DisplayName("Like 동시성 테스트")
 class LikeConcurrencyTest {
 

@@ -3,9 +3,9 @@ package com.loopers.infrastructure.user
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserRepository
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 
-@Component
+@Repository
 class UserRepositoryImpl(
     private val userJpaRepository: UserJpaRepository,
 ) : UserRepository {

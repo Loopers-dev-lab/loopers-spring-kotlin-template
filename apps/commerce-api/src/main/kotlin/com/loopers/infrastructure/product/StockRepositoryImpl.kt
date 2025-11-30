@@ -2,9 +2,9 @@ package com.loopers.infrastructure.product
 
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 
-@Component
+@Repository
 class StockRepositoryImpl(
     private val stockJpaRepository: StockJpaRepository,
 ) : StockRepository {
@@ -17,4 +17,5 @@ class StockRepositoryImpl(
     ): Stock? = stockJpaRepository.findByProductIdWithLock(productId)
 
     override fun save(stock: Stock): Stock = stockJpaRepository.save(stock)
+    override fun saveAll(stocks: List<Stock>) = stockJpaRepository.saveAll(stocks)
 }

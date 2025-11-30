@@ -25,9 +25,6 @@ class PointConcurrencyTest {
     private lateinit var pointService: PointService
 
     @Autowired
-    private lateinit var pointRepository: PointRepository
-
-    @Autowired
     private lateinit var testFixtures: TestFixtures
 
     private var userId by Delegates.notNull<Long>()

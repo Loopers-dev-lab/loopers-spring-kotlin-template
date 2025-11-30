@@ -2,13 +2,14 @@ package com.loopers.infrastructure.product
 
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.SortType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 
-@Component
+@Repository
 class ProductRepositoryImpl(
     private val productJpaRepository: ProductJpaRepository,
 ) : ProductRepository {
@@ -21,50 +22,41 @@ class ProductRepositoryImpl(
 
     override fun findAll(
         brandId: Long?,
-        sort: String,
+        sort: SortType,
         pageable: Pageable,
-    ): Page<Product> = when {
-        brandId != null && sort == "likes_desc" -> {
-            productJpaRepository.findByBrandIdOrderByLikeCount(brandId, pageable)
+    ): Page<Product> = when (sort) {
+        SortType.LIKES_DESC -> {
+            if (brandId != null) {
+                productJpaRepository.findByBrandIdOrderByLikeCount(brandId, pageable)
+            } else {
+                productJpaRepository.findAllOrderByLikeCount(pageable)
+            }
         }
 
-        brandId != null && sort == "price_asc" -> {
-            productJpaRepository.findByBrandId(brandId, pageable.withSort(Sort.by("price.amount").ascending()))
+        SortType.PRICE_ASC -> {
+            if (brandId != null) {
+                productJpaRepository.findByBrandId(brandId, pageable.withSort(Sort.by("price.amount").ascending()))
+            } else {
+                productJpaRepository.findAll(pageable.withSort(Sort.by("price.amount").ascending()))
+            }
         }
 
-        brandId != null && sort == "latest" -> {
-            productJpaRepository.findByBrandId(
-                brandId,
-                pageable.withSort(Sort.by(Sort.Order.desc("createdAt"))),
-            )
-        }
-
-        brandId != null -> {
-            productJpaRepository.findByBrandId(brandId, pageable)
-        }
-
-        sort == "likes_desc" -> {
-            productJpaRepository.findAllOrderByLikeCount(pageable)
-        }
-
-        sort == "price_asc" -> {
-            productJpaRepository.findAll(pageable.withSort(Sort.by("price.amount").ascending()))
-        }
-
-        sort == "latest" -> {
-            productJpaRepository.findAll(
-                pageable.withSort(Sort.by(Sort.Order.desc("createdAt"))),
-            )
-        }
-
-        else -> {
-            productJpaRepository.findAll(pageable)
+        SortType.LATEST -> {
+            val sortedPageable = pageable.withSort(Sort.by(Sort.Order.desc("createdAt")))
+            if (brandId != null) {
+                productJpaRepository.findByBrandId(brandId, sortedPageable)
+            } else {
+                productJpaRepository.findAll(sortedPageable)
+            }
         }
     }
 
     override fun save(product: Product): Product = productJpaRepository.save(product)
+    override fun saveAll(products: List<Product>): List<Product> = productJpaRepository.saveAll(products)
 
     override fun existsById(id: Long): Boolean = productJpaRepository.existsById(id)
+
+    override fun findByIdWithLock(id: Long): Product? = productJpaRepository.findByIdWithLock(id)
 
     private fun Pageable.withSort(
         sort: Sort,

@@ -1,10 +1,13 @@
 package com.loopers.infrastructure.product
 
 import com.loopers.domain.product.Product
+import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 
 interface ProductJpaRepository : JpaRepository<Product, Long> {
     fun findByBrandId(brandId: Long, pageable: Pageable): Page<Product>
@@ -14,12 +17,10 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
     @Query(
         """
         SELECT p FROM Product p
-        LEFT JOIN Like l ON l.productId = p.id
-        GROUP BY p
-        ORDER BY COUNT(l) DESC
+        ORDER BY p.likeCount DESC, p.id DESC
     """,
     countQuery = """
-        SELECT COUNT(DISTINCT p) FROM Product p
+        SELECT COUNT(p) FROM Product p
     """,
     )
     fun findAllOrderByLikeCount(pageable: Pageable): Page<Product>
@@ -27,15 +28,17 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
     @Query(
         """
         SELECT p FROM Product p
-        LEFT JOIN Like l ON l.productId = p.id
         WHERE p.brand.id = :brandId
-        GROUP BY p
-        ORDER BY COUNT(l) DESC
+        ORDER BY p.likeCount DESC, p.id DESC
     """,
     countQuery = """
-        SELECT COUNT(DISTINCT p) FROM Product p
+        SELECT COUNT(p) FROM Product p
         WHERE p.brand.id = :brandId
     """,
     )
     fun findByBrandIdOrderByLikeCount(brandId: Long, pageable: Pageable): Page<Product>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    fun findByIdWithLock(@Param("id") id: Long): Product?
 }
