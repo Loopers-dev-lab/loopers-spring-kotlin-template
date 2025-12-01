@@ -20,13 +20,14 @@ import org.springframework.web.bind.annotation.RestController
 class OrderV1Controller(
     private val orderFacade: OrderFacade,
 ) : OrderV1ApiSpec {
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     override fun placeOrder(
         @RequestHeader(value = "X-USER-ID") userId: String,
         @RequestBody request: OrderV1Dto.CreateOrderRequest,
     ): ApiResponse<OrderV1Dto.CreateOrderResponse> {
-        orderFacade.placeOrder(userId, request.couponId, request.toCommand())
+        orderFacade.placeOrder(request.toCommand(userId))
         return ApiResponse.success(OrderV1Dto.CreateOrderResponse())
     }
 

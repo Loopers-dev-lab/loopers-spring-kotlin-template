@@ -47,7 +47,7 @@ class OrderService(
     }
 
     @Transactional
-    fun createOrder(param: OrderCommand.Create) {
+    fun createOrder(param: OrderCommand.Create): Order {
         val order = orderRepository.save(
             Order.create(
                 totalAmount = param.totalAmount,
@@ -62,5 +62,6 @@ class OrderService(
             order = order,
         )
         orderRepository.saveAllOrderDetail(orderDetails)
+        return order
     }
 }

@@ -3,8 +3,10 @@ package com.loopers.application.order
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
-import com.loopers.domain.order.OrderCommand.OrderDetailCommand
 import com.loopers.domain.order.OrderService
+import com.loopers.domain.payment.PaymentCommand
+import com.loopers.domain.payment.PaymentMethod
+import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.UserService
@@ -25,6 +27,7 @@ class OrderFacade(
     private val brandService: BrandService,
     private val productService: ProductService,
     private val pointService: PointService,
+    private val paymentService: PaymentService,
 ) {
 
     private val log = LoggerFactory.getLogger(OrderFacade::class.java)
@@ -49,7 +52,12 @@ class OrderFacade(
     }
 
     @Transactional
-    fun placeOrder(userId: String, couponId: Long?, items: List<OrderDetailCommand>) {
+    fun placeOrder(command: OrderCommand.Place) {
+        val userId = command.userId
+        val couponId = command.couponId
+        val items = command.items
+        val paymentStatus = command.paymentMethod
+
         val user = userService.getMyInfo(userId)
 
         // 1. 상품 조회
@@ -77,25 +85,59 @@ class OrderFacade(
         // 6. 최종 결제 금액 계산
         val finalAmount = totalAmount - discountAmount
 
-        // 7. 포인트 사용
-        pointService.use(
-            userId = user.id,
-            amount = finalAmount,
-        )
+        when (paymentStatus) {
+            PaymentMethod.POINT -> {
+                // 7. 포인트 사용
+                pointService.use(
+                    userId = user.id,
+                    amount = finalAmount,
+                )
 
-        // 8. 재고 감소
-        productService.deductAllStock(items)
+                // 8. 재고 감소
+                productService.deductAllStock(items)
 
-        // 9. 주문 생성
-        orderService.createOrder(
-            OrderCommand.Create(
-                userId = user.id,
-                totalAmount = finalAmount,
-                items = items,
-                brands = brands,
-                products = products,
-            ),
-        )
+                // 9. 주문 생성
+                orderService.createOrder(
+                    OrderCommand.Create(
+                        userId = user.id,
+                        totalAmount = finalAmount,
+                        items = items,
+                        brands = brands,
+                        products = products,
+                    ),
+                )
+                return
+            }
+
+            PaymentMethod.CARD -> {
+                // 7. 재고 감소
+                productService.deductAllStock(items)
+
+                // 8. 주문 생성
+                val order = orderService.createOrder(
+                    OrderCommand.Create(
+                        userId = user.id,
+                        totalAmount = finalAmount,
+                        items = items,
+                        brands = brands,
+                        products = products,
+                    ),
+                )
+
+                // 9. PG 결제 요청
+                paymentService.request(
+                    PaymentCommand.Request(
+                        userId = userId,
+                        orderId = order.id.toString(),
+                        cardType = command.cardType,
+                        cardNo = command.cardNo,
+                        amount = finalAmount,
+                    ),
+                )
+                return
+            }
+        }
+
         // TODO. 주문 정보 외부 시스템 전송
     }
 }

@@ -3,6 +3,8 @@ package com.loopers.interfaces.api.v1.order
 import com.loopers.application.order.OrderResult
 import com.loopers.domain.order.OrderCommand
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.payment.CardType
+import com.loopers.domain.payment.PaymentMethod
 import io.swagger.v3.oas.annotations.media.Schema
 import java.time.ZonedDateTime
 
@@ -13,11 +15,23 @@ class OrderV1Dto {
         val items: List<OrderItemRequest>,
         @Schema(description = "쿠폰 ID", required = false)
         val couponId: Long?,
+        @Schema(description = "결제 방법", required = false)
+        val paymentMethod: PaymentMethod,
+        @Schema(description = "카드 타입", required = false)
+        val cardType: CardType?,
+        @Schema(description = "카드 번호", required = false)
+        val cardNo: String?,
     ) {
-        fun toCommand(): List<OrderCommand.OrderDetailCommand> = items.map {
-            OrderCommand.OrderDetailCommand(
-                productId = it.productId,
-                quantity = it.quantity,
+        fun toCommand(userId: String): OrderCommand.Place {
+            return OrderCommand.Place(
+                userId = userId,
+                items = items.map {
+                    OrderCommand.OrderDetailCommand(productId = it.productId, quantity = it.quantity)
+                },
+                couponId = couponId,
+                paymentMethod = paymentMethod,
+                cardType = cardType,
+                cardNo = cardNo,
             )
         }
     }
