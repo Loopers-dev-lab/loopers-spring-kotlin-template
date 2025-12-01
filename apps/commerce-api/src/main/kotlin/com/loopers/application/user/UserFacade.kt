@@ -4,8 +4,6 @@ import com.loopers.domain.point.PointService
 import com.loopers.domain.user.UserCommand
 import com.loopers.domain.user.UserResult
 import com.loopers.domain.user.UserService
-import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 

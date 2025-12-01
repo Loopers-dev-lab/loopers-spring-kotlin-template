@@ -3,11 +3,13 @@ package com.loopers.infrastructure.product
 import com.loopers.IntegrationTest
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.like.ProductLike
+import com.loopers.domain.like.ProductLikeCount
 import com.loopers.domain.product.Product
 import com.loopers.domain.user.Gender
 import com.loopers.domain.user.User
 import com.loopers.domain.user.UserCommand
 import com.loopers.infrastructure.brand.BrandJpaRepository
+import com.loopers.infrastructure.like.ProductLikeCountJpaRepository
 import com.loopers.infrastructure.like.ProductLikeJpaRepository
 import com.loopers.infrastructure.user.UserJpaRepository
 import com.loopers.support.fixtures.withId
@@ -24,6 +26,7 @@ class ProductJpaRepositoryTest @Autowired constructor(
     private val brandJpaRepository: BrandJpaRepository,
     private val userJpaRepository: UserJpaRepository,
     private val productLikeJpaRepository: ProductLikeJpaRepository,
+    private val productLikeCountJpaRepository: ProductLikeCountJpaRepository,
 ) : IntegrationTest() {
 
     private lateinit var brand1: Brand
@@ -135,9 +138,11 @@ class ProductJpaRepositoryTest @Autowired constructor(
             // product2에 좋아요 2개
             productLikeJpaRepository.save(ProductLike(productId = product2.id, userId = user1.id))
             productLikeJpaRepository.save(ProductLike(productId = product2.id, userId = user2.id))
+            productLikeCountJpaRepository.save(ProductLikeCount(productId = product2.id, likeCount = 2L))
 
             // product1에 좋아요 1개
             productLikeJpaRepository.save(ProductLike(productId = product1.id, userId = user1.id))
+            productLikeCountJpaRepository.save(ProductLikeCount(productId = product1.id, likeCount = 1L))
 
             // product3에 좋아요 없음
 
@@ -168,6 +173,7 @@ class ProductJpaRepositoryTest @Autowired constructor(
             // brand2 상품에 더 많은 좋아요
             productLikeJpaRepository.save(ProductLike(productId = product2.id, userId = user1.id))
             productLikeJpaRepository.save(ProductLike(productId = product2.id, userId = user2.id))
+            productLikeCountJpaRepository.save(ProductLikeCount(productId = product2.id, likeCount = 2L))
 
             val pageable = PageRequest.of(0, 10)
 
@@ -202,9 +208,11 @@ class ProductJpaRepositoryTest @Autowired constructor(
             // product2에 좋아요 2개
             productLikeJpaRepository.save(ProductLike(productId = product2.id, userId = user1.id))
             productLikeJpaRepository.save(ProductLike(productId = product2.id, userId = user2.id))
+            productLikeCountJpaRepository.save(ProductLikeCount(productId = product2.id, likeCount = 2L))
 
             // product3에 좋아요 1개
             productLikeJpaRepository.save(ProductLike(productId = product3.id, userId = user1.id))
+            productLikeCountJpaRepository.save(ProductLikeCount(productId = product3.id, likeCount = 1L))
 
             // product1에 좋아요 없음
 

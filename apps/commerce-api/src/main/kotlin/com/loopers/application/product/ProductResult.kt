@@ -2,6 +2,7 @@ package com.loopers.application.product
 
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.like.ProductLike
+import com.loopers.domain.like.ProductLikeCount
 import com.loopers.domain.product.Product
 import java.time.ZonedDateTime
 
@@ -17,11 +18,11 @@ object ProductResult {
         companion object {
             fun from(
                 product: Product,
-                productLikes: List<ProductLike>,
+                productLikeCounts: List<ProductLikeCount>,
                 brands: List<Brand>,
             ): ListInfo {
                 val brand = brands.find { it.id == product.brandId }!!
-                val likeCount = productLikes.count { it.productId == product.id }.toLong()
+                val likeCount = productLikeCounts.find { it.productId == product.id }!!.likeCount
 
                 return ListInfo(
                     id = product.id,
@@ -45,22 +46,17 @@ object ProductResult {
         companion object {
             fun from(
                 product: Product,
-                productLikes: List<ProductLike>,
+                userLiked: Boolean,
+                productLikeCount: Long,
                 brand: Brand,
-                userId: String?,
             ): DetailInfo {
-                val likeCount = productLikes.size.toLong()
-                val likedByMe = userId?.let { uid ->
-                    productLikes.any { it.userId.toString() == uid }
-                } ?: false
-
                 return DetailInfo(
                     id = product.id,
                     name = product.name,
                     price = product.price,
                     brandName = brand.name,
-                    likeCount = likeCount,
-                    likedByMe = likedByMe,
+                    likeCount = productLikeCount,
+                    likedByMe = userLiked,
                 )
             }
         }

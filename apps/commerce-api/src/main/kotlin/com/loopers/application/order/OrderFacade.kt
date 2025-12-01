@@ -70,7 +70,7 @@ class OrderFacade(
         val discountAmount = try {
             couponService.applyCoupon(user.id, couponId, totalAmount)
         } catch (e: ObjectOptimisticLockingFailureException) {
-            log.debug("쿠폰 중복 사용 시도 무시: user=${user.id}, couponId=${couponId}")
+            log.debug("쿠폰 중복 사용 시도 무시: user=$user.id, couponId=$couponId")
             throw CoreException(ErrorType.COUPON_ALREADY_USED, "이미 사용된 쿠폰입니다")
         }
 

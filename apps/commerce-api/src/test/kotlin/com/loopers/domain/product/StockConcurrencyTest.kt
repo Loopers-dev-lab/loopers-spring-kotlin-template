@@ -113,15 +113,15 @@ class StockConcurrencyTest : IntegrationTest() {
             val executor = Executors.newFixedThreadPool(2)
             val readyLatch = CountDownLatch(2) // 준비 완료 신호
             val startLatch = CountDownLatch(1) // 동시 시작 신호
-            val endLatch = CountDownLatch(2)   // 완료 신호
+            val endLatch = CountDownLatch(2) // 완료 신호
 
             val exceptions = mutableListOf<Exception>()
 
             // when - 두 스레드가 정확히 동시에 시작
             executor.submit {
                 val threadName = Thread.currentThread().name
-                readyLatch.countDown()  // 준비 완료
-                startLatch.await()       // 시작 신호 대기
+                readyLatch.countDown() // 준비 완료
+                startLatch.await() // 시작 신호 대기
                 try {
                     log.info("[$threadName] 주문1 시작 (상품1→상품2)")
                     productService.deductAllStock(order1Commands)

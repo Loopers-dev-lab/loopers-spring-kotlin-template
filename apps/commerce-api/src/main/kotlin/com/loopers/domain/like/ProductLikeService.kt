@@ -12,10 +12,13 @@ class ProductLikeService(
     private val productLikeRepository: ProductLikeRepository,
 ) {
     @Transactional(readOnly = true)
-    fun getAllBy(productIds: List<Long>): List<ProductLike> = productLikeRepository.findAllBy(productIds)
+    fun getCountAllBy(productIds: List<Long>): List<ProductLikeCount> = productLikeRepository.findCountAllBy(productIds)
 
     @Transactional(readOnly = true)
-    fun getAllBy(productId: Long): List<ProductLike> = productLikeRepository.findAllBy(productId)
+    fun getCountBy(productId: Long): ProductLikeCount = productLikeRepository.findCountBy(productId)
+
+    @Transactional(readOnly = true)
+    fun getBy(productId: Long, userId: Long): ProductLike? = productLikeRepository.findBy(productId, userId)
 
     @Transactional(readOnly = true)
     fun getAllBy(userId: Long, pageable: Pageable): Page<ProductLike> = productLikeRepository.findAllBy(userId, pageable)
@@ -25,12 +28,17 @@ class ProductLikeService(
         if (productLikeRepository.existsBy(product.id, user.id)) {
             return
         }
+        val result = productLikeRepository.increaseCount(product.id)
+        if (result == 0) {
+            productLikeRepository.saveCount(ProductLikeCount.create(product.id, 1L))
+        }
         productLikeRepository.save(ProductLike.create(product.id, user.id))
     }
 
     @Transactional
     fun unlike(product: Product, user: User) {
         productLikeRepository.findBy(product.id, user.id) ?: return
+        productLikeRepository.decreaseCount(product.id)
         return productLikeRepository.deleteBy(product.id, user.id)
     }
 }

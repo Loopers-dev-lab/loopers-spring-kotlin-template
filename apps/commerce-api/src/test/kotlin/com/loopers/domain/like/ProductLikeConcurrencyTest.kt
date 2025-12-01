@@ -2,10 +2,12 @@ package com.loopers.domain.like
 
 import com.loopers.IntegrationTest
 import com.loopers.domain.product.Product
+import com.loopers.infrastructure.like.ProductLikeCountJpaRepository
 import com.loopers.infrastructure.like.ProductLikeJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
 import com.loopers.infrastructure.user.UserJpaRepository
 import com.loopers.support.fixtures.ProductFixtures
+import com.loopers.support.fixtures.ProductLikeFixtures
 import com.loopers.support.fixtures.UserFixtures
 import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.DisplayName
@@ -28,6 +30,9 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
     private lateinit var productLikeRepository: ProductLikeJpaRepository
 
     @Autowired
+    private lateinit var productLikeCountRepository: ProductLikeCountJpaRepository
+
+    @Autowired
     private lateinit var productJpaRepository: ProductJpaRepository
 
     @Autowired
@@ -44,6 +49,10 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
                 name = "테스트상품",
                 price = 1000L,
                 brandId = 1L,
+            )
+            createProductCountProduct(
+                productId = product.id,
+                likeCount = 0L,
             )
 
             val user = userRepository.save(
@@ -80,9 +89,11 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
 
             // then
             val likes = productLikeRepository.findAllByProductId(product.id)
+            val count = productLikeCountRepository.findByProductId(product.id)
 
             assertSoftly { soft ->
                 soft.assertThat(likes.size).isEqualTo(1)
+                soft.assertThat(count.likeCount).isEqualTo(1)
                 soft.assertThat(success.get() + fail.get()).isEqualTo(threadCount)
             }
         }
@@ -95,6 +106,11 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
                 price = 1000L,
                 brandId = 1L,
             )
+            createProductCountProduct(
+                productId = product.id,
+                likeCount = 0L,
+            )
+
             val threadCount = 10
 
             val users = (1..threadCount).map {
@@ -131,9 +147,11 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
 
             // then
             val likes = productLikeRepository.findAllByProductId(product.id)
+            val count = productLikeCountRepository.findByProductId(product.id)
 
             assertSoftly { soft ->
                 soft.assertThat(likes.size).isEqualTo(threadCount)
+                soft.assertThat(count.likeCount.toInt()).isEqualTo(threadCount)
                 soft.assertThat(success.get()).isEqualTo(threadCount)
                 soft.assertThat(fail.get()).isEqualTo(0)
             }
@@ -195,16 +213,13 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
 
             // then
             val remainingLikes = productLikeRepository.findAllByProductId(product.id)
+            val remainingCount = productLikeCountRepository.findByProductId(product.id)
 
             assertSoftly { soft ->
-                soft.assertThat(remainingLikes.size)
-                    .isEqualTo(20)
-
-                soft.assertThat(success.get())
-                    .isEqualTo(30)
-
-                soft.assertThat(fail.get())
-                    .isEqualTo(0)
+                soft.assertThat(remainingLikes.size).isEqualTo(20)
+                soft.assertThat(remainingCount.likeCount).isEqualTo(20)
+                soft.assertThat(success.get()).isEqualTo(30)
+                soft.assertThat(fail.get()).isEqualTo(0)
             }
         }
     }
@@ -215,6 +230,15 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
                 name = name,
                 price = price,
                 brandId = brandId,
+            ),
+        )
+    }
+
+    private fun createProductCountProduct(productId: Long, likeCount: Long): ProductLikeCount {
+        return productLikeCountRepository.save(
+            ProductLikeFixtures.createProductLikeCount(
+                productId = productId,
+                likeCount = likeCount,
             ),
         )
     }
