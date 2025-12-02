@@ -45,7 +45,7 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
         val result = likeFacade.addLike(member.memberId.value, product.id!!)
@@ -67,7 +67,7 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
         // 첫 번째 좋아요
@@ -94,7 +94,7 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
         // 좋아요 추가
@@ -120,7 +120,7 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
         // 좋아요 없이 취소 시도
@@ -138,9 +138,9 @@ class LikeFacadeIntegrationTest @Autowired constructor(
             Member(MemberId("member1"), Email("test@example.com"), BirthDate.from("1990-05-15"), Gender.MALE)
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
-        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), brand))
-        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand))
-        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand))
+        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), 1L))
+        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), 1L))
+        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), 1L))
 
         // 좋아요 추가
         likeFacade.addLike(member.memberId.value, product1.id!!)
@@ -161,9 +161,9 @@ class LikeFacadeIntegrationTest @Autowired constructor(
             Member(MemberId("member1"), Email("test@example.com"), BirthDate.from("1990-05-15"), Gender.MALE)
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
-        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), brand))
-        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand))
-        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand))
+        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), 1L))
+        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), 1L))
+        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), 1L))
 
         likeFacade.addLike(member.memberId.value, product1.id!!)
         likeFacade.addLike(member.memberId.value, product2.id!!)

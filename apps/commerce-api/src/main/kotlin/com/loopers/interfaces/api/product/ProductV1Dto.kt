@@ -9,8 +9,6 @@ class ProductV1Dto {
         val description: String?,
         val price: Long,
         val stock: Int,
-        val brandId: Long,
-        val brandName: String,
         val likesCount: Int,
     ) {
         companion object {
@@ -21,8 +19,6 @@ class ProductV1Dto {
                     description = info.description,
                     price = info.price.amount,
                     stock = info.stock,
-                    brandId = info.brandId,
-                    brandName = info.brandName,
                     likesCount = info.likesCount,
                 )
             }

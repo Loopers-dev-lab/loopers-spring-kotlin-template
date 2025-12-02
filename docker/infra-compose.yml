@@ -13,6 +13,8 @@ services:
       - MYSQL_COLLATE=utf8mb4_general_ci
     volumes:
       - mysql-8-data:/var/lib/mysql
+      - ./01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./02-init-data.sql:/docker-entrypoint-initdb.d/02-init-data.sql
 
   redis-master:
     image: redis:7.0

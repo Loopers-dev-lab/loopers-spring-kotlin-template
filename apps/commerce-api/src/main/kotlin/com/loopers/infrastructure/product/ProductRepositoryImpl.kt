@@ -27,25 +27,35 @@ class ProductRepositoryImpl(
         return findById(id)
             ?: throw CoreException(ErrorType.PRODUCT_NOT_FOUND,"상품을 찾을 수 없습니다. id: $id")
     }
-
     override fun findAll(
         brandId: Long?,
         sort: ProductSortType,
         pageable: Pageable,
     ): Page<Product> {
-        val sortOrder = when(sort) {
-            ProductSortType.LATEST -> Sort.by(Sort.Direction.DESC, "createdAt")
-            ProductSortType.PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price.amount")
-            ProductSortType.LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likesCount")
-        }
-
-        val pageableWithSort = PageRequest.of(pageable.pageNumber, pageable.pageSize, sortOrder)
+        val pageableWithSort = createPageableWithSort(sort, pageable)
 
         return if (brandId != null) {
             productJpaRepository.findByBrandId(brandId, pageableWithSort)
         } else {
             productJpaRepository.findAll(pageableWithSort)
         }
+    }
+
+    override fun count(brandId: Long?): Long {
+        return if (brandId != null) {
+            productJpaRepository.countByBrandId(brandId)
+        } else {
+            productJpaRepository.count()
+        }
+    }
+
+    private fun createPageableWithSort(sort: ProductSortType, pageable: Pageable): Pageable {
+        val sortOrder = when(sort) {
+            ProductSortType.LATEST -> Sort.by(Sort.Direction.DESC, "createdAt")
+            ProductSortType.PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price.amount")
+            ProductSortType.LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likesCount")
+        }
+        return PageRequest.of(pageable.pageNumber, pageable.pageSize, sortOrder)
     }
 
     override fun findAllByIdIn(ids: List<Long>): List<Product> {

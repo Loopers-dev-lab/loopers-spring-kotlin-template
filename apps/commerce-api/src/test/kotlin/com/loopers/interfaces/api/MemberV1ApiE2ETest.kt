@@ -20,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.HttpEntity
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 
@@ -70,7 +71,7 @@ class MemberV1ApiE2ETest @Autowired constructor(
     }
 
 
-    @DisplayName("POST /api/v1/users/{memberId} - 회원 정보 조회")
+    @DisplayName("GET /api/v1/users/me - 회원 정보 조회")
     @Nested
     inner class GetMemberByMemberId {
         @DisplayName("내 정보 조회에 성공할 경우, 해당하는 유저 정보를 응답으로 반환한다")
@@ -79,8 +80,12 @@ class MemberV1ApiE2ETest @Autowired constructor(
             val member = Member(MemberId("testUser1"), Email("test@gmail.com"), BirthDate.from("1990-05-15"), Gender.MALE)
             memberJpaRepository.save(member)
 
+            val headers = HttpHeaders()
+            headers.set("X-USER-ID", "testUser1")
+            val requestEntity = HttpEntity(null, headers)
+
             val responseType = object : ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>>() {}
-            val response = testRestTemplate.exchange("/api/v1/users/testUser1", HttpMethod.GET, null, responseType)
+            val response = testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, requestEntity, responseType)
 
             assertAll(
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
@@ -93,8 +98,12 @@ class MemberV1ApiE2ETest @Autowired constructor(
         @DisplayName("존재하지 않는 ID로 조회할 경우, 404 Not Found 응답을 반환한다")
         @Test
         fun failWithNonexistentMemberId() {
+            val headers = HttpHeaders()
+            headers.set("X-USER-ID", "noUser1")
+            val requestEntity = HttpEntity(null, headers)
+
             val responseType = object : ParameterizedTypeReference<ApiResponse<MemberV1Dto.MemberResponse>>() {}
-            val response = testRestTemplate.exchange("/api/v1/users/noUser1", HttpMethod.GET, null, responseType)
+            val response = testRestTemplate.exchange("/api/v1/users/me", HttpMethod.GET, requestEntity, responseType)
 
             assertThat(response.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
         }

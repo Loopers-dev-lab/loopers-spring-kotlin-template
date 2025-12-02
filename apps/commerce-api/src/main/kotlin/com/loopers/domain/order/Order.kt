@@ -102,12 +102,6 @@ class Order(
         status = OrderStatus.CANCELLED
     }
 
-    fun decreaseProductStocks() {
-        items.forEach { item ->
-            item.product.decreaseStock(item.quantity)
-        }
-    }
-
     fun processPayment(member: Member) {
         member.pay(finalAmount)
     }
@@ -131,7 +125,13 @@ class Order(
                 // 재고 검증
                 product.validateStock(quantity)
 
-                OrderItem.of(product, quantity)
+                // 주문 시점의 스냅샷 데이터 전달
+                OrderItem.of(
+                    productId = product.id,
+                    productName = product.name,
+                    price = product.price,
+                    quantity = quantity
+                )
             }
 
             return Order(memberId, items, discountAmount)

@@ -19,7 +19,7 @@ class MemberV1Controller(
     private val memberFacade: MemberFacade,
 ) : MemberV1ApiSpec {
 
-    @PostMapping
+    @PostMapping("/join")
     override fun join(
         @Valid @RequestBody request: JoinMemberRequest
     ): ApiResponse<MemberV1Dto.MemberResponse> {
