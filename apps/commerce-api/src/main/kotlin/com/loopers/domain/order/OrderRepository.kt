@@ -9,4 +9,5 @@ interface OrderRepository {
     fun findAllOrderDetailBy(orderId: Long): List<OrderDetail>
     fun save(order: Order): Order
     fun saveAllOrderDetail(orderDetails: List<OrderDetail>): List<OrderDetail>
+    fun update(orderId: Long, orderStatus: OrderStatus)
 }

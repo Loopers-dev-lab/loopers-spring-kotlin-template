@@ -22,6 +22,8 @@ object OrderCommand {
         val items: List<OrderDetailCommand>,
         val brands: List<Brand>,
         val products: List<Product>,
+        val couponId: Long? = null,
+        val status: OrderStatus = OrderStatus.PENDING,
     )
 
     data class OrderDetailCommand(

@@ -1,7 +1,7 @@
 package com.loopers.interfaces.api.v1.order
 
-import com.loopers.application.order.OrderResult
 import com.loopers.domain.order.OrderCommand
+import com.loopers.domain.order.OrderResult
 import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.PaymentMethod

@@ -3,10 +3,14 @@ package com.loopers.application.order
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
+import com.loopers.domain.order.OrderResult
 import com.loopers.domain.order.OrderService
-import com.loopers.domain.payment.PaymentCommand
+import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.PaymentMethod
 import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PgDto
+import com.loopers.domain.payment.PgService
+import com.loopers.domain.payment.dto.PaymentCommand
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.UserService
@@ -28,6 +32,7 @@ class OrderFacade(
     private val productService: ProductService,
     private val pointService: PointService,
     private val paymentService: PaymentService,
+    private val pgService: PgService,
 ) {
 
     private val log = LoggerFactory.getLogger(OrderFacade::class.java)
@@ -67,14 +72,17 @@ class OrderFacade(
         // 2. 상품 존재 여부 검증
         productService.validateProductsExist(items, products)
 
-        // 3. 브랜드 조회
+        // 3. 재고 충분성 검증
+        productService.validateStockAvailability(items)
+
+        // 4. 브랜드 조회
         val brandIds = products.map { it.brandId }.distinct()
         val brands = brandService.getAllBrand(brandIds)
 
-        // 4. 총 주문 금액 계산
+        // 5. 총 주문 금액 계산
         val totalAmount = orderService.calculateTotalAmount(items, products)
 
-        // 5. 쿠폰 할인 금액 계산 (쿠폰 사용 중복 발생시 exception을 catch하여 예외를 던짐)
+        // 6. 쿠폰 할인 금액 계산 (쿠폰 사용 중복 발생시 exception을 catch하여 예외를 던짐)
         val discountAmount = try {
             couponService.applyCoupon(user.id, couponId, totalAmount)
         } catch (e: ObjectOptimisticLockingFailureException) {
@@ -82,58 +90,74 @@ class OrderFacade(
             throw CoreException(ErrorType.COUPON_ALREADY_USED, "이미 사용된 쿠폰입니다")
         }
 
-        // 6. 최종 결제 금액 계산
+        // 7. 최종 결제 금액 계산
         val finalAmount = totalAmount - discountAmount
 
         when (paymentStatus) {
             PaymentMethod.POINT -> {
-                // 7. 포인트 사용
+                // 8. 포인트 사용
                 pointService.use(
                     userId = user.id,
                     amount = finalAmount,
                 )
 
-                // 8. 재고 감소
-                productService.deductAllStock(items)
-
                 // 9. 주문 생성
-                orderService.createOrder(
+                val orderResult = orderService.createOrder(
                     OrderCommand.Create(
                         userId = user.id,
                         totalAmount = finalAmount,
                         items = items,
                         brands = brands,
                         products = products,
+                        couponId = couponId,
+                        status = OrderStatus.PENDING,
                     ),
                 )
+
+                // 10. 재고 감소
+                productService.deductAllStock(orderResult.orderDetails)
                 return
             }
 
-            PaymentMethod.CARD -> {
-                // 7. 재고 감소
-                productService.deductAllStock(items)
-
+            PaymentMethod.CARD -> { // 재고 차감은 성공 콜백해서 진행
                 // 8. 주문 생성
-                val order = orderService.createOrder(
+                val orderResult = orderService.createOrder(
                     OrderCommand.Create(
                         userId = user.id,
                         totalAmount = finalAmount,
                         items = items,
                         brands = brands,
                         products = products,
+                        couponId = couponId,
+                        status = OrderStatus.PENDING,
                     ),
                 )
 
-                // 9. PG 결제 요청
-                paymentService.request(
-                    PaymentCommand.Request(
-                        userId = userId,
-                        orderId = order.id.toString(),
+                // 9. Payment(PENDING) 생성
+                val payment = paymentService.create(
+                    PaymentCommand.Create(
+                        userId = user.id,
+                        orderId = orderResult.order.id,
+                        cardType = command.cardType!!,
+                        cardNo = command.cardNo!!,
+                        amount = finalAmount,
+                    ),
+                )
+
+                // 10. PG 결제 요청
+                val transactionKey = pgService.requestPayment(
+                    userId = userId,
+                    request = PgDto.PgRequest(
+                        orderId = orderResult.order.id.toString(),
                         cardType = command.cardType,
                         cardNo = command.cardNo,
                         amount = finalAmount,
                     ),
                 )
+
+                // 11. transactionKey update
+                paymentService.updateTransactionKey(payment.id, transactionKey)
+
                 return
             }
         }
