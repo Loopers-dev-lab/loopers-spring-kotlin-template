@@ -35,11 +35,19 @@ spring:
     activate:
       on-profile: local, test
 
+pg:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
 ---
 spring:
   config:
     activate:
       on-profile: dev
+
+pg:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
 
 ---
 spring:
@@ -47,11 +55,19 @@ spring:
     activate:
       on-profile: qa
 
+pg:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
+
 ---
 spring:
   config:
     activate:
       on-profile: prd
+
+pg:
+  base-url: http://localhost:8082
+  callback-url: http://localhost:8080/api/v1/payments/callback
 
 springdoc:
   api-docs:
