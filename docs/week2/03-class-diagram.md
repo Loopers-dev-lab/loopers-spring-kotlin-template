@@ -85,6 +85,7 @@ classDiagram
     class Order {
         - Long id
         - OrderStatus status
+        - PaymentMethod paymentMethod
         - Long totalAmount
         - Long userId
         + create(totalAmount, userId) Order
@@ -100,6 +101,12 @@ classDiagram
         CANCELLED
     }
 
+    class PaymentMethod {
+        <<enumeration>>
+        POINT
+        CARD
+    }
+
     class OrderDetail {
         - Long id
         - String brandName
@@ -111,6 +118,39 @@ classDiagram
         - Long orderId
         + create(items, brands, products, order) List~OrderDetail~
         + create(quantity, brand, product, order) OrderDetail
+    }
+    
+      class Payment {
+        - Long id
+        - String transactionKey
+        - CardType cardType
+        - String cardNo
+        - Long amount
+        - PaymentStatus status
+        - String reason
+        - Long orderId
+        - Long userId
+        + create(command) Payment
+        + assignTransactionKey(String) void
+        + approve() void
+        + rejectByLimitExceeded() void
+        + rejectByInvalidCard() void
+        + isCompleted() boolean
+    }
+
+    class PaymentStatus {
+        <<enumeration>>
+        PENDING,
+        COMPLETED,
+        FAILED,
+        TIMEOUT
+    }
+
+    class CardType {
+        <<enumeration>>
+        SAMSUNG
+        HYUNDAI
+        KB
     }
 
     class ProductLike {
