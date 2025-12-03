@@ -2,8 +2,11 @@ package com.loopers.domain.product
 
 import com.loopers.IntegrationTest
 import com.loopers.domain.brand.Brand
-import com.loopers.domain.order.OrderCommand
+import com.loopers.domain.order.Order
+import com.loopers.domain.order.OrderDetail
 import com.loopers.infrastructure.brand.BrandJpaRepository
+import com.loopers.infrastructure.order.OrderDetailJpaRepository
+import com.loopers.infrastructure.order.OrderJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
 import com.loopers.infrastructure.product.StockJpaRepository
 import junit.framework.TestCase.assertTrue
@@ -37,9 +40,16 @@ class StockConcurrencyTest : IntegrationTest() {
     @Autowired
     private lateinit var brandJpaRepository: BrandJpaRepository
 
+    @Autowired
+    private lateinit var orderJpaRepository: OrderJpaRepository
+
+    @Autowired
+    private lateinit var orderDetailJpaRepository: OrderDetailJpaRepository
+
     @Test
     fun `30개의 동시 재고 차감 요청시 Lost Update 없이 정확히 0이 된다`() {
         // given
+        val userId = 1L
         val brand = createAndSaveBrand("테스트브랜드")
         val product = createAndSaveProduct("상품1", 1L, brand.id)
         createAndSaveStock(30L, product.id)
@@ -56,9 +66,14 @@ class StockConcurrencyTest : IntegrationTest() {
                 val threadName = Thread.currentThread().name
                 try {
                     log.info("[$threadName] 재고 차감 시도")
-                    productService.deductAllStock(
-                        listOf(OrderCommand.OrderDetailCommand(product.id, 1L)),
+
+                    // 주문 및 주문 상세 생성
+                    val order = orderJpaRepository.save(Order.create(1L, userId))
+                    val orderDetail = orderDetailJpaRepository.save(
+                        OrderDetail.create(1L, brand, product, order),
                     )
+
+                    productService.deductAllStock(listOf(orderDetail))
                     successCount.incrementAndGet()
                     log.info("[$threadName] 재고 차감 성공")
                 } catch (e: Exception) {
@@ -90,6 +105,7 @@ class StockConcurrencyTest : IntegrationTest() {
 
         @Test
         fun `동일한 상품들을 다른 순서로 동시 주문해도 데드락이 발생하지 않는다`() {
+            val userId = 1L
             val brand = createAndSaveBrand("테스트브랜드")
 
             val product1 = createAndSaveProduct("상품1", 1000L, brand.id)
@@ -97,18 +113,6 @@ class StockConcurrencyTest : IntegrationTest() {
 
             createAndSaveStock(100L, product1.id)
             createAndSaveStock(100L, product2.id)
-
-            // 주문1: 상품1 → 상품2 순서
-            val order1Commands = listOf(
-                OrderCommand.OrderDetailCommand(product1.id, 10L),
-                OrderCommand.OrderDetailCommand(product2.id, 10L),
-            )
-
-            // 주문2: 상품2 → 상품1 순서 (역순)
-            val order2Commands = listOf(
-                OrderCommand.OrderDetailCommand(product2.id, 10L),
-                OrderCommand.OrderDetailCommand(product1.id, 10L),
-            )
 
             val executor = Executors.newFixedThreadPool(2)
             val readyLatch = CountDownLatch(2) // 준비 완료 신호
@@ -124,7 +128,15 @@ class StockConcurrencyTest : IntegrationTest() {
                 startLatch.await() // 시작 신호 대기
                 try {
                     log.info("[$threadName] 주문1 시작 (상품1→상품2)")
-                    productService.deductAllStock(order1Commands)
+
+                    // 주문1: 상품1 → 상품2 순서
+                    val order1 = orderJpaRepository.save(Order.create(30000L, userId))
+                    val order1Details = listOf(
+                        orderDetailJpaRepository.save(OrderDetail.create(10L, brand, product1, order1)),
+                        orderDetailJpaRepository.save(OrderDetail.create(10L, brand, product2, order1)),
+                    )
+
+                    productService.deductAllStock(order1Details)
                     log.info("[$threadName] 주문1 성공")
                 } catch (e: Exception) {
                     log.warn("[$threadName] 주문1 실패: ${e.message}")
@@ -142,7 +154,15 @@ class StockConcurrencyTest : IntegrationTest() {
                 startLatch.await() // 시작 신호 대기
                 try {
                     log.info("[$threadName] 주문2 시작 (상품2→상품1)")
-                    productService.deductAllStock(order2Commands)
+
+                    // 주문2: 상품2 → 상품1 순서 (역순)
+                    val order2 = orderJpaRepository.save(Order.create(30000L, userId))
+                    val order2Details = listOf(
+                        orderDetailJpaRepository.save(OrderDetail.create(10L, brand, product2, order2)),
+                        orderDetailJpaRepository.save(OrderDetail.create(10L, brand, product1, order2)),
+                    )
+
+                    productService.deductAllStock(order2Details)
                     log.info("[$threadName] 주문2 성공")
                 } catch (e: Exception) {
                     log.warn("[$threadName] 주문2 실패: ${e.message}")
