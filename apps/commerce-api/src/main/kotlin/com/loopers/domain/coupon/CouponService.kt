@@ -15,6 +15,7 @@ class CouponService(
     private val couponRepository: CouponRepository,
     private val issuedCouponRepository: IssuedCouponRepository,
     private val clock: Clock,
+    private val discountPolicyResolver: DiscountPolicyResolver,
 ) {
     @Transactional
     fun issueCoupon(userId: Long, couponId: Long): IssuedCoupon {
@@ -24,7 +25,7 @@ class CouponService(
         issuedCouponRepository.findByUserIdAndCouponId(userId, couponId)
             ?.let { throw CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다") }
 
-        val issuedCoupon = IssuedCoupon.issue(userId, coupon)
+        val issuedCoupon = coupon.issue(userId)
 
         return runCatching {
             issuedCouponRepository.save(issuedCoupon)
@@ -83,10 +84,10 @@ class CouponService(
         val coupon = couponRepository.findById(issuedCoupon.couponId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "쿠폰 정의를 찾을 수 없습니다")
 
-        val discountAmount = issuedCoupon.use(userId, coupon, orderAmount, ZonedDateTime.now(clock))
-
+        issuedCoupon.use(userId, coupon, ZonedDateTime.now(clock))
         issuedCouponRepository.save(issuedCoupon)
 
-        return discountAmount
+        val policy = discountPolicyResolver.resolve(coupon)
+        return coupon.calculateDiscount(orderAmount, policy)
     }
 }

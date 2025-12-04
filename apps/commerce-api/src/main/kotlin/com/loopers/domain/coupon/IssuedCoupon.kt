@@ -3,7 +3,6 @@ package com.loopers.domain.coupon
 import com.loopers.domain.BaseEntity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import com.loopers.support.values.Money
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -58,16 +57,14 @@ class IssuedCoupon(
         private set
 
     /**
-     * 쿠폰을 사용하고 할인 금액을 반환합니다.
+     * 쿠폰을 사용합니다. 상태를 USED로 변경하고 사용 시각을 기록합니다.
      *
      * @param userId 쿠폰을 사용하려는 사용자 ID
      * @param coupon 사용할 쿠폰 정의
-     * @param orderAmount 주문 금액
      * @param usedAt 쿠폰 사용 시각
-     * @return 할인 금액
      * @throws CoreException 사용자가 일치하지 않거나, 쿠폰 정보가 일치하지 않거나, 이미 사용된 쿠폰인 경우
      */
-    fun use(userId: Long, coupon: Coupon, orderAmount: Money, usedAt: ZonedDateTime): Money {
+    fun use(userId: Long, coupon: Coupon, usedAt: ZonedDateTime) {
         if (this.userId != userId) {
             throw CoreException(ErrorType.BAD_REQUEST, "보유하지 않은 쿠폰입니다")
         }
@@ -82,14 +79,5 @@ class IssuedCoupon(
 
         status = UsageStatus.USED
         this.usedAt = usedAt
-
-        return coupon.calculateDiscount(orderAmount)
-    }
-
-    companion object {
-        // TODO(toong): IssuedCoupon.issue 보다는 coupon.issue가 더 명시적인 시그니처로 보임.
-        fun issue(userId: Long, coupon: Coupon): IssuedCoupon {
-            return IssuedCoupon(userId, coupon.id)
-        }
     }
 }

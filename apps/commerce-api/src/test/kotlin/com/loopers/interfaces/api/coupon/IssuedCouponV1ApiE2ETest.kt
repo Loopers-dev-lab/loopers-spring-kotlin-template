@@ -204,7 +204,7 @@ class IssuedCouponV1ApiE2ETest @Autowired constructor(
         userId: Long,
         coupon: Coupon,
     ): IssuedCoupon {
-        val issuedCoupon = IssuedCoupon.issue(userId = userId, coupon = coupon)
+        val issuedCoupon = coupon.issue(userId)
         return issuedCouponRepository.save(issuedCoupon)
     }
 

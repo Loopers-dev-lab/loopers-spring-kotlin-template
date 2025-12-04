@@ -388,7 +388,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
 
             // 쿠폰을 먼저 사용 처리
             val couponEntity = couponRepository.findById(coupon.id)!!
-            issuedCoupon.use(userId, couponEntity, Money.krw(10000), FIXED_TIME)
+            issuedCoupon.use(userId, couponEntity, FIXED_TIME)
             issuedCouponRepository.save(issuedCoupon)
 
             val criteria = OrderCriteria.PlaceOrder(
@@ -606,7 +606,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         userId: Long,
         coupon: Coupon,
     ): IssuedCoupon {
-        val issuedCoupon = IssuedCoupon.issue(userId = userId, coupon = coupon)
+        val issuedCoupon = coupon.issue(userId)
         return issuedCouponRepository.save(issuedCoupon)
     }
 }
