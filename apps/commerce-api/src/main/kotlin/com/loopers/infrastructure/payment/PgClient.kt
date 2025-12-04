@@ -1,7 +1,6 @@
-package com.loopers.domain.payment
+package com.loopers.infrastructure.payment
 
 import com.loopers.interfaces.api.ApiResponse
-import com.loopers.support.config.FeignConfig
 import org.springframework.cloud.openfeign.FeignClient
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -13,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestParam
 @FeignClient(
     name = "pg-client",
     url = "\${pg.base-url}",
-    configuration = [FeignConfig::class],
 )
 interface PgClient {
 
@@ -24,7 +22,7 @@ interface PgClient {
     fun requestPayment(
         @RequestHeader("X-USER-ID") userId: String,
         @RequestBody request: PgDto.PgRequest,
-    ): ApiResponse<PgDto.PgTransactionResponse>
+    ): ApiResponse<PgDto.PgTransactionDetailResponse>
 
     /**
      * 결제 정보 확인

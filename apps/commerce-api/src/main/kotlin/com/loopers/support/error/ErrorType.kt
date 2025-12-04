@@ -23,4 +23,7 @@ enum class ErrorType(val status: HttpStatus, val code: String, val message: Stri
 
     /** 쿠폰 에러 */
     COUPON_ALREADY_USED(HttpStatus.CONFLICT, "COUPON_IS_USED", "이미 사용된 쿠폰입니다."),
+
+    /** PG 에러 */
+    PG_SYSTEM_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "PG_SYSTEM_ERROR", "결제 시스템에 일시적인 오류가 발생했습니다."),
 }

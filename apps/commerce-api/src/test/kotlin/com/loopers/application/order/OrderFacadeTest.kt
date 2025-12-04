@@ -242,7 +242,7 @@ class OrderFacadeTest {
             every { orderService.createOrder(any()) } returns orderResult
             every { paymentService.create(any()) } returns payment
             every { payment.id } returns 1L
-            every { pgService.requestPayment(any(), any()) } returns transactionKey
+            every { pgService.requestPayment(any()) } returns transactionKey
             justRun { paymentService.updateTransactionKey(any(), any()) }
 
             // when
@@ -267,7 +267,7 @@ class OrderFacadeTest {
             verify(exactly = 1) { couponService.applyCoupon(userIdLong, couponId, totalAmount) }
             verify(exactly = 1) { orderService.createOrder(any()) }
             verify(exactly = 1) { paymentService.create(any()) }
-            verify(exactly = 1) { pgService.requestPayment(any(), any()) }
+            verify(exactly = 1) { pgService.requestPayment(any()) }
             verify(exactly = 1) { paymentService.updateTransactionKey(any(), any()) }
             // 카드 결제는 재고 차감이 콜백에서 발생하므로 여기서는 호출되지 않음
             verify(exactly = 0) { productService.deductAllStock(any()) }

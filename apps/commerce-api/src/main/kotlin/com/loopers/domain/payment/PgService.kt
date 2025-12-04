@@ -1,41 +1,34 @@
 package com.loopers.domain.payment
 
-import org.springframework.beans.factory.annotation.Value
+import com.loopers.domain.payment.dto.PgCommand
+import com.loopers.domain.payment.dto.PgInfo
+import io.github.resilience4j.retry.annotation.Retry
 import org.springframework.stereotype.Service
 
 @Service
 class PgService(
-    private val pgClient: PgClient,
-    @Value("\${pg.callback-url}")
-    private val pgCallbackUrl: String,
+    private val pgGateway: PgGateway,
 ) {
 
-    fun requestPayment(userId: String, request: PgDto.PgRequest): String {
-        val response = pgClient.requestPayment(
-            userId = userId,
-            request = PgDto.PgRequest(
-                orderId = request.orderId,
-                cardType = request.cardType,
-                cardNo = request.cardNo,
-                amount = request.amount,
-                callbackUrl = pgCallbackUrl,
-            ),
-        )
-        return response.data!!.transactionKey
+    @Retry(name = "pgClient")
+    fun requestPayment(command: PgCommand.Request): String {
+        val transaction = pgGateway.requestPayment(command)
+        return transaction.transactionKey
     }
 
-    fun getPayment(userId: String, transactionKey: String) {
-        pgClient.getPayment(
+    @Retry(name = "pgClient")
+    fun getPayment(userId: String, transactionKey: String): PgInfo.Transaction? {
+        return pgGateway.getPayment(
             userId = userId,
             transactionKey = transactionKey,
         )
     }
 
-    fun getPaymentByOrderId(userId: String, orderId: String): PgDto.PgOrderResponse? {
-        val response = pgClient.getPaymentByOrderId(
+    @Retry(name = "pgClient")
+    fun getPaymentByOrderId(userId: String, orderId: String): PgInfo.Order? {
+        return pgGateway.getPaymentByOrderId(
             userId = userId,
             orderId = orderId,
         )
-        return response.data!!
     }
 }

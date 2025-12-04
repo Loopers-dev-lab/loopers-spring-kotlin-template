@@ -50,11 +50,11 @@ class PaymentStatusSyncScheduler(
                 if (statusResponse != null) {
                     // 승인된 트랜잭션 찾기
                     val approvedTransaction = statusResponse.transactions
-                        .firstOrNull { it.status == PaymentStatus.SUCCESS.name }
+                        .firstOrNull { it.status == PaymentStatus.SUCCESS }
 
                     // 실패한 트랜잭션 찾기
                     val failedTransaction = statusResponse.transactions
-                        .firstOrNull { it.status == PaymentStatus.FAILED.name }
+                        .firstOrNull { it.status == PaymentStatus.FAILED }
 
                     when {
                         approvedTransaction != null -> {
@@ -69,7 +69,7 @@ class PaymentStatusSyncScheduler(
                         failedTransaction != null -> {
                             // 결제 실패 처리
                             orderService.fail(orderId)
-                            paymentService.fail(orderId, failedTransaction.status)
+                            paymentService.fail(orderId, failedTransaction.reason)
                             couponService.rollback(order.userId, order.couponId)
                             log.info("결제 상태 동기화 성공 (FAILED): orderId={}", orderId)
                         }

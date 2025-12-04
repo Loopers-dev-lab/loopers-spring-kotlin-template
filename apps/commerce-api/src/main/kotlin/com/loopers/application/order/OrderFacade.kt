@@ -8,9 +8,9 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.PaymentMethod
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PgDto
 import com.loopers.domain.payment.PgService
 import com.loopers.domain.payment.dto.PaymentCommand
+import com.loopers.domain.payment.dto.PgCommand
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.UserService
@@ -119,7 +119,7 @@ class OrderFacade(
                 return
             }
 
-            PaymentMethod.CARD -> { // 재고 차감은 성공 콜백해서 진행
+            PaymentMethod.CARD -> { // 재고 차감은 성공 콜백에서 진행
                 // 8. 주문 생성
                 val orderResult = orderService.createOrder(
                     OrderCommand.Create(
@@ -146,8 +146,8 @@ class OrderFacade(
 
                 // 10. PG 결제 요청
                 val transactionKey = pgService.requestPayment(
-                    userId = userId,
-                    request = PgDto.PgRequest(
+                    command = PgCommand.Request(
+                        userId = userId,
                         orderId = orderResult.order.id.toString(),
                         cardType = command.cardType,
                         cardNo = command.cardNo,
