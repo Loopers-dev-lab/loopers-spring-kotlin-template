@@ -29,6 +29,58 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+feign:
+  client:
+    config:
+      pg-client:
+        connectTimeout: 500 # PG 연결 타임아웃 (ms)
+        readTimeout: 1000 # PG 응답 대기 타임아웃 (ms) - 정상 100~500ms + 여유
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED # COUNT_BASED: 호출 횟수 기반 (요청 실패율 40%로 높아 횟수 기반이 적합)
+        slidingWindowSize: 10 # 최근 10번의 호출을 분석
+        registerHealthIndicator: true # actuator health endpoint에 circuit breaker 상태 노출
+        minimumNumberOfCalls: 5 # 최소 5번 호출 이후부터 실패율 계산 시작
+        permittedNumberOfCallsInHalfOpenState: 3 # HALF_OPEN 상태에서 3번의 테스트 호출 허용
+        automaticTransitionFromOpenToHalfOpenEnabled: true # OPEN → HALF_OPEN 자동 전환 활성화
+        waitDurationInOpenState: 5s # OPEN 상태 유지 시간 (5초 후 HALF_OPEN으로 전환)
+        failureRateThreshold: 60 # 실패율 60% 이상 시 circuit open (PG 요청 실패율 40% 고려)
+        slowCallRateThreshold: 70 # 느린 호출 비율 70% 이상 시 circuit open
+        slowCallDurationThreshold: 800ms # 800ms 이상 걸리는 호출을 느린 호출로 판단 (정상 최대 500ms + 여유)
+        recordExceptions: # circuit breaker가 실패로 기록할 예외
+          - org.springframework.web.client.HttpServerErrorException # 5xx 서버 에러
+          - java.util.concurrent.TimeoutException # 타임아웃
+          - java.io.IOException # I/O 에러
+        ignoreExceptions: # circuit breaker가 무시할 예외 (실패로 카운트하지 않음)
+          - org.springframework.web.client.HttpClientErrorException # 4xx 클라이언트 에러
+          - com.loopers.support.error.CoreException # 비즈니스 예외
+          - java.lang.IllegalArgumentException # 잘못된 인자
+  instances:
+    pgClient:
+      baseConfig: default # PG 클라이언트 호출에 default 설정 적용
+
+  retry:
+    configs:
+      default:
+        maxAttempts: 2 # 총 2번 시도 (원본 호출 1회 + 재시도 1회)
+        waitDuration: 300ms # 재시도 전 대기 시간 300ms
+        enableExponentialBackoff: true # 지수 백오프 활성화
+        exponentialBackoffMultiplier: 2.0 # 재시도마다 대기 시간 2배 증가 (현재는 1회만 재시도하므로 미적용)
+        retryExceptions:
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
+          - feign.RetryableException
+          - org.springframework.web.client.HttpServerErrorException
+        ignoreExceptions:
+          - com.loopers.support.error.CoreException # 비즈니스 예외
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+    instances:
+      pgClient:
+        baseConfig: default # PG 클라이언트 호출에 default 설정 적용
+
 ---
 spring:
   config:
