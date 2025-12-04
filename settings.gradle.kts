@@ -3,6 +3,7 @@ rootProject.name = "loopers-kotlin-spring-template"
 include(
     ":apps:commerce-api",
     ":apps:commerce-streamer",
+    ":apps:pg-simulator",
     ":modules:jpa",
     ":modules:redis",
     ":modules:kafka",
