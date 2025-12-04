@@ -23,11 +23,16 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+      - resilience.yml
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+payment:
+  api-url: http://localhost:8082
+  userId: "123456789"
 
 ---
 spring:
