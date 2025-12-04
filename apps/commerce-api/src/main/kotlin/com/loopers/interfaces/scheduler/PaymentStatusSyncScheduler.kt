@@ -9,7 +9,7 @@ import com.loopers.domain.product.ProductService
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 /**
  * 결제 상태 동기화 스케줄러
@@ -33,7 +33,7 @@ class PaymentStatusSyncScheduler(
 
     @Scheduled(fixedDelay = 300000) // 5분마다
     fun syncPendingPayments() {
-        val fiveMinutesAgo = LocalDateTime.now().minusMinutes(5)
+        val fiveMinutesAgo = ZonedDateTime.now().minusMinutes(5)
         val pendingPayments = paymentService.findPending(fiveMinutesAgo)
 
         pendingPayments.forEach { payment ->

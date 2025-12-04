@@ -6,12 +6,15 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 interface PaymentJpaRepository : JpaRepository<Payment, Long> {
 
+    fun findByTransactionKey(transactionKey: String): Payment?
+
     fun findByOrderId(orderId: Long): Payment?
 
-    fun findByStatusAndCreatedAtBefore(status: PaymentStatus, createdAt: LocalDateTime): List<Payment>
+    fun findByStatusAndCreatedAtBefore(status: PaymentStatus, createdAt: ZonedDateTime): List<Payment>
 
     @Modifying
     @Query("UPDATE Payment SET transactionKey = :transactionKey where id = :id")

@@ -5,6 +5,7 @@ import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentStatus
 import org.springframework.stereotype.Repository
 import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 @Repository
 class PaymentRepositoryImpl(
@@ -14,7 +15,11 @@ class PaymentRepositoryImpl(
         return paymentJpaRepository.findByOrderId(orderId)
     }
 
-    override fun findPending(status: PaymentStatus, createdAt: LocalDateTime): List<Payment> {
+    override fun findBy(transactionKey: String): Payment? {
+        return paymentJpaRepository.findByTransactionKey(transactionKey)
+    }
+
+    override fun findPending(status: PaymentStatus, createdAt: ZonedDateTime): List<Payment> {
         return paymentJpaRepository.findByStatusAndCreatedAtBefore(status, createdAt)
     }
 

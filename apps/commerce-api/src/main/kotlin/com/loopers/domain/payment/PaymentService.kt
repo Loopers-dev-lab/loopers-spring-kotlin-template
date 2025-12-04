@@ -6,6 +6,7 @@ import com.loopers.support.error.ErrorType
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 @Service
 @Transactional
@@ -13,9 +14,14 @@ class PaymentService(
     private val paymentRepository: PaymentRepository,
 ) {
 
-    fun getBy(orderId: Long): Payment? {
+    fun getBy(orderId: Long): Payment {
         return paymentRepository.findBy(orderId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "Payment not found for orderId: $orderId")
+    }
+
+    fun getBy(transactionKey: String): Payment {
+        return paymentRepository.findBy(transactionKey)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "Payment not found for transactionKey: $transactionKey")
     }
 
     fun create(command: PaymentCommand.Create): Payment {
@@ -28,7 +34,7 @@ class PaymentService(
         payment.updateTransactionKey(transactionKey)
     }
 
-    fun findPending(beforeDateTime: LocalDateTime): List<Payment> {
+    fun findPending(beforeDateTime: ZonedDateTime): List<Payment> {
         return paymentRepository.findPending(PaymentStatus.PENDING, beforeDateTime)
     }
 
@@ -37,13 +43,13 @@ class PaymentService(
         payment.success()
     }
 
-    fun success(orderId: Long) {
-        val payment = getBy(orderId)
-        payment?.success()
+    fun success(transactionKey: Long) {
+        val payment = getBy(transactionKey)
+        payment.success()
     }
 
-    fun fail(orderId: Long, reason: String?) {
-        val payment = getBy(orderId)
-        payment?.fail(reason)
+    fun fail(transactionKey: Long, reason: String?) {
+        val payment = getBy(transactionKey)
+        payment.fail(reason)
     }
 }

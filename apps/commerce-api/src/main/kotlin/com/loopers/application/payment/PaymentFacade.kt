@@ -23,6 +23,14 @@ class PaymentFacade(
     @Transactional
     fun callback(command: PaymentCommand.Callback) {
         val orderId = command.orderId.toLong()
+        val transactionKey = command.transactionKey
+
+        val payment = paymentService.getBy(command.transactionKey)
+
+        if (payment.status != PaymentStatus.PENDING) {
+            log.warn("이미 처리된 콜백 - transactionKey: $transactionKey orderId: $orderId, 현재 상태: ${payment.status}")
+            return
+        }
 
         when (command.status) {
             PaymentStatus.PENDING -> {
