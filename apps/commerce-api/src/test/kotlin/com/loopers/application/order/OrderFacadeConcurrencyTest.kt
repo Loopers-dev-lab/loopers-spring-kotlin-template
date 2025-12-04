@@ -7,8 +7,6 @@ import com.loopers.domain.coupon.DiscountType
 import com.loopers.domain.coupon.IssuedCoupon
 import com.loopers.domain.coupon.IssuedCouponRepository
 import com.loopers.domain.coupon.UsageStatus
-import com.loopers.domain.order.OrderRepository
-import com.loopers.domain.order.PaymentRepository
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -20,6 +18,7 @@ import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
+import com.loopers.utils.RedisCleanUp
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -39,14 +38,14 @@ class OrderFacadeConcurrencyTest @Autowired constructor(
     private val pointAccountRepository: PointAccountRepository,
     private val couponRepository: CouponRepository,
     private val issuedCouponRepository: IssuedCouponRepository,
-    private val orderRepository: OrderRepository,
-    private val paymentRepository: PaymentRepository,
     private val databaseCleanUp: DatabaseCleanUp,
+    private val redisCleanUp: RedisCleanUp,
 ) {
 
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
+        redisCleanUp.truncateAll()
     }
 
     @DisplayName("동일한 쿠폰으로 여러 기기에서 동시에 주문해도, 쿠폰은 단 한번만 사용되어야 한다")
@@ -244,7 +243,7 @@ class OrderFacadeConcurrencyTest @Autowired constructor(
         userId: Long,
         coupon: Coupon,
     ): IssuedCoupon {
-        val issuedCoupon = IssuedCoupon.issue(userId = userId, coupon = coupon)
+        val issuedCoupon = coupon.issue(userId)
         return issuedCouponRepository.save(issuedCoupon)
     }
 }

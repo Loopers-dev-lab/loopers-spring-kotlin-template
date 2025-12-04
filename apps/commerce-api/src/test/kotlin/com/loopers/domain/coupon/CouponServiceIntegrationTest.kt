@@ -103,7 +103,7 @@ class CouponServiceIntegrationTest @Autowired constructor(
 
             // 쿠폰 사용
             val couponEntity = couponRepository.findById(coupon.id)!!
-            issuedCoupon.use(userId, couponEntity, Money.krw(10000), FIXED_TIME)
+            issuedCoupon.use(userId, couponEntity, FIXED_TIME)
             issuedCouponRepository.save(issuedCoupon)
 
             // when
@@ -293,7 +293,7 @@ class CouponServiceIntegrationTest @Autowired constructor(
 
             // 쿠폰을 먼저 사용
             val couponEntity = couponRepository.findById(coupon.id)!!
-            issuedCoupon.use(userId, couponEntity, Money.krw(10000), FIXED_TIME)
+            issuedCoupon.use(userId, couponEntity, FIXED_TIME)
             issuedCouponRepository.save(issuedCoupon)
 
             // when & then
@@ -342,7 +342,7 @@ class CouponServiceIntegrationTest @Autowired constructor(
         userId: Long = 1L,
         coupon: Coupon,
     ): IssuedCoupon {
-        val issuedCoupon = IssuedCoupon.issue(userId = userId, coupon = coupon)
+        val issuedCoupon = coupon.issue(userId)
         return issuedCouponRepository.save(issuedCoupon)
     }
 }

@@ -1,5 +1,7 @@
 package com.loopers.application.order
 
+import com.loopers.application.product.ProductCacheKeys
+import com.loopers.cache.CacheTemplate
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
 import com.loopers.domain.order.OrderService
@@ -25,6 +27,7 @@ class OrderFacade(
     val pointService: PointService,
     val couponService: CouponService,
     private val transactionTemplate: TransactionTemplate,
+    private val cacheTemplate: CacheTemplate,
 ) {
     private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
     private lateinit var retryTemplate: RetryTemplate
@@ -42,10 +45,12 @@ class OrderFacade(
                         callback: RetryCallback<T, E>,
                         throwable: Throwable,
                     ) {
-                        logger.warn(
-                            "낙관적 락 충돌 발생 - 재시도 횟수: {}",
-                            context.retryCount,
-                        )
+                        if (throwable is ObjectOptimisticLockingFailureException) {
+                            logger.warn(
+                                "낙관적 락 충돌 발생 - 재시도 횟수: {}",
+                                context.retryCount,
+                            )
+                        }
                     }
                 },
             )
@@ -55,13 +60,16 @@ class OrderFacade(
     fun placeOrder(criteria: OrderCriteria.PlaceOrder): OrderInfo.PlaceOrder {
         return retryTemplate.execute<OrderInfo.PlaceOrder, Exception> {
             // 매 재시도마다 새로운 트랜잭션 시작
-            transactionTemplate.execute { _ ->
+            val (orderInfo, productViews) = transactionTemplate.execute { _ ->
                 // 1. 재고 차감
+                val productIds = criteria.items.map { it.productId }
                 productService.decreaseStocks(criteria.to())
 
-                // 2. 상품 정보 조회 및 주문 생성
-                val productIds = criteria.items.map { it.productId }
-                val productMap = productService.findAllByIds(productIds).associateBy { it.id }
+                // 2. 재고가 변경된 상품의 최신 정보 조회
+                val productViews = productService.findAllProductViewByIds(productIds)
+
+                // 3. 주문 생성을 위한 상품 맵 생성
+                val productMap = productViews.map { it.product }.associateBy { it.id }
 
                 val placeOrderItems = criteria.items.map { item ->
                     val product = productMap[item.productId]
@@ -82,18 +90,18 @@ class OrderFacade(
 
                 val order = orderService.place(placeCommand)
 
-                // 3. 주문 금액에서 쿠폰 할인 적용 (있는 경우)
+                // 4. 주문 금액에서 쿠폰 할인 적용 (있는 경우)
                 val orderAmount = order.totalAmount
                 val couponDiscount = criteria.issuedCouponId?.let { issuedCouponId ->
                     couponService.useCoupon(criteria.userId, issuedCouponId, orderAmount)
                 } ?: Money.ZERO_KRW
 
-                // 4. 포인트 차감 (0원 초과인 경우에만)
+                // 5. 포인트 차감 (0원 초과인 경우에만)
                 if (criteria.usePoint > Money.ZERO_KRW) {
                     pointService.deduct(criteria.userId, criteria.usePoint)
                 }
 
-                // 5. 결제 처리
+                // 6. 결제 처리
                 val payCommand = OrderCommand.Pay(
                     orderId = order.id,
                     userId = criteria.userId,
@@ -104,8 +112,13 @@ class OrderFacade(
 
                 orderService.pay(payCommand)
 
-                OrderInfo.PlaceOrder(order.id)
+                OrderInfo.PlaceOrder(order.id) to productViews
             }!!
+            val productCacheKeys = productViews
+                .associateBy { ProductCacheKeys.ProductDetail(productId = it.product.id) }
+            cacheTemplate.putAll(productCacheKeys)
+
+            orderInfo
         }
     }
 }

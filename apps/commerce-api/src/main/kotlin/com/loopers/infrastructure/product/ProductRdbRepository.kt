@@ -63,11 +63,12 @@ class ProductRdbRepository(
 
             ProductSortType.PRICE_ASC -> arrayOf(
                 qProduct.price.amount.asc(),
+                qProduct.id.desc(),
             )
 
             ProductSortType.LIKES_DESC -> arrayOf(
                 qStatistic.likeCount.desc(),
-                qProduct.id.desc(),
+                qStatistic.productId.desc(),
             )
         }
     }
