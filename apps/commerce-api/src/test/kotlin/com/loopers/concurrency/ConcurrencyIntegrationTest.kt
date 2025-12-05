@@ -1,10 +1,9 @@
 package com.loopers.concurrency
 
 import com.loopers.application.like.LikeFacade
-import com.loopers.application.order.CreateOrderRequest
 import com.loopers.application.order.OrderFacade
-import com.loopers.application.order.OrderItemRequest
 import com.loopers.domain.brand.Brand
+import com.loopers.interfaces.api.order.OrderV1Dto
 import com.loopers.domain.coupon.Coupon
 import com.loopers.domain.coupon.CouponType
 import com.loopers.domain.coupon.MemberCoupon
@@ -101,9 +100,12 @@ class ConcurrencyIntegrationTest @Autowired constructor(
                 try {
                     latch.await()
                     orderFacade.createOrder(
-                        CreateOrderRequest(
-                            memberId = member.memberId.value,
-                            items = listOf(OrderItemRequest(product.id, 1)),
+                        member.memberId.value,
+                        OrderV1Dto.CreateOrderRequest(
+                            items = listOf(OrderV1Dto.OrderItemRequest(product.id, 1)),
+                            usePoint = 5000L, // 쿠폰 할인 후 남은 금액 (10000 - 5000)
+                            cardType = null,
+                            cardNo = null,
                             couponId = coupon.id
                         )
                     )
@@ -137,9 +139,12 @@ class ConcurrencyIntegrationTest @Autowired constructor(
                 try {
                     latch.await()
                     orderFacade.createOrder(
-                        CreateOrderRequest(
-                            memberId = member.memberId.value,
-                            items = listOf(OrderItemRequest(product.id, 1)),
+                        member.memberId.value,
+                        OrderV1Dto.CreateOrderRequest(
+                            items = listOf(OrderV1Dto.OrderItemRequest(product.id, 1)),
+                            usePoint = 10000L, // 상품당 10000원, 총 50000원 포인트 사용
+                            cardType = null,
+                            cardNo = null,
                             couponId = null
                         )
                     )
@@ -172,9 +177,12 @@ class ConcurrencyIntegrationTest @Autowired constructor(
                 try {
                     latch.await()
                     orderFacade.createOrder(
-                        CreateOrderRequest(
-                            memberId = member.memberId.value,
-                            items = listOf(OrderItemRequest(product.id, 1)),
+                        member.memberId.value,
+                        OrderV1Dto.CreateOrderRequest(
+                            items = listOf(OrderV1Dto.OrderItemRequest(product.id, 1)),
+                            usePoint = 1000L, // 전액 포인트 결제
+                            cardType = null,
+                            cardNo = null,
                             couponId = null
                         )
                     )
