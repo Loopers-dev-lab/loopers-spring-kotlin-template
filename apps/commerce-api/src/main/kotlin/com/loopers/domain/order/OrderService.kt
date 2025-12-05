@@ -65,4 +65,20 @@ class OrderService(
 
         return orderRepository.save(order)
     }
+
+    /**
+     * 주문 ID로 주문을 조회합니다.
+     *
+     * @param orderId 주문 ID
+     * @return 주문
+     * @throws CoreException 주문을 찾을 수 없는 경우
+     */
+    @Transactional(readOnly = true)
+    fun findById(orderId: Long): Order {
+        return orderRepository.findById(orderId)
+            ?: throw CoreException(
+                ErrorType.NOT_FOUND,
+                "주문을 찾을 수 없습니다.",
+            )
+    }
 }
