@@ -44,11 +44,11 @@ CREATE TABLE IF NOT EXISTS products (
 -- ================================================
 CREATE TABLE IF NOT EXISTS members (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    member_id VARCHAR(10) NOT NULL UNIQUE,
-    email VARCHAR(255) NOT NULL,
-    birth_date DATE NOT NULL,
+    member_id VARCHAR(10) NOT NULL UNIQUE COMMENT 'MemberId VO',
+    email VARCHAR(255) NOT NULL COMMENT 'Email VO',
+    birth_date DATE NOT NULL COMMENT 'BirthDate VO',
     gender VARCHAR(10) NOT NULL,
-    point BIGINT NOT NULL DEFAULT 0,
+    point BIGINT NOT NULL DEFAULT 0 COMMENT 'Point VO',
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
     deleted_at DATETIME(6) NULL
@@ -132,6 +132,25 @@ CREATE TABLE IF NOT EXISTS member_coupons (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ================================================
+-- 9. commerce_payments 테이블
+-- ================================================
+CREATE TABLE IF NOT EXISTS commerce_payments (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT NOT NULL,
+    amount BIGINT NOT NULL,
+    payment_method VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    transaction_key VARCHAR(100) NULL,
+    card_type VARCHAR(20) NULL,
+    card_no_masked VARCHAR(20) NULL COMMENT '마스킹된 카드 번호 (보안)',
+    failure_reason VARCHAR(500) NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    deleted_at DATETIME(6) NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ================================================
 -- 인덱스 생성
 -- ================================================
 CREATE INDEX idx_products_brand_id ON products(brand_id);
@@ -142,6 +161,31 @@ CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_product_id ON order_items(product_id);
 CREATE INDEX idx_member_coupons_member_id ON member_coupons(member_id);
 CREATE INDEX idx_member_coupons_coupon_id ON member_coupons(coupon_id);
+CREATE INDEX idx_commerce_payments_order_id ON commerce_payments(order_id);
+CREATE INDEX idx_commerce_payments_transaction_key ON commerce_payments(transaction_key);
+CREATE INDEX idx_commerce_payments_status ON commerce_payments(status);
+
+-- ================================================
+-- 10. payments 테이블 (PG Simulator용)
+-- ================================================
+CREATE TABLE IF NOT EXISTS payments (
+    transaction_key VARCHAR(255) NOT NULL PRIMARY KEY COMMENT 'PG 트랜잭션 키 (PK)',
+    user_id VARCHAR(255) NOT NULL COMMENT '사용자 ID',
+    order_id VARCHAR(255) NOT NULL COMMENT '주문 ID',
+    card_type VARCHAR(50) NOT NULL COMMENT '카드 타입',
+    card_no VARCHAR(255) NOT NULL COMMENT '카드 번호',
+    amount BIGINT NOT NULL COMMENT '결제 금액',
+    callback_url VARCHAR(500) NOT NULL COMMENT '콜백 URL',
+    status VARCHAR(50) NOT NULL COMMENT '결제 상태',
+    reason VARCHAR(500) NULL COMMENT '결제 사유',
+    created_at DATETIME(6) NOT NULL COMMENT '생성 시각',
+    updated_at DATETIME(6) NOT NULL COMMENT '수정 시각'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- PG Simulator payments 테이블 인덱스
+CREATE INDEX idx_pg_user_transaction ON payments(user_id, transaction_key);
+CREATE INDEX idx_pg_user_order ON payments(user_id, order_id);
+CREATE UNIQUE INDEX idx_pg_unique_user_order_transaction ON payments(user_id, order_id, transaction_key);
 
 -- 생성 결과 확인
-SELECT '✅ 테이블 스키마 생성 완료' as result;
+SELECT '✅ loopers DB 테이블 스키마 생성 완료' as result;

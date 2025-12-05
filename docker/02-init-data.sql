@@ -53,6 +53,33 @@ SELECT
     NOW()
 FROM numbers;
 
+-- ================================================
+-- 3. 테스트용 회원 데이터
+-- ================================================
+INSERT INTO members (id, member_id, email, birth_date, gender, point, created_at, updated_at) VALUES
+(1, 'testuser01', 'test01@example.com', '1990-01-01', 'MALE', 100000, NOW(), NOW()),
+(2, 'testuser02', 'test02@example.com', '1995-05-15', 'FEMALE', 50000, NOW(), NOW()),
+(3, 'testuser03', 'test03@example.com', '1988-12-25', 'MALE', 200000, NOW(), NOW());
+
+-- ================================================
+-- 4. 쿠폰 데이터
+-- ================================================
+INSERT INTO coupons (id, name, description, type, discount_amount, discount_rate, created_at, updated_at) VALUES
+(1, '10% 할인 쿠폰', '전체 상품 10% 할인', 'PERCENTAGE', NULL, 10, NOW(), NOW()),
+(2, '5000원 할인 쿠폰', '5000원 즉시 할인', 'FIXED', 5000, NULL, NOW(), NOW()),
+(3, '20% 할인 쿠폰', '전체 상품 20% 할인', 'PERCENTAGE', NULL, 20, NOW(), NOW());
+
+-- ================================================
+-- 5. 회원 쿠폰 (testuser01에게 쿠폰 지급)
+-- ================================================
+INSERT INTO member_coupons (id, member_id, coupon_id, used_at, created_at, updated_at) VALUES
+(1, 'testuser01', 1, NULL, NOW(), NOW()),
+(2, 'testuser01', 2, NULL, NOW(), NOW()),
+(3, 'testuser02', 1, NULL, NOW(), NOW());
+
 -- 생성 결과 확인
 SELECT CONCAT('✅ 브랜드 ', COUNT(*), '개 생성 완료') as result FROM brands;
 SELECT CONCAT('✅ 상품 ', COUNT(*), '개 생성 완료') as result FROM products;
+SELECT CONCAT('✅ 회원 ', COUNT(*), '개 생성 완료') as result FROM members;
+SELECT CONCAT('✅ 쿠폰 ', COUNT(*), '개 생성 완료') as result FROM coupons;
+SELECT CONCAT('✅ 회원 쿠폰 ', COUNT(*), '개 생성 완료') as result FROM member_coupons;
