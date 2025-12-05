@@ -20,38 +20,56 @@ class OrderService(
     private val memberRepository: MemberRepository,
     private val couponService: CouponService,
     private val externalOrderService: ExternalOrderService,
-    private val paymentService: com.loopers.domain.payment.PaymentService,
 ) {
+    /**
+     * 주문 생성 및 계산 (쿠폰 할인, 포인트 사용 검증)
+     * 순수 도메인 로직만 처리
+     */
     @Transactional
-    fun createOrder(
+    fun createOrderWithCalculation(
         memberId: String,
         orderItems: List<OrderItemCommand>,
         couponId: Long? = null,
-        usePoint: Long = 0L,
-        cardType: String? = null,
-        cardNo: String? = null
+        usePoint: Long = 0L
     ): Order {
-        // 1. 상품 및 회원 조회
         val productMap = loadProducts(orderItems)
         val member = memberRepository.findByMemberIdWithLockOrThrow(memberId)
 
-        // 2. 주문 생성 (쿠폰 할인 포함)
+        // 쿠폰 할인 적용
         val order = createOrderWithCoupon(memberId, orderItems, couponId, productMap)
 
-        // 3. 포인트 사용 및 최종 결제 금액 계산
-        val finalPaymentAmount = calculateFinalPaymentAmount(order, usePoint, member)
-
-        // 4. 주문 저장
-        val savedOrder = orderRepository.save(order)
-
-        // 5. 결제 처리 (포인트 전액 or 카드 결제)
-        if (finalPaymentAmount == 0L) {
-            completePointPayment(savedOrder, productMap)
-        } else {
-            processCardPayment(savedOrder, memberId, finalPaymentAmount, cardType, cardNo, usePoint, member)
+        // 포인트 사용 검증 및 차감
+        val finalPaymentAmount = order.finalAmount.amount - usePoint
+        if (finalPaymentAmount < 0) {
+            throw CoreException(
+                ErrorType.BAD_REQUEST,
+                "포인트를 너무 많이 사용했습니다. 최종 금액: ${order.finalAmount.amount}, 사용 포인트: $usePoint"
+            )
         }
 
-        return savedOrder
+        if (usePoint > 0) {
+            member.usePoint(usePoint)
+        }
+
+        return orderRepository.save(order)
+    }
+
+    /**
+     * 결제 완료 후 주문 처리
+     * - 재고 차감
+     * - 주문 상태를 COMPLETED로 변경
+     * - 외부 시스템 연동
+     */
+    @Transactional
+    fun completeOrderWithPayment(orderId: Long) {
+        val order = orderRepository.findByIdOrThrow(orderId)
+        val productMap = productRepository.findAllByIdInWithLock(
+            order.items.map { it.productId }
+        ).associateBy { it.id }
+
+        decreaseProductStocks(order, productMap)
+        order.complete()
+        externalOrderService.processOrder(order)
     }
 
     private fun loadProducts(orderItems: List<OrderItemCommand>): Map<Long, Product> {
@@ -78,67 +96,6 @@ class OrderService(
             productMap = productMap,
             discountAmount = discountAmount
         )
-    }
-
-    private fun calculateFinalPaymentAmount(order: Order, usePoint: Long, member: Member): Long {
-        val finalPaymentAmount = order.finalAmount.amount - usePoint
-
-        if (finalPaymentAmount < 0) {
-            throw CoreException(
-                ErrorType.BAD_REQUEST,
-                "포인트를 너무 많이 사용했습니다. 최종 금액: ${order.finalAmount.amount}, 사용 포인트: $usePoint"
-            )
-        }
-
-        if (usePoint > 0) {
-            member.usePoint(usePoint)
-        }
-
-        return finalPaymentAmount
-    }
-
-    private fun completePointPayment(order: Order, productMap: Map<Long, Product>) {
-        decreaseProductStocks(order, productMap)
-        order.complete()
-        externalOrderService.processOrder(order)
-    }
-
-    private fun processCardPayment(
-        order: Order,
-        memberId: String,
-        amount: Long,
-        cardType: String?,
-        cardNo: String?,
-        usePoint: Long,
-        member: Member
-    ) {
-        if (cardType == null || cardNo == null) {
-            throw CoreException(
-                ErrorType.BAD_REQUEST,
-                "카드 결제가 필요합니다. cardType과 cardNo를 입력해주세요."
-            )
-        }
-
-        try {
-            paymentService.requestCardPayment(
-                order = order,
-                userId = memberId,
-                cardType = cardType,
-                cardNo = cardNo,
-                amount = amount
-            )
-        } catch (e: CoreException) {
-            rollbackPaymentFailure(order, usePoint, member)
-            throw e
-        }
-    }
-
-    private fun rollbackPaymentFailure(order: Order, usePoint: Long, member: Member) {
-        if (usePoint > 0) {
-            member.chargePoint(usePoint)
-        }
-        order.fail()
-        orderRepository.save(order)
     }
 
     private fun decreaseProductStocks(order: Order, productMap: Map<Long, Product>) {

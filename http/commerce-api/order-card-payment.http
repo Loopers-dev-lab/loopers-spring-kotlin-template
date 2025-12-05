@@ -102,14 +102,12 @@ Content-Type: application/json
 ### 6. 주문 상세 조회
 ### ================================================
 GET {{baseUrl}}/api/v1/orders/1
-Content-Type: application/json
 
 ### ================================================
 ### 7. 주문 목록 조회
 ### ================================================
 GET {{baseUrl}}/api/v1/orders?page=0&size=20
 X-USER-ID: {{userId}}
-Content-Type: application/json
 
 ### ================================================
 ### Circuit Breaker 테스트 - 연속 요청

@@ -34,7 +34,7 @@ enum class ErrorType(val status: HttpStatus, val code: String, val message: Stri
 
 
     // 결제 관련 에러
-    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_001", "쿠폰을 찾을 수 없습니다."),
+    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_001", "결제를 찾을 수 없습니다."),
     INVALID_PAYMENT_STATUS(HttpStatus.BAD_REQUEST, "PAYMENT_002", "결제 상태를 변경할 수 없습니다."),
     PAYMENT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "PAYMENT_003", "현재 결제 서비스를 이용할 수 없습니다."),
     PG_NOT_AVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "PAYMENT_004", "결제 대행사를 찾을 수 없습니다."),

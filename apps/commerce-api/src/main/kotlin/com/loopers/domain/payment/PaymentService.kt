@@ -7,10 +7,10 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Service
+import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-@Service
+@Component
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val pgStrategies: List<PgStrategy>
@@ -24,18 +24,18 @@ class PaymentService(
         userId: String,
         cardType: String,
         cardNo: String,
-        amount: Long? = null // null이면 order.finalAmount 사용
+        amount: Long? = null
     ): Payment {
         val paymentAmount = amount ?: order.finalAmount.amount
-        
-        logger.info("Requesting card payment for order: ${order.id}, amount: $paymentAmount")
+
+        logger.info("카드 결제 요청: orderId=${order.id}, amount=$paymentAmount")
 
         val pgStrategy = pgStrategies.firstOrNull { it.supports(PaymentMethod.CARD) }
             ?: throw CoreException(ErrorType.PAYMENT_UNAVAILABLE, "사용 가능한 PG가 없습니다.")
 
         val pgRequest = PgDto.PaymentRequest(
             orderId = "ORDER${order.id.toString().padStart(6, '0')}", // ORDER000001 형식
-            cardType = PgDto.CardTypeDto.valueOf(cardType),
+            cardType = PgDto.CardTypeDto.from(cardType),
             cardNo = cardNo,
             amount = paymentAmount,
             callbackUrl = "http://localhost:8080/api/v1/payments/callback"
@@ -43,7 +43,7 @@ class PaymentService(
 
         val pgResponse = pgStrategy.requestPayment(userId, pgRequest)
 
-        logger.info("PG response received: transactionKey=${pgResponse.transactionKey}, status=${pgResponse.status}")
+        logger.info("PG 응답 수신: transactionKey=${pgResponse.transactionKey}, status=${pgResponse.status}")
 
         val payment = Payment.createCardPayment(
             orderId = order.id,
@@ -65,8 +65,8 @@ class PaymentService(
         ex: Exception
     ): Payment {
         val paymentAmount = amount ?: order.finalAmount.amount
-        
-        logger.error("Payment fallback triggered for order: ${order.id}, amount: $paymentAmount", ex)
+
+        logger.error("결제 폴백 실행: orderId=${order.id}, amount=$paymentAmount", ex)
 
         val payment = Payment.createFailedPayment(
             orderId = order.id,

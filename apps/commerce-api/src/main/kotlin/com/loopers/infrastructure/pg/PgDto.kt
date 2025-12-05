@@ -1,6 +1,8 @@
 package com.loopers.infrastructure.pg
 
 import com.loopers.interfaces.api.ApiResponse
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 
 object PgDto {
 
@@ -42,7 +44,17 @@ object PgDto {
     enum class CardTypeDto {
         SAMSUNG,
         KB,
-        HYUNDAI
+        HYUNDAI;
+
+        companion object {
+            fun from(cardType: String): CardTypeDto {
+                return try {
+                    valueOf(cardType.uppercase())
+                } catch (e: IllegalArgumentException) {
+                    throw CoreException(ErrorType.BAD_REQUEST, "지원하지 않는 카드 타입입니다: $cardType")
+                }
+            }
+        }
     }
 
     enum class TransactionStatusDto {

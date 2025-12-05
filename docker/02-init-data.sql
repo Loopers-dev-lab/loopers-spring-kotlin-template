@@ -22,7 +22,7 @@ WITH RECURSIVE numbers AS (
     UNION ALL
     SELECT seq + 1
     FROM numbers
-    WHERE seq < 100
+    WHERE seq <= 100
 )
 SELECT
     CONCAT('Brand_', LPAD(seq, 3, '0')),
@@ -40,7 +40,7 @@ WITH RECURSIVE numbers AS (
     UNION ALL
     SELECT seq + 1
     FROM numbers
-    WHERE seq < 100000
+    WHERE seq <= 100000
 )
 SELECT
     CONCAT('Product_', LPAD(seq, 6, '0')),

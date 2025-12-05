@@ -63,11 +63,6 @@ resilience4j:
 
         register-health-indicator: true
 
-  timelimiter:
-    instances:
-      pgTimeLimiter:
-        timeout-duration: 3s
-
 ---
 spring:
   config:
