@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 @Component
 class PaymentRecoveryScheduler(
@@ -21,10 +21,10 @@ class PaymentRecoveryScheduler(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(initialDelay = 60000, fixedDelay = 60000)
     @Transactional
     fun recoverPendingPayments() {
-        val cutoffTime = LocalDateTime.now().minusMinutes(10)
+        val cutoffTime = ZonedDateTime.now().minusMinutes(10)
 
         val staleOrders = orderRepository.findByStatusAndCreatedAtBefore(
             OrderStatus.PENDING,

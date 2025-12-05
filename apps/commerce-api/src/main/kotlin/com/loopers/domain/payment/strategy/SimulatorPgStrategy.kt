@@ -18,7 +18,7 @@ class SimulatorPgStrategy(
         userId: String,
         request: PgDto.PaymentRequest
     ): PgDto.PaymentResponse {
-        return pgSimulatorClient.requestPayment(userId, request)
+        return pgSimulatorClient.requestPayment(userId, request).data!!
     }
 
     override fun getPaymentStatus(

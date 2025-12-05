@@ -29,6 +29,45 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+pg:
+  base-url: http://localhost:8082
+
+# Feign 로깅
+logging:
+  level:
+    com.loopers.infrastructure.pg.PgSimulatorClient: DEBUG
+
+# Resilience4j 설정
+resilience4j:
+  circuitbreaker:
+    instances:
+      pgCircuit:
+        sliding-window-type: TIME_BASED
+        sliding-window-size: 30
+        minimum-number-of-calls: 20
+        failure-rate-threshold: 60
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+
+        record-exceptions:
+          - java.net.SocketTimeoutException
+          - org.springframework.web.client.HttpServerErrorException
+          - feign.RetryableException
+
+        ignore-exceptions:
+          - org.springframework.web.client.HttpClientErrorException
+
+        register-health-indicator: true
+
+  timelimiter:
+    instances:
+      pgTimeLimiter:
+        timeout-duration: 3s
+
 ---
 spring:
   config:
