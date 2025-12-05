@@ -25,6 +25,6 @@ class SimulatorPgStrategy(
         userId: String,
         transactionKey: String
     ): PgDto.PaymentStatusResponse {
-        return pgSimulatorClient.getPaymentStatus(userId, transactionKey)
+        return pgSimulatorClient.getPaymentStatus(userId, transactionKey).data!!
     }
 }

@@ -25,7 +25,7 @@ interface PgSimulatorClient {
     fun getPaymentStatus(
         @RequestHeader("X-USER-ID") userId: String,
         @PathVariable transactionKey: String
-    ): PgDto.PaymentStatusResponse
+    ): com.loopers.interfaces.api.ApiResponse<PgDto.PaymentStatusResponse>
 
     @GetMapping("/api/v1/payments")
     fun getPaymentsByOrderId(
