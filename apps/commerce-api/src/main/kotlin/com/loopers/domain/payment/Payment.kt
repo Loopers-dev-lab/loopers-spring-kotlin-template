@@ -92,6 +92,21 @@ class Payment(
             )
         }
 
+        fun createPendingPayment(
+            orderId: Long,
+            amount: Money,
+            cardType: String,
+            cardNo: String,
+        ): Payment {
+            return Payment(
+                orderId = orderId,
+                amount = amount,
+                paymentMethod = PaymentMethod.CARD,
+                cardType = cardType,
+                cardNumber = CardNumber.from(cardNo),
+            )
+        }
+
         fun createFailedPayment(
             orderId: Long,
             amount: Money,

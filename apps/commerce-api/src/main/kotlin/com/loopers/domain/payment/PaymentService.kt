@@ -66,20 +66,16 @@ class PaymentService(
     ): Payment {
         val paymentAmount = amount ?: order.finalAmount.amount
 
-        logger.error("결제 폴백 실행: orderId=${order.id}, amount=$paymentAmount", ex)
+        logger.warn("결제 폴백 실행 - PENDING 상태로 저장: orderId=${order.id}, amount=$paymentAmount, reason=${ex.message}")
 
-        val payment = Payment.createFailedPayment(
+        val payment = Payment.createPendingPayment(
             orderId = order.id,
             amount = com.loopers.domain.shared.Money(paymentAmount),
-            reason = "PG 시스템 일시 불가: ${ex.message}"
+            cardType = cardType,
+            cardNo = cardNo
         )
 
-        paymentRepository.save(payment)
-
-        throw CoreException(
-            ErrorType.PAYMENT_UNAVAILABLE,
-            "현재 카드 결제가 불가능합니다. 잠시 후 다시 시도해주세요."
-        )
+        return paymentRepository.save(payment)
     }
 
 }

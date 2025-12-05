@@ -39,6 +39,32 @@ class PaymentTest {
         )
     }
 
+    @DisplayName("PENDING 상태의 카드 Payment를 생성할 수 있다")
+    @Test
+    fun createPendingPayment() {
+        val orderId = 1L
+        val amount = Money.of(10000)
+        val cardType = "SAMSUNG"
+        val cardNo = "1234-5678-9012-3456"
+
+        val payment = Payment.createPendingPayment(
+            orderId = orderId,
+            amount = amount,
+            cardType = cardType,
+            cardNo = cardNo
+        )
+
+        assertAll(
+            { assertThat(payment.orderId).isEqualTo(orderId) },
+            { assertThat(payment.amount).isEqualTo(amount) },
+            { assertThat(payment.paymentMethod).isEqualTo(PaymentMethod.CARD) },
+            { assertThat(payment.status).isEqualTo(PaymentStatus.PENDING) },
+            { assertThat(payment.transactionKey).isNull() },
+            { assertThat(payment.cardType).isEqualTo(cardType) },
+            { assertThat(payment.cardNumber).isNotNull() }
+        )
+    }
+
     @DisplayName("실패한 Payment를 생성할 수 있다")
     @Test
     fun createFailedPayment() {
