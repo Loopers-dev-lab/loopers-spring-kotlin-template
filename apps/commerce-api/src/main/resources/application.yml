@@ -2,12 +2,12 @@ server:
   shutdown: graceful
   tomcat:
     threads:
-      max: 200 # 최대 워커 스레드 수 (default : 200)
-      min-spare: 10 # 최소 유지 스레드 수 (default : 10)
-    connection-timeout: 1m # 연결 타임아웃 (ms) (default : 60000ms = 1m)
-    max-connections: 8192 # 최대 동시 연결 수 (default : 8192)
-    accept-count: 100 # 대기 큐 크기 (default : 100)
-    keep-alive-timeout: 60s # 60s
+      max: 200
+      min-spare: 10
+    connection-timeout: 1m
+    max-connections: 8192
+    accept-count: 100
+    keep-alive-timeout: 60s
   max-http-request-header-size: 8KB
 
 spring:
@@ -23,18 +23,23 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          pg:
+            connect-timeout: 1000
+            read-timeout: 1000
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
 
-# PG 설정
 pg:
   base-url: http://localhost:8081
   callback-base-url: http://localhost:8080
 
-# Resilience4j 설정
 resilience4j:
   circuitbreaker:
     configs:
@@ -48,14 +53,12 @@ resilience4j:
         wait-duration-in-open-state: 5s
         permitted-number-of-calls-in-half-open-state: 3
         record-exceptions:
-          - java.net.ConnectException
-          - java.net.SocketTimeoutException
-          - com.loopers.infrastructure.pg.PgException$RequestNotReached
-        ignore-exceptions:
-          - com.loopers.infrastructure.pg.PgException$BusinessError
+          - com.loopers.infrastructure.payment.PgRequestNotReachedException
+          - com.loopers.infrastructure.payment.PgResponseUncertainException
     instances:
       pg:
         base-config: default
+
   retry:
     configs:
       default:
@@ -65,12 +68,9 @@ resilience4j:
         exponential-backoff-multiplier: 2
         exponential-max-wait-duration: 1s
         retry-exceptions:
-          - java.net.ConnectException
-          - com.loopers.infrastructure.pg.PgException$RequestNotReached
+          - com.loopers.infrastructure.payment.PgRequestNotReachedException
         ignore-exceptions:
-          - java.net.SocketTimeoutException
-          - com.loopers.infrastructure.pg.PgException$ResponseUncertain
-          - com.loopers.infrastructure.pg.PgException$BusinessError
+          - com.loopers.infrastructure.payment.PgResponseUncertainException
     instances:
       pg:
         base-config: default
