@@ -15,6 +15,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
+    // feign
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+    kapt("org.springframework.cloud:spring-cloud-openfeign-core") // ← 이 줄 추가
+
     // retry
     implementation("org.springframework.retry:spring-retry")
     implementation("org.springframework:spring-aspects")

@@ -5,7 +5,6 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PgClient
-import com.loopers.infrastructure.pg.PgException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
@@ -47,12 +46,7 @@ class PaymentFacade(
      */
     fun processInProgressPayment(payment: Payment) {
         // PG 트랜잭션 조회 (트랜잭션 외부)
-        val transactions = try {
-            pgClient.findTransactionsByOrderId(payment.orderId)
-        } catch (e: PgException) {
-            logger.warn("PG 상태 조회 실패 - paymentId: {}, reason: {}", payment.id, e.message)
-            return // 다음 스케줄에 재시도
-        }
+        val transactions = pgClient.findTransactionsByOrderId(payment.orderId)
 
         val orderItems = getOrderItems(payment.orderId)
         val currentTime = Instant.now()

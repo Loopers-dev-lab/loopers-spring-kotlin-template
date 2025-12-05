@@ -11,7 +11,7 @@ import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
-import com.loopers.infrastructure.pg.PgException
+import com.loopers.infrastructure.payment.PgRequestNotReachedException
 import com.loopers.support.values.Money
 import io.mockk.Runs
 import io.mockk.clearAllMocks
@@ -265,7 +265,7 @@ class PaymentFacadeTest {
 
             every {
                 pgClient.findTransactionsByOrderId(200L)
-            } throws PgException.RequestNotReached("PG 연결 실패")
+            } throws PgRequestNotReachedException("PG 연결 실패")
 
             // when
             facade.processInProgressPayment(payment)

@@ -16,10 +16,8 @@ import com.loopers.domain.payment.PgPaymentRequest
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointService
-import java.time.Instant
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductView
-import com.loopers.infrastructure.pg.PgException
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -33,6 +31,7 @@ import org.springframework.retry.RetryListener
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Instant
 
 @Component
 class OrderFacade(
@@ -290,32 +289,21 @@ class OrderFacade(
         criteria: OrderCriteria.PlaceOrder,
         allocationResult: ResourceAllocationResult,
     ): PgCallResult {
-        return try {
-            val cardInfo = CardInfo(
-                cardType = CardType.valueOf(criteria.cardType!!),
-                cardNo = criteria.cardNo!!,
-            )
+        val cardInfo = CardInfo(
+            cardType = CardType.valueOf(criteria.cardType!!),
+            cardNo = criteria.cardNo!!,
+        )
 
-            val request = PgPaymentRequest(
-                orderId = allocationResult.orderId,
-                amount = allocationResult.payment.paidAmount,
-                cardInfo = cardInfo,
-                callbackUrl = "$callbackBaseUrl/api/v1/payments/callback",
-            )
+        val request = PgPaymentRequest(
+            orderId = allocationResult.orderId,
+            amount = allocationResult.payment.paidAmount,
+            cardInfo = cardInfo,
+            callbackUrl = "$callbackBaseUrl/api/v1/payments/callback",
+        )
 
-            when (val result = pgClient.requestPayment(request)) {
-                is PgPaymentCreateResult.Accepted -> PgCallResult.Success(result.transactionKey)
-                is PgPaymentCreateResult.Uncertain -> PgCallResult.ResponseUncertain("PG 응답 불확실")
-            }
-        } catch (e: PgException.RequestNotReached) {
-            logger.warn("PG 요청 실패 (Circuit Open 또는 연결 실패) - {}", e.message)
-            PgCallResult.RequestNotReached(e.message ?: "요청이 PG에 도달하지 못했습니다")
-        } catch (e: PgException.CircuitOpen) {
-            logger.warn("PG Circuit Breaker OPEN - {}", e.message)
-            PgCallResult.RequestNotReached(e.message ?: "서킷브레이커 OPEN")
-        } catch (e: PgException.BusinessError) {
-            logger.warn("PG 비즈니스 에러 - {}: {}", e.errorCode, e.message)
-            PgCallResult.RequestNotReached(e.message ?: "PG 비즈니스 에러")
+        return when (val result = pgClient.requestPayment(request)) {
+            is PgPaymentCreateResult.Accepted -> PgCallResult.Success(result.transactionKey)
+            is PgPaymentCreateResult.Uncertain -> PgCallResult.ResponseUncertain("PG 응답 불확실")
         }
     }
 

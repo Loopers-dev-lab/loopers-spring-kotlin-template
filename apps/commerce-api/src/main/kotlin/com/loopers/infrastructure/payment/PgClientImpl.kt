@@ -44,13 +44,12 @@ class PgClientImpl(
                 pgFeignClient.requestPayment(infraRequest)
             }
 
-            val data = response.data
-                ?: throw PgInfraException.RequestNotReached("PG 응답 데이터 없음")
+            val data = extractData(response)
 
             PgPaymentCreateResult.Accepted(data.transactionKey)
-        } catch (e: PgInfraException.ResponseUncertain) {
+        } catch (e: PgResponseUncertainException) {
             PgPaymentCreateResult.Uncertain
-        } catch (e: PgInfraException.RequestNotReached) {
+        } catch (e: PgRequestNotReachedException) {
             throw PgServiceUnavailableException(e.message ?: "PG 서비스 불가", e)
         }
     }
@@ -103,7 +102,7 @@ class PgClientImpl(
         return try {
             circuitBreaker.executeSupplier(retrySupplier)
         } catch (e: CallNotPermittedException) {
-            throw PgInfraException.RequestNotReached("서킷 브레이커 오픈. ${e.message}", e)
+            throw PgRequestNotReachedException("서킷 브레이커 오픈. ${e.message}", e)
         } catch (e: PgInfraException) {
             throw e
         }
@@ -121,39 +120,33 @@ class PgClientImpl(
         val message = cause.message?.lowercase() ?: ""
 
         return when {
-            // HTTP 에러 응답
             cause is FeignException -> {
                 val status = cause.status()
                 val detail = "status=$status, message=${cause.message}"
                 when (status) {
-                    in 500..599, 429 -> PgInfraException.RequestNotReached("PG 서버 오류. $detail", cause)
-                    else -> PgInfraException.RequestNotReached("PG 요청 오류. $detail", cause)
+                    in 500..599, 429 -> PgRequestNotReachedException("PG 서버 오류. $detail", cause)
+                    else -> PgRequestNotReachedException("PG 요청 오류. $detail", cause)
                 }
             }
 
-            // Read Timeout: 요청이 갔을 수도 있음 → 재시도 불가
             cause is SocketTimeoutException && message.contains("read timed out") -> {
-                PgInfraException.ResponseUncertain("응답 타임아웃. ${cause.message}", cause)
+                PgResponseUncertainException("응답 타임아웃. ${cause.message}", cause)
             }
 
-            // Connection Reset: 요청이 갔을 수도 있음 → 재시도 불가
             (cause is SocketException || cause is IOException) && message.contains("connection reset") -> {
-                PgInfraException.ResponseUncertain("연결 끊김. ${cause.message}", cause)
+                PgResponseUncertainException("연결 끊김. ${cause.message}", cause)
             }
 
-            // Connection Timeout: 요청 미도달 확실 → 재시도 가능
             cause is SocketTimeoutException -> {
-                PgInfraException.RequestNotReached("연결 타임아웃. ${cause.message}", cause)
+                PgRequestNotReachedException("연결 타임아웃. ${cause.message}", cause)
             }
 
-            // Connection Refused: 요청 미도달 확실 → 재시도 가능
             cause is ConnectException -> {
-                PgInfraException.RequestNotReached("연결 실패. ${cause.message}", cause)
+                PgRequestNotReachedException("연결 실패. ${cause.message}", cause)
             }
 
-            // 기타: 안전하게 미도달로 처리 → 재시도 가능
             else -> {
-                PgInfraException.RequestNotReached("네트워크 오류. ${cause.message}", cause)
+                PgRequestNotReachedException("네트워크 오류. ${cause.message}", cause)
             }
         }
     }
@@ -168,7 +161,7 @@ class PgClientImpl(
 
     private fun <T> extractData(response: PgResponse<T>): T {
         return response.data
-            ?: throw PgInfraException.RequestNotReached("PG 응답 데이터 없음")
+            ?: throw PgRequestNotReachedException("PG 응답 데이터 없음")
     }
 
     private fun toDomainTransaction(response: PgPaymentDetailResponse): PgTransaction {

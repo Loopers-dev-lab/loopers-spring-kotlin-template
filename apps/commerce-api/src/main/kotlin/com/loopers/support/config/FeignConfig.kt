@@ -1,8 +1,8 @@
-package com.loopers.config.feign
+package com.loopers.support.config
 
 import org.springframework.cloud.openfeign.EnableFeignClients
 import org.springframework.context.annotation.Configuration
 
 @Configuration
-@EnableFeignClients
+@EnableFeignClients(basePackages = ["com.loopers.infrastructure"])
 class FeignConfig
