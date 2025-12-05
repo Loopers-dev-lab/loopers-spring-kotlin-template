@@ -184,25 +184,25 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### TODO
 
-- [ ] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentCreateResult.kt` - sealed class with Accepted and Uncertain variants (spec: section 1.1 PgPaymentCreateResult class diagram, pattern: `application/payment/PaymentFacade.kt:L35-L44` PgQueryResult sealed class)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentCreateResult.kt` - sealed class with Accepted and Uncertain variants (spec: section 1.1 PgPaymentCreateResult class diagram, pattern: `application/payment/PaymentFacade.kt:L35-L44` PgQueryResult sealed class)
   - sealed class PgPaymentCreateResult
   - data class Accepted(val transactionKey: String) : PgPaymentCreateResult()
   - data object Uncertain : PgPaymentCreateResult()
 
-- [ ] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgClient.kt` - PgClient interface (spec: section 1.1 PgClient class diagram, pattern: `domain/coupon/DiscountPolicy.kt:L5-L8` for interface pattern)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgClient.kt` - PgClient interface (spec: section 1.1 PgClient class diagram, pattern: `domain/coupon/DiscountPolicy.kt:L5-L8` for interface pattern)
   - fun requestPayment(request: PgPaymentRequest): PgPaymentCreateResult
   - fun findTransaction(transactionKey: String): PgTransaction
   - fun findTransactionsByOrderId(orderId: Long): List<PgTransaction>
 
 ### Tests
 
-- [ ] No unit tests needed for interface definition (will be tested via integration tests)
+- [x] No unit tests needed for interface definition (will be tested via integration tests)
 
 ### Done When
 
-- [ ] `./gradlew :apps:commerce-api:compileKotlin` succeeds
-- [ ] PgClient interface exists in domain package
-- [ ] PgPaymentCreateResult sealed class has exactly 2 variants: Accepted, Uncertain
+- [x] `./gradlew :apps:commerce-api:compileKotlin` succeeds
+- [x] PgClient interface exists in domain package
+- [x] PgPaymentCreateResult sealed class has exactly 2 variants: Accepted, Uncertain
 
 ---
 
