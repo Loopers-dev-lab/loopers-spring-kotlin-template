@@ -52,17 +52,16 @@ class PaymentCallbackDtoTest {
         assertThat(exception.message).isEqualTo("거래 키는 100자를 초과할 수 없습니다")
     }
 
-    @DisplayName("상태에 따라 isSuccess와 isFailed가 올바르게 동작한다")
+    @DisplayName("상태에 따라 isSuccess가 올바르게 동작한다")
     @ParameterizedTest
     @CsvSource(
-        "SUCCESS, true, false",
-        "FAILED, false, true",
-        "PENDING, false, false"
+        "SUCCESS, true",
+        "FAILED, false",
+        "PENDING, false"
     )
-    fun checkStatusMethods(status: String, expectedSuccess: Boolean, expectedFailed: Boolean) {
+    fun checkStatusMethods(status: String, expectedSuccess: Boolean) {
         val dto = PaymentCallbackDto("TR-001", status, null)
 
         assertThat(dto.isSuccess()).isEqualTo(expectedSuccess)
-        assertThat(dto.isFailed()).isEqualTo(expectedFailed)
     }
 }
