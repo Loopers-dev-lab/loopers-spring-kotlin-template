@@ -7,6 +7,7 @@ import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.time.ZonedDateTime
 
 @Component
@@ -47,58 +48,49 @@ class PaymentService(
     }
 
     /**
-     * 결제를 시작합니다. PENDING → IN_PROGRESS 상태 전이.
-     * PG API 호출 직전에 호출됩니다.
+     * 결제를 개시합니다. PENDING → IN_PROGRESS 상태 전이.
+     * PG 결제 요청 후 결과를 받은 시점에 호출됩니다.
      *
      * @param paymentId 결제 ID
+     * @param result PG 결제 요청 결과 (Accepted/Uncertain)
+     * @param attemptedAt 결제 시도 시각
      * @return 상태가 변경된 Payment
      * @throws CoreException 결제를 찾을 수 없는 경우
      */
     @Transactional
-    fun startPayment(paymentId: Long): Payment {
+    fun initiatePayment(
+        paymentId: Long,
+        result: PgPaymentCreateResult,
+        attemptedAt: Instant = Instant.now(),
+    ): Payment {
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
-        payment.start()
+        payment.initiate(result, attemptedAt)
 
         return paymentRepository.save(payment)
     }
 
     /**
-     * 결제를 완료합니다. IN_PROGRESS → PAID 상태 전이.
-     * PG 결제 성공 또는 콜백 수신 시 호출됩니다.
+     * PG 트랜잭션 결과로 결제 상태를 확정합니다.
+     * Payment.confirmPayment()를 호출하여 상태를 결정합니다.
      *
      * @param paymentId 결제 ID
-     * @param externalPaymentKey PG사 거래 키 (nullable)
+     * @param transactions PG에서 조회한 트랜잭션 목록
+     * @param currentTime 현재 시각 (타임아웃 판단용)
      * @return 상태가 변경된 Payment
      * @throws CoreException 결제를 찾을 수 없는 경우
      */
     @Transactional
-    fun completePayment(paymentId: Long, externalPaymentKey: String? = null): Payment {
+    fun confirmPayment(
+        paymentId: Long,
+        transactions: List<PgTransaction>,
+        currentTime: Instant,
+    ): Payment {
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
-        externalPaymentKey?.let { payment.updateExternalPaymentKey(it) }
-        payment.paid()
-
-        return paymentRepository.save(payment)
-    }
-
-    /**
-     * 결제를 실패 처리합니다. PENDING/IN_PROGRESS → FAILED 상태 전이.
-     * PG 결제 실패 또는 복구 처리 시 호출됩니다.
-     *
-     * @param paymentId 결제 ID
-     * @param message 실패 메시지 (nullable)
-     * @return 상태가 변경된 Payment
-     * @throws CoreException 결제를 찾을 수 없는 경우
-     */
-    @Transactional
-    fun failPayment(paymentId: Long, message: String? = null): Payment {
-        val payment = paymentRepository.findById(paymentId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
-
-        payment.fail(message)
+        payment.confirmPayment(*transactions.toTypedArray(), currentTime = currentTime)
 
         return paymentRepository.save(payment)
     }

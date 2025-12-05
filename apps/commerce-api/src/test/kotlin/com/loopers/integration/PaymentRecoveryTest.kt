@@ -14,7 +14,11 @@ import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PgTransaction
+import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -35,6 +39,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import java.time.Instant
 
 /**
  * 결제 복구 테스트
@@ -88,9 +93,21 @@ class PaymentRecoveryTest @Autowired constructor(
                     quantity = it.quantity,
                 )
             }
+            val failedTransaction = createTransaction(
+                transactionKey = payment.externalPaymentKey!!,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "PG 연결 실패",
+            )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentFailure(payment.id, "PG 연결 실패", orderItems)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
+                orderItems = orderItems,
+            )
 
             // then - 포인트가 복구됨
             val restoredAccount = pointAccountRepository.findByUserId(userId)!!
@@ -121,9 +138,21 @@ class PaymentRecoveryTest @Autowired constructor(
                     quantity = it.quantity,
                 )
             }
+            val failedTransaction = createTransaction(
+                transactionKey = payment.externalPaymentKey!!,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "카드 한도 초과",
+            )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentFailure(payment.id, "카드 한도 초과", orderItems)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
+                orderItems = orderItems,
+            )
 
             // then - 포인트 잔액 그대로
             val account = pointAccountRepository.findByUserId(userId)!!
@@ -155,9 +184,21 @@ class PaymentRecoveryTest @Autowired constructor(
                     quantity = it.quantity,
                 )
             }
+            val failedTransaction = createTransaction(
+                transactionKey = payment.externalPaymentKey!!,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "서킷 브레이커 오픈",
+            )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentFailure(payment.id, "서킷 브레이커 오픈", orderItems)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
+                orderItems = orderItems,
+            )
 
             // then - 쿠폰 상태가 AVAILABLE로 복구됨
             val restoredCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
@@ -182,9 +223,21 @@ class PaymentRecoveryTest @Autowired constructor(
                     quantity = it.quantity,
                 )
             }
+            val failedTransaction = createTransaction(
+                transactionKey = payment.externalPaymentKey!!,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "PG 거부",
+            )
 
             // when - 결제 실패 처리 (쿠폰 없음)
-            paymentResultHandler.handlePaymentFailure(payment.id, "PG 거부", orderItems)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
+                orderItems = orderItems,
+            )
 
             // then - 결제가 실패됨 (쿠폰 관련 에러 없음)
             val failedPayment = paymentRepository.findById(payment.id)!!
@@ -219,9 +272,21 @@ class PaymentRecoveryTest @Autowired constructor(
                     quantity = it.quantity,
                 )
             }
+            val failedTransaction = createTransaction(
+                transactionKey = payment.externalPaymentKey!!,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "잔액 부족",
+            )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentFailure(payment.id, "잔액 부족", orderItems)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
+                orderItems = orderItems,
+            )
 
             // then - 재고가 복구됨
             val restoredProduct = productRepository.findById(product.id)!!
@@ -258,15 +323,31 @@ class PaymentRecoveryTest @Autowired constructor(
                 order = savedOrder,
                 usedPoint = Money.krw(50000),
             )
-            paymentService.startPayment(payment.id)
+            val initiatedPayment = paymentService.initiatePayment(
+                paymentId = payment.id,
+                result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
+                attemptedAt = Instant.now(),
+            )
 
             val orderItems = listOf(
                 PaymentResultHandler.OrderItemInfo(productId = product1.id, quantity = 5),
                 PaymentResultHandler.OrderItemInfo(productId = product2.id, quantity = 3),
             )
+            val failedTransaction = createTransaction(
+                transactionKey = initiatedPayment.externalPaymentKey!!,
+                orderId = initiatedPayment.orderId,
+                amount = initiatedPayment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "타임아웃",
+            )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentFailure(payment.id, "타임아웃", orderItems)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = initiatedPayment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
+                orderItems = orderItems,
+            )
 
             // then - 모든 재고가 복구됨
             val restoredProduct1 = productRepository.findById(product1.id)!!
@@ -300,9 +381,21 @@ class PaymentRecoveryTest @Autowired constructor(
                     quantity = it.quantity,
                 )
             }
+            val failedTransaction = createTransaction(
+                transactionKey = payment.externalPaymentKey!!,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "결제 거부",
+            )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentFailure(payment.id, "결제 거부", orderItems)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
+                orderItems = orderItems,
+            )
 
             // then - 주문 상태가 CANCELLED
             val cancelledOrder = orderRepository.findById(payment.orderId)!!
@@ -318,9 +411,19 @@ class PaymentRecoveryTest @Autowired constructor(
                 userId = userId,
                 usedPoint = Money.krw(5000),
             )
+            val successTransaction = createTransaction(
+                transactionKey = payment.externalPaymentKey!!,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.SUCCESS,
+            )
 
             // when - 결제 성공 처리
-            paymentResultHandler.handlePaymentSuccess(payment.id, "tx_success_123")
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(successTransaction),
+                currentTime = Instant.now(),
+            )
 
             // then - 주문 상태가 PAID
             val paidOrder = orderRepository.findById(payment.orderId)!!
@@ -376,14 +479,30 @@ class PaymentRecoveryTest @Autowired constructor(
                 issuedCouponId = issuedCoupon.id,
                 couponDiscount = Money.krw(3000),
             )
-            paymentService.startPayment(payment.id)
+            val initiatedPayment = paymentService.initiatePayment(
+                paymentId = payment.id,
+                result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
+                attemptedAt = Instant.now(),
+            )
 
             val orderItems = listOf(
                 PaymentResultHandler.OrderItemInfo(productId = product.id, quantity = orderQuantity),
             )
+            val failedTransaction = createTransaction(
+                transactionKey = initiatedPayment.externalPaymentKey!!,
+                orderId = initiatedPayment.orderId,
+                amount = initiatedPayment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "PG 서버 오류",
+            )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentFailure(payment.id, "PG 서버 오류", orderItems)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = initiatedPayment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
+                orderItems = orderItems,
+            )
 
             // then - 모든 리소스 복구
             val restoredPointAccount = pointAccountRepository.findByUserId(userId)!!
@@ -481,7 +600,11 @@ class PaymentRecoveryTest @Autowired constructor(
             usedPoint = usedPoint,
         )
 
-        return paymentService.startPayment(payment.id)
+        return paymentService.initiatePayment(
+            paymentId = payment.id,
+            result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
+            attemptedAt = Instant.now(),
+        )
     }
 
     private fun createInProgressPaymentWithCoupon(
@@ -524,7 +647,11 @@ class PaymentRecoveryTest @Autowired constructor(
             couponDiscount = couponDiscount,
         )
 
-        return paymentService.startPayment(payment.id)
+        return paymentService.initiatePayment(
+            paymentId = payment.id,
+            result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
+            attemptedAt = Instant.now(),
+        )
     }
 
     private fun createInProgressPaymentWithProduct(
@@ -563,6 +690,28 @@ class PaymentRecoveryTest @Autowired constructor(
             usedPoint = usedPoint,
         )
 
-        return paymentService.startPayment(payment.id)
+        return paymentService.initiatePayment(
+            paymentId = payment.id,
+            result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
+            attemptedAt = Instant.now(),
+        )
+    }
+
+    private fun createTransaction(
+        transactionKey: String,
+        orderId: Long,
+        amount: Money,
+        status: PgTransactionStatus,
+        failureReason: String? = null,
+    ): PgTransaction {
+        return PgTransaction(
+            transactionKey = transactionKey,
+            orderId = orderId,
+            cardType = CardType.KB,
+            cardNo = "0000-0000-0000-0000",
+            amount = amount,
+            status = status,
+            failureReason = failureReason,
+        )
     }
 }

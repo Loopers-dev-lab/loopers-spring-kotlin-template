@@ -13,7 +13,10 @@ import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgPaymentRequest
+import com.loopers.domain.payment.PgTransaction
+import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointService
+import java.time.Instant
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductView
 import com.loopers.infrastructure.pg.PgException
@@ -181,13 +184,22 @@ class OrderFacade(
             }
 
             is PgCallResult.ResponseUncertain -> {
-                // 타임아웃 등으로 응답을 받지 못한 경우 - IN_PROGRESS 유지
-                // 스케줄러가 나중에 처리
+                // 타임아웃 등으로 응답을 받지 못한 경우
+                // IN_PROGRESS로 전이하고 스케줄러가 나중에 처리
                 logger.warn(
                     "PG 응답 불확실 - paymentId: {}, reason: {}",
                     allocationResult.payment.id,
                     pgResult.reason,
                 )
+
+                // PENDING → IN_PROGRESS (transactionKey 없이)
+                transactionTemplate.execute { _ ->
+                    paymentService.initiatePayment(
+                        paymentId = allocationResult.payment.id,
+                        result = PgPaymentCreateResult.Uncertain,
+                    )
+                }
+
                 OrderInfo.PlaceOrder(
                     orderId = allocationResult.orderId,
                     paymentId = allocationResult.payment.id,
@@ -256,12 +268,10 @@ class OrderFacade(
                 couponDiscount = couponDiscount,
             )
 
-            // 8. 결제 시작 (PENDING → IN_PROGRESS)
-            val startedPayment = paymentService.startPayment(payment.id)
-
+            // 결제는 PENDING 상태로 유지, PG 결과 수신 후 initiate()로 IN_PROGRESS 전이
             ResourceAllocationResult(
                 orderId = order.id,
-                payment = startedPayment,
+                payment = payment,
                 productViews = productViews,
                 orderItems = criteria.items.map {
                     PaymentResultHandler.OrderItemInfo(
@@ -311,13 +321,35 @@ class OrderFacade(
 
     /**
      * PG 성공 처리
+     * - PENDING → IN_PROGRESS (initiate with Accepted)
+     * - IN_PROGRESS → PAID (confirmPayment via handlePaymentResult)
      */
     private fun handlePgSuccess(
         allocationResult: ResourceAllocationResult,
         transactionKey: String,
     ): OrderInfo.PlaceOrder {
         transactionTemplate.execute { _ ->
-            paymentResultHandler.handlePaymentSuccess(allocationResult.payment.id, transactionKey)
+            // 1. 결제 개시 (PENDING → IN_PROGRESS, transactionKey 저장)
+            paymentService.initiatePayment(
+                paymentId = allocationResult.payment.id,
+                result = PgPaymentCreateResult.Accepted(transactionKey),
+            )
+
+            // 2. 결제 확정 (IN_PROGRESS → PAID)
+            val successTransaction = PgTransaction(
+                transactionKey = transactionKey,
+                orderId = allocationResult.payment.orderId,
+                cardType = CardType.KB,
+                cardNo = "0000-0000-0000-0000",
+                amount = allocationResult.payment.paidAmount,
+                status = PgTransactionStatus.SUCCESS,
+            )
+            paymentResultHandler.handlePaymentResult(
+                paymentId = allocationResult.payment.id,
+                transactions = listOf(successTransaction),
+                currentTime = Instant.now(),
+                orderItems = allocationResult.orderItems,
+            )
         }
 
         updateProductCache(allocationResult.productViews)
@@ -331,15 +363,34 @@ class OrderFacade(
 
     /**
      * PG 실패 처리 및 리소스 복구
+     * - PENDING → IN_PROGRESS (initiate with Uncertain)
+     * - IN_PROGRESS → FAILED (confirmPayment via handlePaymentResult)
      */
     private fun handlePgFailure(
         allocationResult: ResourceAllocationResult,
         reason: String,
     ): OrderInfo.PlaceOrder {
         transactionTemplate.execute { _ ->
-            paymentResultHandler.handlePaymentFailure(
+            // 1. 결제 개시 (PENDING → IN_PROGRESS)
+            paymentService.initiatePayment(
                 paymentId = allocationResult.payment.id,
-                reason = reason,
+                result = PgPaymentCreateResult.Uncertain,
+            )
+
+            // 2. 결제 확정 (IN_PROGRESS → FAILED)
+            val failedTransaction = PgTransaction(
+                transactionKey = "failed_${allocationResult.payment.id}",
+                orderId = allocationResult.payment.orderId,
+                cardType = CardType.KB,
+                cardNo = "0000-0000-0000-0000",
+                amount = allocationResult.payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = reason,
+            )
+            paymentResultHandler.handlePaymentResult(
+                paymentId = allocationResult.payment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
                 orderItems = allocationResult.orderItems,
             )
         }
@@ -360,23 +411,31 @@ class OrderFacade(
 
     /**
      * 콜백/스케줄러에서 사용할 결제 결과 처리
+     * 주의: 이 메서드는 이미 IN_PROGRESS 상태인 결제에 대해 호출됩니다.
+     *
+     * @param paymentId 결제 ID
+     * @param transactions PG에서 조회한 트랜잭션 목록
+     * @param currentTime 현재 시각 (타임아웃 판단용)
      */
-    fun handlePaymentResult(paymentId: Long, isSuccess: Boolean, transactionKey: String?, reason: String?) {
+    fun handlePaymentResult(
+        paymentId: Long,
+        transactions: List<PgTransaction>,
+        currentTime: Instant,
+    ) {
         val payment = paymentService.findById(paymentId)
-
-        if (isSuccess) {
-            paymentResultHandler.handlePaymentSuccess(paymentId, transactionKey)
-        } else {
-            // 주문 상품 정보 조회 (재고 복구용)
-            val order = orderService.findById(payment.orderId)
-            val orderItems = order.orderItems.map {
-                PaymentResultHandler.OrderItemInfo(
-                    productId = it.productId,
-                    quantity = it.quantity,
-                )
-            }
-            paymentResultHandler.handlePaymentFailure(paymentId, reason, orderItems)
+        val order = orderService.findById(payment.orderId)
+        val orderItems = order.orderItems.map {
+            PaymentResultHandler.OrderItemInfo(
+                productId = it.productId,
+                quantity = it.quantity,
+            )
         }
+        paymentResultHandler.handlePaymentResult(
+            paymentId = paymentId,
+            transactions = transactions,
+            currentTime = currentTime,
+            orderItems = orderItems,
+        )
     }
 
     /**

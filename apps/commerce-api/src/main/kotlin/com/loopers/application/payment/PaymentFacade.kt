@@ -5,11 +5,11 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PgClient
-import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.infrastructure.pg.PgException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Instant
 import java.time.ZonedDateTime
 
 /**
@@ -29,21 +29,6 @@ class PaymentFacade(
 ) {
     private val logger = LoggerFactory.getLogger(PaymentFacade::class.java)
 
-    companion object {
-        private const val FORCE_FAIL_THRESHOLD_MINUTES = 5L
-    }
-
-    /**
-     * PG 상태 조회 결과
-     */
-    sealed class PgQueryResult {
-        data class Success(val transactionKey: String) : PgQueryResult()
-        data class Failed(val reason: String) : PgQueryResult()
-        data object Pending : PgQueryResult()
-        data object NotFound : PgQueryResult()
-        data class QueryFailed(val reason: String) : PgQueryResult()
-    }
-
     /**
      * IN_PROGRESS 상태의 결제 목록을 조회합니다.
      *
@@ -56,121 +41,30 @@ class PaymentFacade(
 
     /**
      * IN_PROGRESS 상태의 결제를 처리합니다.
-     * PG 상태를 조회하고 결과에 따라 성공/실패 처리합니다.
+     * PG 트랜잭션을 조회하고 Payment.confirmPayment()로 상태를 결정합니다.
      *
      * @param payment 처리할 결제
      */
     fun processInProgressPayment(payment: Payment) {
-        // PG 상태 조회 (트랜잭션 외부)
-        val pgResult = queryPgStatus(payment.userId, payment.orderId.toString())
-
-        // 결과에 따라 처리 (트랜잭션 내부)
-        transactionTemplate.execute { _ ->
-            when (pgResult) {
-                is PgQueryResult.Success -> {
-                    logger.info(
-                        "PG 결제 성공 확인 - paymentId: {}, transactionKey: {}",
-                        payment.id,
-                        pgResult.transactionKey,
-                    )
-                    paymentResultHandler.handlePaymentSuccess(payment.id, pgResult.transactionKey)
-                }
-
-                is PgQueryResult.Failed -> {
-                    logger.info(
-                        "PG 결제 실패 확인 - paymentId: {}, reason: {}",
-                        payment.id,
-                        pgResult.reason,
-                    )
-                    val orderItems = getOrderItems(payment.orderId)
-                    paymentResultHandler.handlePaymentFailure(payment.id, pgResult.reason, orderItems)
-                }
-
-                is PgQueryResult.Pending -> {
-                    // 5분 초과 시 강제 실패
-                    val forceFailThreshold = ZonedDateTime.now().minusMinutes(FORCE_FAIL_THRESHOLD_MINUTES)
-                    if (payment.createdAt.isBefore(forceFailThreshold)) {
-                        logger.warn(
-                            "결제 강제 실패 처리 - paymentId: {}, createdAt: {}, threshold: {}",
-                            payment.id,
-                            payment.createdAt,
-                            forceFailThreshold,
-                        )
-                        val orderItems = getOrderItems(payment.orderId)
-                        paymentResultHandler.handlePaymentFailure(
-                            paymentId = payment.id,
-                            reason = "결제 시간 초과 (5분)",
-                            orderItems = orderItems,
-                        )
-                    } else {
-                        logger.debug(
-                            "PG 결제 아직 처리 중 - paymentId: {}, createdAt: {}",
-                            payment.id,
-                            payment.createdAt,
-                        )
-                    }
-                }
-
-                is PgQueryResult.NotFound -> {
-                    // PG에 기록이 없는 경우 - 요청이 도달하지 않은 것으로 판단
-                    logger.warn(
-                        "PG에 결제 기록 없음 - paymentId: {}, orderId: {}",
-                        payment.id,
-                        payment.orderId,
-                    )
-                    val orderItems = getOrderItems(payment.orderId)
-                    paymentResultHandler.handlePaymentFailure(
-                        paymentId = payment.id,
-                        reason = "PG에 결제 기록 없음",
-                        orderItems = orderItems,
-                    )
-                }
-
-                is PgQueryResult.QueryFailed -> {
-                    // PG 조회 실패 - 다음 스케줄에 재시도
-                    logger.warn(
-                        "PG 상태 조회 실패 - paymentId: {}, reason: {}",
-                        payment.id,
-                        pgResult.reason,
-                    )
-                }
-            }
-        }
-    }
-
-    /**
-     * PG 상태를 조회합니다.
-     */
-    private fun queryPgStatus(userId: Long, orderId: String): PgQueryResult {
-        return try {
-            val transactions = pgClient.findTransactionsByOrderId(orderId.toLong())
-            val latestTransaction = transactions.lastOrNull()
-
-            if (latestTransaction == null) {
-                PgQueryResult.NotFound
-            } else {
-                when (latestTransaction.status) {
-                    PgTransactionStatus.SUCCESS -> {
-                        PgQueryResult.Success(latestTransaction.transactionKey)
-                    }
-
-                    PgTransactionStatus.FAILED -> {
-                        PgQueryResult.Failed(latestTransaction.failureReason ?: "PG 결제 실패")
-                    }
-
-                    PgTransactionStatus.PENDING -> {
-                        PgQueryResult.Pending
-                    }
-                }
-            }
-        } catch (e: PgException.BusinessError) {
-            if (e.errorCode == "NOT_FOUND") {
-                PgQueryResult.NotFound
-            } else {
-                PgQueryResult.QueryFailed(e.message ?: "PG 비즈니스 에러")
-            }
+        // PG 트랜잭션 조회 (트랜잭션 외부)
+        val transactions = try {
+            pgClient.findTransactionsByOrderId(payment.orderId)
         } catch (e: PgException) {
-            PgQueryResult.QueryFailed(e.message ?: "PG 조회 실패")
+            logger.warn("PG 상태 조회 실패 - paymentId: {}, reason: {}", payment.id, e.message)
+            return // 다음 스케줄에 재시도
+        }
+
+        val orderItems = getOrderItems(payment.orderId)
+        val currentTime = Instant.now()
+
+        // 결제 결과 처리 (트랜잭션 내부)
+        transactionTemplate.execute { _ ->
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = transactions,
+                currentTime = currentTime,
+                orderItems = orderItems,
+            )
         }
     }
 

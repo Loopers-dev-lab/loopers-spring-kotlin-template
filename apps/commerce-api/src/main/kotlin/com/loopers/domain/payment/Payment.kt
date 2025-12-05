@@ -13,6 +13,7 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 import jakarta.persistence.Version
+import java.time.Instant
 
 @Table(name = "payments")
 @Entity
@@ -27,6 +28,7 @@ class Payment(
     couponDiscount: Money = Money.ZERO_KRW,
     externalPaymentKey: String? = null,
     failureMessage: String? = null,
+    attemptedAt: Instant? = null,
 ) : BaseEntity() {
     var orderId: Long = orderId
         private set
@@ -71,55 +73,86 @@ class Payment(
     var failureMessage: String? = failureMessage
         private set
 
+    @Column(name = "attempted_at")
+    var attemptedAt: Instant? = attemptedAt
+        private set
+
     @Version
     @Column(name = "version", nullable = false)
     var version: Long = 0
         private set
 
     /**
-     * 결제를 시작합니다. PENDING → IN_PROGRESS 상태 전이
+     * 결제를 개시합니다. PENDING → IN_PROGRESS 상태 전이
+     * PG 결제 요청 결과에 따라 externalPaymentKey를 저장합니다.
+     * - Accepted: transactionKey 저장
+     * - Uncertain: null 유지
+     *
+     * @param result PG 결제 요청 결과
+     * @param attemptedAt 결제 시도 시각
      * @throws CoreException PENDING 상태가 아닌 경우
      */
-    fun start() {
+    fun initiate(result: PgPaymentCreateResult, attemptedAt: Instant) {
         if (status != PaymentStatus.PENDING) {
-            throw CoreException(ErrorType.BAD_REQUEST, "결제 대기 상태에서만 결제를 시작할 수 있습니다")
+            throw CoreException(ErrorType.BAD_REQUEST, "결제 대기 상태에서만 결제를 개시할 수 있습니다")
         }
         status = PaymentStatus.IN_PROGRESS
+        this.attemptedAt = attemptedAt
+
+        when (result) {
+            is PgPaymentCreateResult.Accepted -> externalPaymentKey = result.transactionKey
+            is PgPaymentCreateResult.Uncertain -> { /* externalPaymentKey remains null */ }
+        }
     }
 
     /**
-     * PG 트랜잭션 키를 저장합니다.
+     * PG 트랜잭션 결과로 결제 상태를 확정합니다.
+     *
+     * 매칭 우선순위:
+     * 1. externalPaymentKey가 있으면 해당 키와 일치하는 transaction
+     * 2. externalPaymentKey가 없으면 paidAmount와 일치하고 PENDING이 아닌 transaction
+     *
+     * @param transactions PG에서 조회한 트랜잭션 목록
+     * @param currentTime 현재 시각 (타임아웃 판단용)
      * @throws CoreException IN_PROGRESS 상태가 아닌 경우
      */
-    fun updateExternalPaymentKey(key: String) {
+    fun confirmPayment(vararg transactions: PgTransaction, currentTime: Instant) {
         if (status != PaymentStatus.IN_PROGRESS) {
-            throw CoreException(ErrorType.BAD_REQUEST, "결제 진행 중 상태에서만 외부 결제 키를 저장할 수 있습니다")
+            throw CoreException(ErrorType.BAD_REQUEST, "결제 진행 중 상태에서만 확정할 수 있습니다")
         }
-        externalPaymentKey = key
+
+        val matched = findMatchingTransaction(transactions.toList())
+
+        when {
+            matched?.status == PgTransactionStatus.SUCCESS -> {
+                status = PaymentStatus.PAID
+                externalPaymentKey = matched.transactionKey
+            }
+            matched?.status == PgTransactionStatus.FAILED -> {
+                status = PaymentStatus.FAILED
+                externalPaymentKey = matched.transactionKey
+                failureMessage = matched.failureReason
+            }
+            isTimedOut(currentTime) -> {
+                status = PaymentStatus.FAILED
+                failureMessage = "결제 시간 초과"
+            }
+        }
     }
 
-    /**
-     * 결제 IN_PROGRESS → PAID 상태 전이
-     * @throws CoreException IN_PROGRESS 상태가 아닌 경우
-     */
-    fun paid() {
-        if (status != PaymentStatus.IN_PROGRESS) {
-            throw CoreException(ErrorType.BAD_REQUEST, "결제 진행 중 상태에서만 성공 처리할 수 있습니다")
+    private fun findMatchingTransaction(transactions: List<PgTransaction>): PgTransaction? {
+        return if (externalPaymentKey != null) {
+            transactions.find { it.transactionKey == externalPaymentKey }
+        } else {
+            transactions.find {
+                it.amount == paidAmount && it.status != PgTransactionStatus.PENDING
+            }
         }
-        status = PaymentStatus.PAID
     }
 
-    /**
-     * 결제를 실패 처리합니다. PENDING/IN_PROGRESS → FAILED 상태 전이
-     * @param message 실패 사유 (nullable)
-     * @throws CoreException 이미 처리된 결제(PAID/FAILED)인 경우
-     */
-    fun fail(message: String?) {
-        if (status == PaymentStatus.PAID || status == PaymentStatus.FAILED) {
-            throw CoreException(ErrorType.BAD_REQUEST, "이미 처리된 결제입니다")
-        }
-        status = PaymentStatus.FAILED
-        failureMessage = message
+    private fun isTimedOut(currentTime: Instant): Boolean {
+        val timeout = attemptedAt?.plusSeconds(300) ?: return false
+        return currentTime.isAfter(timeout)
     }
 
     companion object {
@@ -171,6 +204,7 @@ class Payment(
             paidAmount: Money = Money.ZERO_KRW,
             externalPaymentKey: String? = null,
             failureMessage: String? = null,
+            attemptedAt: Instant? = null,
         ): Payment {
             return Payment(
                 orderId = orderId,
@@ -183,6 +217,7 @@ class Payment(
                 couponDiscount = couponDiscount,
                 externalPaymentKey = externalPaymentKey,
                 failureMessage = failureMessage,
+                attemptedAt = attemptedAt,
             )
         }
     }

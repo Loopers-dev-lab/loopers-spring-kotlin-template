@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.support.TransactionCallback
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Instant
 import java.time.ZonedDateTime
 
 @DisplayName("PaymentFacade 단위 테스트")
@@ -88,37 +89,8 @@ class PaymentFacadeTest {
     inner class ProcessInProgressPayment {
 
         @Test
-        @DisplayName("PG에서 SUCCESS 응답 시 결제 성공 처리를 호출한다")
-        fun `calls handlePaymentSuccess when PG returns SUCCESS`() {
-            // given
-            val payment = createMockPayment(
-                id = 1L,
-                userId = 100L,
-                orderId = 200L,
-                createdAt = ZonedDateTime.now().minusMinutes(2),
-            )
-
-            every {
-                pgClient.findTransactionsByOrderId(200L)
-            } returns listOf(
-                createPgTransaction(
-                    transactionKey = "tx_123",
-                    orderId = 200L,
-                    status = PgTransactionStatus.SUCCESS,
-                ),
-            )
-            every { paymentResultHandler.handlePaymentSuccess(1L, "tx_123") } just Runs
-
-            // when
-            facade.processInProgressPayment(payment)
-
-            // then
-            verify(exactly = 1) { paymentResultHandler.handlePaymentSuccess(1L, "tx_123") }
-        }
-
-        @Test
-        @DisplayName("PG에서 FAILED 응답 시 결제 실패 처리를 호출한다")
-        fun `calls handlePaymentFailure when PG returns FAILED`() {
+        @DisplayName("PG에서 SUCCESS 트랜잭션 조회 시 handlePaymentResult를 호출한다")
+        fun `calls handlePaymentResult when PG returns SUCCESS`() {
             // given
             val payment = createMockPayment(
                 id = 1L,
@@ -127,22 +99,19 @@ class PaymentFacadeTest {
                 createdAt = ZonedDateTime.now().minusMinutes(2),
             )
             val order = createMockOrder(orderId = 200L)
-
-            every {
-                pgClient.findTransactionsByOrderId(200L)
-            } returns listOf(
-                createPgTransaction(
-                    transactionKey = "tx_123",
-                    orderId = 200L,
-                    status = PgTransactionStatus.FAILED,
-                    failureReason = "잔액 부족",
-                ),
+            val successTransaction = createPgTransaction(
+                transactionKey = "tx_123",
+                orderId = 200L,
+                status = PgTransactionStatus.SUCCESS,
             )
+
+            every { pgClient.findTransactionsByOrderId(200L) } returns listOf(successTransaction)
             every { orderService.findById(200L) } returns order
             every {
-                paymentResultHandler.handlePaymentFailure(
+                paymentResultHandler.handlePaymentResult(
                     paymentId = 1L,
-                    reason = "잔액 부족",
+                    transactions = listOf(successTransaction),
+                    currentTime = any(),
                     orderItems = any(),
                 )
             } just Runs
@@ -152,17 +121,61 @@ class PaymentFacadeTest {
 
             // then
             verify(exactly = 1) {
-                paymentResultHandler.handlePaymentFailure(
+                paymentResultHandler.handlePaymentResult(
                     paymentId = 1L,
-                    reason = "잔액 부족",
+                    transactions = listOf(successTransaction),
+                    currentTime = any<Instant>(),
                     orderItems = any(),
                 )
             }
         }
 
         @Test
-        @DisplayName("PG PENDING이고 5분 이하이면 아무 처리도 하지 않는다")
-        fun `does nothing when PG returns PENDING and under 5 minutes`() {
+        @DisplayName("PG에서 FAILED 트랜잭션 조회 시 handlePaymentResult를 호출한다")
+        fun `calls handlePaymentResult when PG returns FAILED`() {
+            // given
+            val payment = createMockPayment(
+                id = 1L,
+                userId = 100L,
+                orderId = 200L,
+                createdAt = ZonedDateTime.now().minusMinutes(2),
+            )
+            val order = createMockOrder(orderId = 200L)
+            val failedTransaction = createPgTransaction(
+                transactionKey = "tx_123",
+                orderId = 200L,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "잔액 부족",
+            )
+
+            every { pgClient.findTransactionsByOrderId(200L) } returns listOf(failedTransaction)
+            every { orderService.findById(200L) } returns order
+            every {
+                paymentResultHandler.handlePaymentResult(
+                    paymentId = 1L,
+                    transactions = listOf(failedTransaction),
+                    currentTime = any(),
+                    orderItems = any(),
+                )
+            } just Runs
+
+            // when
+            facade.processInProgressPayment(payment)
+
+            // then
+            verify(exactly = 1) {
+                paymentResultHandler.handlePaymentResult(
+                    paymentId = 1L,
+                    transactions = listOf(failedTransaction),
+                    currentTime = any<Instant>(),
+                    orderItems = any(),
+                )
+            }
+        }
+
+        @Test
+        @DisplayName("PG에서 PENDING 트랜잭션 조회 시 handlePaymentResult를 호출한다 (confirmPayment에서 상태 결정)")
+        fun `calls handlePaymentResult when PG returns PENDING`() {
             // given
             val payment = createMockPayment(
                 id = 1L,
@@ -170,51 +183,20 @@ class PaymentFacadeTest {
                 orderId = 200L,
                 createdAt = ZonedDateTime.now().minusMinutes(3),
             )
-
-            every {
-                pgClient.findTransactionsByOrderId(200L)
-            } returns listOf(
-                createPgTransaction(
-                    transactionKey = "tx_123",
-                    orderId = 200L,
-                    status = PgTransactionStatus.PENDING,
-                ),
-            )
-
-            // when
-            facade.processInProgressPayment(payment)
-
-            // then
-            verify(exactly = 0) { paymentResultHandler.handlePaymentSuccess(any(), any()) }
-            verify(exactly = 0) { paymentResultHandler.handlePaymentFailure(any(), any(), any()) }
-        }
-
-        @Test
-        @DisplayName("PG PENDING이고 5분 초과이면 강제 실패 처리한다")
-        fun `forces failure when PG returns PENDING and over 5 minutes`() {
-            // given
-            val payment = createMockPayment(
-                id = 1L,
-                userId = 100L,
-                orderId = 200L,
-                createdAt = ZonedDateTime.now().minusMinutes(6),
-            )
             val order = createMockOrder(orderId = 200L)
-
-            every {
-                pgClient.findTransactionsByOrderId(200L)
-            } returns listOf(
-                createPgTransaction(
-                    transactionKey = "tx_123",
-                    orderId = 200L,
-                    status = PgTransactionStatus.PENDING,
-                ),
+            val pendingTransaction = createPgTransaction(
+                transactionKey = "tx_123",
+                orderId = 200L,
+                status = PgTransactionStatus.PENDING,
             )
+
+            every { pgClient.findTransactionsByOrderId(200L) } returns listOf(pendingTransaction)
             every { orderService.findById(200L) } returns order
             every {
-                paymentResultHandler.handlePaymentFailure(
+                paymentResultHandler.handlePaymentResult(
                     paymentId = 1L,
-                    reason = "결제 시간 초과 (5분)",
+                    transactions = listOf(pendingTransaction),
+                    currentTime = any(),
                     orderItems = any(),
                 )
             } just Runs
@@ -224,17 +206,18 @@ class PaymentFacadeTest {
 
             // then
             verify(exactly = 1) {
-                paymentResultHandler.handlePaymentFailure(
+                paymentResultHandler.handlePaymentResult(
                     paymentId = 1L,
-                    reason = "결제 시간 초과 (5분)",
+                    transactions = listOf(pendingTransaction),
+                    currentTime = any<Instant>(),
                     orderItems = any(),
                 )
             }
         }
 
         @Test
-        @DisplayName("PG에 결제 기록이 없으면 실패 처리한다")
-        fun `fails payment when no transaction found in PG`() {
+        @DisplayName("PG에 결제 기록이 없으면 빈 트랜잭션 목록으로 handlePaymentResult를 호출한다")
+        fun `calls handlePaymentResult with empty list when no transaction found`() {
             // given
             val payment = createMockPayment(
                 id = 1L,
@@ -244,14 +227,13 @@ class PaymentFacadeTest {
             )
             val order = createMockOrder(orderId = 200L)
 
-            every {
-                pgClient.findTransactionsByOrderId(200L)
-            } returns emptyList()
+            every { pgClient.findTransactionsByOrderId(200L) } returns emptyList()
             every { orderService.findById(200L) } returns order
             every {
-                paymentResultHandler.handlePaymentFailure(
+                paymentResultHandler.handlePaymentResult(
                     paymentId = 1L,
-                    reason = "PG에 결제 기록 없음",
+                    transactions = emptyList(),
+                    currentTime = any(),
                     orderItems = any(),
                 )
             } just Runs
@@ -261,46 +243,10 @@ class PaymentFacadeTest {
 
             // then
             verify(exactly = 1) {
-                paymentResultHandler.handlePaymentFailure(
+                paymentResultHandler.handlePaymentResult(
                     paymentId = 1L,
-                    reason = "PG에 결제 기록 없음",
-                    orderItems = any(),
-                )
-            }
-        }
-
-        @Test
-        @DisplayName("PG NOT_FOUND 에러 시 실패 처리한다")
-        fun `fails payment when PG returns NOT_FOUND error`() {
-            // given
-            val payment = createMockPayment(
-                id = 1L,
-                userId = 100L,
-                orderId = 200L,
-                createdAt = ZonedDateTime.now().minusMinutes(2),
-            )
-            val order = createMockOrder(orderId = 200L)
-
-            every {
-                pgClient.findTransactionsByOrderId(200L)
-            } throws PgException.BusinessError("NOT_FOUND", "결제 정보 없음")
-            every { orderService.findById(200L) } returns order
-            every {
-                paymentResultHandler.handlePaymentFailure(
-                    paymentId = 1L,
-                    reason = "PG에 결제 기록 없음",
-                    orderItems = any(),
-                )
-            } just Runs
-
-            // when
-            facade.processInProgressPayment(payment)
-
-            // then
-            verify(exactly = 1) {
-                paymentResultHandler.handlePaymentFailure(
-                    paymentId = 1L,
-                    reason = "PG에 결제 기록 없음",
+                    transactions = emptyList<PgTransaction>(),
+                    currentTime = any<Instant>(),
                     orderItems = any(),
                 )
             }
@@ -325,8 +271,9 @@ class PaymentFacadeTest {
             facade.processInProgressPayment(payment)
 
             // then
-            verify(exactly = 0) { paymentResultHandler.handlePaymentSuccess(any(), any()) }
-            verify(exactly = 0) { paymentResultHandler.handlePaymentFailure(any(), any(), any()) }
+            verify(exactly = 0) {
+                paymentResultHandler.handlePaymentResult(any(), any(), any(), any())
+            }
         }
     }
 
@@ -336,6 +283,7 @@ class PaymentFacadeTest {
         orderId: Long = 200L,
         status: PaymentStatus = PaymentStatus.IN_PROGRESS,
         createdAt: ZonedDateTime = ZonedDateTime.now().minusMinutes(2),
+        externalPaymentKey: String? = "tx_mock_$id",
     ): Payment {
         val payment = mockk<Payment>()
         every { payment.id } returns id
@@ -345,6 +293,7 @@ class PaymentFacadeTest {
         every { payment.createdAt } returns createdAt
         every { payment.usedPoint } returns Money.krw(0)
         every { payment.issuedCouponId } returns null
+        every { payment.externalPaymentKey } returns externalPaymentKey
         return payment
     }
 

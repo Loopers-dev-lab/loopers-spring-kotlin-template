@@ -1,14 +1,18 @@
 package com.loopers.interfaces.api.payment
 
 import com.loopers.application.order.OrderFacade
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgTransaction
+import com.loopers.domain.payment.PgTransactionStatus
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import java.time.Instant
 
 /**
  * PG 결제 콜백을 처리하는 Webhook 컨트롤러
@@ -72,13 +76,22 @@ class PaymentWebhookController(
             }
         }
 
-        // 3. 결제 결과 처리
+        // 3. 결제 결과 처리 (externalPaymentKey는 initiate 시점에 이미 저장됨)
         return try {
+            val transaction = PgTransaction(
+                transactionKey = request.transactionKey,
+                orderId = payment.orderId,
+                cardType = CardType.KB,
+                cardNo = "0000-0000-0000-0000",
+                amount = payment.paidAmount,
+                status = if (request.isSuccess()) PgTransactionStatus.SUCCESS else PgTransactionStatus.FAILED,
+                failureReason = request.reason,
+            )
+
             orderFacade.handlePaymentResult(
                 paymentId = payment.id,
-                isSuccess = request.isSuccess(),
-                transactionKey = request.transactionKey,
-                reason = request.reason,
+                transactions = listOf(transaction),
+                currentTime = Instant.now(),
             )
 
             logger.info(

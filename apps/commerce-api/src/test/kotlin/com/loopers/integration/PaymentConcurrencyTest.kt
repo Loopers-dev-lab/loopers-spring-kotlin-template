@@ -6,7 +6,11 @@ import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PgTransaction
+import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -27,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -62,7 +67,13 @@ class PaymentConcurrencyTest @Autowired constructor(
     fun `concurrent payment processing results in only one success due to optimistic lock`() {
         // given
         val payment = createInProgressPayment()
-        val transactionKey = "tx_concurrent_test"
+        val transactionKey = payment.externalPaymentKey!!
+        val transaction = createTransaction(
+            transactionKey = transactionKey,
+            orderId = payment.orderId,
+            amount = payment.paidAmount,
+            status = PgTransactionStatus.SUCCESS,
+        )
 
         val threadCount = 5
         val executor = Executors.newFixedThreadPool(threadCount)
@@ -76,7 +87,11 @@ class PaymentConcurrencyTest @Autowired constructor(
             executor.submit {
                 try {
                     transactionTemplate.execute { _ ->
-                        paymentResultHandler.handlePaymentSuccess(payment.id, transactionKey)
+                        paymentResultHandler.handlePaymentResult(
+                            paymentId = payment.id,
+                            transactions = listOf(transaction),
+                            currentTime = Instant.now(),
+                        )
                     }
                     successCount.incrementAndGet()
                 } catch (e: ObjectOptimisticLockingFailureException) {
@@ -107,7 +122,13 @@ class PaymentConcurrencyTest @Autowired constructor(
     fun `scheduler after callback success gets optimistic lock exception`() {
         // given
         val payment = createInProgressPayment()
-        val transactionKey = "tx_callback_first"
+        val transactionKey = payment.externalPaymentKey!!
+        val successTransaction = createTransaction(
+            transactionKey = transactionKey,
+            orderId = payment.orderId,
+            amount = payment.paidAmount,
+            status = PgTransactionStatus.SUCCESS,
+        )
         val order = orderRepository.findById(payment.orderId)!!
         val orderItems = order.orderItems.map {
             PaymentResultHandler.OrderItemInfo(
@@ -118,24 +139,41 @@ class PaymentConcurrencyTest @Autowired constructor(
 
         // 콜백 먼저 성공 처리
         transactionTemplate.execute { _ ->
-            paymentResultHandler.handlePaymentSuccess(payment.id, transactionKey)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(successTransaction),
+                currentTime = Instant.now(),
+            )
         }
 
         // 버전이 증가했으므로 이전 버전으로 처리하려 하면 실패
         // 스케줄러 시뮬레이션: 동일한 결제를 다시 처리 시도
-        var optimisticLockExceptionOccurred = false
+        val failedTransaction = createTransaction(
+            transactionKey = transactionKey,
+            orderId = payment.orderId,
+            amount = payment.paidAmount,
+            status = PgTransactionStatus.FAILED,
+            failureReason = "강제 실패",
+        )
+
+        var exceptionOccurred = false
         try {
             transactionTemplate.execute { _ ->
                 // 이미 PAID 상태이므로 상태 체크에서 예외 발생
-                paymentResultHandler.handlePaymentFailure(payment.id, "강제 실패", orderItems)
+                paymentResultHandler.handlePaymentResult(
+                    paymentId = payment.id,
+                    transactions = listOf(failedTransaction),
+                    currentTime = Instant.now(),
+                    orderItems = orderItems,
+                )
             }
         } catch (e: Exception) {
             // 상태 체크 예외 또는 낙관적 락 예외
-            optimisticLockExceptionOccurred = true
+            exceptionOccurred = true
         }
 
         // then
-        assertThat(optimisticLockExceptionOccurred).isTrue()
+        assertThat(exceptionOccurred).isTrue()
 
         // 결제 상태는 여전히 PAID
         val finalPayment = paymentRepository.findById(payment.id)!!
@@ -147,11 +185,21 @@ class PaymentConcurrencyTest @Autowired constructor(
     fun `second processing attempt fails due to state check`() {
         // given
         val payment = createInProgressPayment()
-        val transactionKey = "tx_state_check"
+        val transactionKey = payment.externalPaymentKey!!
+        val transaction = createTransaction(
+            transactionKey = transactionKey,
+            orderId = payment.orderId,
+            amount = payment.paidAmount,
+            status = PgTransactionStatus.SUCCESS,
+        )
 
         // 첫 번째 처리 - 성공
         transactionTemplate.execute { _ ->
-            paymentResultHandler.handlePaymentSuccess(payment.id, transactionKey)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(transaction),
+                currentTime = Instant.now(),
+            )
         }
 
         // when - 두 번째 처리 시도
@@ -159,9 +207,9 @@ class PaymentConcurrencyTest @Autowired constructor(
         var exceptionMessage = ""
         try {
             transactionTemplate.execute { _ ->
-                // PAID 상태에서 다시 success() 호출 시도
+                // PAID 상태에서 다시 confirmPayment() 호출 시도
                 val existingPayment = paymentService.findById(payment.id)
-                existingPayment.paid() // 여기서 예외 발생해야 함
+                existingPayment.confirmPayment(transaction, currentTime = Instant.now()) // 여기서 예외 발생해야 함
             }
         } catch (e: Exception) {
             exceptionOccurred = true
@@ -170,7 +218,7 @@ class PaymentConcurrencyTest @Autowired constructor(
 
         // then
         assertThat(exceptionOccurred).isTrue()
-        assertThat(exceptionMessage).contains("결제 진행 중 상태에서만 성공 처리할 수 있습니다")
+        assertThat(exceptionMessage).contains("결제 진행 중 상태에서만 확정할 수 있습니다")
     }
 
     private fun createProduct(
@@ -220,6 +268,28 @@ class PaymentConcurrencyTest @Autowired constructor(
             usedPoint = Money.krw(5000),
         )
 
-        return paymentService.startPayment(payment.id)
+        return paymentService.initiatePayment(
+            paymentId = payment.id,
+            result = PgPaymentCreateResult.Accepted("tx_concurrent_test"),
+            attemptedAt = Instant.now(),
+        )
+    }
+
+    private fun createTransaction(
+        transactionKey: String,
+        orderId: Long,
+        amount: Money,
+        status: PgTransactionStatus,
+        failureReason: String? = null,
+    ): PgTransaction {
+        return PgTransaction(
+            transactionKey = transactionKey,
+            orderId = orderId,
+            cardType = CardType.KB,
+            cardNo = "0000-0000-0000-0000",
+            amount = amount,
+            status = status,
+            failureReason = failureReason,
+        )
     }
 }

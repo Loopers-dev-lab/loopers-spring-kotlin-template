@@ -7,7 +7,11 @@ import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PgTransaction
+import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -31,6 +35,7 @@ import org.junit.jupiter.api.assertAll
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpStatus
+import java.time.Instant
 
 /**
  * 결제 멱등성 테스트
@@ -68,10 +73,21 @@ class PaymentIdempotencyTest @Autowired constructor(
         fun `duplicate SUCCESS callback for PAID payment returns 200 OK`() {
             // given
             val payment = createInProgressPayment()
-            val transactionKey = "tx_test_123"
+            // payment에 설정된 externalPaymentKey 사용
+            val transactionKey = payment.externalPaymentKey!!
+            val transaction = createTransaction(
+                transactionKey = transactionKey,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.SUCCESS,
+            )
 
             // 결제 성공 처리 (첫 번째 콜백)
-            paymentResultHandler.handlePaymentSuccess(payment.id, transactionKey)
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(transaction),
+                currentTime = Instant.now(),
+            )
 
             // 동일한 콜백 요청 (두 번째)
             val duplicateRequest = PaymentCallbackRequest(
@@ -112,7 +128,19 @@ class PaymentIdempotencyTest @Autowired constructor(
                     quantity = it.quantity,
                 )
             }
-            paymentResultHandler.handlePaymentFailure(payment.id, "테스트 실패", orderItems)
+            val failedTransaction = createTransaction(
+                transactionKey = transactionKey,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "테스트 실패",
+            )
+            paymentResultHandler.handlePaymentResult(
+                paymentId = payment.id,
+                transactions = listOf(failedTransaction),
+                currentTime = Instant.now(),
+                orderItems = orderItems,
+            )
 
             // 동일한 콜백 요청
             val callbackRequest = PaymentCallbackRequest(
@@ -258,10 +286,29 @@ class PaymentIdempotencyTest @Autowired constructor(
             usedPoint = Money.krw(5000),
         )
 
-        val startedPayment = paymentService.startPayment(payment.id)
+        // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
+        return paymentService.initiatePayment(
+            paymentId = payment.id,
+            result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
+            attemptedAt = Instant.now(),
+        )
+    }
 
-        // externalPaymentKey 설정
-        startedPayment.updateExternalPaymentKey("tx_test_${startedPayment.id}")
-        return paymentRepository.save(startedPayment)
+    private fun createTransaction(
+        transactionKey: String,
+        orderId: Long,
+        amount: Money,
+        status: PgTransactionStatus,
+        failureReason: String? = null,
+    ): PgTransaction {
+        return PgTransaction(
+            transactionKey = transactionKey,
+            orderId = orderId,
+            cardType = CardType.KB,
+            cardNo = "0000-0000-0000-0000",
+            amount = amount,
+            status = status,
+            failureReason = failureReason,
+        )
     }
 }

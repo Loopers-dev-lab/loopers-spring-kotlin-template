@@ -5,6 +5,7 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
@@ -12,6 +13,7 @@ import com.loopers.support.values.Money
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 /**
  * 결제 결과 처리를 담당하는 핸들러
@@ -28,61 +30,45 @@ class PaymentResultHandler(
     private val logger = LoggerFactory.getLogger(PaymentResultHandler::class.java)
 
     /**
-     * 결제 성공 처리
-     * - Payment 상태를 PAID로 변경
-     * - Order 상태를 PAID로 변경
+     * PG 트랜잭션 결과로 결제 상태를 확정하고 후속 처리를 수행합니다.
+     *
+     * - PAID: Order 상태를 PAID로 변경
+     * - FAILED: 리소스 복구 (포인트, 쿠폰, 재고) 및 Order 취소
+     * - IN_PROGRESS: 상태 유지 (아무 작업 안 함)
      *
      * @param paymentId 결제 ID
-     * @param externalPaymentKey PG사 거래 키
+     * @param transactions PG에서 조회한 트랜잭션 목록
+     * @param currentTime 현재 시각 (타임아웃 판단용)
+     * @param orderItems 주문 상품 목록 (재고 복구용, nullable)
      */
     @Transactional
-    fun handlePaymentSuccess(paymentId: Long, externalPaymentKey: String? = null) {
-        logger.info("결제 성공 처리 시작 - paymentId: {}", paymentId)
-
-        val payment = paymentService.completePayment(paymentId, externalPaymentKey)
-        orderService.completePayment(payment.orderId)
-
-        logger.info("결제 성공 처리 완료 - paymentId: {}, orderId: {}", paymentId, payment.orderId)
-    }
-
-    /**
-     * 결제 실패 처리 및 리소스 복구
-     * - Payment 상태를 FAILED로 변경
-     * - 차감했던 포인트 복구
-     * - 사용했던 쿠폰 복구
-     * - 감소했던 재고 복구
-     * - Order 상태를 CANCELLED로 변경
-     *
-     * @param paymentId 결제 ID
-     * @param reason 실패 사유
-     * @param orderItems 주문 상품 목록 (재고 복구용)
-     */
-    @Transactional
-    fun handlePaymentFailure(
+    fun handlePaymentResult(
         paymentId: Long,
-        reason: String?,
+        transactions: List<PgTransaction>,
+        currentTime: Instant,
         orderItems: List<OrderItemInfo>? = null,
     ) {
-        logger.info("결제 실패 처리 시작 - paymentId: {}, reason: {}", paymentId, reason)
+        logger.info("결제 결과 처리 시작 - paymentId: {}", paymentId)
 
-        val payment = paymentService.findById(paymentId)
+        val payment = paymentService.confirmPayment(paymentId, transactions, currentTime)
 
-        // 이미 FAILED 상태면 중복 처리 방지
-        if (payment.status == PaymentStatus.FAILED) {
-            logger.info("이미 실패 처리된 결제 - paymentId: {}", paymentId)
-            return
+        when (payment.status) {
+            PaymentStatus.PAID -> {
+                orderService.completePayment(payment.orderId)
+                logger.info("결제 성공 처리 완료 - paymentId: {}, orderId: {}", paymentId, payment.orderId)
+            }
+            PaymentStatus.FAILED -> {
+                recoverResources(payment, orderItems)
+                orderService.cancelOrder(payment.orderId)
+                logger.info("결제 실패 처리 완료 - paymentId: {}, orderId: {}", paymentId, payment.orderId)
+            }
+            PaymentStatus.IN_PROGRESS -> {
+                logger.info("결제 상태 유지 - paymentId: {}", paymentId)
+            }
+            else -> {
+                logger.warn("예상치 못한 결제 상태 - paymentId: {}, status: {}", paymentId, payment.status)
+            }
         }
-
-        // 결제 실패 처리
-        paymentService.failPayment(paymentId, reason)
-
-        // 리소스 복구
-        recoverResources(payment, orderItems)
-
-        // 주문 취소
-        orderService.cancelOrder(payment.orderId)
-
-        logger.info("결제 실패 처리 완료 - paymentId: {}, orderId: {}", paymentId, payment.orderId)
     }
 
     /**

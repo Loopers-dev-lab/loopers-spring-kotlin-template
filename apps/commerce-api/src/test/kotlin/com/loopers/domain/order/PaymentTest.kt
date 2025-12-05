@@ -1,7 +1,11 @@
 package com.loopers.domain.order
 
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PgTransaction
+import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -9,6 +13,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.assertThrows
+import java.time.Instant
 import kotlin.test.Test
 
 class PaymentTest {
@@ -361,192 +366,216 @@ class PaymentTest {
         }
     }
 
-    @DisplayName("start 테스트")
+    @DisplayName("initiate 테스트")
     @Nested
-    inner class Start {
+    inner class Initiate {
 
-        @DisplayName("PENDING 상태에서 start() 호출 시 IN_PROGRESS로 전이된다")
+        @DisplayName("PENDING 상태에서 Accepted로 initiate() 호출 시 IN_PROGRESS로 전이되고 transactionKey가 저장된다")
         @Test
-        fun `transitions from PENDING to IN_PROGRESS when start is called`() {
+        fun `transitions to IN_PROGRESS with transactionKey when initiate with Accepted`() {
             // given
             val payment = createPendingPayment()
+            val transactionKey = "tx_12345"
+            val attemptedAt = Instant.now()
 
             // when
-            payment.start()
+            payment.initiate(PgPaymentCreateResult.Accepted(transactionKey), attemptedAt)
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+            assertThat(payment.externalPaymentKey).isEqualTo(transactionKey)
+            assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
+        }
+
+        @DisplayName("PENDING 상태에서 Uncertain으로 initiate() 호출 시 IN_PROGRESS로 전이되고 transactionKey는 null이다")
+        @Test
+        fun `transitions to IN_PROGRESS without transactionKey when initiate with Uncertain`() {
+            // given
+            val payment = createPendingPayment()
+            val attemptedAt = Instant.now()
+
+            // when
+            payment.initiate(PgPaymentCreateResult.Uncertain, attemptedAt)
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+            assertThat(payment.externalPaymentKey).isNull()
+            assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
+        }
+
+        @DisplayName("PENDING이 아닌 상태에서 initiate() 호출 시 예외가 발생한다")
+        @Test
+        fun `throws exception when initiate is called from non-PENDING state`() {
+            // given
+            val payment = createPendingPayment()
+            payment.initiate(PgPaymentCreateResult.Accepted("tx_first"), Instant.now())
+
+            // when
+            val exception = assertThrows<CoreException> {
+                payment.initiate(PgPaymentCreateResult.Accepted("tx_second"), Instant.now())
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("결제 대기 상태에서만 결제를 개시할 수 있습니다")
+        }
+    }
+
+    @DisplayName("confirmPayment 테스트")
+    @Nested
+    inner class ConfirmPayment {
+
+        @DisplayName("externalPaymentKey로 SUCCESS 매칭 시 PAID로 전이된다")
+        @Test
+        fun `transitions to PAID when matched by externalPaymentKey with SUCCESS`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
+            val transaction = createTransaction(
+                transactionKey = "tx_12345",
+                status = PgTransactionStatus.SUCCESS,
+            )
+
+            // when
+            payment.confirmPayment(transaction, currentTime = Instant.now())
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(payment.externalPaymentKey).isEqualTo("tx_12345")
+        }
+
+        @DisplayName("externalPaymentKey로 FAILED 매칭 시 FAILED로 전이된다")
+        @Test
+        fun `transitions to FAILED when matched by externalPaymentKey with FAILED`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
+            val transaction = createTransaction(
+                transactionKey = "tx_12345",
+                status = PgTransactionStatus.FAILED,
+                failureReason = "잔액 부족",
+            )
+
+            // when
+            payment.confirmPayment(transaction, currentTime = Instant.now())
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(payment.externalPaymentKey).isEqualTo("tx_12345")
+            assertThat(payment.failureMessage).isEqualTo("잔액 부족")
+        }
+
+        @DisplayName("paidAmount로 SUCCESS 매칭 시 PAID로 전이하고 키가 설정된다")
+        @Test
+        fun `transitions to PAID and sets key when matched by paidAmount with SUCCESS`() {
+            // given - Uncertain으로 initiate된 경우 externalPaymentKey가 null
+            val payment = createInProgressPayment(externalPaymentKey = null)
+            val transaction = createTransaction(
+                transactionKey = "tx_new_12345",
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.SUCCESS,
+            )
+
+            // when
+            payment.confirmPayment(transaction, currentTime = Instant.now())
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(payment.externalPaymentKey).isEqualTo("tx_new_12345")
+        }
+
+        @DisplayName("paidAmount로 FAILED 매칭 시 FAILED로 전이하고 키가 설정된다")
+        @Test
+        fun `transitions to FAILED and sets key when matched by paidAmount with FAILED`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = null)
+            val transaction = createTransaction(
+                transactionKey = "tx_failed_12345",
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = "카드 한도 초과",
+            )
+
+            // when
+            payment.confirmPayment(transaction, currentTime = Instant.now())
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(payment.externalPaymentKey).isEqualTo("tx_failed_12345")
+            assertThat(payment.failureMessage).isEqualTo("카드 한도 초과")
+        }
+
+        @DisplayName("매칭 없고 5분 경과 시 FAILED로 전이된다")
+        @Test
+        fun `transitions to FAILED when no match and 5 minutes elapsed`() {
+            // given
+            val attemptedAt = Instant.now().minusSeconds(301) // 5분 1초 전
+            val payment = createInProgressPayment(attemptedAt = attemptedAt)
+            // 다른 금액의 트랜잭션 생성
+            val transaction = createTransaction(
+                transactionKey = "tx_different",
+                amount = Money.krw(99999),
+                status = PgTransactionStatus.SUCCESS,
+            )
+
+            // when
+            payment.confirmPayment(transaction, currentTime = Instant.now())
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(payment.failureMessage).isEqualTo("결제 시간 초과")
+        }
+
+        @DisplayName("매칭 없고 5분 미경과 시 IN_PROGRESS 유지된다")
+        @Test
+        fun `stays IN_PROGRESS when no match and less than 5 minutes elapsed`() {
+            // given - 4분 59초 전
+            val attemptedAt = Instant.now().minusSeconds(299)
+            val payment = createInProgressPayment(attemptedAt = attemptedAt)
+            // 다른 금액의 트랜잭션 생성
+            val transaction = createTransaction(
+                transactionKey = "tx_different",
+                amount = Money.krw(99999),
+                status = PgTransactionStatus.SUCCESS,
+            )
+
+            // when
+            payment.confirmPayment(transaction, currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
         }
 
-        @DisplayName("PENDING이 아닌 상태에서 start() 호출 시 예외가 발생한다")
-        @Test
-        fun `throws exception when start is called from non-PENDING state`() {
-            // given
-            val payment = createPendingPayment()
-            payment.start() // IN_PROGRESS 상태로 전이
-
-            // when
-            val exception = assertThrows<CoreException> {
-                payment.start()
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("결제 대기 상태에서만 결제를 시작할 수 있습니다")
-        }
-    }
-
-    @DisplayName("updateExternalPaymentKey 테스트")
-    @Nested
-    inner class UpdateExternalPaymentKey {
-
-        @DisplayName("IN_PROGRESS 상태에서 externalPaymentKey를 저장할 수 있다")
-        @Test
-        fun `saves externalPaymentKey when in IN_PROGRESS state`() {
-            // given
-            val payment = createPendingPayment()
-            payment.start()
-            val paymentKey = "pg_txn_12345"
-
-            // when
-            payment.updateExternalPaymentKey(paymentKey)
-
-            // then
-            assertThat(payment.externalPaymentKey).isEqualTo(paymentKey)
-        }
-
-        @DisplayName("IN_PROGRESS가 아닌 상태에서 updateExternalPaymentKey 호출 시 예외가 발생한다")
+        @DisplayName("IN_PROGRESS가 아닌 상태에서 호출 시 예외가 발생한다")
         @Test
         fun `throws exception when called from non-IN_PROGRESS state`() {
             // given
             val payment = createPendingPayment() // PENDING 상태
+            val transaction = createTransaction()
 
             // when
             val exception = assertThrows<CoreException> {
-                payment.updateExternalPaymentKey("pg_txn_12345")
+                payment.confirmPayment(transaction, currentTime = Instant.now())
             }
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("결제 진행 중 상태에서만 외부 결제 키를 저장할 수 있습니다")
-        }
-    }
-
-    @DisplayName("success 테스트")
-    @Nested
-    inner class Success {
-
-        @DisplayName("IN_PROGRESS 상태에서 success() 호출 시 PAID로 전이된다")
-        @Test
-        fun `transitions from IN_PROGRESS to PAID when success is called`() {
-            // given
-            val payment = createPendingPayment()
-            payment.start()
-
-            // when
-            payment.paid()
-
-            // then
-            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(exception.message).isEqualTo("결제 진행 중 상태에서만 확정할 수 있습니다")
         }
 
-        @DisplayName("IN_PROGRESS가 아닌 상태에서 success() 호출 시 예외가 발생한다")
+        @DisplayName("PENDING 트랜잭션만 있는 경우 IN_PROGRESS 유지된다")
         @Test
-        fun `throws exception when success is called from non-IN_PROGRESS state`() {
+        fun `stays IN_PROGRESS when only PENDING transactions exist`() {
             // given
-            val payment = createPendingPayment() // PENDING 상태
+            val payment = createInProgressPayment(externalPaymentKey = null)
+            val transaction = createTransaction(
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.PENDING,
+            )
 
             // when
-            val exception = assertThrows<CoreException> {
-                payment.paid()
-            }
+            payment.confirmPayment(transaction, currentTime = Instant.now())
 
             // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("결제 진행 중 상태에서만 성공 처리할 수 있습니다")
-        }
-    }
-
-    @DisplayName("fail 테스트")
-    @Nested
-    inner class Fail {
-
-        @DisplayName("PENDING 상태에서 fail() 호출 시 FAILED로 전이된다")
-        @Test
-        fun `transitions from PENDING to FAILED when fail is called`() {
-            // given
-            val payment = createPendingPayment()
-
-            // when
-            payment.fail("서킷 오픈")
-
-            // then
-            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
-            assertThat(payment.failureMessage).isEqualTo("서킷 오픈")
-        }
-
-        @DisplayName("IN_PROGRESS 상태에서 fail() 호출 시 FAILED로 전이된다")
-        @Test
-        fun `transitions from IN_PROGRESS to FAILED when fail is called`() {
-            // given
-            val payment = createPendingPayment()
-            payment.start()
-
-            // when
-            payment.fail("PG 거절")
-
-            // then
-            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
-            assertThat(payment.failureMessage).isEqualTo("PG 거절")
-        }
-
-        @DisplayName("failureMessage 없이 fail() 호출할 수 있다")
-        @Test
-        fun `can call fail without failureMessage`() {
-            // given
-            val payment = createPendingPayment()
-
-            // when
-            payment.fail(null)
-
-            // then
-            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
-            assertThat(payment.failureMessage).isNull()
-        }
-
-        @DisplayName("PAID 상태에서 fail() 호출 시 예외가 발생한다")
-        @Test
-        fun `throws exception when fail is called from PAID state`() {
-            // given
-            val payment = createPendingPayment()
-            payment.start()
-            payment.paid()
-
-            // when
-            val exception = assertThrows<CoreException> {
-                payment.fail("실패 시도")
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("이미 처리된 결제입니다")
-        }
-
-        @DisplayName("FAILED 상태에서 fail() 호출 시 예외가 발생한다")
-        @Test
-        fun `throws exception when fail is called from FAILED state`() {
-            // given
-            val payment = createPendingPayment()
-            payment.fail("첫 번째 실패")
-
-            // when
-            val exception = assertThrows<CoreException> {
-                payment.fail("두 번째 실패 시도")
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("이미 처리된 결제입니다")
+            assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
         }
     }
 
@@ -558,6 +587,44 @@ class PaymentTest {
             userId = userId,
             order = order,
             usedPoint = Money.ZERO_KRW,
+        )
+    }
+
+    private fun createInProgressPayment(
+        userId: Long = 1L,
+        order: Order = createOrder(),
+        externalPaymentKey: String? = "tx_12345",
+        attemptedAt: Instant = Instant.now(),
+    ): Payment {
+        val payment = Payment.create(
+            userId = userId,
+            order = order,
+            usedPoint = Money.ZERO_KRW,
+        )
+        val result = if (externalPaymentKey != null) {
+            PgPaymentCreateResult.Accepted(externalPaymentKey)
+        } else {
+            PgPaymentCreateResult.Uncertain
+        }
+        payment.initiate(result, attemptedAt)
+        return payment
+    }
+
+    private fun createTransaction(
+        transactionKey: String = "tx_default",
+        orderId: Long = 1L,
+        amount: Money = Money.krw(10000),
+        status: PgTransactionStatus = PgTransactionStatus.SUCCESS,
+        failureReason: String? = null,
+    ): PgTransaction {
+        return PgTransaction(
+            transactionKey = transactionKey,
+            orderId = orderId,
+            cardType = CardType.KB,
+            cardNo = "0000-0000-0000-0000",
+            amount = amount,
+            status = status,
+            failureReason = failureReason,
         )
     }
 
