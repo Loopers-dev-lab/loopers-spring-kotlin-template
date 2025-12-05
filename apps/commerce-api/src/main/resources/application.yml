@@ -29,6 +29,52 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+# PG 설정
+pg:
+  base-url: http://localhost:8081
+  callback-base-url: http://localhost:8080
+
+# Resilience4j 설정
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 30
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 700ms
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - com.loopers.infrastructure.pg.PgException$RequestNotReached
+        ignore-exceptions:
+          - com.loopers.infrastructure.pg.PgException$BusinessError
+    instances:
+      pg:
+        base-config: default
+  retry:
+    configs:
+      default:
+        max-attempts: 4
+        wait-duration: 100ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        exponential-max-wait-duration: 1s
+        retry-exceptions:
+          - java.net.ConnectException
+          - com.loopers.infrastructure.pg.PgException$RequestNotReached
+        ignore-exceptions:
+          - java.net.SocketTimeoutException
+          - com.loopers.infrastructure.pg.PgException$ResponseUncertain
+          - com.loopers.infrastructure.pg.PgException$BusinessError
+    instances:
+      pg:
+        base-config: default
+
 ---
 spring:
   config:
