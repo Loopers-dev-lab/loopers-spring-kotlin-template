@@ -75,6 +75,52 @@ class Payment(
     var version: Long = 0
         private set
 
+    /**
+     * 결제를 시작합니다. PENDING → IN_PROGRESS 상태 전이
+     * @throws CoreException PENDING 상태가 아닌 경우
+     */
+    fun start() {
+        if (status != PaymentStatus.PENDING) {
+            throw CoreException(ErrorType.BAD_REQUEST, "결제 대기 상태에서만 결제를 시작할 수 있습니다")
+        }
+        status = PaymentStatus.IN_PROGRESS
+    }
+
+    /**
+     * PG 트랜잭션 키를 저장합니다.
+     * @throws CoreException IN_PROGRESS 상태가 아닌 경우
+     */
+    fun updateExternalPaymentKey(key: String) {
+        if (status != PaymentStatus.IN_PROGRESS) {
+            throw CoreException(ErrorType.BAD_REQUEST, "결제 진행 중 상태에서만 외부 결제 키를 저장할 수 있습니다")
+        }
+        externalPaymentKey = key
+    }
+
+    /**
+     * 결제를 성공 처리합니다. IN_PROGRESS → PAID 상태 전이
+     * @throws CoreException IN_PROGRESS 상태가 아닌 경우
+     */
+    fun success() {
+        if (status != PaymentStatus.IN_PROGRESS) {
+            throw CoreException(ErrorType.BAD_REQUEST, "결제 진행 중 상태에서만 성공 처리할 수 있습니다")
+        }
+        status = PaymentStatus.PAID
+    }
+
+    /**
+     * 결제를 실패 처리합니다. PENDING/IN_PROGRESS → FAILED 상태 전이
+     * @param message 실패 사유 (nullable)
+     * @throws CoreException 이미 처리된 결제(PAID/FAILED)인 경우
+     */
+    fun fail(message: String?) {
+        if (status == PaymentStatus.PAID || status == PaymentStatus.FAILED) {
+            throw CoreException(ErrorType.BAD_REQUEST, "이미 처리된 결제입니다")
+        }
+        status = PaymentStatus.FAILED
+        failureMessage = message
+    }
+
     companion object {
         /**
          * 포인트 전액 결제용 팩토리 메서드 (기존 방식 - 즉시 PAID)

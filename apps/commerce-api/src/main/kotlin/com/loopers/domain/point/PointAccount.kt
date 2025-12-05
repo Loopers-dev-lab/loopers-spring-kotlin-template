@@ -70,4 +70,16 @@ class PointAccount(
 
         this.balance = this.balance.minus(amount)
     }
+
+    /**
+     * 포인트를 복구합니다. 결제 실패 시 차감했던 포인트를 되돌립니다.
+     * @param amount 복구할 금액 (양수)
+     * @throws CoreException 금액이 0 이하인 경우
+     */
+    fun restore(amount: Money) {
+        if (amount <= Money.ZERO_KRW) {
+            throw CoreException(ErrorType.BAD_REQUEST, "복구 금액은 양수여야 합니다")
+        }
+        this.balance = this.balance.plus(amount)
+    }
 }

@@ -266,6 +266,57 @@ class OrderTest {
         }
     }
 
+    @DisplayName("cancel 테스트")
+    @Nested
+    inner class Cancel {
+
+        @DisplayName("PLACED 상태의 주문이 CANCELLED로 전환된다")
+        @Test
+        fun `transition from PLACED to CANCELLED`() {
+            // given
+            val order = createOrder(status = OrderStatus.PLACED)
+
+            // when
+            order.cancel()
+
+            // then
+            assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
+        }
+
+        @DisplayName("PAID 상태에서 cancel() 호출 시 예외가 발생한다")
+        @Test
+        fun `throws exception when cancel is called from PAID status`() {
+            // given
+            val order = createOrder(status = OrderStatus.PAID)
+
+            // when
+            val exception = assertThrows<CoreException> {
+                order.cancel()
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("주문 대기 상태에서만 취소할 수 있습니다")
+        }
+
+        @DisplayName("CANCELLED 상태에서 cancel() 호출 시 예외가 발생한다")
+        @Test
+        fun `throws exception when cancel is called from CANCELLED status`() {
+            // given
+            val order = createOrder(status = OrderStatus.PLACED)
+            order.cancel()
+
+            // when
+            val exception = assertThrows<CoreException> {
+                order.cancel()
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("주문 대기 상태에서만 취소할 수 있습니다")
+        }
+    }
+
     private fun addOrderItem(
         productId: Long = 1L,
         quantity: Int = 1,

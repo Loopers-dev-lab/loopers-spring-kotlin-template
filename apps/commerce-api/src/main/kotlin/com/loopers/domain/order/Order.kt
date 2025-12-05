@@ -96,4 +96,15 @@ class Order(
 
         status = OrderStatus.PAID
     }
+
+    /**
+     * 주문을 취소합니다. PLACED → CANCELLED 상태 전이
+     * @throws CoreException PLACED 상태가 아닌 경우
+     */
+    fun cancel() {
+        if (status != OrderStatus.PLACED) {
+            throw CoreException(ErrorType.BAD_REQUEST, "주문 대기 상태에서만 취소할 수 있습니다")
+        }
+        status = OrderStatus.CANCELLED
+    }
 }

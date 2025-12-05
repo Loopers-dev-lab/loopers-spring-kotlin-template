@@ -80,4 +80,16 @@ class IssuedCoupon(
         status = UsageStatus.USED
         this.usedAt = usedAt
     }
+
+    /**
+     * 쿠폰 사용을 취소합니다. USED → AVAILABLE 상태 전이
+     * @throws CoreException USED 상태가 아닌 경우
+     */
+    fun cancelUse() {
+        if (status != UsageStatus.USED) {
+            throw CoreException(ErrorType.BAD_REQUEST, "사용되지 않은 쿠폰입니다")
+        }
+        status = UsageStatus.AVAILABLE
+        usedAt = null
+    }
 }

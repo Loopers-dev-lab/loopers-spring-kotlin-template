@@ -140,6 +140,58 @@ class PointAccountTest {
         }
     }
 
+    @DisplayName("포인트 복구 테스트")
+    @Nested
+    inner class Restore {
+
+        @DisplayName("유효한 금액으로 복구하면 잔액이 증가한다")
+        @Test
+        fun `increase balance when restore with valid amount`() {
+            // given
+            val initialBalance = Money.krw(5000)
+            val pointAccount = createPointAccount(balance = initialBalance)
+            val restoreAmount = Money.krw(3000)
+
+            // when
+            pointAccount.restore(restoreAmount)
+
+            // then
+            assertThat(pointAccount.balance).isEqualTo(Money.krw(8000))
+        }
+
+        @DisplayName("0원 복구 시도 시 예외가 발생한다")
+        @Test
+        fun `throws exception when restore with zero amount`() {
+            // given
+            val pointAccount = createPointAccount(balance = Money.krw(5000))
+
+            // when
+            val exception = assertThrows<CoreException> {
+                pointAccount.restore(Money.ZERO_KRW)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("복구 금액은 양수여야 합니다")
+        }
+
+        @DisplayName("음수 금액 복구 시도 시 예외가 발생한다")
+        @Test
+        fun `throws exception when restore with negative amount`() {
+            // given
+            val pointAccount = createPointAccount(balance = Money.krw(5000))
+
+            // when
+            val exception = assertThrows<CoreException> {
+                pointAccount.restore(Money.krw(-1000))
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("복구 금액은 양수여야 합니다")
+        }
+    }
+
     fun createPointAccount(
         userId: Long = 1L,
         balance: Money = Money.krw(1000),
