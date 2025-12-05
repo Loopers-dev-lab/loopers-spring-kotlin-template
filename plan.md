@@ -293,24 +293,24 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### Clarifications
 
-- [ ] Confirm: Safe to delete infrastructure PgClient.kt? (After verifying no external dependencies)
+- [x] Confirm: Safe to delete infrastructure PgClient.kt? (After verifying no external dependencies)
 
 ### TODO
 
-- [ ] Delete `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt` - old interface (now superseded by domain/pg/PgClient.kt)
+- [x] Delete `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt` - old interface (now superseded by domain/pg/PgClient.kt)
 
-- [ ] Verify no remaining imports of infrastructure PgClient
+- [x] Verify no remaining imports of infrastructure PgClient
   - Run: `grep -r "infrastructure.pg.PgClient" apps/`
 
 ### Tests
 
-- [ ] All existing tests pass
+- [x] All existing tests pass
 
 ### Done When
 
-- [ ] `./gradlew :apps:commerce-api:test` passes
-- [ ] `ls apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/` does NOT show PgClient.kt
-- [ ] `grep -r "infrastructure.pg.PgClient" apps/` returns empty
+- [x] `./gradlew :apps:commerce-api:test` passes
+- [x] `ls apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/` does NOT show PgClient.kt
+- [x] `grep -r "infrastructure.pg.PgClient" apps/` returns empty
 
 ---
 
