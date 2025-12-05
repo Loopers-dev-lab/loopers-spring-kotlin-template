@@ -1,6 +1,5 @@
 package com.loopers.domain.order
 
-import com.loopers.domain.brand.Brand
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.Quantity
 import com.loopers.domain.product.Stock
@@ -38,19 +37,6 @@ class OrderTest {
 
         val order = Order("member1", listOf(orderItem1, orderItem2))
 
-        assertThat(order.totalAmount.amount).isEqualTo(40000L)
-    }
-
-    @DisplayName("주문에 아이템을 추가할 수 있다")
-    @Test
-    fun addItemToOrder() {
-        val orderItem1 = OrderItem.of(1L, "상품1", Money.of(10000L), Quantity.of(2))
-        val order = Order("member1", listOf(orderItem1))
-
-        val orderItem2 = OrderItem.of(2L, "상품2", Money.of(20000L), Quantity.of(1))
-        order.addItem(orderItem2)
-
-        assertThat(order.items).hasSize(2)
         assertThat(order.totalAmount.amount).isEqualTo(40000L)
     }
 

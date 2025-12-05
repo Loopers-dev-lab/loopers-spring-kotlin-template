@@ -13,6 +13,7 @@ import com.loopers.domain.shared.Money
 import com.loopers.infrastructure.brand.BrandJpaRepository
 import com.loopers.infrastructure.member.MemberJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
+import com.loopers.interfaces.api.order.OrderV1Dto
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.utils.DatabaseCleanUp
@@ -38,7 +39,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         databaseCleanUp.truncateAllTables()
     }
 
-    @DisplayName("주문을 생성할 수 있다")
+    @DisplayName("포인트 전액 결제로 주문을 생성할 수 있다")
     @Test
     fun createOrder() {
         // Given
@@ -53,13 +54,16 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
-        val request = CreateOrderRequest(
-            memberId = "member1",
-            items = listOf(OrderItemRequest(product.id!!, 2))
+        val request = OrderV1Dto.CreateOrderRequest(
+            items = listOf(OrderV1Dto.OrderItemRequest(product.id, 2)),
+            usePoint = 20000L, // 전액 포인트 결제
+            cardType = null,
+            cardNo = null,
+            couponId = null
         )
 
         // When
-        val result = orderFacade.createOrder(request)
+        val result = orderFacade.createOrder("member1", request)
 
         // Then
         assertThat(result).isNotNull
@@ -73,15 +77,15 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         assertThat(result.items[0].subtotal).isEqualTo(20000L)
 
         // 재고 감소 확인
-        val updatedProduct = productJpaRepository.findById(product.id!!).get()
+        val updatedProduct = productJpaRepository.findById(product.id).get()
         assertThat(updatedProduct.stock.quantity).isEqualTo(98)
 
         // 포인트 차감 확인
-        val updatedMember = memberJpaRepository.findById(member.id!!).get()
+        val updatedMember = memberJpaRepository.findById(member.id).get()
         assertThat(updatedMember.point.amount).isEqualTo(80000L)
     }
 
-    @DisplayName("여러 상품을 포함한 주문을 생성할 수 있다")
+    @DisplayName("여러 상품을 포함한 주문을 포인트 전액 결제로 생성할 수 있다")
     @Test
     fun createOrderWithMultipleProducts() {
         // Given
@@ -95,16 +99,19 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), 1L))
         val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), 1L))
 
-        val request = CreateOrderRequest(
-            memberId = "member1",
+        val request = OrderV1Dto.CreateOrderRequest(
             items = listOf(
-                OrderItemRequest(product1.id!!, 2),
-                OrderItemRequest(product2.id!!, 1)
-            )
+                OrderV1Dto.OrderItemRequest(product1.id, 2),
+                OrderV1Dto.OrderItemRequest(product2.id, 1)
+            ),
+            usePoint = 40000L, // 전액 포인트 결제
+            cardType = null,
+            cardNo = null,
+            couponId = null
         )
 
         // When
-        val result = orderFacade.createOrder(request)
+        val result = orderFacade.createOrder("member1", request)
 
         // Then
         assertThat(result.totalAmount).isEqualTo(40000L) // (10000*2) + (20000*1)
@@ -130,13 +137,16 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
-        val request = CreateOrderRequest(
-            memberId = "nonExistentMember",
-            items = listOf(OrderItemRequest(product.id!!, 2))
+        val request = OrderV1Dto.CreateOrderRequest(
+            items = listOf(OrderV1Dto.OrderItemRequest(product.id, 2)),
+            usePoint = 20000L,
+            cardType = null,
+            cardNo = null,
+            couponId = null
         )
 
         val exception = assertThrows<CoreException> {
-            orderFacade.createOrder(request)
+            orderFacade.createOrder("nonExistentMember", request)
         }
 
         assertThat(exception.errorType).isEqualTo(ErrorType.MEMBER_NOT_FOUND)
@@ -151,13 +161,16 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         member.chargePoint(100000L)
         memberJpaRepository.save(member)
 
-        val request = CreateOrderRequest(
-            memberId = "member1",
-            items = listOf(OrderItemRequest(999L, 2))
+        val request = OrderV1Dto.CreateOrderRequest(
+            items = listOf(OrderV1Dto.OrderItemRequest(999L, 2)),
+            usePoint = 20000L,
+            cardType = null,
+            cardNo = null,
+            couponId = null
         )
 
         val exception = assertThrows<CoreException> {
-            orderFacade.createOrder(request)
+            orderFacade.createOrder("member1", request)
         }
 
         assertThat(exception.errorType).isEqualTo(ErrorType.PRODUCT_NOT_FOUND)
@@ -177,13 +190,16 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             Product("상품1", "설명", Money.of(10000L), Stock.of(5), 1L)
         )
 
-        val request = CreateOrderRequest(
-            memberId = "member1",
-            items = listOf(OrderItemRequest(product.id!!, 10))
+        val request = OrderV1Dto.CreateOrderRequest(
+            items = listOf(OrderV1Dto.OrderItemRequest(product.id, 10)),
+            usePoint = 100000L,
+            cardType = null,
+            cardNo = null,
+            couponId = null
         )
 
         val exception = assertThrows<CoreException> {
-            orderFacade.createOrder(request)
+            orderFacade.createOrder("member1", request)
         }
 
         assertThat(exception.errorType).isEqualTo(ErrorType.INSUFFICIENT_STOCK)
@@ -203,13 +219,16 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
         )
 
-        val request = CreateOrderRequest(
-            memberId = "member1",
-            items = listOf(OrderItemRequest(product.id!!, 2)) // 총 20000원
+        val request = OrderV1Dto.CreateOrderRequest(
+            items = listOf(OrderV1Dto.OrderItemRequest(product.id, 2)), // 총 20000원
+            usePoint = 20000L, // 부족한 포인트로 전액 결제 시도
+            cardType = null,
+            cardNo = null,
+            couponId = null
         )
 
         val exception = assertThrows<CoreException> {
-            orderFacade.createOrder(request)
+            orderFacade.createOrder("member1", request)
         }
 
         assertThat(exception.errorType).isEqualTo(ErrorType.INSUFFICIENT_POINT)
