@@ -1,0 +1,568 @@
+package com.loopers.integration
+
+import com.loopers.application.order.PaymentResultHandler
+import com.loopers.domain.coupon.Coupon
+import com.loopers.domain.coupon.CouponRepository
+import com.loopers.domain.coupon.DiscountAmount
+import com.loopers.domain.coupon.DiscountType
+import com.loopers.domain.coupon.IssuedCoupon
+import com.loopers.domain.coupon.IssuedCouponRepository
+import com.loopers.domain.coupon.UsageStatus
+import com.loopers.domain.order.Order
+import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.order.Payment
+import com.loopers.domain.order.PaymentRepository
+import com.loopers.domain.order.PaymentService
+import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.point.PointAccount
+import com.loopers.domain.point.PointAccountRepository
+import com.loopers.domain.product.Brand
+import com.loopers.domain.product.BrandRepository
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.ProductStatistic
+import com.loopers.domain.product.ProductStatisticRepository
+import com.loopers.domain.product.Stock
+import com.loopers.support.values.Money
+import com.loopers.utils.DatabaseCleanUp
+import com.loopers.utils.RedisCleanUp
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertAll
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+
+/**
+ * 결제 복구 테스트
+ * - PG 실패 시 리소스 복구 (재고, 포인트, 쿠폰)
+ * - 다양한 실패 시나리오에서의 복구 검증
+ */
+@SpringBootTest
+@DisplayName("결제 복구 테스트")
+class PaymentRecoveryTest @Autowired constructor(
+    private val paymentService: PaymentService,
+    private val paymentResultHandler: PaymentResultHandler,
+    private val paymentRepository: PaymentRepository,
+    private val orderRepository: OrderRepository,
+    private val productRepository: ProductRepository,
+    private val brandRepository: BrandRepository,
+    private val productStatisticRepository: ProductStatisticRepository,
+    private val pointAccountRepository: PointAccountRepository,
+    private val couponRepository: CouponRepository,
+    private val issuedCouponRepository: IssuedCouponRepository,
+    private val databaseCleanUp: DatabaseCleanUp,
+    private val redisCleanUp: RedisCleanUp,
+) {
+    @AfterEach
+    fun tearDown() {
+        databaseCleanUp.truncateAllTables()
+        redisCleanUp.truncateAll()
+    }
+
+    @Nested
+    @DisplayName("포인트 복구")
+    inner class PointRecovery {
+
+        @Test
+        @DisplayName("결제 실패 시 차감된 포인트가 복구된다")
+        fun `point is restored when payment fails`() {
+            // given
+            val userId = 1L
+            val initialBalance = Money.krw(100000)
+            val pointAccount = createPointAccount(userId = userId, balance = initialBalance)
+            val usedPoint = Money.krw(5000)
+
+            val payment = createInProgressPaymentWithPoint(
+                userId = userId,
+                usedPoint = usedPoint,
+            )
+
+            val order = orderRepository.findById(payment.orderId)!!
+            val orderItems = order.orderItems.map {
+                PaymentResultHandler.OrderItemInfo(
+                    productId = it.productId,
+                    quantity = it.quantity,
+                )
+            }
+
+            // when - 결제 실패 처리
+            paymentResultHandler.handlePaymentFailure(payment.id, "PG 연결 실패", orderItems)
+
+            // then - 포인트가 복구됨
+            val restoredAccount = pointAccountRepository.findByUserId(userId)!!
+
+            assertAll(
+                { assertThat(restoredAccount.balance).isEqualTo(initialBalance) },
+                { assertThat(restoredAccount.balance).isEqualTo(pointAccount.balance) },
+            )
+        }
+
+        @Test
+        @DisplayName("포인트 사용 없이 결제 실패 시 포인트 복구가 수행되지 않는다")
+        fun `no point restoration when no point was used`() {
+            // given
+            val userId = 1L
+            val initialBalance = Money.krw(100000)
+            createPointAccount(userId = userId, balance = initialBalance)
+
+            val payment = createInProgressPaymentWithPoint(
+                userId = userId,
+                usedPoint = Money.ZERO_KRW,
+            )
+
+            val order = orderRepository.findById(payment.orderId)!!
+            val orderItems = order.orderItems.map {
+                PaymentResultHandler.OrderItemInfo(
+                    productId = it.productId,
+                    quantity = it.quantity,
+                )
+            }
+
+            // when - 결제 실패 처리
+            paymentResultHandler.handlePaymentFailure(payment.id, "카드 한도 초과", orderItems)
+
+            // then - 포인트 잔액 그대로
+            val account = pointAccountRepository.findByUserId(userId)!!
+            assertThat(account.balance).isEqualTo(initialBalance)
+        }
+    }
+
+    @Nested
+    @DisplayName("쿠폰 복구")
+    inner class CouponRecovery {
+
+        @Test
+        @DisplayName("결제 실패 시 사용된 쿠폰이 복구된다")
+        fun `coupon is restored when payment fails`() {
+            // given
+            val userId = 1L
+            val coupon = createCoupon()
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            val payment = createInProgressPaymentWithCoupon(
+                userId = userId,
+                issuedCoupon = issuedCoupon,
+            )
+
+            val order = orderRepository.findById(payment.orderId)!!
+            val orderItems = order.orderItems.map {
+                PaymentResultHandler.OrderItemInfo(
+                    productId = it.productId,
+                    quantity = it.quantity,
+                )
+            }
+
+            // when - 결제 실패 처리
+            paymentResultHandler.handlePaymentFailure(payment.id, "서킷 브레이커 오픈", orderItems)
+
+            // then - 쿠폰 상태가 AVAILABLE로 복구됨
+            val restoredCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
+
+            assertThat(restoredCoupon.status).isEqualTo(UsageStatus.AVAILABLE)
+        }
+
+        @Test
+        @DisplayName("쿠폰 없이 결제 실패 시 쿠폰 복구가 수행되지 않는다")
+        fun `no coupon restoration when no coupon was used`() {
+            // given
+            val userId = 1L
+            val payment = createInProgressPaymentWithPoint(
+                userId = userId,
+                usedPoint = Money.krw(10000),
+            )
+
+            val order = orderRepository.findById(payment.orderId)!!
+            val orderItems = order.orderItems.map {
+                PaymentResultHandler.OrderItemInfo(
+                    productId = it.productId,
+                    quantity = it.quantity,
+                )
+            }
+
+            // when - 결제 실패 처리 (쿠폰 없음)
+            paymentResultHandler.handlePaymentFailure(payment.id, "PG 거부", orderItems)
+
+            // then - 결제가 실패됨 (쿠폰 관련 에러 없음)
+            val failedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(failedPayment.status).isEqualTo(PaymentStatus.FAILED)
+        }
+    }
+
+    @Nested
+    @DisplayName("재고 복구")
+    inner class StockRecovery {
+
+        @Test
+        @DisplayName("결제 실패 시 차감된 재고가 복구된다")
+        fun `stock is restored when payment fails`() {
+            // given
+            val userId = 1L
+            val initialStock = 100
+            val orderQuantity = 5
+            val product = createProduct(stock = Stock.of(initialStock))
+
+            // 재고 차감 및 결제 생성
+            val payment = createInProgressPaymentWithProduct(
+                userId = userId,
+                product = product,
+                quantity = orderQuantity,
+            )
+
+            val order = orderRepository.findById(payment.orderId)!!
+            val orderItems = order.orderItems.map {
+                PaymentResultHandler.OrderItemInfo(
+                    productId = it.productId,
+                    quantity = it.quantity,
+                )
+            }
+
+            // when - 결제 실패 처리
+            paymentResultHandler.handlePaymentFailure(payment.id, "잔액 부족", orderItems)
+
+            // then - 재고가 복구됨
+            val restoredProduct = productRepository.findById(product.id)!!
+            assertThat(restoredProduct.stock.amount).isEqualTo(initialStock)
+        }
+
+        @Test
+        @DisplayName("여러 상품의 재고가 모두 복구된다")
+        fun `multiple product stocks are all restored when payment fails`() {
+            // given
+            val userId = 1L
+            val product1 = createProduct(stock = Stock.of(100))
+            val product2 = createProduct(stock = Stock.of(50))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            // 주문 생성 (재고 차감 시뮬레이션)
+            val order = Order.place(userId)
+            order.addOrderItem(product1.id, 5, "상품1", Money.krw(10000))
+            order.addOrderItem(product2.id, 3, "상품2", Money.krw(15000))
+            val savedOrder = orderRepository.save(order)
+
+            // 재고 차감
+            val updatedProduct1 = productRepository.findById(product1.id)!!
+            updatedProduct1.decreaseStock(5)
+            productRepository.save(updatedProduct1)
+
+            val updatedProduct2 = productRepository.findById(product2.id)!!
+            updatedProduct2.decreaseStock(3)
+            productRepository.save(updatedProduct2)
+
+            // Payment 생성
+            val payment = paymentService.createPending(
+                userId = userId,
+                order = savedOrder,
+                usedPoint = Money.krw(95000),
+                paidAmount = Money.ZERO_KRW,
+            )
+            paymentService.startPayment(payment.id)
+
+            val orderItems = listOf(
+                PaymentResultHandler.OrderItemInfo(productId = product1.id, quantity = 5),
+                PaymentResultHandler.OrderItemInfo(productId = product2.id, quantity = 3),
+            )
+
+            // when - 결제 실패 처리
+            paymentResultHandler.handlePaymentFailure(payment.id, "타임아웃", orderItems)
+
+            // then - 모든 재고가 복구됨
+            val restoredProduct1 = productRepository.findById(product1.id)!!
+            val restoredProduct2 = productRepository.findById(product2.id)!!
+
+            assertAll(
+                { assertThat(restoredProduct1.stock.amount).isEqualTo(100) },
+                { assertThat(restoredProduct2.stock.amount).isEqualTo(50) },
+            )
+        }
+    }
+
+    @Nested
+    @DisplayName("주문 상태 변경")
+    inner class OrderStatusChange {
+
+        @Test
+        @DisplayName("결제 실패 시 주문 상태가 CANCELLED로 변경된다")
+        fun `order status changes to CANCELLED when payment fails`() {
+            // given
+            val userId = 1L
+            val payment = createInProgressPaymentWithPoint(
+                userId = userId,
+                usedPoint = Money.krw(10000),
+            )
+
+            val order = orderRepository.findById(payment.orderId)!!
+            val orderItems = order.orderItems.map {
+                PaymentResultHandler.OrderItemInfo(
+                    productId = it.productId,
+                    quantity = it.quantity,
+                )
+            }
+
+            // when - 결제 실패 처리
+            paymentResultHandler.handlePaymentFailure(payment.id, "결제 거부", orderItems)
+
+            // then - 주문 상태가 CANCELLED
+            val cancelledOrder = orderRepository.findById(payment.orderId)!!
+            assertThat(cancelledOrder.status).isEqualTo(OrderStatus.CANCELLED)
+        }
+
+        @Test
+        @DisplayName("결제 성공 시 주문 상태가 PAID로 변경된다")
+        fun `order status changes to PAID when payment succeeds`() {
+            // given
+            val userId = 1L
+            val payment = createInProgressPaymentWithPoint(
+                userId = userId,
+                usedPoint = Money.krw(10000),
+            )
+
+            // when - 결제 성공 처리
+            paymentResultHandler.handlePaymentSuccess(payment.id, "tx_success_123")
+
+            // then - 주문 상태가 PAID
+            val paidOrder = orderRepository.findById(payment.orderId)!!
+            assertThat(paidOrder.status).isEqualTo(OrderStatus.PAID)
+        }
+    }
+
+    @Nested
+    @DisplayName("전체 리소스 복구")
+    inner class FullResourceRecovery {
+
+        @Test
+        @DisplayName("결제 실패 시 모든 리소스(포인트, 쿠폰, 재고)가 복구된다")
+        fun `all resources are restored when payment fails`() {
+            // given
+            val userId = 1L
+            val initialPoint = Money.krw(100000)
+            val initialStock = 100
+            val usedPoint = Money.krw(5000)
+            val orderQuantity = 2
+
+            createPointAccount(userId = userId, balance = initialPoint)
+            val product = createProduct(stock = Stock.of(initialStock))
+            val coupon = createCoupon(discountValue = 3000)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            // 주문 생성
+            val order = Order.place(userId)
+            order.addOrderItem(product.id, orderQuantity, "테스트 상품", Money.krw(10000))
+            val savedOrder = orderRepository.save(order)
+
+            // 재고 차감
+            val updatedProduct = productRepository.findById(product.id)!!
+            updatedProduct.decreaseStock(orderQuantity)
+            productRepository.save(updatedProduct)
+
+            // 포인트 차감
+            val pointAccount = pointAccountRepository.findByUserId(userId)!!
+            pointAccount.deduct(usedPoint)
+            pointAccountRepository.save(pointAccount)
+
+            // 쿠폰 사용 (시뮬레이션 - 직접 상태 변경)
+            val couponToUse = issuedCouponRepository.findById(issuedCoupon.id)!!
+            val couponDef = couponRepository.findById(coupon.id)!!
+            couponToUse.use(userId, couponDef, java.time.ZonedDateTime.now())
+            issuedCouponRepository.save(couponToUse)
+
+            // Payment 생성 (couponDiscount 포함)
+            val payment = paymentService.createPending(
+                userId = userId,
+                order = savedOrder,
+                usedPoint = usedPoint,
+                paidAmount = Money.krw(12000),
+                issuedCouponId = issuedCoupon.id,
+                couponDiscount = Money.krw(3000),
+            )
+            paymentService.startPayment(payment.id)
+
+            val orderItems = listOf(
+                PaymentResultHandler.OrderItemInfo(productId = product.id, quantity = orderQuantity),
+            )
+
+            // when - 결제 실패 처리
+            paymentResultHandler.handlePaymentFailure(payment.id, "PG 서버 오류", orderItems)
+
+            // then - 모든 리소스 복구
+            val restoredPointAccount = pointAccountRepository.findByUserId(userId)!!
+            val restoredProduct = productRepository.findById(product.id)!!
+            val restoredCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
+            val cancelledOrder = orderRepository.findById(savedOrder.id)!!
+
+            assertAll(
+                { assertThat(restoredPointAccount.balance).isEqualTo(initialPoint) },
+                { assertThat(restoredProduct.stock.amount).isEqualTo(initialStock) },
+                { assertThat(restoredCoupon.status).isEqualTo(UsageStatus.AVAILABLE) },
+                { assertThat(cancelledOrder.status).isEqualTo(OrderStatus.CANCELLED) },
+            )
+        }
+    }
+
+    private fun createProduct(
+        price: Money = Money.krw(10000),
+        stock: Stock = Stock.of(100),
+    ): Product {
+        val brand = brandRepository.save(Brand.create("테스트 브랜드"))
+        val product = Product.create(
+            name = "테스트 상품",
+            price = price,
+            stock = stock,
+            brand = brand,
+        )
+        val savedProduct = productRepository.save(product)
+        productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
+        return savedProduct
+    }
+
+    private fun createPointAccount(
+        userId: Long = 1L,
+        balance: Money = Money.ZERO_KRW,
+    ): PointAccount {
+        val account = PointAccount.of(userId, balance)
+        return pointAccountRepository.save(account)
+    }
+
+    private fun createCoupon(
+        name: String = "테스트 쿠폰",
+        discountType: DiscountType = DiscountType.FIXED_AMOUNT,
+        discountValue: Long = 5000,
+    ): Coupon {
+        val discountAmount = DiscountAmount(
+            type = discountType,
+            value = discountValue,
+        )
+        val coupon = Coupon.of(name = name, discountAmount = discountAmount)
+        return couponRepository.save(coupon)
+    }
+
+    private fun createIssuedCoupon(
+        userId: Long,
+        coupon: Coupon,
+    ): IssuedCoupon {
+        val issuedCoupon = coupon.issue(userId)
+        return issuedCouponRepository.save(issuedCoupon)
+    }
+
+    private fun createInProgressPaymentWithPoint(
+        userId: Long = 1L,
+        usedPoint: Money = Money.krw(10000),
+    ): Payment {
+        val product = createProduct(price = Money.krw(10000), stock = Stock.of(100))
+        if (pointAccountRepository.findByUserId(userId) == null) {
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+        }
+
+        // Order 생성
+        val order = Order.place(userId)
+        order.addOrderItem(
+            productId = product.id,
+            quantity = 1,
+            productName = "테스트 상품",
+            unitPrice = Money.krw(10000),
+        )
+        val savedOrder = orderRepository.save(order)
+
+        // 포인트 차감 (시뮬레이션)
+        if (usedPoint > Money.ZERO_KRW) {
+            val pointAccount = pointAccountRepository.findByUserId(userId)!!
+            pointAccount.deduct(usedPoint)
+            pointAccountRepository.save(pointAccount)
+        }
+
+        // Payment 생성 (PENDING -> IN_PROGRESS)
+        val payment = paymentService.createPending(
+            userId = userId,
+            order = savedOrder,
+            usedPoint = usedPoint,
+            paidAmount = Money.krw(10000) - usedPoint,
+        )
+
+        return paymentService.startPayment(payment.id)
+    }
+
+    private fun createInProgressPaymentWithCoupon(
+        userId: Long = 1L,
+        issuedCoupon: IssuedCoupon,
+    ): Payment {
+        val product = createProduct(price = Money.krw(10000), stock = Stock.of(100))
+        createPointAccount(userId = userId, balance = Money.krw(100000))
+
+        // Order 생성
+        val order = Order.place(userId)
+        order.addOrderItem(
+            productId = product.id,
+            quantity = 1,
+            productName = "테스트 상품",
+            unitPrice = Money.krw(10000),
+        )
+        val savedOrder = orderRepository.save(order)
+
+        // 쿠폰 사용 (시뮬레이션)
+        val coupon = couponRepository.findById(issuedCoupon.couponId)!!
+        issuedCoupon.use(userId, coupon, java.time.ZonedDateTime.now())
+        issuedCouponRepository.save(issuedCoupon)
+
+        val couponDiscount = Money.krw(5000)
+        val usedPoint = Money.krw(5000)
+
+        // 포인트 차감 (시뮬레이션)
+        val pointAccount = pointAccountRepository.findByUserId(userId)!!
+        pointAccount.deduct(usedPoint)
+        pointAccountRepository.save(pointAccount)
+
+        // Payment 생성 (PENDING -> IN_PROGRESS)
+        val payment = paymentService.createPending(
+            userId = userId,
+            order = savedOrder,
+            usedPoint = usedPoint,
+            paidAmount = Money.ZERO_KRW,
+            issuedCouponId = issuedCoupon.id,
+            couponDiscount = couponDiscount,
+        )
+
+        return paymentService.startPayment(payment.id)
+    }
+
+    private fun createInProgressPaymentWithProduct(
+        userId: Long = 1L,
+        product: Product,
+        quantity: Int,
+    ): Payment {
+        createPointAccount(userId = userId, balance = Money.krw(100000))
+
+        // Order 생성
+        val order = Order.place(userId)
+        order.addOrderItem(
+            productId = product.id,
+            quantity = quantity,
+            productName = "테스트 상품",
+            unitPrice = product.price,
+        )
+        val savedOrder = orderRepository.save(order)
+
+        // 재고 차감 (시뮬레이션)
+        product.decreaseStock(quantity)
+        productRepository.save(product)
+
+        val usedPoint = product.price * quantity
+
+        // 포인트 차감 (시뮬레이션)
+        val pointAccount = pointAccountRepository.findByUserId(userId)!!
+        pointAccount.deduct(usedPoint)
+        pointAccountRepository.save(pointAccount)
+
+        // Payment 생성 (PENDING -> IN_PROGRESS)
+        val payment = paymentService.createPending(
+            userId = userId,
+            order = savedOrder,
+            usedPoint = usedPoint,
+            paidAmount = Money.ZERO_KRW,
+        )
+
+        return paymentService.startPayment(payment.id)
+    }
+}

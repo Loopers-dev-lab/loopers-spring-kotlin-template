@@ -40,15 +40,7 @@ class PaymentResultHandler(
         logger.info("결제 성공 처리 시작 - paymentId: {}", paymentId)
 
         val payment = paymentService.completePayment(paymentId, externalPaymentKey)
-        orderService.pay(
-            com.loopers.domain.order.OrderCommand.Pay(
-                orderId = payment.orderId,
-                userId = payment.userId,
-                usePoint = payment.usedPoint,
-                issuedCouponId = payment.issuedCouponId,
-                couponDiscount = payment.couponDiscount,
-            ),
-        )
+        orderService.completePayment(payment.orderId)
 
         logger.info("결제 성공 처리 완료 - paymentId: {}, orderId: {}", paymentId, payment.orderId)
     }

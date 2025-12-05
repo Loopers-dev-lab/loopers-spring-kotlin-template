@@ -81,4 +81,25 @@ class OrderService(
                 "주문을 찾을 수 없습니다.",
             )
     }
+
+    /**
+     * 결제 완료 시 주문 상태를 PAID로 변경합니다.
+     * 기존 pay() 메서드와 달리 새 Payment를 생성하지 않습니다.
+     *
+     * @param orderId 결제 완료된 주문 ID
+     * @return 상태가 변경된 주문
+     * @throws CoreException 주문을 찾을 수 없거나 상태 변경이 불가능한 경우
+     */
+    @Transactional
+    fun completePayment(orderId: Long): Order {
+        val order = orderRepository.findById(orderId)
+            ?: throw CoreException(
+                ErrorType.NOT_FOUND,
+                "주문을 찾을 수 없습니다.",
+            )
+
+        order.pay()
+
+        return orderRepository.save(order)
+    }
 }
