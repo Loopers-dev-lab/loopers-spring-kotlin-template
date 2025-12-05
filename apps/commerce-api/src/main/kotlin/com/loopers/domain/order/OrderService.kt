@@ -1,5 +1,7 @@
 package com.loopers.domain.order
 
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Component
@@ -35,7 +37,7 @@ class OrderService(
 
         orderRepository.save(order)
 
-        val payment = Payment.pay(
+        val payment = Payment.create(
             userId = command.userId,
             order = order,
             usedPoint = command.usePoint,

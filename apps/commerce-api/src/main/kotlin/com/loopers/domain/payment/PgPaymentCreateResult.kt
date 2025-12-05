@@ -1,4 +1,4 @@
-package com.loopers.domain.pg
+package com.loopers.domain.payment
 
 sealed class PgPaymentCreateResult {
     data class Accepted(val transactionKey: String) : PgPaymentCreateResult()

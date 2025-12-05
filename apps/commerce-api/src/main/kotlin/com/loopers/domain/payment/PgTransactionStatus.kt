@@ -1,4 +1,4 @@
-package com.loopers.domain.pg
+package com.loopers.domain.payment
 
 enum class PgTransactionStatus {
     PENDING,

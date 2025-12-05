@@ -11,10 +11,10 @@ import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.OrderStatus
-import com.loopers.domain.order.Payment
-import com.loopers.domain.order.PaymentRepository
-import com.loopers.domain.order.PaymentService
-import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentRepository
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -172,7 +172,7 @@ class PaymentRecoveryTest @Autowired constructor(
             val userId = 1L
             val payment = createInProgressPaymentWithPoint(
                 userId = userId,
-                usedPoint = Money.krw(10000),
+                usedPoint = Money.krw(5000),
             )
 
             val order = orderRepository.findById(payment.orderId)!!
@@ -252,12 +252,11 @@ class PaymentRecoveryTest @Autowired constructor(
             updatedProduct2.decreaseStock(3)
             productRepository.save(updatedProduct2)
 
-            // Payment 생성
+            // Payment 생성 (usedPoint < totalAmount면 PENDING 상태)
             val payment = paymentService.createPending(
                 userId = userId,
                 order = savedOrder,
-                usedPoint = Money.krw(95000),
-                paidAmount = Money.ZERO_KRW,
+                usedPoint = Money.krw(50000),
             )
             paymentService.startPayment(payment.id)
 
@@ -291,7 +290,7 @@ class PaymentRecoveryTest @Autowired constructor(
             val userId = 1L
             val payment = createInProgressPaymentWithPoint(
                 userId = userId,
-                usedPoint = Money.krw(10000),
+                usedPoint = Money.krw(5000),
             )
 
             val order = orderRepository.findById(payment.orderId)!!
@@ -317,7 +316,7 @@ class PaymentRecoveryTest @Autowired constructor(
             val userId = 1L
             val payment = createInProgressPaymentWithPoint(
                 userId = userId,
-                usedPoint = Money.krw(10000),
+                usedPoint = Money.krw(5000),
             )
 
             // when - 결제 성공 처리
@@ -369,12 +368,11 @@ class PaymentRecoveryTest @Autowired constructor(
             couponToUse.use(userId, couponDef, java.time.ZonedDateTime.now())
             issuedCouponRepository.save(couponToUse)
 
-            // Payment 생성 (couponDiscount 포함)
+            // Payment 생성 (couponDiscount 포함, paidAmount = 20000 - 5000 - 3000 = 12000 자동 계산)
             val payment = paymentService.createPending(
                 userId = userId,
                 order = savedOrder,
                 usedPoint = usedPoint,
-                paidAmount = Money.krw(12000),
                 issuedCouponId = issuedCoupon.id,
                 couponDiscount = Money.krw(3000),
             )
@@ -449,7 +447,7 @@ class PaymentRecoveryTest @Autowired constructor(
 
     private fun createInProgressPaymentWithPoint(
         userId: Long = 1L,
-        usedPoint: Money = Money.krw(10000),
+        usedPoint: Money = Money.krw(5000),
     ): Payment {
         val product = createProduct(price = Money.krw(10000), stock = Stock.of(100))
         if (pointAccountRepository.findByUserId(userId) == null) {
@@ -473,12 +471,14 @@ class PaymentRecoveryTest @Autowired constructor(
             pointAccountRepository.save(pointAccount)
         }
 
-        // Payment 생성 (PENDING -> IN_PROGRESS)
+        // usedPoint < totalAmount면 PENDING 상태가 됨
+        require(usedPoint < Money.krw(10000)) { "usedPoint must be < totalAmount for PENDING state" }
+
+        // Payment 생성 (PENDING -> IN_PROGRESS), paidAmount = 10000 - usedPoint 자동 계산
         val payment = paymentService.createPending(
             userId = userId,
             order = savedOrder,
             usedPoint = usedPoint,
-            paidAmount = Money.krw(10000) - usedPoint,
         )
 
         return paymentService.startPayment(payment.id)
@@ -507,7 +507,8 @@ class PaymentRecoveryTest @Autowired constructor(
         issuedCouponRepository.save(issuedCoupon)
 
         val couponDiscount = Money.krw(5000)
-        val usedPoint = Money.krw(5000)
+        val usedPoint = Money.krw(3000)
+        // paidAmount = 10000 - 3000 - 5000 = 2000 자동 계산
 
         // 포인트 차감 (시뮬레이션)
         val pointAccount = pointAccountRepository.findByUserId(userId)!!
@@ -519,7 +520,6 @@ class PaymentRecoveryTest @Autowired constructor(
             userId = userId,
             order = savedOrder,
             usedPoint = usedPoint,
-            paidAmount = Money.ZERO_KRW,
             issuedCouponId = issuedCoupon.id,
             couponDiscount = couponDiscount,
         )
@@ -548,7 +548,8 @@ class PaymentRecoveryTest @Autowired constructor(
         product.decreaseStock(quantity)
         productRepository.save(product)
 
-        val usedPoint = product.price * quantity
+        val totalAmount = product.price * quantity
+        val usedPoint = totalAmount / 2 // 절반은 포인트로, paidAmount = 나머지 자동 계산
 
         // 포인트 차감 (시뮬레이션)
         val pointAccount = pointAccountRepository.findByUserId(userId)!!
@@ -560,7 +561,6 @@ class PaymentRecoveryTest @Autowired constructor(
             userId = userId,
             order = savedOrder,
             usedPoint = usedPoint,
-            paidAmount = Money.ZERO_KRW,
         )
 
         return paymentService.startPayment(payment.id)

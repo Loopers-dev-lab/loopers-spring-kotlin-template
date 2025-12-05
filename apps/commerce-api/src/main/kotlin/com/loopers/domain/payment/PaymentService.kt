@@ -1,5 +1,7 @@
-package com.loopers.domain.order
+package com.loopers.domain.payment
 
+import com.loopers.domain.order.Order
+import com.loopers.domain.order.OrderRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -13,13 +15,14 @@ class PaymentService(
     private val orderRepository: OrderRepository,
 ) {
     /**
-     * PENDING 상태의 결제를 생성합니다.
-     * PG 결제를 위한 초기 상태로, 리소스(포인트, 쿠폰, 재고)가 할당된 후 호출됩니다.
+     * 결제를 생성합니다.
+     * paidAmount는 totalAmount - usedPoint - couponDiscount로 자동 계산됩니다.
+     * - paidAmount가 0이면 (포인트+쿠폰으로 전액 결제) → PAID
+     * - paidAmount가 0보다 크면 (PG 결제 필요) → PENDING
      *
      * @param userId 사용자 ID
      * @param order 주문 엔티티
      * @param usedPoint 사용할 포인트
-     * @param paidAmount 카드로 결제할 금액
      * @param issuedCouponId 사용할 쿠폰 ID (nullable)
      * @param couponDiscount 쿠폰 할인 금액
      * @return 생성된 Payment
@@ -29,15 +32,13 @@ class PaymentService(
         userId: Long,
         order: Order,
         usedPoint: Money,
-        paidAmount: Money,
         issuedCouponId: Long? = null,
         couponDiscount: Money = Money.ZERO_KRW,
     ): Payment {
-        val payment = Payment.pending(
+        val payment = Payment.create(
             userId = userId,
             order = order,
             usedPoint = usedPoint,
-            paidAmount = paidAmount,
             issuedCouponId = issuedCouponId,
             couponDiscount = couponDiscount,
         )
@@ -78,7 +79,7 @@ class PaymentService(
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
         externalPaymentKey?.let { payment.updateExternalPaymentKey(it) }
-        payment.success()
+        payment.paid()
 
         return paymentRepository.save(payment)
     }

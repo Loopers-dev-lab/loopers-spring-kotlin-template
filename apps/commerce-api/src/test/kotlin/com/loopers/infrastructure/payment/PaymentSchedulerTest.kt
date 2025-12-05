@@ -1,8 +1,8 @@
 package com.loopers.infrastructure.payment
 
 import com.loopers.application.payment.PaymentFacade
-import com.loopers.domain.order.Payment
-import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.support.values.Money
 import io.mockk.Runs
 import io.mockk.clearAllMocks
@@ -97,7 +97,7 @@ class PaymentSchedulerTest {
 
             // payment1 - 낙관적 락 충돌
             every { paymentFacade.processInProgressPayment(payment1) } throws
-                ObjectOptimisticLockingFailureException(Payment::class.java, payment1.id)
+                    ObjectOptimisticLockingFailureException(Payment::class.java, payment1.id)
 
             // payment2 - 정상 처리
             every { paymentFacade.processInProgressPayment(payment2) } just Runs

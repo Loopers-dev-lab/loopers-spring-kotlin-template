@@ -1,4 +1,4 @@
-package com.loopers.domain.pg
+package com.loopers.domain.payment
 
 import com.loopers.support.values.Money
 

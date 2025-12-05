@@ -1,5 +1,7 @@
 package com.loopers.domain.order
 
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -11,9 +13,9 @@ import kotlin.test.Test
 
 class PaymentTest {
 
-    @DisplayName("pay 테스트")
+    @DisplayName("create 테스트")
     @Nested
-    inner class Pay {
+    inner class Create {
 
         @DisplayName("주문 정보로 결제가 생성된다")
         @Test
@@ -23,7 +25,7 @@ class PaymentTest {
             val order = createOrder(userId = userId)
 
             // when
-            val payment = Payment.pay(
+            val payment = Payment.create(
                 userId = userId,
                 order = order,
                 usedPoint = order.totalAmount,
@@ -36,85 +38,39 @@ class PaymentTest {
             assertThat(payment.usedPoint).isEqualTo(order.totalAmount)
         }
 
-        @DisplayName("결제 상태가 PAID로 설정된다")
+        @DisplayName("포인트로 전액 결제하면 PAID 상태로 생성된다")
         @Test
-        fun `have paid status when paid`() {
+        fun `have paid status when point covers total amount`() {
             // given
             val order = createOrder()
 
             // when
-            val payment = createPayment(order = order)
+            val payment = Payment.create(
+                userId = 1L,
+                order = order,
+                usedPoint = order.totalAmount,
+            )
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
         }
 
-        @DisplayName("사용 포인트가 주문 금액과 정확히 일치하면 결제가 생성된다")
+        @DisplayName("포인트로 전액 결제하지 않으면 PENDING 상태로 생성된다")
         @Test
-        fun `create payed payment when used point exactly matches total amount`() {
+        fun `have pending status when point does not cover total amount`() {
             // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
+            val order = createOrder()
 
             // when
-            val payment = createPayment(order = order)
-
-            // then
-            assertThat(payment.usedPoint).isEqualTo(order.totalAmount)
-            assertThat(payment.totalAmount).isEqualTo(order.totalAmount)
-        }
-
-        @DisplayName("사용 포인트가 주문 금액보다 부족하면 예외가 발생한다")
-        @Test
-        fun `throws exception when used point is less than total amount`() {
-            // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
+            val payment = Payment.create(
+                userId = 1L,
+                order = order,
+                usedPoint = Money.ZERO_KRW,
             )
-            val insufficientPoint = Money.krw(5000)
-
-            // when
-            val exception = assertThrows<CoreException> {
-                Payment.pay(
-                    userId = 1L,
-                    order = order,
-                    usedPoint = insufficientPoint,
-                )
-            }
 
             // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("사용 포인트가 결제 금액과 일치하지 않습니다.")
-        }
-
-        @DisplayName("사용 포인트가 주문 금액을 초과하면 예외가 발생한다")
-        @Test
-        fun `throws exception when used point exceeds total amount`() {
-            // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
-            val excessPoint = Money.krw(15000)
-
-            // when
-            val exception = assertThrows<CoreException> {
-                Payment.pay(
-                    userId = 1L,
-                    order = order,
-                    usedPoint = excessPoint,
-                )
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("사용 포인트가 결제 금액과 일치하지 않습니다.")
+            assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+            assertThat(payment.paidAmount).isEqualTo(order.totalAmount)
         }
 
         @DisplayName("사용 포인트가 음수이면 예외가 발생한다")
@@ -126,7 +82,7 @@ class PaymentTest {
 
             // when
             val exception = assertThrows<CoreException> {
-                Payment.pay(
+                Payment.create(
                     userId = 1L,
                     order = order,
                     usedPoint = negativePoint,
@@ -135,7 +91,27 @@ class PaymentTest {
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("사용 포인트는 0 이상이어야 합니다.")
+            assertThat(exception.message).isEqualTo("사용 포인트는 0 이상이어야 합니다")
+        }
+
+        @DisplayName("포인트+쿠폰 할인이 주문 금액을 초과하면 예외가 발생한다")
+        @Test
+        fun `throws exception when point plus coupon exceeds total amount`() {
+            // given
+            val order = createOrder() // totalAmount = 10000
+
+            // when - 포인트 11000 > 주문금액 10000
+            val exception = assertThrows<CoreException> {
+                Payment.create(
+                    userId = 1L,
+                    order = order,
+                    usedPoint = Money.krw(11000),
+                )
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("포인트와 쿠폰 할인의 합이 주문 금액을 초과합니다")
         }
 
         @DisplayName("쿠폰 할인을 적용하여 결제가 생성된다")
@@ -152,7 +128,7 @@ class PaymentTest {
             val issuedCouponId = 100L
 
             // when
-            val payment = Payment.pay(
+            val payment = Payment.create(
                 userId = 1L,
                 order = order,
                 usedPoint = usedPoint,
@@ -165,6 +141,7 @@ class PaymentTest {
             assertThat(payment.couponDiscount).isEqualTo(couponDiscount)
             assertThat(payment.usedPoint).isEqualTo(usedPoint)
             assertThat(payment.issuedCouponId).isEqualTo(issuedCouponId)
+            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @DisplayName("쿠폰 없이 결제가 생성되면 쿠폰 할인이 0원이다")
@@ -178,7 +155,7 @@ class PaymentTest {
             )
 
             // when
-            val payment = Payment.pay(
+            val payment = Payment.create(
                 userId = 1L,
                 order = order,
                 usedPoint = order.totalAmount,
@@ -188,36 +165,6 @@ class PaymentTest {
             assertThat(payment.couponDiscount).isEqualTo(Money.ZERO_KRW)
             assertThat(payment.issuedCouponId).isNull()
             assertThat(payment.usedPoint).isEqualTo(order.totalAmount)
-        }
-
-        @DisplayName("쿠폰 할인 적용 시 사용 포인트가 (주문 금액 - 쿠폰 할인)과 일치하지 않으면 예외가 발생한다")
-        @Test
-        fun `throws exception when used point does not match total amount minus coupon discount`() {
-            // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
-            val couponDiscount = Money.krw(3000)
-
-            // 잘못된 포인트: 10000 - 3000 = 7000이어야 하는데 5000
-            val incorrectPoint = Money.krw(5000)
-
-            // when
-            val exception = assertThrows<CoreException> {
-                Payment.pay(
-                    userId = 1L,
-                    order = order,
-                    usedPoint = incorrectPoint,
-                    issuedCouponId = 100L,
-                    couponDiscount = couponDiscount,
-                )
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("사용 포인트가 결제 금액과 일치하지 않습니다.")
         }
 
         @DisplayName("쿠폰 할인이 주문 금액과 같으면 포인트는 0원이어야 한다")
@@ -234,7 +181,7 @@ class PaymentTest {
             val couponDiscount = Money.krw(10000)
 
             // when
-            val payment = Payment.pay(
+            val payment = Payment.create(
                 userId = 1L,
                 order = order,
                 usedPoint = Money.ZERO_KRW,
@@ -246,6 +193,83 @@ class PaymentTest {
             assertThat(payment.usedPoint).isEqualTo(Money.ZERO_KRW)
             assertThat(payment.couponDiscount).isEqualTo(couponDiscount)
             assertThat(payment.totalAmount).isEqualTo(Money.krw(10000))
+            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
+        }
+
+        @DisplayName("포인트와 카드 혼합 결제가 생성된다")
+        @Test
+        fun `create mixed payment with point and card`() {
+            // given
+            val order = createOrder(
+                orderItems = mutableListOf(
+                    createOrderItem(unitPrice = Money.krw(10000)),
+                ),
+            )
+            val usedPoint = Money.krw(3000)
+
+            // when
+            val payment = Payment.create(
+                userId = 1L,
+                order = order,
+                usedPoint = usedPoint,
+            )
+
+            // then - paidAmount = 10000 - 3000 = 7000 자동 계산
+            assertThat(payment.usedPoint).isEqualTo(usedPoint)
+            assertThat(payment.paidAmount).isEqualTo(Money.krw(7000))
+            assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+        }
+
+        @DisplayName("카드 전액 결제가 생성된다")
+        @Test
+        fun `create card only payment`() {
+            // given
+            val order = createOrder(
+                orderItems = mutableListOf(
+                    createOrderItem(unitPrice = Money.krw(10000)),
+                ),
+            )
+
+            // when
+            val payment = Payment.create(
+                userId = 1L,
+                order = order,
+                usedPoint = Money.ZERO_KRW,
+            )
+
+            // then - paidAmount = 10000 자동 계산
+            assertThat(payment.usedPoint).isEqualTo(Money.ZERO_KRW)
+            assertThat(payment.paidAmount).isEqualTo(Money.krw(10000))
+            assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+        }
+
+        @DisplayName("쿠폰 + 포인트 + 카드 혼합 결제가 생성된다")
+        @Test
+        fun `create payment with coupon point and card`() {
+            // given
+            val order = createOrder(
+                orderItems = mutableListOf(
+                    createOrderItem(unitPrice = Money.krw(10000)),
+                ),
+            )
+            val couponDiscount = Money.krw(3000)
+            val usedPoint = Money.krw(2000)
+
+            // when
+            val payment = Payment.create(
+                userId = 1L,
+                order = order,
+                usedPoint = usedPoint,
+                issuedCouponId = 100L,
+                couponDiscount = couponDiscount,
+            )
+
+            // then - paidAmount = 10000 - 3000 - 2000 = 5000 자동 계산
+            assertThat(payment.totalAmount).isEqualTo(Money.krw(10000))
+            assertThat(payment.couponDiscount).isEqualTo(couponDiscount)
+            assertThat(payment.usedPoint).isEqualTo(usedPoint)
+            assertThat(payment.paidAmount).isEqualTo(Money.krw(5000))
+            assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
         }
     }
 
@@ -281,182 +305,6 @@ class PaymentTest {
         }
     }
 
-    @DisplayName("pending 팩토리 메서드 테스트")
-    @Nested
-    inner class Pending {
-
-        @DisplayName("주문 정보로 결제가 PENDING 상태로 생성된다")
-        @Test
-        fun `create payment in PENDING status when provide order`() {
-            // given
-            val userId = 1L
-            val order = createOrder(userId = userId)
-
-            // when
-            val payment = Payment.pending(
-                userId = userId,
-                order = order,
-                usedPoint = order.totalAmount,
-                paidAmount = Money.ZERO_KRW,
-            )
-
-            // then
-            assertThat(payment.orderId).isEqualTo(order.id)
-            assertThat(payment.userId).isEqualTo(userId)
-            assertThat(payment.totalAmount).isEqualTo(order.totalAmount)
-            assertThat(payment.usedPoint).isEqualTo(order.totalAmount)
-            assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW)
-            assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
-        }
-
-        @DisplayName("포인트와 카드 혼합 결제가 생성된다")
-        @Test
-        fun `create mixed payment with point and card`() {
-            // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
-            val usedPoint = Money.krw(3000)
-            val paidAmount = Money.krw(7000)
-
-            // when
-            val payment = Payment.pending(
-                userId = 1L,
-                order = order,
-                usedPoint = usedPoint,
-                paidAmount = paidAmount,
-            )
-
-            // then
-            assertThat(payment.usedPoint).isEqualTo(usedPoint)
-            assertThat(payment.paidAmount).isEqualTo(paidAmount)
-            assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
-        }
-
-        @DisplayName("카드 전액 결제가 생성된다")
-        @Test
-        fun `create card only payment`() {
-            // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
-
-            // when
-            val payment = Payment.pending(
-                userId = 1L,
-                order = order,
-                usedPoint = Money.ZERO_KRW,
-                paidAmount = Money.krw(10000),
-            )
-
-            // then
-            assertThat(payment.usedPoint).isEqualTo(Money.ZERO_KRW)
-            assertThat(payment.paidAmount).isEqualTo(Money.krw(10000))
-        }
-
-        @DisplayName("쿠폰 + 포인트 + 카드 혼합 결제가 생성된다")
-        @Test
-        fun `create payment with coupon point and card`() {
-            // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
-            val couponDiscount = Money.krw(3000)
-            val usedPoint = Money.krw(2000)
-            val paidAmount = Money.krw(5000) // 10000 - 3000 - 2000
-
-            // when
-            val payment = Payment.pending(
-                userId = 1L,
-                order = order,
-                usedPoint = usedPoint,
-                paidAmount = paidAmount,
-                issuedCouponId = 100L,
-                couponDiscount = couponDiscount,
-            )
-
-            // then
-            assertThat(payment.totalAmount).isEqualTo(Money.krw(10000))
-            assertThat(payment.couponDiscount).isEqualTo(couponDiscount)
-            assertThat(payment.usedPoint).isEqualTo(usedPoint)
-            assertThat(payment.paidAmount).isEqualTo(paidAmount)
-        }
-
-        @DisplayName("사용 포인트가 음수이면 예외가 발생한다")
-        @Test
-        fun `throws exception when used point is negative`() {
-            // given
-            val order = createOrder()
-
-            // when
-            val exception = assertThrows<CoreException> {
-                Payment.pending(
-                    userId = 1L,
-                    order = order,
-                    usedPoint = Money.krw(-1000),
-                    paidAmount = Money.krw(11000),
-                )
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("사용 포인트는 0 이상이어야 합니다")
-        }
-
-        @DisplayName("카드 결제 금액이 음수이면 예외가 발생한다")
-        @Test
-        fun `throws exception when paid amount is negative`() {
-            // given
-            val order = createOrder()
-
-            // when
-            val exception = assertThrows<CoreException> {
-                Payment.pending(
-                    userId = 1L,
-                    order = order,
-                    usedPoint = Money.krw(11000),
-                    paidAmount = Money.krw(-1000),
-                )
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("카드 결제 금액은 0 이상이어야 합니다")
-        }
-
-        @DisplayName("usedPoint + paidAmount + couponDiscount != totalAmount이면 예외가 발생한다")
-        @Test
-        fun `throws exception when payment amounts do not match total`() {
-            // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
-
-            // when
-            val exception = assertThrows<CoreException> {
-                Payment.pending(
-                    userId = 1L,
-                    order = order,
-                    usedPoint = Money.krw(3000),
-                    // 합계 8000 != 10000
-                    paidAmount = Money.krw(5000),
-                )
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("결제 금액이 주문 금액과 일치하지 않습니다")
-        }
-    }
-
     @DisplayName("신규 필드 테스트")
     @Nested
     inner class NewFields {
@@ -468,11 +316,10 @@ class PaymentTest {
             val order = createOrder()
 
             // when
-            val payment = Payment.pending(
+            val payment = Payment.create(
                 userId = 1L,
                 order = order,
                 usedPoint = order.totalAmount,
-                paidAmount = Money.ZERO_KRW,
             )
 
             // then
@@ -486,11 +333,10 @@ class PaymentTest {
             val order = createOrder()
 
             // when
-            val payment = Payment.pending(
+            val payment = Payment.create(
                 userId = 1L,
                 order = order,
                 usedPoint = order.totalAmount,
-                paidAmount = Money.ZERO_KRW,
             )
 
             // then
@@ -504,11 +350,10 @@ class PaymentTest {
             val order = createOrder()
 
             // when
-            val payment = Payment.pending(
+            val payment = Payment.create(
                 userId = 1L,
                 order = order,
                 usedPoint = order.totalAmount,
-                paidAmount = Money.ZERO_KRW,
             )
 
             // then
@@ -599,7 +444,7 @@ class PaymentTest {
             payment.start()
 
             // when
-            payment.success()
+            payment.paid()
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
@@ -613,7 +458,7 @@ class PaymentTest {
 
             // when
             val exception = assertThrows<CoreException> {
-                payment.success()
+                payment.paid()
             }
 
             // then
@@ -675,7 +520,7 @@ class PaymentTest {
             // given
             val payment = createPendingPayment()
             payment.start()
-            payment.success()
+            payment.paid()
 
             // when
             val exception = assertThrows<CoreException> {
@@ -709,22 +554,10 @@ class PaymentTest {
         userId: Long = 1L,
         order: Order = createOrder(),
     ): Payment {
-        return Payment.pending(
+        return Payment.create(
             userId = userId,
             order = order,
-            usedPoint = order.totalAmount,
-            paidAmount = Money.ZERO_KRW,
-        )
-    }
-
-    private fun createPayment(
-        userId: Long = 1L,
-        order: Order = createOrder(),
-    ): Payment {
-        return Payment.pay(
-            userId = userId,
-            order = order,
-            usedPoint = order.totalAmount,
+            usedPoint = Money.ZERO_KRW,
         )
     }
 

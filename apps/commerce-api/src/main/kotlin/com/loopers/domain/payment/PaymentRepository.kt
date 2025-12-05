@@ -1,4 +1,4 @@
-package com.loopers.domain.order
+package com.loopers.domain.payment
 
 import java.time.ZonedDateTime
 
@@ -10,5 +10,6 @@ interface PaymentRepository {
         statuses: List<PaymentStatus>,
         before: ZonedDateTime,
     ): List<Payment>
+
     fun save(payment: Payment): Payment
 }

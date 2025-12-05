@@ -2,9 +2,9 @@ package com.loopers.application.order
 
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderService
-import com.loopers.domain.order.Payment
-import com.loopers.domain.order.PaymentService
-import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService

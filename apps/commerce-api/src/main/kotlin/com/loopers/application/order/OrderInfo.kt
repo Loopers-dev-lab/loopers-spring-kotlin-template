@@ -1,6 +1,6 @@
 package com.loopers.application.order
 
-import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.payment.PaymentStatus
 
 class OrderInfo {
     data class PlaceOrder(

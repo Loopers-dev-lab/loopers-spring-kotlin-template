@@ -11,7 +11,7 @@ import com.loopers.domain.coupon.IssuedCoupon
 import com.loopers.domain.coupon.IssuedCouponRepository
 import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.OrderRepository
-import com.loopers.domain.order.PaymentRepository
+import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand

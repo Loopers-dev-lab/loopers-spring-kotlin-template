@@ -1,7 +1,7 @@
 package com.loopers.infrastructure.order
 
-import com.loopers.domain.order.Payment
-import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentStatus
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
 import java.time.ZonedDateTime

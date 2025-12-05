@@ -4,10 +4,10 @@ import com.loopers.application.order.OrderFacade
 import com.loopers.application.order.PaymentResultHandler
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
-import com.loopers.domain.order.Payment
-import com.loopers.domain.order.PaymentRepository
-import com.loopers.domain.order.PaymentService
-import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentRepository
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -251,12 +251,11 @@ class PaymentIdempotencyTest @Autowired constructor(
         )
         val savedOrder = orderRepository.save(order)
 
-        // Payment 생성 (PENDING -> IN_PROGRESS)
+        // Payment 생성 (PENDING -> IN_PROGRESS), paidAmount = 10000 - 5000 = 5000 자동 계산
         val payment = paymentService.createPending(
             userId = userId,
             order = savedOrder,
             usedPoint = Money.krw(5000),
-            paidAmount = Money.krw(5000),
         )
 
         val startedPayment = paymentService.startPayment(payment.id)

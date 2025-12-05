@@ -1,8 +1,8 @@
 package com.loopers.interfaces.api.payment
 
 import com.loopers.application.order.OrderFacade
-import com.loopers.domain.order.PaymentService
-import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PaymentStatus
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
@@ -54,16 +54,19 @@ class PaymentWebhookController(
                 logger.info("이미 성공 처리된 결제 - paymentId: {}", payment.id)
                 return ResponseEntity.ok(PaymentCallbackResponse.alreadyProcessed())
             }
+
             PaymentStatus.FAILED -> {
                 logger.info("이미 실패 처리된 결제 - paymentId: {}", payment.id)
                 return ResponseEntity.ok(PaymentCallbackResponse.alreadyProcessed())
             }
+
             PaymentStatus.PENDING -> {
                 logger.warn("PENDING 상태의 결제에 콜백 수신 - paymentId: {}", payment.id)
                 return ResponseEntity.ok(
                     PaymentCallbackResponse.error("결제가 아직 시작되지 않았습니다"),
                 )
             }
+
             PaymentStatus.IN_PROGRESS -> {
                 // 정상 처리 대상
             }

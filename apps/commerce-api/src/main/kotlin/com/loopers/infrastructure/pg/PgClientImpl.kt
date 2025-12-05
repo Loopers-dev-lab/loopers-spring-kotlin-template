@@ -1,10 +1,10 @@
 package com.loopers.infrastructure.pg
 
-import com.loopers.domain.pg.PgClient
-import com.loopers.domain.pg.PgPaymentCreateResult
-import com.loopers.domain.pg.PgPaymentRequest
-import com.loopers.domain.pg.PgTransaction
-import com.loopers.domain.pg.PgTransactionStatus
+import com.loopers.domain.payment.PgClient
+import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PgPaymentRequest
+import com.loopers.domain.payment.PgTransaction
+import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.support.values.Money
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
@@ -20,7 +20,7 @@ import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import java.net.ConnectException
 import java.net.SocketTimeoutException
-import com.loopers.domain.pg.CardType as DomainCardType
+import com.loopers.domain.payment.CardType as DomainCardType
 
 @Component
 class PgClientImpl(
@@ -291,9 +291,11 @@ class PgClientImpl(
                 // Connect Timeout: 요청 미도달, 재시도 가능
                 throw PgException.RequestNotReached("연결 타임아웃", e)
             }
+
             is ConnectException -> {
                 throw PgException.RequestNotReached("연결 실패: ${cause.message}", e)
             }
+
             else -> {
                 throw PgException.RequestNotReached("네트워크 오류: ${e.message}", e)
             }

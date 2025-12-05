@@ -3,10 +3,10 @@ package com.loopers.integration
 import com.loopers.application.order.PaymentResultHandler
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
-import com.loopers.domain.order.Payment
-import com.loopers.domain.order.PaymentRepository
-import com.loopers.domain.order.PaymentService
-import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentRepository
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -161,7 +161,7 @@ class PaymentConcurrencyTest @Autowired constructor(
             transactionTemplate.execute { _ ->
                 // PAID 상태에서 다시 success() 호출 시도
                 val existingPayment = paymentService.findById(payment.id)
-                existingPayment.success() // 여기서 예외 발생해야 함
+                existingPayment.paid() // 여기서 예외 발생해야 함
             }
         } catch (e: Exception) {
             exceptionOccurred = true
@@ -213,12 +213,11 @@ class PaymentConcurrencyTest @Autowired constructor(
         )
         val savedOrder = orderRepository.save(order)
 
-        // Payment 생성 (PENDING -> IN_PROGRESS)
+        // Payment 생성 (PENDING -> IN_PROGRESS), paidAmount = 10000 - 5000 = 5000 자동 계산
         val payment = paymentService.createPending(
             userId = userId,
             order = savedOrder,
             usedPoint = Money.krw(5000),
-            paidAmount = Money.krw(5000),
         )
 
         return paymentService.startPayment(payment.id)

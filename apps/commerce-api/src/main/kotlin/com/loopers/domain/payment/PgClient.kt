@@ -1,4 +1,4 @@
-package com.loopers.domain.pg
+package com.loopers.domain.payment
 
 interface PgClient {
     fun requestPayment(request: PgPaymentRequest): PgPaymentCreateResult

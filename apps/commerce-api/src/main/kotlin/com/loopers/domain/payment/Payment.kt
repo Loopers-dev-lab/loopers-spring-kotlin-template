@@ -1,6 +1,7 @@
-package com.loopers.domain.order
+package com.loopers.domain.payment
 
 import com.loopers.domain.BaseEntity
+import com.loopers.domain.order.Order
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -98,10 +99,10 @@ class Payment(
     }
 
     /**
-     * 결제를 성공 처리합니다. IN_PROGRESS → PAID 상태 전이
+     * 결제 IN_PROGRESS → PAID 상태 전이
      * @throws CoreException IN_PROGRESS 상태가 아닌 경우
      */
-    fun success() {
+    fun paid() {
         if (status != PaymentStatus.IN_PROGRESS) {
             throw CoreException(ErrorType.BAD_REQUEST, "결제 진행 중 상태에서만 성공 처리할 수 있습니다")
         }
@@ -123,47 +124,15 @@ class Payment(
 
     companion object {
         /**
-         * 포인트 전액 결제용 팩토리 메서드 (기존 방식 - 즉시 PAID)
+         * 결제를 생성합니다.
+         * paidAmount = totalAmount - usedPoint - couponDiscount 로 자동 계산
+         * - paidAmount가 0이면 (포인트+쿠폰으로 전액 결제) → PAID
+         * - paidAmount가 0보다 크면 (PG 결제 필요) → PENDING
          */
-        fun pay(
+        fun create(
             userId: Long,
             order: Order,
             usedPoint: Money,
-            issuedCouponId: Long? = null,
-            couponDiscount: Money = Money.ZERO_KRW,
-        ): Payment {
-            if (usedPoint < Money.ZERO_KRW) {
-                throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트는 0 이상이어야 합니다.")
-            }
-
-            // 주문 금액에서 쿠폰 할인을 뺀 금액이 포인트로 결제되어야 함
-            val expectedPayment = order.totalAmount - couponDiscount
-
-            if (usedPoint != expectedPayment) {
-                throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트가 결제 금액과 일치하지 않습니다.")
-            }
-
-            return Payment(
-                orderId = order.id,
-                userId = userId,
-                totalAmount = order.totalAmount,
-                usedPoint = usedPoint,
-                paidAmount = Money.ZERO_KRW,
-                status = PaymentStatus.PAID,
-                issuedCouponId = issuedCouponId,
-                couponDiscount = couponDiscount,
-            )
-        }
-
-        /**
-         * PG 결제를 위한 PENDING 상태 결제 생성
-         * usedPoint + paidAmount + couponDiscount == totalAmount 검증
-         */
-        fun pending(
-            userId: Long,
-            order: Order,
-            usedPoint: Money,
-            paidAmount: Money,
             issuedCouponId: Long? = null,
             couponDiscount: Money = Money.ZERO_KRW,
         ): Payment {
@@ -171,14 +140,13 @@ class Payment(
                 throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트는 0 이상이어야 합니다")
             }
 
+            val paidAmount = order.totalAmount - usedPoint - couponDiscount
+
             if (paidAmount < Money.ZERO_KRW) {
-                throw CoreException(ErrorType.BAD_REQUEST, "카드 결제 금액은 0 이상이어야 합니다")
+                throw CoreException(ErrorType.BAD_REQUEST, "포인트와 쿠폰 할인의 합이 주문 금액을 초과합니다")
             }
 
-            val totalPayment = usedPoint + paidAmount + couponDiscount
-            if (totalPayment != order.totalAmount) {
-                throw CoreException(ErrorType.BAD_REQUEST, "결제 금액이 주문 금액과 일치하지 않습니다")
-            }
+            val status = if (paidAmount == Money.ZERO_KRW) PaymentStatus.PAID else PaymentStatus.PENDING
 
             return Payment(
                 orderId = order.id,
@@ -186,7 +154,7 @@ class Payment(
                 totalAmount = order.totalAmount,
                 usedPoint = usedPoint,
                 paidAmount = paidAmount,
-                status = PaymentStatus.PENDING,
+                status = status,
                 issuedCouponId = issuedCouponId,
                 couponDiscount = couponDiscount,
             )

@@ -2,10 +2,10 @@ package com.loopers.application.payment
 
 import com.loopers.application.order.PaymentResultHandler
 import com.loopers.domain.order.OrderService
-import com.loopers.domain.order.Payment
-import com.loopers.domain.order.PaymentService
-import com.loopers.domain.pg.PgClient
-import com.loopers.domain.pg.PgTransactionStatus
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PgClient
+import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.infrastructure.pg.PgException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component

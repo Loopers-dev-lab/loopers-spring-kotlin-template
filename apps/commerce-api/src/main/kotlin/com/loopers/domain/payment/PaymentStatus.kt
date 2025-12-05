@@ -1,4 +1,4 @@
-package com.loopers.domain.order
+package com.loopers.domain.payment
 
 enum class PaymentStatus {
     PENDING,

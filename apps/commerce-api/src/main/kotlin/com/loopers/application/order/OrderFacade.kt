@@ -5,17 +5,17 @@ import com.loopers.cache.CacheTemplate
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
 import com.loopers.domain.order.OrderService
-import com.loopers.domain.order.Payment
-import com.loopers.domain.order.PaymentService
-import com.loopers.domain.order.PaymentStatus
+import com.loopers.domain.payment.CardInfo
+import com.loopers.domain.payment.CardType
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgClient
+import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PgPaymentRequest
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductView
-import com.loopers.domain.pg.CardInfo
-import com.loopers.domain.pg.CardType
-import com.loopers.domain.pg.PgClient
-import com.loopers.domain.pg.PgPaymentCreateResult
-import com.loopers.domain.pg.PgPaymentRequest
 import com.loopers.infrastructure.pg.PgException
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -140,6 +140,14 @@ class OrderFacade(
 
             val payment = orderService.pay(payCommand)
 
+            // 포인트 전액 결제 검증: PAID 상태가 아니면 포인트+쿠폰이 부족한 것
+            if (payment.status != PaymentStatus.PAID) {
+                throw CoreException(
+                    ErrorType.BAD_REQUEST,
+                    "포인트와 쿠폰만으로 결제할 수 없습니다. 카드 정보를 입력해주세요.",
+                )
+            }
+
             OrderInfo.PlaceOrder(
                 orderId = order.id,
                 paymentId = payment.id,
@@ -167,9 +175,11 @@ class OrderFacade(
             is PgCallResult.Success -> {
                 handlePgSuccess(allocationResult, pgResult.transactionKey)
             }
+
             is PgCallResult.RequestNotReached -> {
                 handlePgFailure(allocationResult, pgResult.reason)
             }
+
             is PgCallResult.ResponseUncertain -> {
                 // 타임아웃 등으로 응답을 받지 못한 경우 - IN_PROGRESS 유지
                 // 스케줄러가 나중에 처리
@@ -237,15 +247,11 @@ class OrderFacade(
                 pointService.deduct(criteria.userId, criteria.usePoint)
             }
 
-            // 6. 카드 결제 금액 계산
-            val paidAmount = orderAmount - couponDiscount - criteria.usePoint
-
-            // 7. PENDING 결제 생성
+            // 6. PENDING 결제 생성 (paidAmount = totalAmount - usePoint - couponDiscount 자동 계산)
             val payment = paymentService.createPending(
                 userId = criteria.userId,
                 order = order,
                 usedPoint = criteria.usePoint,
-                paidAmount = paidAmount,
                 issuedCouponId = criteria.issuedCouponId,
                 couponDiscount = couponDiscount,
             )

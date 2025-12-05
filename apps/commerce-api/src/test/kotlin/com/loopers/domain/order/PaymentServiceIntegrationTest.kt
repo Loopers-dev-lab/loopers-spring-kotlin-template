@@ -1,5 +1,9 @@
 package com.loopers.domain.order
 
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentRepository
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -35,23 +39,21 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         @Test
         fun `create pending payment successfully`() {
             // given
-            val order = createOrder()
+            val order = createOrder() // totalAmount = 10000
             val usedPoint = Money.krw(5000)
-            val paidAmount = Money.krw(5000)
 
             // when
             val payment = paymentService.createPending(
                 userId = order.userId,
                 order = order,
                 usedPoint = usedPoint,
-                paidAmount = paidAmount,
             )
 
-            // then
+            // then - paidAmount = 10000 - 5000 = 5000 자동 계산
             assertAll(
                 { assertThat(payment.status).isEqualTo(PaymentStatus.PENDING) },
                 { assertThat(payment.usedPoint).isEqualTo(usedPoint) },
-                { assertThat(payment.paidAmount).isEqualTo(paidAmount) },
+                { assertThat(payment.paidAmount).isEqualTo(Money.krw(5000)) },
                 { assertThat(payment.orderId).isEqualTo(order.id) },
             )
         }
@@ -62,7 +64,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             // given
             val order = createOrder(totalAmount = Money.krw(15000))
             val usedPoint = Money.krw(5000)
-            val paidAmount = Money.krw(7000)
             val couponDiscount = Money.krw(3000)
 
             // when
@@ -70,16 +71,16 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                 userId = order.userId,
                 order = order,
                 usedPoint = usedPoint,
-                paidAmount = paidAmount,
                 issuedCouponId = 1L,
                 couponDiscount = couponDiscount,
             )
 
-            // then
+            // then - paidAmount = 15000 - 5000 - 3000 = 7000 자동 계산
             assertAll(
                 { assertThat(payment.status).isEqualTo(PaymentStatus.PENDING) },
                 { assertThat(payment.couponDiscount).isEqualTo(couponDiscount) },
                 { assertThat(payment.issuedCouponId).isEqualTo(1L) },
+                { assertThat(payment.paidAmount).isEqualTo(Money.krw(7000)) },
             )
         }
     }
@@ -255,14 +256,12 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     private fun createPendingPayment(
         userId: Long = 1L,
         usedPoint: Money = Money.krw(5000),
-        paidAmount: Money = Money.krw(5000),
     ): Payment {
         val order = createOrder()
-        val payment = Payment.pending(
+        val payment = Payment.create(
             userId = userId,
             order = order,
             usedPoint = usedPoint,
-            paidAmount = paidAmount,
         )
         return paymentRepository.save(payment)
     }
