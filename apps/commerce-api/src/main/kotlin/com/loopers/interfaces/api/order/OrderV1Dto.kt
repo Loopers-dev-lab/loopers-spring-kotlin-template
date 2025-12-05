@@ -15,7 +15,12 @@ class OrderV1Dto {
     data class OrderItemRequest(
         val productId: Long,
         val quantity: Int,
-    )
+    ) {
+        fun toCommand() = com.loopers.domain.order.OrderItemCommand(
+            productId = productId,
+            quantity = quantity
+        )
+    }
 
     data class OrderResponse(
         val id: Long,

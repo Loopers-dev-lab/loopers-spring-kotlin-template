@@ -10,6 +10,8 @@ data class OrderInfo(
     val memberId: String,
     val status: OrderStatus,
     val totalAmount: Long,
+    val discountAmount: Long,
+    val finalAmount: Long,
     val items: List<OrderItemInfo>,
     val createdAt: String,
 ) {
@@ -20,6 +22,8 @@ data class OrderInfo(
                 memberId = order.memberId,
                 status = order.status,
                 totalAmount = order.totalAmount.amount,
+                discountAmount = order.discountAmount.amount,
+                finalAmount = order.finalAmount.amount,
                 items = order.items.map { OrderItemInfo.from(it) },
                 createdAt = order.createdAt.toString(),
             )
