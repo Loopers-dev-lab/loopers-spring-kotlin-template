@@ -4,9 +4,9 @@ import com.loopers.application.order.PaymentResultHandler
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.Payment
 import com.loopers.domain.order.PaymentService
-import com.loopers.infrastructure.pg.PgClient
+import com.loopers.domain.pg.PgClient
+import com.loopers.domain.pg.PgTransactionStatus
 import com.loopers.infrastructure.pg.PgException
-import com.loopers.infrastructure.pg.PgTransactionStatus
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
@@ -143,22 +143,22 @@ class PaymentFacade(
      */
     private fun queryPgStatus(userId: Long, orderId: String): PgQueryResult {
         return try {
-            val response = pgClient.getPaymentsByOrderId(userId, orderId)
-            val latestTransaction = response.transactions.lastOrNull()
+            val transactions = pgClient.findTransactionsByOrderId(orderId.toLong())
+            val latestTransaction = transactions.lastOrNull()
 
             if (latestTransaction == null) {
                 PgQueryResult.NotFound
             } else {
                 when (latestTransaction.status) {
-                    PgTransactionStatus.SUCCESS.name -> {
+                    PgTransactionStatus.SUCCESS -> {
                         PgQueryResult.Success(latestTransaction.transactionKey)
                     }
 
-                    PgTransactionStatus.FAILED.name -> {
-                        PgQueryResult.Failed(latestTransaction.reason ?: "PG 결제 실패")
+                    PgTransactionStatus.FAILED -> {
+                        PgQueryResult.Failed(latestTransaction.failureReason ?: "PG 결제 실패")
                     }
 
-                    else -> {
+                    PgTransactionStatus.PENDING -> {
                         PgQueryResult.Pending
                     }
                 }

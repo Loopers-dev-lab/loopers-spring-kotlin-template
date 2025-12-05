@@ -7,11 +7,11 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.Payment
 import com.loopers.domain.order.PaymentService
 import com.loopers.domain.order.PaymentStatus
-import com.loopers.infrastructure.pg.PgClient
+import com.loopers.domain.pg.CardType
+import com.loopers.domain.pg.PgClient
+import com.loopers.domain.pg.PgTransaction
+import com.loopers.domain.pg.PgTransactionStatus
 import com.loopers.infrastructure.pg.PgException
-import com.loopers.infrastructure.pg.PgPaymentListResponse
-import com.loopers.infrastructure.pg.PgTransactionStatus
-import com.loopers.infrastructure.pg.PgTransactionSummary
 import com.loopers.support.values.Money
 import io.mockk.Runs
 import io.mockk.clearAllMocks
@@ -99,15 +99,12 @@ class PaymentFacadeTest {
             )
 
             every {
-                pgClient.getPaymentsByOrderId(100L, "200")
-            } returns PgPaymentListResponse(
-                orderId = "200",
-                transactions = listOf(
-                    PgTransactionSummary(
-                        transactionKey = "tx_123",
-                        status = PgTransactionStatus.SUCCESS.name,
-                        reason = null,
-                    ),
+                pgClient.findTransactionsByOrderId(200L)
+            } returns listOf(
+                createPgTransaction(
+                    transactionKey = "tx_123",
+                    orderId = 200L,
+                    status = PgTransactionStatus.SUCCESS,
                 ),
             )
             every { paymentResultHandler.handlePaymentSuccess(1L, "tx_123") } just Runs
@@ -132,15 +129,13 @@ class PaymentFacadeTest {
             val order = createMockOrder(orderId = 200L)
 
             every {
-                pgClient.getPaymentsByOrderId(100L, "200")
-            } returns PgPaymentListResponse(
-                orderId = "200",
-                transactions = listOf(
-                    PgTransactionSummary(
-                        transactionKey = "tx_123",
-                        status = PgTransactionStatus.FAILED.name,
-                        reason = "잔액 부족",
-                    ),
+                pgClient.findTransactionsByOrderId(200L)
+            } returns listOf(
+                createPgTransaction(
+                    transactionKey = "tx_123",
+                    orderId = 200L,
+                    status = PgTransactionStatus.FAILED,
+                    failureReason = "잔액 부족",
                 ),
             )
             every { orderService.findById(200L) } returns order
@@ -177,15 +172,12 @@ class PaymentFacadeTest {
             )
 
             every {
-                pgClient.getPaymentsByOrderId(100L, "200")
-            } returns PgPaymentListResponse(
-                orderId = "200",
-                transactions = listOf(
-                    PgTransactionSummary(
-                        transactionKey = "tx_123",
-                        status = PgTransactionStatus.PENDING.name,
-                        reason = null,
-                    ),
+                pgClient.findTransactionsByOrderId(200L)
+            } returns listOf(
+                createPgTransaction(
+                    transactionKey = "tx_123",
+                    orderId = 200L,
+                    status = PgTransactionStatus.PENDING,
                 ),
             )
 
@@ -210,15 +202,12 @@ class PaymentFacadeTest {
             val order = createMockOrder(orderId = 200L)
 
             every {
-                pgClient.getPaymentsByOrderId(100L, "200")
-            } returns PgPaymentListResponse(
-                orderId = "200",
-                transactions = listOf(
-                    PgTransactionSummary(
-                        transactionKey = "tx_123",
-                        status = PgTransactionStatus.PENDING.name,
-                        reason = null,
-                    ),
+                pgClient.findTransactionsByOrderId(200L)
+            } returns listOf(
+                createPgTransaction(
+                    transactionKey = "tx_123",
+                    orderId = 200L,
+                    status = PgTransactionStatus.PENDING,
                 ),
             )
             every { orderService.findById(200L) } returns order
@@ -256,11 +245,8 @@ class PaymentFacadeTest {
             val order = createMockOrder(orderId = 200L)
 
             every {
-                pgClient.getPaymentsByOrderId(100L, "200")
-            } returns PgPaymentListResponse(
-                orderId = "200",
-                transactions = emptyList(),
-            )
+                pgClient.findTransactionsByOrderId(200L)
+            } returns emptyList()
             every { orderService.findById(200L) } returns order
             every {
                 paymentResultHandler.handlePaymentFailure(
@@ -296,7 +282,7 @@ class PaymentFacadeTest {
             val order = createMockOrder(orderId = 200L)
 
             every {
-                pgClient.getPaymentsByOrderId(100L, "200")
+                pgClient.findTransactionsByOrderId(200L)
             } throws PgException.BusinessError("NOT_FOUND", "결제 정보 없음")
             every { orderService.findById(200L) } returns order
             every {
@@ -332,7 +318,7 @@ class PaymentFacadeTest {
             )
 
             every {
-                pgClient.getPaymentsByOrderId(100L, "200")
+                pgClient.findTransactionsByOrderId(200L)
             } throws PgException.RequestNotReached("PG 연결 실패")
 
             // when
@@ -371,5 +357,22 @@ class PaymentFacadeTest {
         every { order.id } returns orderId
         every { order.orderItems } returns mutableListOf(orderItem)
         return order
+    }
+
+    private fun createPgTransaction(
+        transactionKey: String,
+        orderId: Long,
+        status: PgTransactionStatus,
+        failureReason: String? = null,
+    ): PgTransaction {
+        return PgTransaction(
+            transactionKey = transactionKey,
+            orderId = orderId,
+            cardType = CardType.SAMSUNG,
+            cardNo = "1234-5678-9012-3456",
+            amount = Money.krw(10000),
+            status = status,
+            failureReason = failureReason,
+        )
     }
 }
