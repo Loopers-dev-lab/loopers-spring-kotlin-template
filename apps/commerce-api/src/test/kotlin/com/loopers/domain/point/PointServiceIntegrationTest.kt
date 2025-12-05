@@ -152,6 +152,39 @@ class PointServiceIntegrationTest @Autowired constructor(
         }
     }
 
+    @DisplayName("포인트 복구 통합테스트")
+    @Nested
+    inner class Restore {
+        @DisplayName("존재하지 않는 유저 id로 복구할 수 없다")
+        @Test
+        fun `throw exception when invalid user id is provided`() {
+            // when
+            val invalidUserId = 999L
+            val exception = assertThrows<CoreException> {
+                pointService.restore(invalidUserId, Money.krw(1000))
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+        }
+
+        @DisplayName("포인트를 복구할 수 있다")
+        @Test
+        fun `restore point when valid user id is provided`() {
+            // given
+            val initialBalance = Money.krw(5000)
+            val pointAccount = createPointAccount(balance = initialBalance)
+
+            // when
+            val restoreAmount = Money.krw(3000)
+            pointService.restore(pointAccount.userId, restoreAmount)
+
+            // then
+            val updatedPointAccount = pointAccountRepository.findByUserId(pointAccount.userId)
+            assertThat(updatedPointAccount?.balance).isEqualTo(initialBalance.plus(restoreAmount))
+        }
+    }
+
     private fun charge(
         userId: Long = 1L,
         amount: Money = Money.krw(1000),

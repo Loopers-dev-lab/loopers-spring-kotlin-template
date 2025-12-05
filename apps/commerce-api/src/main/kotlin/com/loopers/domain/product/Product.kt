@@ -115,4 +115,15 @@ class Product(
         this.stock = decreasedStock
         this.status = determineStatus(this.stock)
     }
+
+    /**
+     * 재고를 복구합니다. 결제 실패 시 감소했던 재고를 되돌립니다.
+     *
+     * @param amount 복구할 재고량
+     */
+    fun increaseStock(amount: Int) {
+        val increasedStock = this.stock.increase(amount)
+        this.stock = increasedStock
+        this.status = determineStatus(this.stock)
+    }
 }

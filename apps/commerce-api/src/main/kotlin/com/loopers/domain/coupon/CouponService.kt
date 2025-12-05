@@ -90,4 +90,19 @@ class CouponService(
         val policy = discountPolicyResolver.resolve(coupon)
         return coupon.calculateDiscount(orderAmount, policy)
     }
+
+    /**
+     * 쿠폰 사용을 취소합니다. 결제 실패 시 사용했던 쿠폰을 되돌립니다.
+     *
+     * @param issuedCouponId 발급된 쿠폰 ID
+     * @throws CoreException 쿠폰을 찾을 수 없는 경우
+     */
+    @Transactional
+    fun cancelCouponUse(issuedCouponId: Long) {
+        val issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "쿠폰을 찾을 수 없습니다")
+
+        issuedCoupon.cancelUse()
+        issuedCouponRepository.save(issuedCoupon)
+    }
 }

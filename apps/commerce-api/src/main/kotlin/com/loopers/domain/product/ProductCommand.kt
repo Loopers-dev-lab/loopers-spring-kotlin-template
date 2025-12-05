@@ -25,4 +25,13 @@ class ProductCommand {
         val productId: Long,
         val amount: Int,
     )
+
+    data class IncreaseStocks(
+        val units: List<IncreaseStockUnit>,
+    )
+
+    data class IncreaseStockUnit(
+        val productId: Long,
+        val amount: Int,
+    )
 }
