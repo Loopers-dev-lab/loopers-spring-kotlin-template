@@ -122,17 +122,17 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### TODO
 
-- [ ] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardType.kt` - CardType enum (spec: section 1.1 CardType enumeration, pattern: `domain/coupon/DiscountType.kt:L2-L5`)
-- [ ] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransactionStatus.kt` - PgTransactionStatus enum (spec: section 1.1 PgTransactionStatus enumeration, pattern: `domain/coupon/DiscountType.kt:L2-L5`)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardType.kt` - CardType enum (spec: section 1.1 CardType enumeration, pattern: `domain/coupon/DiscountType.kt:L2-L5`)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransactionStatus.kt` - PgTransactionStatus enum (spec: section 1.1 PgTransactionStatus enumeration, pattern: `domain/coupon/DiscountType.kt:L2-L5`)
 
 ### Tests
 
-- [ ] No unit tests needed for simple enums (enum values are compile-time verified)
+- [x] No unit tests needed for simple enums (enum values are compile-time verified)
 
 ### Done When
 
-- [ ] `ls apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/` shows CardType.kt and PgTransactionStatus.kt
-- [ ] `./gradlew :apps:commerce-api:compileKotlin` succeeds
+- [x] `ls apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/` shows CardType.kt and PgTransactionStatus.kt
+- [x] `./gradlew :apps:commerce-api:compileKotlin` succeeds
 
 ---
 
