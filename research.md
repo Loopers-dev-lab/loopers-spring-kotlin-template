@@ -1,234 +1,106 @@
-# Research: PaymentScheduler Refactoring
+# Research: PG Client Implementation (Domain Layer)
 
 **Date**: 2025-12-06
-**Specs Reviewed**:
-- `docs/specs/요구사항_분석_문서_PG연동_Resilience.md`
-- `docs/specs/솔루션_설계_문서_PG연동_Resilience.md`
-- `docs/specs/상세_설계_문서_PG연동_Resilience.md`
+**Specs Reviewed**: `docs/specs/도메인_모델링_문서_PG연동_Resilience.md`
 
 ---
 
-## 1. Current PaymentStatusScheduler Structure
+## 1. Current State Analysis
 
-### Location and Dependencies
+### 1.1 PgClient Already Exists in Infrastructure Layer
 
-| Attribute | Value |
-|-----------|-------|
-| File | `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/payment/PaymentStatusScheduler.kt` |
-| Lines | L1-L221 |
-| Layer | Infrastructure |
+The spec requests placing PgClient interface in the domain layer, but currently:
 
-**Current Dependencies:**
+| Component | Location | Status |
+|-----------|----------|--------|
+| PgClient interface | `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt` | Exists in infrastructure |
+| PgClientImpl | `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClientImpl.kt` | Exists |
+| PgException | `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgException.kt` | Exists (sealed class) |
+| PgDto (Request/Response) | `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgDto.kt` | Exists |
+
+**Current PgClient Interface** (L6-L32):
 ```kotlin
-class PaymentStatusScheduler(
-    private val paymentService: PaymentService,      // Domain Service
-    private val orderService: OrderService,          // Domain Service
-    private val paymentResultHandler: PaymentResultHandler,  // Application Handler
-    private val pgClient: PgClient,                  // Infrastructure Client
-    private val transactionTemplate: TransactionTemplate,
-)
+interface PgClient {
+    fun requestPayment(userId: Long, request: PgPaymentRequest): PgPaymentResponse
+    fun getPaymentByKey(userId: Long, transactionKey: String): PgPaymentDetailResponse
+    fun getPaymentsByOrderId(userId: Long, orderId: String): PgPaymentListResponse
+}
 ```
 
-**Current Flow:**
-1. `@Scheduled(fixedRate = 60_000)` - Runs every 1 minute
-2. Finds IN_PROGRESS payments older than 1 minute via `paymentService.findInProgressPayments(threshold)`
-3. For each payment, queries PG status via `pgClient.getPaymentsByOrderId(userId, orderId)`
-4. Based on PG result, calls `paymentResultHandler.handlePaymentSuccess/handlePaymentFailure`
-5. Force fails payments older than 5 minutes if still PENDING at PG
+### 1.2 Gap Analysis: Spec vs Current Implementation
 
-**Issues with Current Design:**
-- Scheduler directly depends on `PgClient` (infrastructure layer)
-- Scheduler directly depends on `OrderService` (domain layer) to get orderItems
-- Internal `PgQueryResult` sealed class exists in infrastructure layer
-- Scheduler handles transaction management via `TransactionTemplate`
+| Spec Requirement | Current State | Gap |
+|-----------------|---------------|-----|
+| PgClient in domain layer | In infrastructure layer | Need to move/create domain interface |
+| PgPaymentRequest (Value Object) | PgPaymentRequest exists but as simple DTO | Need domain value object with validation |
+| CardInfo (Value Object) | Not exists | Need to create |
+| CardType (Enum) | Exists in `infrastructure/pg/PgDto.kt` L78-82 | Need to move to domain |
+| PgPaymentCreateResult (sealed) | Not exists (similar: PgPaymentResponse) | Need to create |
+| PgTransaction (Value Object) | Similar: PgPaymentDetailResponse | Need domain value object |
+| PgTransactionStatus (Enum) | Exists in `infrastructure/pg/PgDto.kt` L69-73 | Need to move to domain |
 
 ---
 
 ## 2. Integration Points
 
-### 2.1 PaymentStatusScheduler (To Rename/Refactor)
+### 2.1 OrderFacade - PG Call Location
 
 | Attribute | Value |
 |-----------|-------|
-| File | `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/payment/PaymentStatusScheduler.kt` |
-| Test File | `/apps/commerce-api/src/test/kotlin/com/loopers/infrastructure/payment/PaymentStatusSchedulerTest.kt` |
-| Method | `checkInProgressPayments()` |
-| Lines | L43-L85 |
+| File | `/apps/commerce-api/src/main/kotlin/com/loopers/application/order/OrderFacade.kt` |
+| Method | `requestPayment` |
+| Lines | L271-L304 |
+| Current Usage | `pgClient.requestPayment(userId, PgPaymentRequest(...))` |
 
-**Key Methods:**
-- `checkInProgressPayments()` - L43-L85 (scheduled method)
-- `processPayment(paymentId, userId, orderId, createdAt)` - L87-L168 (private)
-- `queryPgStatus(userId, orderId)` - L170-L199 (private, PG query logic)
-- `getOrderItems(orderId)` - L201-L209 (private, gets order items for recovery)
+**Current Flow**:
+1. `allocateResources()` - TX1: Stock, Coupon, Point deduction + PENDING Payment creation
+2. `requestPayment()` - PG call outside transaction
+3. `handlePgSuccess/handlePgFailure` - TX2: Result processing
 
-### 2.2 PaymentResultHandler (Already in Application Layer)
+**Modification Point**: `requestPayment()` method needs to use domain PgClient instead of infrastructure PgClient
 
-| Attribute | Value |
-|-----------|-------|
-| File | `/apps/commerce-api/src/main/kotlin/com/loopers/application/order/PaymentResultHandler.kt` |
-| Lines | L1-L125 |
-| Annotation | `@Component` |
-
-**Methods:**
-```kotlin
-@Transactional
-fun handlePaymentSuccess(paymentId: Long, externalPaymentKey: String? = null)  // L38-L46
-
-@Transactional
-fun handlePaymentFailure(paymentId: Long, reason: String?, orderItems: List<OrderItemInfo>?)  // L60-L86
-```
-
-**Dependencies:**
-- `PaymentService`, `OrderService`, `PointService`, `CouponService`, `ProductService`
-
-### 2.3 PaymentService (Domain Layer)
+### 2.2 PaymentFacade - PG Query Location
 
 | Attribute | Value |
 |-----------|-------|
-| File | `/apps/commerce-api/src/main/kotlin/com/loopers/domain/order/PaymentService.kt` |
-| Lines | L1-L145 |
+| File | `/apps/commerce-api/src/main/kotlin/com/loopers/application/payment/PaymentFacade.kt` |
+| Method | `queryPgStatus` |
+| Lines | L144-L175 |
+| Current Usage | `pgClient.getPaymentsByOrderId(userId, orderId)` |
 
-**Key Methods for Scheduler:**
-```kotlin
-@Transactional(readOnly = true)
-fun findInProgressPayments(threshold: ZonedDateTime): List<Payment>  // L112-L118
-
-@Transactional(readOnly = true)
-fun findById(paymentId: Long): Payment  // L139-L143
-```
-
-### 2.4 PgClient (Infrastructure Layer)
-
-| Attribute | Value |
-|-----------|-------|
-| Interface | `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt` |
-| Implementation | `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClientImpl.kt` |
-
-**Key Method:**
-```kotlin
-fun getPaymentsByOrderId(userId: Long, orderId: String): PgPaymentListResponse  // L28-L31
-```
+**Current Flow**:
+1. `findInProgressPayments()` - Get IN_PROGRESS payments
+2. `queryPgStatus()` - Query PG for transaction status
+3. Handle result based on `PgQueryResult` sealed class
 
 ---
 
 ## 3. Patterns to Follow
 
-### 3.1 Facade Pattern
+### 3.1 Interface Pattern in Domain Layer
 
-**Reference**: `/apps/commerce-api/src/main/kotlin/com/loopers/application/order/OrderFacade.kt`
+**Reference**: `/apps/commerce-api/src/main/kotlin/com/loopers/domain/coupon/DiscountPolicy.kt`
 
-| Characteristic | Example |
-|----------------|---------|
-| Annotation | `@Component` |
-| Dependencies | Multiple Services + Infrastructure (PgClient, CacheTemplate) |
-| Transaction | Uses `TransactionTemplate` for programmatic TX control |
-| No @Transactional | Methods do NOT use declarative @Transactional |
-
-**OrderFacade Structure (L33-L45):**
 ```kotlin
-@Component
-class OrderFacade(
-    val productService: ProductService,
-    val orderService: OrderService,
-    val pointService: PointService,
-    val couponService: CouponService,
-    val paymentService: PaymentService,
-    val pgClient: PgClient,
-    val paymentResultHandler: PaymentResultHandler,
-    private val transactionTemplate: TransactionTemplate,
-    private val cacheTemplate: CacheTemplate,
-    ...
-)
-```
-
-**Transaction Pattern in OrderFacade:**
-```kotlin
-// L313-L315 - Uses transactionTemplate for TX boundaries
-transactionTemplate.execute { _ ->
-    paymentResultHandler.handlePaymentSuccess(...)
+interface DiscountPolicy {
+    fun supports(coupon: Coupon): Boolean
+    fun calculate(orderAmount: Money, coupon: Coupon): Money
 }
 ```
 
-**Payment Result Method in OrderFacade (L358-L374):**
-```kotlin
-fun handlePaymentResult(paymentId: Long, isSuccess: Boolean, transactionKey: String?, reason: String?) {
-    val payment = paymentService.findById(paymentId)
+**Repository Interface Pattern**: `/apps/commerce-api/src/main/kotlin/com/loopers/domain/point/PointAccountRepository.kt`
 
-    if (isSuccess) {
-        paymentResultHandler.handlePaymentSuccess(paymentId, transactionKey)
-    } else {
-        val order = orderService.findById(payment.orderId)
-        val orderItems = order.orderItems.map { ... }
-        paymentResultHandler.handlePaymentFailure(paymentId, reason, orderItems)
-    }
+```kotlin
+interface PointAccountRepository {
+    fun findByUserId(userId: Long): PointAccount?
+    fun findByUserIdWithLock(userId: Long): PointAccount?
+    fun save(pointAccount: PointAccount): PointAccount
 }
 ```
 
-### 3.2 Simple Facade Pattern (No External Calls)
+### 3.2 Sealed Class Pattern
 
-**Reference**: `/apps/commerce-api/src/main/kotlin/com/loopers/application/like/LikeFacade.kt`
-
-```kotlin
-@Component
-class LikeFacade(
-    private val likeService: ProductLikeService,
-    private val productService: ProductService,
-) {
-    @Transactional
-    fun addLike(userId: Long, productId: Long) { ... }
-}
-```
-
-- Uses declarative `@Transactional` when no external calls involved
-
-### 3.3 Scheduler Pattern
-
-**Current Pattern** (in PaymentStatusScheduler L42-L85):
-```kotlin
-@Scheduled(fixedRate = 60_000)
-fun checkInProgressPayments() {
-    val inProgressPayments = paymentService.findInProgressPayments(threshold)
-
-    for (payment in inProgressPayments) {
-        try {
-            processPayment(...)
-        } catch (e: ObjectOptimisticLockingFailureException) {
-            // Skip - already processed by callback
-        } catch (e: Exception) {
-            logger.error(...)
-        }
-    }
-}
-```
-
-**Key Design Decisions:**
-- Individual payment processing with try-catch
-- Optimistic lock conflicts are logged at DEBUG level and skipped
-- Other exceptions logged at ERROR level
-
-### 3.4 PG Query Result Pattern
-
-**Current Location**: PaymentStatusScheduler L214-L220 (private sealed class)
-
-```kotlin
-private sealed class PgQueryResult {
-    data class Success(val transactionKey: String) : PgQueryResult()
-    data class Failed(val reason: String) : PgQueryResult()
-    data object Pending : PgQueryResult()
-    data object NotFound : PgQueryResult()
-    data class QueryFailed(val reason: String) : PgQueryResult()
-}
-```
-
-This pattern will need to move to Facade or be exposed publicly.
-
----
-
-## 4. Reference Implementations
-
-### 4.1 PG Exception Handling
-
-**Location**: `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgException.kt` (L1-L45)
+**Reference 1 - Exception**: `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgException.kt` (L6-L45)
 
 ```kotlin
 sealed class PgException(message: String, cause: Throwable? = null) : RuntimeException(message, cause) {
@@ -239,129 +111,184 @@ sealed class PgException(message: String, cause: Throwable? = null) : RuntimeExc
 }
 ```
 
-### 4.2 Compensation Transaction (Resource Recovery)
-
-**Location**: `/apps/commerce-api/src/main/kotlin/com/loopers/application/order/PaymentResultHandler.kt` L91-L115
+**Reference 2 - Result**: `/apps/commerce-api/src/main/kotlin/com/loopers/application/payment/PaymentFacade.kt` (L39-L45)
 
 ```kotlin
-private fun recoverResources(payment: Payment, orderItems: List<OrderItemInfo>?) {
-    // 1. Point recovery
-    if (payment.usedPoint > Money.ZERO_KRW) {
-        pointService.restore(payment.userId, payment.usedPoint)
-    }
+sealed class PgQueryResult {
+    data class Success(val transactionKey: String) : PgQueryResult()
+    data class Failed(val reason: String) : PgQueryResult()
+    data object Pending : PgQueryResult()
+    data object NotFound : PgQueryResult()
+    data class QueryFailed(val reason: String) : PgQueryResult()
+}
+```
 
-    // 2. Coupon recovery
-    payment.issuedCouponId?.let { couponId ->
-        couponService.cancelCouponUse(couponId)
-    }
+**Reference 3 - Repository Result**: `/apps/commerce-api/src/main/kotlin/com/loopers/domain/like/ProductLikeRepository.kt` (L9-L17)
 
-    // 3. Stock recovery
-    orderItems?.let { items ->
-        val increaseUnits = items.map { ... }
-        productService.increaseStocks(...)
+```kotlin
+sealed interface SaveResult {
+    data object Created : SaveResult
+    data object AlreadyExists : SaveResult
+}
+```
+
+### 3.3 Value Object Pattern
+
+**Reference 1 - Embeddable**: `/apps/commerce-api/src/main/kotlin/com/loopers/support/values/Money.kt`
+
+- Uses `@Embeddable` annotation for JPA
+- Has `data class` for value equality
+- Includes validation in companion object factory methods
+- Operator overloading for domain operations
+
+**Reference 2 - Domain Value Object with Validation**: `/apps/commerce-api/src/main/kotlin/com/loopers/domain/coupon/DiscountAmount.kt`
+
+```kotlin
+@Embeddable
+data class DiscountAmount(
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", nullable = false)
+    val type: DiscountType,
+    @Column(name = "discount_value", nullable = false)
+    val value: Long,
+) {
+    init {
+        if (value <= 0) {
+            throw CoreException(ErrorType.BAD_REQUEST, "할인 금액은 0보다 커야 합니다")
+        }
+        // ... more validation
     }
 }
 ```
 
-### 4.3 Optimistic Lock Handling
+### 3.4 Enum Pattern
 
-**Current Usage**: PaymentStatusScheduler L64-L70
+**Reference**: `/apps/commerce-api/src/main/kotlin/com/loopers/domain/coupon/DiscountType.kt`
 
 ```kotlin
-catch (e: ObjectOptimisticLockingFailureException) {
-    logger.debug(
-        "결제 상태 확인 중 낙관적 락 충돌 - paymentId: {} (이미 다른 곳에서 처리됨)",
-        payment.id,
-    )
-    skippedCount++
+enum class DiscountType {
+    FIXED_AMOUNT,
+    RATE,
 }
 ```
 
-**Payment Entity Version Field**: `/apps/commerce-api/src/main/kotlin/com/loopers/domain/order/Payment.kt` L73-L76
+**PG-Simulator Reference**: `/apps/pg-simulator/src/main/kotlin/com/loopers/domain/payment/CardType.kt`
 
 ```kotlin
-@Version
-@Column(name = "version", nullable = false)
-var version: Long = 0
-    private set
+enum class CardType {
+    SAMSUNG,
+    KB,
+    HYUNDAI,
+}
 ```
 
 ---
 
-## 5. Error Types
+## 4. Where Domain Types Should Be Placed
+
+### 4.1 Recommended Package Structure
+
+Based on the spec and existing patterns, domain types should be in:
+
+```
+apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/
+    PgClient.kt              # Interface
+    PgPaymentRequest.kt      # Value Object
+    CardInfo.kt              # Value Object
+    CardType.kt              # Enum
+    PgPaymentCreateResult.kt # Sealed class
+    PgTransaction.kt         # Value Object
+    PgTransactionStatus.kt   # Enum
+```
+
+**Alternative**: Place in `domain/order/pg/` if PG is considered a subdomain of Order.
+
+### 4.2 Infrastructure Adapter Pattern
+
+The existing `PgClientImpl` would need to:
+1. Implement the new domain `PgClient` interface
+2. Convert between domain types and infrastructure DTOs
+3. Keep existing Resilience4j integration
+
+---
+
+## 5. Current ErrorType Values
 
 **Location**: `/apps/commerce-api/src/main/kotlin/com/loopers/support/error/ErrorType.kt`
 
 ```kotlin
 enum class ErrorType(val status: HttpStatus, val code: String, val message: String) {
-    /** Generic Errors */
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, ...),
     BAD_REQUEST(HttpStatus.BAD_REQUEST, ...),
     NOT_FOUND(HttpStatus.NOT_FOUND, ...),
     CONFLICT(HttpStatus.CONFLICT, ...),
 
-    /** PG Related Errors */
-    CIRCUIT_OPEN(HttpStatus.SERVICE_UNAVAILABLE, "CIRCUIT_OPEN", "일시적으로 결제 서비스를 이용할 수 없습니다."),
-    PAYMENT_IN_PROGRESS(HttpStatus.ACCEPTED, "PAYMENT_IN_PROGRESS", "결제가 진행 중입니다."),
-    PAYMENT_FAILED(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_FAILED", "결제에 실패했습니다."),
+    // PG related
+    CIRCUIT_OPEN(HttpStatus.SERVICE_UNAVAILABLE, "CIRCUIT_OPEN", ...),
+    PAYMENT_IN_PROGRESS(HttpStatus.ACCEPTED, "PAYMENT_IN_PROGRESS", ...),
+    PAYMENT_FAILED(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_FAILED", ...),
 }
 ```
+
+**New types likely needed**:
+- `INVALID_CARD_NUMBER` - CardInfo validation failure
+- `UNSUPPORTED_CARD_TYPE` - CardType validation failure
 
 ---
 
 ## 6. Considerations for Planner
 
-### 6.1 New PaymentFacade Creation
+### 6.1 Dependency Inversion Decision
 
-- Currently no `PaymentFacade` exists
-- Need to create `/apps/commerce-api/src/main/kotlin/com/loopers/application/payment/PaymentFacade.kt`
-- Move scheduler-related logic from infrastructure to application layer
+Currently, `OrderFacade` and `PaymentFacade` directly import from `com.loopers.infrastructure.pg.*`. To follow the spec:
 
-### 6.2 Logic to Move to PaymentFacade
+1. Create domain interfaces/types in `domain/pg/` package
+2. Update `PgClientImpl` to implement domain interface
+3. Update facades to import from domain package
+4. Keep infrastructure DTOs for HTTP communication, add mapping to domain types
 
-From current PaymentStatusScheduler:
-1. `queryPgStatus()` logic (L170-L199) - queries PG and interprets result
-2. `getOrderItems()` logic (L201-L209) - gets order items for recovery
-3. Decision logic in `processPayment()` (L97-L167) - when to succeed/fail/wait
+### 6.2 Validation Rules from Spec
 
-### 6.3 New PaymentScheduler Responsibilities
+**CardInfo.cardNo validation**: `xxxx-xxxx-xxxx-xxxx` format
+- Regex pattern: `^\d{4}-\d{4}-\d{4}-\d{4}$`
+- Should be validated in `CardInfo` value object init block
 
-After refactoring, scheduler should only:
-1. Find IN_PROGRESS payments via Facade
-2. Call Facade method for each payment
-3. Handle exceptions (optimistic lock, general errors)
+### 6.3 PgPaymentCreateResult vs PgPaymentResponse
 
-### 6.4 Method Signature Proposal for PaymentFacade
-
+Current `PgPaymentResponse`:
 ```kotlin
-// Option 1: One-by-one processing
-fun findInProgressPaymentsToCheck(threshold: ZonedDateTime): List<PaymentInfo.InProgress>
-fun processInProgressPayment(paymentId: Long)
-
-// Option 2: Combined (current pattern simplified)
-fun checkAndFinalizePayment(paymentId: Long, userId: Long, orderId: Long, createdAt: ZonedDateTime)
+data class PgPaymentResponse(
+    val transactionKey: String,
+    val status: String,
+    val reason: String?,
+)
 ```
 
-### 6.5 PgQueryResult Visibility
+Spec `PgPaymentCreateResult`:
+```kotlin
+sealed class PgPaymentCreateResult {
+    data class Accepted(val transactionKey: String)
+    data object Uncertain
+}
+```
 
-- Currently private in PaymentStatusScheduler
-- Options:
-  1. Create as sealed class in Facade or domain package
-  2. Handle internally in Facade, return simple result (success/failure/pending)
+**Mapping needed**: `PgClientImpl` should convert `PgPaymentResponse` to `PgPaymentCreateResult`
 
-### 6.6 Transaction Boundaries
+### 6.4 Files to Modify
 
-Per spec design doc (L167-L181):
-- Each payment should be processed in individual transaction
-- Optimistic lock conflicts should skip that payment, continue others
-- PaymentFacade methods should NOT use `@Transactional` annotation
-- Use `TransactionTemplate` for programmatic transaction control
+| File | Change |
+|------|--------|
+| `OrderFacade.kt` | Import domain PgClient instead of infrastructure |
+| `PaymentFacade.kt` | Import domain PgClient instead of infrastructure |
+| `PgClientImpl.kt` | Implement domain interface, add type conversion |
 
-### 6.7 Test Updates Required
+### 6.5 CardType Duplication
 
-| Test File | Reason |
-|-----------|--------|
-| `PaymentStatusSchedulerTest.kt` | Rename to PaymentSchedulerTest, update to use PaymentFacade |
+CardType exists in two places:
+1. `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgDto.kt` L78-82
+2. `/apps/pg-simulator/src/main/kotlin/com/loopers/domain/payment/CardType.kt`
+
+Decision needed: Use domain CardType or keep both (with conversion in impl).
 
 ---
 
@@ -369,32 +296,17 @@ Per spec design doc (L167-L181):
 
 | File | Relevance |
 |------|-----------|
-| `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/payment/PaymentStatusScheduler.kt` | Current scheduler implementation to refactor |
-| `/apps/commerce-api/src/test/kotlin/com/loopers/infrastructure/payment/PaymentStatusSchedulerTest.kt` | Test to update |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/application/order/OrderFacade.kt` | Reference Facade pattern with PG calls |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/application/order/PaymentResultHandler.kt` | Existing handler to reuse |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/domain/order/PaymentService.kt` | Domain service methods |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/domain/order/OrderService.kt` | Domain service for order lookup |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt` | PG interface |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClientImpl.kt` | PG implementation with resilience |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgException.kt` | PG exception types |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgDto.kt` | PG DTOs including PgTransactionStatus |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/domain/order/Payment.kt` | Payment entity with @Version |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/domain/order/PaymentRepository.kt` | Repository interface |
-| `/apps/commerce-api/src/main/kotlin/com/loopers/support/error/ErrorType.kt` | Error type enum |
-| `docs/specs/상세_설계_문서_PG연동_Resilience.md` | Design spec for scheduler behavior |
-
----
-
-## 8. Proposed File Structure After Refactoring
-
-```
-apps/commerce-api/src/main/kotlin/com/loopers/
-├── application/
-│   └── payment/
-│       └── PaymentFacade.kt           # NEW - Contains PG query logic, decision logic
-├── infrastructure/
-│   └── payment/
-│       └── PaymentScheduler.kt        # RENAMED from PaymentStatusScheduler
-│                                      # Now only depends on PaymentFacade
-```
+| `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt` | Current PgClient interface location |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgDto.kt` | Current DTOs, CardType, PgTransactionStatus |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgException.kt` | Sealed class pattern for exceptions |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClientImpl.kt` | Implementation with Resilience4j |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/application/order/OrderFacade.kt` | Main PG call integration point |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/application/payment/PaymentFacade.kt` | PG query integration point |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/domain/order/Payment.kt` | Payment entity with PG fields |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/domain/coupon/DiscountPolicy.kt` | Interface pattern reference |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/domain/coupon/DiscountAmount.kt` | Value object pattern reference |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/domain/like/ProductLikeRepository.kt` | Sealed interface pattern reference |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/support/values/Money.kt` | Value object pattern reference |
+| `/apps/commerce-api/src/main/kotlin/com/loopers/support/error/ErrorType.kt` | Current error types |
+| `/apps/pg-simulator/src/main/kotlin/com/loopers/domain/payment/CardType.kt` | PG simulator CardType reference |
+| `/apps/pg-simulator/src/main/kotlin/com/loopers/domain/payment/TransactionStatus.kt` | PG simulator status reference |
