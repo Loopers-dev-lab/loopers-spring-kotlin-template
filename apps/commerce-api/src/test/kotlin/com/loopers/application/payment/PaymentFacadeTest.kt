@@ -1,4 +1,4 @@
-package com.loopers.infrastructure.payment
+package com.loopers.application.payment
 
 import com.loopers.application.order.PaymentResultHandler
 import com.loopers.domain.order.Order
@@ -23,20 +23,19 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.transaction.support.TransactionCallback
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.ZonedDateTime
 
-@DisplayName("PaymentStatusScheduler 단위 테스트")
-class PaymentStatusSchedulerTest {
+@DisplayName("PaymentFacade 단위 테스트")
+class PaymentFacadeTest {
     private lateinit var paymentService: PaymentService
     private lateinit var orderService: OrderService
     private lateinit var paymentResultHandler: PaymentResultHandler
     private lateinit var pgClient: PgClient
     private lateinit var transactionTemplate: TransactionTemplate
 
-    private lateinit var scheduler: PaymentStatusScheduler
+    private lateinit var facade: PaymentFacade
 
     @BeforeEach
     fun setUp() {
@@ -54,7 +53,7 @@ class PaymentStatusSchedulerTest {
             callback.doInTransaction(mockk())
         }
 
-        scheduler = PaymentStatusScheduler(
+        facade = PaymentFacade(
             paymentService = paymentService,
             orderService = orderService,
             paymentResultHandler = paymentResultHandler,
@@ -64,8 +63,29 @@ class PaymentStatusSchedulerTest {
     }
 
     @Nested
-    @DisplayName("IN_PROGRESS 결제 처리")
-    inner class ProcessInProgressPayments {
+    @DisplayName("findInProgressPayments")
+    inner class FindInProgressPayments {
+
+        @Test
+        @DisplayName("PaymentService에 위임하여 IN_PROGRESS 결제 목록을 조회한다")
+        fun `delegates to PaymentService`() {
+            // given
+            val threshold = ZonedDateTime.now().minusMinutes(1)
+            val payments = listOf(createMockPayment(id = 1L))
+            every { paymentService.findInProgressPayments(threshold) } returns payments
+
+            // when
+            val result = facade.findInProgressPayments(threshold)
+
+            // then
+            verify(exactly = 1) { paymentService.findInProgressPayments(threshold) }
+            assert(result == payments)
+        }
+    }
+
+    @Nested
+    @DisplayName("processInProgressPayment - PG 결과에 따른 처리")
+    inner class ProcessInProgressPayment {
 
         @Test
         @DisplayName("PG에서 SUCCESS 응답 시 결제 성공 처리를 호출한다")
@@ -75,11 +95,9 @@ class PaymentStatusSchedulerTest {
                 id = 1L,
                 userId = 100L,
                 orderId = 200L,
-                status = PaymentStatus.IN_PROGRESS,
                 createdAt = ZonedDateTime.now().minusMinutes(2),
             )
 
-            every { paymentService.findInProgressPayments(any()) } returns listOf(payment)
             every {
                 pgClient.getPaymentsByOrderId(100L, "200")
             } returns PgPaymentListResponse(
@@ -95,7 +113,7 @@ class PaymentStatusSchedulerTest {
             every { paymentResultHandler.handlePaymentSuccess(1L, "tx_123") } just Runs
 
             // when
-            scheduler.checkInProgressPayments()
+            facade.processInProgressPayment(payment)
 
             // then
             verify(exactly = 1) { paymentResultHandler.handlePaymentSuccess(1L, "tx_123") }
@@ -109,12 +127,10 @@ class PaymentStatusSchedulerTest {
                 id = 1L,
                 userId = 100L,
                 orderId = 200L,
-                status = PaymentStatus.IN_PROGRESS,
                 createdAt = ZonedDateTime.now().minusMinutes(2),
             )
             val order = createMockOrder(orderId = 200L)
 
-            every { paymentService.findInProgressPayments(any()) } returns listOf(payment)
             every {
                 pgClient.getPaymentsByOrderId(100L, "200")
             } returns PgPaymentListResponse(
@@ -137,7 +153,7 @@ class PaymentStatusSchedulerTest {
             } just Runs
 
             // when
-            scheduler.checkInProgressPayments()
+            facade.processInProgressPayment(payment)
 
             // then
             verify(exactly = 1) {
@@ -150,45 +166,16 @@ class PaymentStatusSchedulerTest {
         }
 
         @Test
-        @DisplayName("IN_PROGRESS 결제가 없으면 아무 작업도 하지 않는다")
-        fun `does nothing when no IN_PROGRESS payments`() {
+        @DisplayName("PG PENDING이고 5분 이하이면 아무 처리도 하지 않는다")
+        fun `does nothing when PG returns PENDING and under 5 minutes`() {
             // given
-            every { paymentService.findInProgressPayments(any()) } returns emptyList()
-
-            // when
-            scheduler.checkInProgressPayments()
-
-            // then
-            verify(exactly = 0) { pgClient.getPaymentsByOrderId(any(), any()) }
-        }
-    }
-
-    @Nested
-    @DisplayName("낙관적 락 충돌 처리")
-    inner class OptimisticLockConflict {
-
-        @Test
-        @DisplayName("낙관적 락 충돌 시 해당 결제를 건너뛴다")
-        fun `skips payment when optimistic lock conflict occurs`() {
-            // given
-            val payment1 = createMockPayment(
+            val payment = createMockPayment(
                 id = 1L,
                 userId = 100L,
                 orderId = 200L,
-                status = PaymentStatus.IN_PROGRESS,
-                createdAt = ZonedDateTime.now().minusMinutes(2),
-            )
-            val payment2 = createMockPayment(
-                id = 2L,
-                userId = 101L,
-                orderId = 201L,
-                status = PaymentStatus.IN_PROGRESS,
-                createdAt = ZonedDateTime.now().minusMinutes(2),
+                createdAt = ZonedDateTime.now().minusMinutes(3),
             )
 
-            every { paymentService.findInProgressPayments(any()) } returns listOf(payment1, payment2)
-
-            // payment1 - 낙관적 락 충돌
             every {
                 pgClient.getPaymentsByOrderId(100L, "200")
             } returns PgPaymentListResponse(
@@ -196,66 +183,32 @@ class PaymentStatusSchedulerTest {
                 transactions = listOf(
                     PgTransactionSummary(
                         transactionKey = "tx_123",
-                        status = PgTransactionStatus.SUCCESS.name,
+                        status = PgTransactionStatus.PENDING.name,
                         reason = null,
                     ),
                 ),
             )
-
-            // 첫 번째 트랜잭션에서 낙관적 락 예외 발생
-            var callCount = 0
-            every { transactionTemplate.execute(any<TransactionCallback<*>>()) } answers {
-                callCount++
-                if (callCount == 1) {
-                    throw ObjectOptimisticLockingFailureException(Payment::class.java, payment1.id)
-                }
-                val callback = firstArg<TransactionCallback<*>>()
-                callback.doInTransaction(mockk())
-            }
-
-            // payment2 - 정상 처리
-            every {
-                pgClient.getPaymentsByOrderId(101L, "201")
-            } returns PgPaymentListResponse(
-                orderId = "201",
-                transactions = listOf(
-                    PgTransactionSummary(
-                        transactionKey = "tx_456",
-                        status = PgTransactionStatus.SUCCESS.name,
-                        reason = null,
-                    ),
-                ),
-            )
-            every { paymentResultHandler.handlePaymentSuccess(2L, "tx_456") } just Runs
 
             // when
-            scheduler.checkInProgressPayments()
+            facade.processInProgressPayment(payment)
 
             // then
-            verify(exactly = 0) { paymentResultHandler.handlePaymentSuccess(1L, any()) }
-            verify(exactly = 1) { paymentResultHandler.handlePaymentSuccess(2L, "tx_456") }
+            verify(exactly = 0) { paymentResultHandler.handlePaymentSuccess(any(), any()) }
+            verify(exactly = 0) { paymentResultHandler.handlePaymentFailure(any(), any(), any()) }
         }
-    }
-
-    @Nested
-    @DisplayName("5분 초과 강제 실패")
-    inner class ForceFailure {
 
         @Test
-        @DisplayName("5분 초과 시 강제 실패 처리한다")
-        fun `forces failure for payments older than 5 minutes`() {
+        @DisplayName("PG PENDING이고 5분 초과이면 강제 실패 처리한다")
+        fun `forces failure when PG returns PENDING and over 5 minutes`() {
             // given
-            // 6분 전 생성된 결제
-            val oldPayment = createMockPayment(
+            val payment = createMockPayment(
                 id = 1L,
                 userId = 100L,
                 orderId = 200L,
-                status = PaymentStatus.IN_PROGRESS,
                 createdAt = ZonedDateTime.now().minusMinutes(6),
             )
             val order = createMockOrder(orderId = 200L)
 
-            every { paymentService.findInProgressPayments(any()) } returns listOf(oldPayment)
             every {
                 pgClient.getPaymentsByOrderId(100L, "200")
             } returns PgPaymentListResponse(
@@ -278,7 +231,7 @@ class PaymentStatusSchedulerTest {
             } just Runs
 
             // when
-            scheduler.checkInProgressPayments()
+            facade.processInProgressPayment(payment)
 
             // then
             verify(exactly = 1) {
@@ -291,71 +244,6 @@ class PaymentStatusSchedulerTest {
         }
 
         @Test
-        @DisplayName("5분 이하이고 PG가 PENDING이면 다음 스케줄에 재시도한다")
-        fun `waits for next schedule when payment is pending and under 5 minutes`() {
-            // given
-            // 3분 전 생성된 결제
-            val recentPayment = createMockPayment(
-                id = 1L,
-                userId = 100L,
-                orderId = 200L,
-                status = PaymentStatus.IN_PROGRESS,
-                createdAt = ZonedDateTime.now().minusMinutes(3),
-            )
-
-            every { paymentService.findInProgressPayments(any()) } returns listOf(recentPayment)
-            every {
-                pgClient.getPaymentsByOrderId(100L, "200")
-            } returns PgPaymentListResponse(
-                orderId = "200",
-                transactions = listOf(
-                    PgTransactionSummary(
-                        transactionKey = "tx_123",
-                        status = PgTransactionStatus.PENDING.name,
-                        reason = null,
-                    ),
-                ),
-            )
-
-            // when
-            scheduler.checkInProgressPayments()
-
-            // then
-            verify(exactly = 0) { paymentResultHandler.handlePaymentSuccess(any(), any()) }
-            verify(exactly = 0) { paymentResultHandler.handlePaymentFailure(any(), any(), any()) }
-        }
-    }
-
-    @Nested
-    @DisplayName("PG 조회 실패 처리")
-    inner class PgQueryFailure {
-
-        @Test
-        @DisplayName("PG 조회 실패 시 다음 스케줄에 재시도한다")
-        fun `waits for next schedule when PG query fails`() {
-            // given
-            val payment = createMockPayment(
-                id = 1L,
-                userId = 100L,
-                orderId = 200L,
-                status = PaymentStatus.IN_PROGRESS,
-                createdAt = ZonedDateTime.now().minusMinutes(2),
-            )
-
-            every { paymentService.findInProgressPayments(any()) } returns listOf(payment)
-            every {
-                pgClient.getPaymentsByOrderId(100L, "200")
-            } throws PgException.RequestNotReached("PG 연결 실패")
-
-            // when
-            scheduler.checkInProgressPayments()
-
-            // then
-            verify(exactly = 0) { paymentResultHandler.handlePaymentSuccess(any(), any()) }
-            verify(exactly = 0) { paymentResultHandler.handlePaymentFailure(any(), any(), any()) }
-        }
-
-        @Test
         @DisplayName("PG에 결제 기록이 없으면 실패 처리한다")
         fun `fails payment when no transaction found in PG`() {
             // given
@@ -363,12 +251,10 @@ class PaymentStatusSchedulerTest {
                 id = 1L,
                 userId = 100L,
                 orderId = 200L,
-                status = PaymentStatus.IN_PROGRESS,
                 createdAt = ZonedDateTime.now().minusMinutes(2),
             )
             val order = createMockOrder(orderId = 200L)
 
-            every { paymentService.findInProgressPayments(any()) } returns listOf(payment)
             every {
                 pgClient.getPaymentsByOrderId(100L, "200")
             } returns PgPaymentListResponse(
@@ -385,7 +271,7 @@ class PaymentStatusSchedulerTest {
             } just Runs
 
             // when
-            scheduler.checkInProgressPayments()
+            facade.processInProgressPayment(payment)
 
             // then
             verify(exactly = 1) {
@@ -405,12 +291,10 @@ class PaymentStatusSchedulerTest {
                 id = 1L,
                 userId = 100L,
                 orderId = 200L,
-                status = PaymentStatus.IN_PROGRESS,
                 createdAt = ZonedDateTime.now().minusMinutes(2),
             )
             val order = createMockOrder(orderId = 200L)
 
-            every { paymentService.findInProgressPayments(any()) } returns listOf(payment)
             every {
                 pgClient.getPaymentsByOrderId(100L, "200")
             } throws PgException.BusinessError("NOT_FOUND", "결제 정보 없음")
@@ -424,7 +308,7 @@ class PaymentStatusSchedulerTest {
             } just Runs
 
             // when
-            scheduler.checkInProgressPayments()
+            facade.processInProgressPayment(payment)
 
             // then
             verify(exactly = 1) {
@@ -435,14 +319,37 @@ class PaymentStatusSchedulerTest {
                 )
             }
         }
+
+        @Test
+        @DisplayName("PG 조회 실패 시 아무 처리도 하지 않는다 (다음 스케줄에 재시도)")
+        fun `does nothing when PG query fails`() {
+            // given
+            val payment = createMockPayment(
+                id = 1L,
+                userId = 100L,
+                orderId = 200L,
+                createdAt = ZonedDateTime.now().minusMinutes(2),
+            )
+
+            every {
+                pgClient.getPaymentsByOrderId(100L, "200")
+            } throws PgException.RequestNotReached("PG 연결 실패")
+
+            // when
+            facade.processInProgressPayment(payment)
+
+            // then
+            verify(exactly = 0) { paymentResultHandler.handlePaymentSuccess(any(), any()) }
+            verify(exactly = 0) { paymentResultHandler.handlePaymentFailure(any(), any(), any()) }
+        }
     }
 
     private fun createMockPayment(
-        id: Long,
-        userId: Long,
-        orderId: Long,
-        status: PaymentStatus,
-        createdAt: ZonedDateTime,
+        id: Long = 1L,
+        userId: Long = 100L,
+        orderId: Long = 200L,
+        status: PaymentStatus = PaymentStatus.IN_PROGRESS,
+        createdAt: ZonedDateTime = ZonedDateTime.now().minusMinutes(2),
     ): Payment {
         val payment = mockk<Payment>()
         every { payment.id } returns id

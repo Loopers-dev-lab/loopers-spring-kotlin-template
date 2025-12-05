@@ -55,12 +55,12 @@ PaymentFacade (Application)
 
 ### TODO
 
-- [ ] Create `apps/commerce-api/src/main/kotlin/com/loopers/application/payment/PaymentFacade.kt` - new Facade for payment operations (pattern: `application/order/OrderFacade.kt:L32-L72`)
-- [ ] Add `PgQueryResult` sealed class in `PaymentFacade.kt` - move from PaymentStatusScheduler (current location: `infrastructure/payment/PaymentStatusScheduler.kt:L214-L220`)
-- [ ] Add `findInProgressPayments(threshold: ZonedDateTime)` method in `PaymentFacade.kt` - delegate to PaymentService (pattern: `application/order/OrderFacade.kt:L358-L374`)
-- [ ] Add `processInProgressPayment(payment: Payment)` method in `PaymentFacade.kt` - contains PG query, decision logic, and transaction handling (spec: 상세_설계_문서_PG연동_Resilience.md#1.3 스케줄러 상태 확정 플로우)
-- [ ] Add `queryPgStatus(userId: Long, orderId: String)` private method in `PaymentFacade.kt` - PG status query logic (move from: `infrastructure/payment/PaymentStatusScheduler.kt:L170-L199`)
-- [ ] Add `getOrderItems(orderId: Long)` private method in `PaymentFacade.kt` - order items lookup for recovery (move from: `infrastructure/payment/PaymentStatusScheduler.kt:L201-L209`)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/application/payment/PaymentFacade.kt` - new Facade for payment operations (pattern: `application/order/OrderFacade.kt:L32-L72`)
+- [x] Add `PgQueryResult` sealed class in `PaymentFacade.kt` - move from PaymentStatusScheduler (current location: `infrastructure/payment/PaymentStatusScheduler.kt:L214-L220`)
+- [x] Add `findInProgressPayments(threshold: ZonedDateTime)` method in `PaymentFacade.kt` - delegate to PaymentService (pattern: `application/order/OrderFacade.kt:L358-L374`)
+- [x] Add `processInProgressPayment(payment: Payment)` method in `PaymentFacade.kt` - contains PG query, decision logic, and transaction handling (spec: 상세_설계_문서_PG연동_Resilience.md#1.3 스케줄러 상태 확정 플로우)
+- [x] Add `queryPgStatus(userId: Long, orderId: String)` private method in `PaymentFacade.kt` - PG status query logic (move from: `infrastructure/payment/PaymentStatusScheduler.kt:L170-L199`)
+- [x] Add `getOrderItems(orderId: Long)` private method in `PaymentFacade.kt` - order items lookup for recovery (move from: `infrastructure/payment/PaymentStatusScheduler.kt:L201-L209`)
 
 ### Implementation Details
 
@@ -105,14 +105,14 @@ class PaymentFacade(
 
 ### Tests
 
-- [ ] Create `apps/commerce-api/src/test/kotlin/com/loopers/application/payment/PaymentFacadeTest.kt` - unit tests for PaymentFacade (pattern: `infrastructure/payment/PaymentStatusSchedulerTest.kt:L31-L64`)
+- [x] Create `apps/commerce-api/src/test/kotlin/com/loopers/application/payment/PaymentFacadeTest.kt` - unit tests for PaymentFacade (pattern: `infrastructure/payment/PaymentStatusSchedulerTest.kt:L31-L64`)
     - Cover: PG SUCCESS handling, PG FAILED handling, PENDING within threshold, PENDING over 5min force fail, NOT_FOUND handling, query failure handling
 
 ### Done When
 
-- [ ] `./gradlew :apps:commerce-api:test --tests "*PaymentFacadeTest"` passes
-- [ ] PaymentFacade.kt compiles without errors
-- [ ] All 5 PgQueryResult cases have corresponding test methods
+- [x] `./gradlew :apps:commerce-api:test --tests "*PaymentFacadeTest"` passes
+- [x] PaymentFacade.kt compiles without errors
+- [x] All 5 PgQueryResult cases have corresponding test methods
 
 ---
 
@@ -120,15 +120,15 @@ class PaymentFacade(
 
 ### TODO
 
-- [ ] Rename `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/payment/PaymentStatusScheduler.kt` to `PaymentScheduler.kt`
-- [ ] Modify `PaymentScheduler.kt` constructor - replace all dependencies with single `PaymentFacade` dependency
-- [ ] Modify `checkInProgressPayments()` method in `PaymentScheduler.kt` - simplify to iterate and delegate to Facade (current location: L43-L85)
-- [ ] Remove `processPayment()` method from `PaymentScheduler.kt` - logic moved to Facade (current location: L87-L168)
-- [ ] Remove `queryPgStatus()` method from `PaymentScheduler.kt` - logic moved to Facade (current location: L170-L199)
-- [ ] Remove `getOrderItems()` method from `PaymentScheduler.kt` - logic moved to Facade (current location: L201-L209)
-- [ ] Remove `PgQueryResult` sealed class from `PaymentScheduler.kt` - moved to Facade (current location: L214-L220)
-- [ ] Keep `CHECK_THRESHOLD_MINUTES` constant in `PaymentScheduler.kt` - scheduler-specific config (current location: L35)
-- [ ] Move `FORCE_FAIL_THRESHOLD_MINUTES` to `PaymentFacade.kt` - business logic config (current location: L36)
+- [x] Rename `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/payment/PaymentStatusScheduler.kt` to `PaymentScheduler.kt`
+- [x] Modify `PaymentScheduler.kt` constructor - replace all dependencies with single `PaymentFacade` dependency
+- [x] Modify `checkInProgressPayments()` method in `PaymentScheduler.kt` - simplify to iterate and delegate to Facade (current location: L43-L85)
+- [x] Remove `processPayment()` method from `PaymentScheduler.kt` - logic moved to Facade (current location: L87-L168)
+- [x] Remove `queryPgStatus()` method from `PaymentScheduler.kt` - logic moved to Facade (current location: L170-L199)
+- [x] Remove `getOrderItems()` method from `PaymentScheduler.kt` - logic moved to Facade (current location: L201-L209)
+- [x] Remove `PgQueryResult` sealed class from `PaymentScheduler.kt` - moved to Facade (current location: L214-L220)
+- [x] Keep `CHECK_THRESHOLD_MINUTES` constant in `PaymentScheduler.kt` - scheduler-specific config (current location: L35)
+- [x] Move `FORCE_FAIL_THRESHOLD_MINUTES` to `PaymentFacade.kt` - business logic config (current location: L36)
 
 ### Implementation Details
 
@@ -173,17 +173,17 @@ class PaymentScheduler(
 
 ### Tests
 
-- [ ] Rename `apps/commerce-api/src/test/kotlin/com/loopers/infrastructure/payment/PaymentStatusSchedulerTest.kt` to `PaymentSchedulerTest.kt`
-- [ ] Modify `PaymentSchedulerTest.kt` - update to mock only `PaymentFacade` instead of individual services
-- [ ] Simplify test cases in `PaymentSchedulerTest.kt` - test scheduler iteration/exception handling, not business logic (business logic tested in PaymentFacadeTest)
+- [x] Rename `apps/commerce-api/src/test/kotlin/com/loopers/infrastructure/payment/PaymentStatusSchedulerTest.kt` to `PaymentSchedulerTest.kt`
+- [x] Modify `PaymentSchedulerTest.kt` - update to mock only `PaymentFacade` instead of individual services
+- [x] Simplify test cases in `PaymentSchedulerTest.kt` - test scheduler iteration/exception handling, not business logic (business logic tested in PaymentFacadeTest)
 
 ### Done When
 
-- [ ] `./gradlew :apps:commerce-api:test --tests "*PaymentSchedulerTest"` passes
-- [ ] `./gradlew :apps:commerce-api:test --tests "*PaymentFacadeTest"` passes
-- [ ] PaymentScheduler.kt only has one dependency: PaymentFacade
-- [ ] No compile errors in the project
-- [ ] `grep -r "PaymentStatusScheduler" apps/commerce-api/src/` returns empty (old class name removed)
+- [x] `./gradlew :apps:commerce-api:test --tests "*PaymentSchedulerTest"` passes
+- [x] `./gradlew :apps:commerce-api:test --tests "*PaymentFacadeTest"` passes
+- [x] PaymentScheduler.kt only has one dependency: PaymentFacade
+- [x] No compile errors in the project
+- [x] `grep -r "PaymentStatusScheduler" apps/commerce-api/src/` returns empty (old class name removed)
 
 ---
 
@@ -191,20 +191,20 @@ class PaymentScheduler(
 
 ### TODO
 
-- [ ] Run full test suite to verify no regressions
-- [ ] Verify PaymentWebhookController still works (uses OrderFacade.handlePaymentResult, not affected)
-- [ ] Verify OrderFacade still works (independent of PaymentFacade)
+- [x] Run full test suite to verify no regressions
+- [x] Verify PaymentWebhookController still works (uses OrderFacade.handlePaymentResult, not affected)
+- [x] Verify OrderFacade still works (independent of PaymentFacade)
 
 ### Tests
 
-- [ ] Run `./gradlew :apps:commerce-api:test` - all tests pass
-- [ ] Run `./gradlew :apps:commerce-api:test --tests "*PaymentSchedulerCriticalScenarioTest"` - if exists, verify critical scenarios still pass
+- [x] Run `./gradlew :apps:commerce-api:test` - all tests pass
+- [x] Run `./gradlew :apps:commerce-api:test --tests "*PaymentSchedulerCriticalScenarioTest"` - if exists, verify critical scenarios still pass
 
 ### Done When
 
-- [ ] `./gradlew :apps:commerce-api:test` passes (all tests green)
-- [ ] `./gradlew :apps:commerce-api:build` succeeds
-- [ ] No ktlint errors: `./gradlew ktlintCheck` passes
+- [x] `./gradlew :apps:commerce-api:test` passes (all tests green)
+- [x] `./gradlew :apps:commerce-api:build` succeeds
+- [x] No ktlint errors: `./gradlew ktlintCheck` passes
 
 ---
 
