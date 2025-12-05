@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.order
 
 import com.loopers.application.order.OrderInfo
 import com.loopers.application.order.OrderItemInfo
+import com.loopers.domain.order.OrderItemCommand
 
 class OrderV1Dto {
     data class CreateOrderRequest(
@@ -16,7 +17,7 @@ class OrderV1Dto {
         val productId: Long,
         val quantity: Int,
     ) {
-        fun toCommand() = com.loopers.domain.order.OrderItemCommand(
+        fun toCommand() = OrderItemCommand(
             productId = productId,
             quantity = quantity
         )
