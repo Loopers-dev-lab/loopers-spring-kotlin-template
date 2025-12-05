@@ -142,18 +142,18 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### TODO
 
-- [ ] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardInfo.kt` - CardInfo value object with cardNo validation (spec: section 1.1 CardInfo class diagram + section 1.3 CardInfo validation rules, pattern: `domain/coupon/DiscountAmount.kt:L9-L27`)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardInfo.kt` - CardInfo value object with cardNo validation (spec: section 1.1 CardInfo class diagram + section 1.3 CardInfo validation rules, pattern: `domain/coupon/DiscountAmount.kt:L9-L27`)
   - cardType: CardType
   - cardNo: String validated with regex `^\d{4}-\d{4}-\d{4}-\d{4}$`
   - init block validates cardNo format, throws CoreException(ErrorType.BAD_REQUEST) on failure
 
-- [ ] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentRequest.kt` - PgPaymentRequest value object (spec: section 1.1 PgPaymentRequest class diagram, pattern: `domain/coupon/DiscountAmount.kt:L9-L27`)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentRequest.kt` - PgPaymentRequest value object (spec: section 1.1 PgPaymentRequest class diagram, pattern: `domain/coupon/DiscountAmount.kt:L9-L27`)
   - orderId: Long
   - amount: Money
   - cardInfo: CardInfo
   - callbackUrl: String
 
-- [ ] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransaction.kt` - PgTransaction value object (spec: section 1.1 PgTransaction class diagram)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransaction.kt` - PgTransaction value object (spec: section 1.1 PgTransaction class diagram)
   - transactionKey: String
   - orderId: Long
   - cardType: CardType
@@ -164,7 +164,7 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### Tests
 
-- [ ] Create `apps/commerce-api/src/test/kotlin/com/loopers/domain/pg/CardInfoTest.kt` - unit tests for CardInfo validation (pattern: `domain/coupon/DiscountAmountTest.kt` if exists, or use standard test pattern)
+- [x] Create `apps/commerce-api/src/test/kotlin/com/loopers/domain/pg/CardInfoTest.kt` - unit tests for CardInfo validation (pattern: `domain/coupon/DiscountAmountTest.kt` if exists, or use standard test pattern)
   - Test: valid cardNo format "1234-5678-9012-3456" succeeds
   - Test: invalid cardNo format "12345678901234567" throws CoreException
   - Test: invalid cardNo format "1234-5678-9012-345" throws CoreException
@@ -172,9 +172,9 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### Done When
 
-- [ ] `./gradlew :apps:commerce-api:test --tests "*CardInfoTest"` passes
-- [ ] `./gradlew :apps:commerce-api:compileKotlin` succeeds
-- [ ] CardInfo validates cardNo format in init block
+- [x] `./gradlew :apps:commerce-api:test --tests "*CardInfoTest"` passes
+- [x] `./gradlew :apps:commerce-api:compileKotlin` succeeds
+- [x] CardInfo validates cardNo format in init block
 
 ---
 
