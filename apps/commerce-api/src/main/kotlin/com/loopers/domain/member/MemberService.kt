@@ -37,4 +37,11 @@ class MemberService(
         memberRepository.save(member) // 명시적 저장
         return member.point.amount
     }
+
+    @Transactional
+    fun rollbackPoint(memberId: String, usePoint: Long) {
+        val member = memberRepository.findByMemberIdWithLockOrThrow(memberId)
+        member.chargePoint(usePoint)
+        memberRepository.save(member)
+    }
 }
