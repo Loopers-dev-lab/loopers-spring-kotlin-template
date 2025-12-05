@@ -98,6 +98,15 @@ subprojects {
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
         jvmArgs("-Xshare:off")
+
+        // Colima Docker 환경설정 (macOS용)
+        environment("DOCKER_HOST", "unix://${System.getProperty("user.home")}/.colima/default/docker.sock")
+        environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+        environment("TESTCONTAINERS_REUSE_ENABLE", "true")
+        systemProperty("testcontainers.docker.socket.override", "/var/run/docker.sock")
+
+        // JVM 힙 크기 조정 (컨테이너 실행 시 메모리 부족 방지)
+        jvmArgs("-Xmx2g")
     }
 
     tasks.withType<JacocoReport> {
