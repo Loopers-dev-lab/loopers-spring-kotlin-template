@@ -1,5 +1,11 @@
 package com.loopers.infrastructure.pg
 
+import com.loopers.domain.pg.PgClient
+import com.loopers.domain.pg.PgPaymentCreateResult
+import com.loopers.domain.pg.PgPaymentRequest
+import com.loopers.domain.pg.PgTransaction
+import com.loopers.domain.pg.PgTransactionStatus
+import com.loopers.support.values.Money
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
@@ -14,6 +20,7 @@ import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import java.net.ConnectException
 import java.net.SocketTimeoutException
+import com.loopers.domain.pg.CardType as DomainCardType
 
 @Component
 class PgClientImpl(
@@ -32,9 +39,52 @@ class PgClientImpl(
     private val circuitBreaker: CircuitBreaker = circuitBreakerRegistry.circuitBreaker("pg")
     private val retry: Retry = retryRegistry.retry("pg")
 
-    override fun requestPayment(
+    // ========================================
+    // Domain Interface Implementation
+    // ========================================
+
+    override fun requestPayment(request: PgPaymentRequest): PgPaymentCreateResult {
+        log.info(
+            "PG 결제 요청. orderId={}, amount={}",
+            request.orderId,
+            request.amount,
+        )
+
+        return try {
+            val infraRequest = toInfraPaymentRequest(request)
+            val response = executePaymentRequest(infraRequest)
+            PgPaymentCreateResult.Accepted(response.transactionKey)
+        } catch (e: PgException.ResponseUncertain) {
+            log.warn("PG 응답 불확실. orderId={}", request.orderId, e)
+            PgPaymentCreateResult.Uncertain
+        }
+    }
+
+    override fun findTransaction(transactionKey: String): PgTransaction {
+        log.info("PG 결제 조회(단건). transactionKey={}", transactionKey)
+
+        val response = executeTransactionQuery(transactionKey)
+        return toDomainTransaction(response)
+    }
+
+    override fun findTransactionsByOrderId(orderId: Long): List<PgTransaction> {
+        log.info("PG 결제 조회(주문별). orderId={}", orderId)
+
+        val response = executeOrderQuery(orderId.toString())
+        return response.transactions.map { summary ->
+            // 상세 정보를 조회하여 전체 PgTransaction 생성
+            val detail = executeTransactionQuery(summary.transactionKey)
+            toDomainTransaction(detail)
+        }
+    }
+
+    // ========================================
+    // Legacy Methods (for backward compatibility)
+    // ========================================
+
+    fun requestPaymentLegacy(
         userId: Long,
-        request: PgPaymentRequest,
+        request: com.loopers.infrastructure.pg.PgPaymentRequest,
     ): PgPaymentResponse {
         log.info(
             "PG 결제 요청. userId={}, orderId={}, amount={}",
@@ -61,7 +111,7 @@ class PgClientImpl(
         }
     }
 
-    override fun getPaymentByKey(
+    fun getPaymentByKey(
         userId: Long,
         transactionKey: String,
     ): PgPaymentDetailResponse {
@@ -84,7 +134,7 @@ class PgClientImpl(
         }
     }
 
-    override fun getPaymentsByOrderId(
+    fun getPaymentsByOrderId(
         userId: Long,
         orderId: String,
     ): PgPaymentListResponse {
@@ -106,6 +156,100 @@ class PgClientImpl(
             handleResponse(response)
         }
     }
+
+    // ========================================
+    // Internal Execution Methods
+    // ========================================
+
+    private fun executePaymentRequest(request: com.loopers.infrastructure.pg.PgPaymentRequest): PgPaymentResponse {
+        return executeWithResilience(0L, "결제 요청") {
+            val response = restClient.post()
+                .uri("/api/v1/payments")
+                .body(request)
+                .retrieve()
+                .onStatus(HttpStatusCode::is5xxServerError) { _, response ->
+                    throw PgException.RequestNotReached("PG 서버 오류: ${response.statusCode}")
+                }
+                .onStatus(HttpStatusCode::is4xxClientError) { _, response ->
+                    throw PgException.BusinessError("BAD_REQUEST", "잘못된 요청: ${response.statusCode}")
+                }
+                .body(object : ParameterizedTypeReference<PgResponse<PgPaymentResponse>>() {})
+
+            handleResponse(response)
+        }
+    }
+
+    private fun executeTransactionQuery(transactionKey: String): PgPaymentDetailResponse {
+        return executeWithResilience(0L, "결제 조회") {
+            val response = restClient.get()
+                .uri("/api/v1/payments/{transactionKey}", transactionKey)
+                .retrieve()
+                .onStatus(HttpStatusCode::is5xxServerError) { _, response ->
+                    throw PgException.RequestNotReached("PG 서버 오류: ${response.statusCode}")
+                }
+                .onStatus(HttpStatusCode::is4xxClientError) { _, response ->
+                    throw PgException.BusinessError("NOT_FOUND", "결제 정보 없음: ${response.statusCode}")
+                }
+                .body(object : ParameterizedTypeReference<PgResponse<PgPaymentDetailResponse>>() {})
+
+            handleResponse(response)
+        }
+    }
+
+    private fun executeOrderQuery(orderId: String): PgPaymentListResponse {
+        return executeWithResilience(0L, "결제 목록 조회") {
+            val response = restClient.get()
+                .uri("/api/v1/payments?orderId={orderId}", orderId)
+                .retrieve()
+                .onStatus(HttpStatusCode::is5xxServerError) { _, response ->
+                    throw PgException.RequestNotReached("PG 서버 오류: ${response.statusCode}")
+                }
+                .onStatus(HttpStatusCode::is4xxClientError) { _, response ->
+                    throw PgException.BusinessError("NOT_FOUND", "주문 정보 없음: ${response.statusCode}")
+                }
+                .body(object : ParameterizedTypeReference<PgResponse<PgPaymentListResponse>>() {})
+
+            handleResponse(response)
+        }
+    }
+
+    // ========================================
+    // Type Conversion Helpers
+    // ========================================
+
+    private fun toInfraPaymentRequest(request: PgPaymentRequest): com.loopers.infrastructure.pg.PgPaymentRequest {
+        return com.loopers.infrastructure.pg.PgPaymentRequest(
+            orderId = request.orderId.toString(),
+            cardType = request.cardInfo.cardType.name,
+            cardNo = request.cardInfo.cardNo,
+            amount = request.amount.amount.toLong(),
+            callbackUrl = request.callbackUrl,
+        )
+    }
+
+    private fun toDomainTransaction(response: PgPaymentDetailResponse): PgTransaction {
+        return PgTransaction(
+            transactionKey = response.transactionKey,
+            orderId = response.orderId.toLong(),
+            cardType = toDomainCardType(response.cardType),
+            cardNo = response.cardNo,
+            amount = Money.krw(response.amount),
+            status = toDomainTransactionStatus(response.status),
+            failureReason = response.reason,
+        )
+    }
+
+    private fun toDomainCardType(cardType: String): DomainCardType {
+        return DomainCardType.valueOf(cardType)
+    }
+
+    private fun toDomainTransactionStatus(status: String): PgTransactionStatus {
+        return PgTransactionStatus.valueOf(status)
+    }
+
+    // ========================================
+    // Resilience & Response Handling
+    // ========================================
 
     private fun <T> executeWithResilience(
         userId: Long,
