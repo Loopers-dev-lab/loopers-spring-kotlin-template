@@ -8,6 +8,8 @@ import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.support.values.Money
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Timer
 import org.springframework.stereotype.Component
 import com.loopers.domain.payment.CardType as DomainCardType
 
@@ -15,18 +17,22 @@ import com.loopers.domain.payment.CardType as DomainCardType
 class PgClientImpl(
     private val pgFeignClient: PgFeignClient,
     private val exceptionClassifier: PgExceptionClassifier,
+    private val meterRegistry: MeterRegistry,
 ) : PgClient {
 
     @CircuitBreaker(name = "pg", fallbackMethod = "requestPaymentFallback")
     @Retry(name = "pg")
     override fun requestPayment(request: PgPaymentRequest): PgPaymentCreateResult {
+        val sample = Timer.start(meterRegistry)
         val infraRequest = request.toInfraRequest()
 
         return try {
             val response = pgFeignClient.requestPayment(infraRequest)
             val data = extractData(response)
+            recordSuccess(sample, "requestPayment")
             PgPaymentCreateResult.Accepted(data.transactionKey)
         } catch (e: Exception) {
+            recordFailure(sample, "requestPayment", e)
             throw exceptionClassifier.classify(e)
         }
     }
@@ -43,11 +49,16 @@ class PgClientImpl(
     @CircuitBreaker(name = "pg")
     @Retry(name = "pg")
     override fun findTransaction(transactionKey: String): PgTransaction {
+        val sample = Timer.start(meterRegistry)
+
         return try {
-            pgFeignClient.getPayment(transactionKey)
+            val result = pgFeignClient.getPayment(transactionKey)
                 .let { extractData(it) }
                 .let { toDomainTransaction(it) }
+            recordSuccess(sample, "findTransaction")
+            result
         } catch (e: Exception) {
+            recordFailure(sample, "findTransaction", e)
             throw exceptionClassifier.classify(e)
         }
     }
@@ -55,14 +66,19 @@ class PgClientImpl(
     @CircuitBreaker(name = "pg")
     @Retry(name = "pg")
     override fun findTransactionsByOrderId(orderId: Long): List<PgTransaction> {
+        val sample = Timer.start(meterRegistry)
+
         return try {
             val response = pgFeignClient.getPaymentsByOrderId(orderId.toString())
-            extractData(response).transactions.map { summary ->
+            val result = extractData(response).transactions.map { summary ->
                 pgFeignClient.getPayment(summary.transactionKey)
                     .let { extractData(it) }
                     .let { toDomainTransaction(it) }
             }
+            recordSuccess(sample, "findTransactionsByOrderId")
+            result
         } catch (e: Exception) {
+            recordFailure(sample, "findTransactionsByOrderId", e)
             throw exceptionClassifier.classify(e)
         }
     }
@@ -87,4 +103,30 @@ class PgClientImpl(
         status = PgTransactionStatus.valueOf(response.status),
         failureReason = response.reason,
     )
+
+    private fun recordSuccess(sample: Timer.Sample, method: String) {
+        sample.stop(meterRegistry.timer(METRIC_LATENCY, TAG_RESULT, "success", TAG_METHOD, method))
+        meterRegistry.counter(METRIC_TOTAL, TAG_RESULT, "success", TAG_METHOD, method).increment()
+    }
+
+    private fun recordFailure(sample: Timer.Sample, method: String, e: Exception) {
+        sample.stop(meterRegistry.timer(METRIC_LATENCY, TAG_RESULT, "failure", TAG_METHOD, method))
+        meterRegistry.counter(
+            METRIC_TOTAL,
+            TAG_RESULT,
+            "failure",
+            TAG_METHOD,
+            method,
+            TAG_ERROR,
+            e.javaClass.simpleName,
+        ).increment()
+    }
+
+    companion object {
+        private const val METRIC_LATENCY = "pg_request_latency_seconds"
+        private const val METRIC_TOTAL = "pg_request_total"
+        private const val TAG_RESULT = "result"
+        private const val TAG_METHOD = "method"
+        private const val TAG_ERROR = "error"
+    }
 }
