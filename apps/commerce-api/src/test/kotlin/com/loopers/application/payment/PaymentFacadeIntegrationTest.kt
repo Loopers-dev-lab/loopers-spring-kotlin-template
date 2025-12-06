@@ -1,7 +1,14 @@
-package com.loopers.integration
+package com.loopers.application.payment
 
+import com.loopers.application.order.OrderCriteria
 import com.loopers.application.order.OrderFacade
-import com.loopers.application.payment.PaymentFacade
+import com.loopers.domain.coupon.Coupon
+import com.loopers.domain.coupon.CouponRepository
+import com.loopers.domain.coupon.DiscountAmount
+import com.loopers.domain.coupon.DiscountType
+import com.loopers.domain.coupon.IssuedCoupon
+import com.loopers.domain.coupon.IssuedCouponRepository
+import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.payment.CardType
@@ -34,6 +41,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
@@ -42,23 +50,25 @@ import org.springframework.boot.test.mock.mockito.MockBean
 import java.time.Instant
 
 /**
- * 결제 멱등성 테스트
- * - 중복 콜백 요청 처리
- * - 이미 처리된 결제에 대한 콜백 처리
+ * PaymentFacade 통합 테스트
+ * - 경계값 테스트: 포인트 전액/혼합/쿠폰 할인 결제
+ * - 멱등성 테스트: 중복 콜백 처리
  */
 @SpringBootTest
-@DisplayName("결제 멱등성 테스트")
-class PaymentIdempotencyTest @Autowired constructor(
-    private val webhookController: PaymentWebhookV1Controller,
+@DisplayName("PaymentFacade 통합 테스트")
+class PaymentFacadeIntegrationTest @Autowired constructor(
+    private val orderFacade: OrderFacade,
     private val paymentFacade: PaymentFacade,
     private val paymentService: PaymentService,
-    private val orderFacade: OrderFacade,
+    private val webhookController: PaymentWebhookV1Controller,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
+    private val couponRepository: CouponRepository,
+    private val issuedCouponRepository: IssuedCouponRepository,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
 ) {
@@ -71,9 +81,217 @@ class PaymentIdempotencyTest @Autowired constructor(
         redisCleanUp.truncateAll()
     }
 
+    // ===========================================
+    // 경계값 테스트
+    // ===========================================
+
     @Nested
-    @DisplayName("중복 콜백 요청 처리")
-    inner class DuplicateCallbackHandling {
+    @DisplayName("placeOrder - 포인트 전액 결제")
+    inner class `placeOrder - PointOnlyPayment` {
+
+        @Test
+        @DisplayName("포인트로만 결제하면 paidAmount가 0이고 즉시 PAID 상태가 된다")
+        fun `point only payment results in zero paidAmount and immediate PAID status`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(10000))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(10000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = null,
+                cardType = null,
+                cardNo = null,
+            )
+
+            // when
+            val result = orderFacade.placeOrder(criteria)
+
+            // then
+            val payment = paymentRepository.findById(result.paymentId)!!
+
+            assertAll(
+                { assertThat(result.paymentStatus).isEqualTo(PaymentStatus.PAID) },
+                { assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW) },
+                { assertThat(payment.usedPoint).isEqualTo(Money.krw(10000)) },
+                { assertThat(payment.status).isEqualTo(PaymentStatus.PAID) },
+            )
+        }
+
+        @Test
+        @DisplayName("쿠폰 할인 후 포인트로만 결제할 수 있다")
+        fun `point only payment with coupon discount`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(15000))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+            val coupon = createCoupon(discountType = DiscountType.FIXED_AMOUNT, discountValue = 5000)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            // 15000 - 5000(쿠폰) = 10000원을 포인트로 결제
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(10000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = issuedCoupon.id,
+                cardType = null,
+                cardNo = null,
+            )
+
+            // when
+            val result = orderFacade.placeOrder(criteria)
+
+            // then
+            val payment = paymentRepository.findById(result.paymentId)!!
+
+            assertAll(
+                { assertThat(result.paymentStatus).isEqualTo(PaymentStatus.PAID) },
+                { assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW) },
+                { assertThat(payment.usedPoint).isEqualTo(Money.krw(10000)) },
+                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(5000)) },
+            )
+
+            // 쿠폰이 사용됨
+            val usedCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
+            assertThat(usedCoupon.status).isEqualTo(UsageStatus.USED)
+        }
+    }
+
+    @Nested
+    @DisplayName("placeOrder - 혼합 결제")
+    inner class `placeOrder - MixedPayment` {
+
+        @Test
+        @DisplayName("포인트와 카드를 함께 사용하는 경우 requiresCardPayment()가 true를 반환한다")
+        fun `mixed payment requires card payment`() {
+            // given
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = 1L,
+                usePoint = Money.krw(5000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = 1L, quantity = 1),
+                ),
+                issuedCouponId = null,
+                cardType = "SAMSUNG",
+                cardNo = "1234-5678-9012-3456",
+            )
+
+            // when & then
+            assertThat(criteria.requiresCardPayment()).isTrue()
+        }
+
+        @Test
+        @DisplayName("포인트만 사용하는 경우 requiresCardPayment()가 false를 반환한다")
+        fun `point only payment does not require card payment`() {
+            // given
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = 1L,
+                usePoint = Money.krw(10000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = 1L, quantity = 1),
+                ),
+                issuedCouponId = null,
+                cardType = null,
+                cardNo = null,
+            )
+
+            // when & then
+            assertThat(criteria.requiresCardPayment()).isFalse()
+        }
+    }
+
+    @Nested
+    @DisplayName("placeOrder - 쿠폰 할인 적용")
+    inner class `placeOrder - CouponDiscountPayment` {
+
+        @Test
+        @DisplayName("정률 할인 쿠폰 적용 시 할인 금액이 올바르게 계산된다")
+        fun `rate discount coupon calculates correct discount amount`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(10000))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            // 10% 할인 쿠폰
+            val coupon = createCoupon(discountType = DiscountType.RATE, discountValue = 10)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            // 10000 * 10% = 1000원 할인, 9000원을 포인트로 결제
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(9000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = issuedCoupon.id,
+                cardType = null,
+                cardNo = null,
+            )
+
+            // when
+            val result = orderFacade.placeOrder(criteria)
+
+            // then
+            val payment = paymentRepository.findById(result.paymentId)!!
+
+            assertAll(
+                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(1000)) },
+                { assertThat(payment.usedPoint).isEqualTo(Money.krw(9000)) },
+                { assertThat(payment.totalAmount).isEqualTo(Money.krw(10000)) },
+            )
+        }
+
+        @Test
+        @DisplayName("정액 할인 쿠폰 적용 시 할인 금액이 올바르게 계산된다")
+        fun `fixed amount coupon calculates correct discount amount`() {
+            // given
+            val userId = 1L
+            val product = createProduct(price = Money.krw(20000))
+            createPointAccount(userId = userId, balance = Money.krw(100000))
+
+            // 3000원 정액 할인 쿠폰
+            val coupon = createCoupon(discountType = DiscountType.FIXED_AMOUNT, discountValue = 3000)
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            // 20000 - 3000 = 17000원을 포인트로 결제
+            val criteria = OrderCriteria.PlaceOrder(
+                userId = userId,
+                usePoint = Money.krw(17000),
+                items = listOf(
+                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
+                ),
+                issuedCouponId = issuedCoupon.id,
+                cardType = null,
+                cardNo = null,
+            )
+
+            // when
+            val result = orderFacade.placeOrder(criteria)
+
+            // then
+            val payment = paymentRepository.findById(result.paymentId)!!
+
+            assertAll(
+                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(3000)) },
+                { assertThat(payment.usedPoint).isEqualTo(Money.krw(17000)) },
+                { assertThat(payment.totalAmount).isEqualTo(Money.krw(20000)) },
+            )
+        }
+    }
+
+    // ===========================================
+    // 멱등성 테스트
+    // ===========================================
+
+    @Nested
+    @DisplayName("processCallback - 중복 콜백 처리")
+    inner class `processCallback - DuplicateCallbackHandling` {
 
         @Test
         @DisplayName("이미 PAID 상태인 결제에 콜백이 오면 SUCCESS를 반환한다")
@@ -88,11 +306,16 @@ class PaymentIdempotencyTest @Autowired constructor(
                 status = PgTransactionStatus.SUCCESS,
             )
 
+            // PG 조회 Mock - 첫 번째 콜백 처리용
+            whenever(pgClient.findTransaction(externalPaymentKey))
+                .thenReturn(transaction)
+
             // 결제 성공 처리 (첫 번째)
-            orderFacade.handlePaymentResult(
-                paymentId = payment.id,
-                transactions = listOf(transaction),
-                currentTime = Instant.now(),
+            paymentFacade.processCallback(
+                PaymentCriteria.ProcessCallback(
+                    orderId = payment.orderId,
+                    externalPaymentKey = externalPaymentKey,
+                ),
             )
 
             // 동일한 콜백 요청 (두 번째 - 멱등성 테스트)
@@ -127,10 +350,16 @@ class PaymentIdempotencyTest @Autowired constructor(
                 status = PgTransactionStatus.FAILED,
                 failureReason = "테스트 실패",
             )
-            orderFacade.handlePaymentResult(
-                paymentId = payment.id,
-                transactions = listOf(failedTransaction),
-                currentTime = Instant.now(),
+
+            // PG 조회 Mock
+            whenever(pgClient.findTransaction(externalPaymentKey))
+                .thenReturn(failedTransaction)
+
+            paymentFacade.processCallback(
+                PaymentCriteria.ProcessCallback(
+                    orderId = payment.orderId,
+                    externalPaymentKey = externalPaymentKey,
+                ),
             )
 
             // 콜백 요청
@@ -152,8 +381,8 @@ class PaymentIdempotencyTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("여러 번 콜백 처리")
-    inner class MultipleCallbackProcessing {
+    @DisplayName("processCallback - 여러 번 콜백 처리")
+    inner class `processCallback - MultipleCallbackProcessing` {
 
         @Test
         @DisplayName("동일한 결제에 대해 여러 번 콜백이 와도 한 번만 처리된다")
@@ -201,8 +430,8 @@ class PaymentIdempotencyTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("존재하지 않는 결제 콜백 처리")
-    inner class NonExistentPaymentCallback {
+    @DisplayName("processCallback - 존재하지 않는 결제")
+    inner class `processCallback - NonExistentPaymentCallback` {
 
         @Test
         @DisplayName("존재하지 않는 orderId로 콜백이 오면 예외가 발생한다")
@@ -221,8 +450,8 @@ class PaymentIdempotencyTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("externalPaymentKey 검증")
-    inner class ExternalPaymentKeyValidation {
+    @DisplayName("processCallback - externalPaymentKey 검증")
+    inner class `processCallback - ExternalPaymentKeyValidation` {
 
         @Test
         @DisplayName("잘못된 externalPaymentKey로 조회 시 PG에서 예외가 발생한다")
@@ -250,6 +479,10 @@ class PaymentIdempotencyTest @Autowired constructor(
         }
     }
 
+    // ===========================================
+    // 헬퍼 메서드
+    // ===========================================
+
     private fun createProduct(
         price: Money = Money.krw(10000),
         stock: Stock = Stock.of(100),
@@ -272,6 +505,27 @@ class PaymentIdempotencyTest @Autowired constructor(
     ): PointAccount {
         val account = PointAccount.of(userId, balance)
         return pointAccountRepository.save(account)
+    }
+
+    private fun createCoupon(
+        name: String = "테스트 쿠폰",
+        discountType: DiscountType = DiscountType.FIXED_AMOUNT,
+        discountValue: Long = 5000,
+    ): Coupon {
+        val discountAmount = DiscountAmount(
+            type = discountType,
+            value = discountValue,
+        )
+        val coupon = Coupon.of(name = name, discountAmount = discountAmount)
+        return couponRepository.save(coupon)
+    }
+
+    private fun createIssuedCoupon(
+        userId: Long,
+        coupon: Coupon,
+    ): IssuedCoupon {
+        val issuedCoupon = coupon.issue(userId)
+        return issuedCouponRepository.save(issuedCoupon)
     }
 
     private fun createInProgressPayment(

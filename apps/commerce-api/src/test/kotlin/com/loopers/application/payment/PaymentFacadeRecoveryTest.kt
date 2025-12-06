@@ -1,6 +1,5 @@
-package com.loopers.integration
+package com.loopers.application.payment
 
-import com.loopers.application.order.OrderFacade
 import com.loopers.domain.coupon.Coupon
 import com.loopers.domain.coupon.CouponRepository
 import com.loopers.domain.coupon.DiscountAmount
@@ -11,11 +10,12 @@ import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
@@ -37,20 +37,22 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
+import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import java.time.Instant
 
 /**
- * 결제 복구 테스트
+ * 결제 복구 통합 테스트
  * - PG 실패 시 리소스 복구 (재고, 포인트, 쿠폰)
  * - 다양한 실패 시나리오에서의 복구 검증
  */
 @SpringBootTest
-@DisplayName("결제 복구 테스트")
-class PaymentRecoveryTest @Autowired constructor(
+@DisplayName("결제 복구 통합 테스트")
+class PaymentFacadeRecoveryTest @Autowired constructor(
+    private val paymentFacade: PaymentFacade,
     private val paymentService: PaymentService,
-    private val orderFacade: OrderFacade,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
@@ -62,6 +64,9 @@ class PaymentRecoveryTest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
 ) {
+    @MockBean
+    private lateinit var pgClient: PgClient
+
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
@@ -69,8 +74,8 @@ class PaymentRecoveryTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("포인트 복구")
-    inner class PointRecovery {
+    @DisplayName("processInProgressPayment - 포인트 복구")
+    inner class `processInProgressPayment - PointRecovery` {
 
         @Test
         @DisplayName("결제 실패 시 차감된 포인트가 복구된다")
@@ -94,12 +99,11 @@ class PaymentRecoveryTest @Autowired constructor(
                 failureReason = "PG 연결 실패",
             )
 
+            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
+                .thenReturn(listOf(failedTransaction))
+
             // when - 결제 실패 처리
-            orderFacade.handlePaymentResult(
-                paymentId = payment.id,
-                transactions = listOf(failedTransaction),
-                currentTime = Instant.now(),
-            )
+            paymentFacade.processInProgressPayment(payment.id)
 
             // then - 포인트가 복구됨
             val restoredAccount = pointAccountRepository.findByUserId(userId)!!
@@ -131,12 +135,11 @@ class PaymentRecoveryTest @Autowired constructor(
                 failureReason = "카드 한도 초과",
             )
 
+            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
+                .thenReturn(listOf(failedTransaction))
+
             // when - 결제 실패 처리
-            orderFacade.handlePaymentResult(
-                paymentId = payment.id,
-                transactions = listOf(failedTransaction),
-                currentTime = Instant.now(),
-            )
+            paymentFacade.processInProgressPayment(payment.id)
 
             // then - 포인트 잔액 그대로
             val account = pointAccountRepository.findByUserId(userId)!!
@@ -145,8 +148,8 @@ class PaymentRecoveryTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("쿠폰 복구")
-    inner class CouponRecovery {
+    @DisplayName("processInProgressPayment - 쿠폰 복구")
+    inner class `processInProgressPayment - CouponRecovery` {
 
         @Test
         @DisplayName("결제 실패 시 사용된 쿠폰이 복구된다")
@@ -169,12 +172,11 @@ class PaymentRecoveryTest @Autowired constructor(
                 failureReason = "서킷 브레이커 오픈",
             )
 
+            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
+                .thenReturn(listOf(failedTransaction))
+
             // when - 결제 실패 처리
-            orderFacade.handlePaymentResult(
-                paymentId = payment.id,
-                transactions = listOf(failedTransaction),
-                currentTime = Instant.now(),
-            )
+            paymentFacade.processInProgressPayment(payment.id)
 
             // then - 쿠폰 상태가 AVAILABLE로 복구됨
             val restoredCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
@@ -200,12 +202,11 @@ class PaymentRecoveryTest @Autowired constructor(
                 failureReason = "PG 거부",
             )
 
+            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
+                .thenReturn(listOf(failedTransaction))
+
             // when - 결제 실패 처리 (쿠폰 없음)
-            orderFacade.handlePaymentResult(
-                paymentId = payment.id,
-                transactions = listOf(failedTransaction),
-                currentTime = Instant.now(),
-            )
+            paymentFacade.processInProgressPayment(payment.id)
 
             // then - 결제가 실패됨 (쿠폰 관련 에러 없음)
             val failedPayment = paymentRepository.findById(payment.id)!!
@@ -214,8 +215,8 @@ class PaymentRecoveryTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("재고 복구")
-    inner class StockRecovery {
+    @DisplayName("processInProgressPayment - 재고 복구")
+    inner class `processInProgressPayment - StockRecovery` {
 
         @Test
         @DisplayName("결제 실패 시 차감된 재고가 복구된다")
@@ -241,12 +242,11 @@ class PaymentRecoveryTest @Autowired constructor(
                 failureReason = "잔액 부족",
             )
 
+            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
+                .thenReturn(listOf(failedTransaction))
+
             // when - 결제 실패 처리
-            orderFacade.handlePaymentResult(
-                paymentId = payment.id,
-                transactions = listOf(failedTransaction),
-                currentTime = Instant.now(),
-            )
+            paymentFacade.processInProgressPayment(payment.id)
 
             // then - 재고가 복구됨
             val restoredProduct = productRepository.findById(product.id)!!
@@ -297,12 +297,11 @@ class PaymentRecoveryTest @Autowired constructor(
                 failureReason = "타임아웃",
             )
 
+            whenever(pgClient.findTransactionsByOrderId(initiatedPayment.orderId))
+                .thenReturn(listOf(failedTransaction))
+
             // when - 결제 실패 처리
-            orderFacade.handlePaymentResult(
-                paymentId = initiatedPayment.id,
-                transactions = listOf(failedTransaction),
-                currentTime = Instant.now(),
-            )
+            paymentFacade.processInProgressPayment(initiatedPayment.id)
 
             // then - 모든 재고가 복구됨
             val restoredProduct1 = productRepository.findById(product1.id)!!
@@ -316,8 +315,8 @@ class PaymentRecoveryTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("주문 상태 변경")
-    inner class OrderStatusChange {
+    @DisplayName("processInProgressPayment - 주문 상태 변경")
+    inner class `processInProgressPayment - OrderStatusChange` {
 
         @Test
         @DisplayName("결제 실패 시 주문 상태가 CANCELLED로 변경된다")
@@ -337,12 +336,11 @@ class PaymentRecoveryTest @Autowired constructor(
                 failureReason = "결제 거부",
             )
 
+            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
+                .thenReturn(listOf(failedTransaction))
+
             // when - 결제 실패 처리
-            orderFacade.handlePaymentResult(
-                paymentId = payment.id,
-                transactions = listOf(failedTransaction),
-                currentTime = Instant.now(),
-            )
+            paymentFacade.processInProgressPayment(payment.id)
 
             // then - 주문 상태가 CANCELLED
             val cancelledOrder = orderRepository.findById(payment.orderId)!!
@@ -365,12 +363,11 @@ class PaymentRecoveryTest @Autowired constructor(
                 status = PgTransactionStatus.SUCCESS,
             )
 
+            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
+                .thenReturn(listOf(successTransaction))
+
             // when - 결제 성공 처리
-            orderFacade.handlePaymentResult(
-                paymentId = payment.id,
-                transactions = listOf(successTransaction),
-                currentTime = Instant.now(),
-            )
+            paymentFacade.processInProgressPayment(payment.id)
 
             // then - 주문 상태가 PAID
             val paidOrder = orderRepository.findById(payment.orderId)!!
@@ -379,8 +376,8 @@ class PaymentRecoveryTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("전체 리소스 복구")
-    inner class FullResourceRecovery {
+    @DisplayName("processInProgressPayment - 전체 리소스 복구")
+    inner class `processInProgressPayment - FullResourceRecovery` {
 
         @Test
         @DisplayName("결제 실패 시 모든 리소스(포인트, 쿠폰, 재고)가 복구된다")
@@ -440,12 +437,11 @@ class PaymentRecoveryTest @Autowired constructor(
                 failureReason = "PG 서버 오류",
             )
 
+            whenever(pgClient.findTransactionsByOrderId(initiatedPayment.orderId))
+                .thenReturn(listOf(failedTransaction))
+
             // when - 결제 실패 처리
-            orderFacade.handlePaymentResult(
-                paymentId = initiatedPayment.id,
-                transactions = listOf(failedTransaction),
-                currentTime = Instant.now(),
-            )
+            paymentFacade.processInProgressPayment(initiatedPayment.id)
 
             // then - 모든 리소스 복구
             val restoredPointAccount = pointAccountRepository.findByUserId(userId)!!
@@ -461,6 +457,10 @@ class PaymentRecoveryTest @Autowired constructor(
             )
         }
     }
+
+    // ===========================================
+    // 헬퍼 메서드
+    // ===========================================
 
     private fun createProduct(
         price: Money = Money.krw(10000),

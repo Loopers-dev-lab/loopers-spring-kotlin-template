@@ -1,0 +1,222 @@
+package com.loopers.application.payment
+
+import com.loopers.domain.order.Order
+import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.payment.CardType
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentRepository
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgClient
+import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PgTransaction
+import com.loopers.domain.payment.PgTransactionStatus
+import com.loopers.domain.point.PointAccount
+import com.loopers.domain.point.PointAccountRepository
+import com.loopers.domain.product.Brand
+import com.loopers.domain.product.BrandRepository
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.ProductStatistic
+import com.loopers.domain.product.ProductStatisticRepository
+import com.loopers.domain.product.Stock
+import com.loopers.support.values.Money
+import com.loopers.utils.DatabaseCleanUp
+import com.loopers.utils.RedisCleanUp
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.mockito.kotlin.whenever
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.orm.ObjectOptimisticLockingFailureException
+import java.time.Instant
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * 결제 동시성 통합 테스트
+ * - 콜백과 스케줄러가 동시에 같은 결제를 처리하려 할 때
+ * - 낙관적 락으로 하나만 성공하고 나머지는 실패
+ */
+@SpringBootTest
+@DisplayName("결제 동시성 통합 테스트")
+class PaymentFacadeConcurrencyTest @Autowired constructor(
+    private val paymentFacade: PaymentFacade,
+    private val paymentService: PaymentService,
+    private val paymentRepository: PaymentRepository,
+    private val orderRepository: OrderRepository,
+    private val productRepository: ProductRepository,
+    private val brandRepository: BrandRepository,
+    private val productStatisticRepository: ProductStatisticRepository,
+    private val pointAccountRepository: PointAccountRepository,
+    private val databaseCleanUp: DatabaseCleanUp,
+    private val redisCleanUp: RedisCleanUp,
+) {
+    @MockBean
+    private lateinit var pgClient: PgClient
+
+    @AfterEach
+    fun tearDown() {
+        databaseCleanUp.truncateAllTables()
+        redisCleanUp.truncateAll()
+    }
+
+    @Nested
+    @DisplayName("processInProgressPayment")
+    inner class `processInProgressPayment` {
+
+        @Test
+        @DisplayName("동시에 같은 결제를 처리하면 낙관적 락으로 하나만 성공한다")
+        fun `concurrent payment processing results in only one success due to optimistic lock`() {
+            // given
+            val payment = createInProgressPayment()
+            val successTransaction = createTransaction(
+                transactionKey = payment.externalPaymentKey!!,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.SUCCESS,
+            )
+
+            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
+                .thenReturn(listOf(successTransaction))
+
+            val threadCount = 5
+            val executor = Executors.newFixedThreadPool(threadCount)
+            val latch = CountDownLatch(threadCount)
+
+            val successCount = AtomicInteger(0)
+            val failureCount = AtomicInteger(0)
+
+            // when - 5개 스레드가 동시에 같은 결제를 처리 시도
+            repeat(threadCount) {
+                executor.submit {
+                    try {
+                        paymentFacade.processInProgressPayment(payment.id)
+                        successCount.incrementAndGet()
+                    } catch (e: ObjectOptimisticLockingFailureException) {
+                        failureCount.incrementAndGet()
+                    } catch (e: Exception) {
+                        failureCount.incrementAndGet()
+                    } finally {
+                        latch.countDown()
+                    }
+                }
+            }
+
+            latch.await()
+            executor.shutdown()
+
+            // then - 하나만 성공하고 나머지는 실패 또는 AlreadyProcessed
+            val finalPayment = paymentRepository.findById(payment.id)!!
+            assertThat(finalPayment.status).isEqualTo(PaymentStatus.PAID)
+        }
+
+        @Test
+        @DisplayName("이미 처리된 결제에 대해 다시 처리 시도하면 무시된다")
+        fun `second processing attempt is ignored for already processed payment`() {
+            // given
+            val payment = createInProgressPayment()
+            val successTransaction = createTransaction(
+                transactionKey = payment.externalPaymentKey!!,
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.SUCCESS,
+            )
+
+            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
+                .thenReturn(listOf(successTransaction))
+
+            // 첫 번째 처리 - 성공
+            paymentFacade.processInProgressPayment(payment.id)
+
+            val paidPayment = paymentRepository.findById(payment.id)!!
+            assertThat(paidPayment.status).isEqualTo(PaymentStatus.PAID)
+
+            // when - 두 번째 처리 시도 (멱등성)
+            paymentFacade.processInProgressPayment(payment.id)
+
+            // then - 예외 없이 정상 종료, 상태 유지
+            val finalPayment = paymentRepository.findById(payment.id)!!
+            assertThat(finalPayment.status).isEqualTo(PaymentStatus.PAID)
+        }
+    }
+
+    // ===========================================
+    // 헬퍼 메서드
+    // ===========================================
+
+    private fun createProduct(
+        price: Money = Money.krw(10000),
+        stock: Stock = Stock.of(100),
+    ): Product {
+        val brand = brandRepository.save(Brand.create("테스트 브랜드"))
+        val product = Product.create(
+            name = "테스트 상품",
+            price = price,
+            stock = stock,
+            brand = brand,
+        )
+        val savedProduct = productRepository.save(product)
+        productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
+        return savedProduct
+    }
+
+    private fun createPointAccount(
+        userId: Long = 1L,
+        balance: Money = Money.ZERO_KRW,
+    ): PointAccount {
+        val account = PointAccount.of(userId, balance)
+        return pointAccountRepository.save(account)
+    }
+
+    private fun createInProgressPayment(
+        userId: Long = 1L,
+    ): Payment {
+        val product = createProduct(price = Money.krw(10000), stock = Stock.of(100))
+        createPointAccount(userId = userId, balance = Money.krw(100000))
+
+        val order = Order.place(userId)
+        order.addOrderItem(
+            productId = product.id,
+            quantity = 1,
+            productName = "테스트 상품",
+            unitPrice = Money.krw(10000),
+        )
+        val savedOrder = orderRepository.save(order)
+
+        val payment = paymentService.createPending(
+            userId = userId,
+            order = savedOrder,
+            usedPoint = Money.krw(5000),
+        )
+
+        return paymentService.initiatePayment(
+            paymentId = payment.id,
+            result = PgPaymentCreateResult.Accepted("tx_concurrent_test"),
+            attemptedAt = Instant.now(),
+        )
+    }
+
+    private fun createTransaction(
+        transactionKey: String,
+        orderId: Long,
+        amount: Money,
+        status: PgTransactionStatus,
+        failureReason: String? = null,
+    ): PgTransaction {
+        return PgTransaction(
+            transactionKey = transactionKey,
+            orderId = orderId,
+            cardType = CardType.KB,
+            cardNo = "0000-0000-0000-0000",
+            amount = amount,
+            status = status,
+            failureReason = failureReason,
+        )
+    }
+}

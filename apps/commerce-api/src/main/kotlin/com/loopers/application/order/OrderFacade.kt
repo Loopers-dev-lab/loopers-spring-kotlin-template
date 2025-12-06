@@ -12,7 +12,6 @@ import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentRequest
-import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
@@ -26,7 +25,6 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
-import java.time.Instant
 
 @Component
 class OrderFacade(
@@ -200,29 +198,6 @@ class OrderFacade(
         val productCacheKeys = productViews
             .associateBy { ProductCacheKeys.ProductDetail(productId = it.product.id) }
         cacheTemplate.putAll(productCacheKeys)
-    }
-
-    /**
-     * 콜백/스케줄러에서 사용할 결제 결과 처리
-     * 주의: 이 메서드는 이미 IN_PROGRESS 상태인 결제에 대해 호출됩니다.
-     *
-     * @param paymentId 결제 ID
-     * @param transactions PG에서 조회한 트랜잭션 목록
-     * @param currentTime 현재 시각 (타임아웃 판단용)
-     */
-    fun handlePaymentResult(
-        paymentId: Long,
-        transactions: List<PgTransaction>,
-        currentTime: Instant,
-    ) {
-        val payment = paymentService.confirmPayment(paymentId, transactions, currentTime)
-        if (payment.status == PaymentStatus.PAID) {
-            orderService.completePayment(payment.orderId)
-            return
-        }
-
-        recoverResources(payment)
-        orderService.cancelOrder(payment.orderId)
     }
 
     /**

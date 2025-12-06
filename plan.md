@@ -7,7 +7,8 @@
 
 ## Overview
 
-This plan implements the PG Client abstraction in the domain layer according to the spec, enabling dependency inversion where the domain layer defines interfaces and the infrastructure layer provides implementations.
+This plan implements the PG Client abstraction in the domain layer according to the spec, enabling dependency inversion
+where the domain layer defines interfaces and the infrastructure layer provides implementations.
 
 ---
 
@@ -71,19 +72,19 @@ PgTransactionStatus (Enum)
 
 ### Validation Rules (from spec section 1.3)
 
-| Field | Rule | Error Message |
-|-------|------|---------------|
-| CardInfo.cardNo | Must match `^\d{4}-\d{4}-\d{4}-\d{4}$` | "카드 번호 형식이 올바르지 않습니다" |
-| CardInfo.cardType | Must be valid CardType enum | (handled by type system) |
+| Field             | Rule                                   | Error Message            |
+|-------------------|----------------------------------------|--------------------------|
+| CardInfo.cardNo   | Must match `^\d{4}-\d{4}-\d{4}-\d{4}$` | "카드 번호 형식이 올바르지 않습니다"    |
+| CardInfo.cardType | Must be valid CardType enum            | (handled by type system) |
 
 ### PgClient Method Semantics (from spec section 1.3)
 
-| Method | Success Result | Error Cases |
-|--------|---------------|-------------|
-| requestPayment | `Accepted` with transactionKey | Throws PgException (CircuitOpen, RequestNotReached, BusinessError) |
-| requestPayment (timeout) | `Uncertain` | When Read Timeout occurs |
-| findTransaction | PgTransaction | Throws PgException |
-| findTransactionsByOrderId | List<PgTransaction> | Throws PgException |
+| Method                    | Success Result                 | Error Cases                                                        |
+|---------------------------|--------------------------------|--------------------------------------------------------------------|
+| requestPayment            | `Accepted` with transactionKey | Throws PgException (CircuitOpen, RequestNotReached, BusinessError) |
+| requestPayment (timeout)  | `Uncertain`                    | When Read Timeout occurs                                           |
+| findTransaction           | PgTransaction                  | Throws PgException                                                 |
+| findTransactionsByOrderId | List<PgTransaction>            | Throws PgException                                                 |
 
 ---
 
@@ -122,8 +123,10 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### TODO
 
-- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardType.kt` - CardType enum (spec: section 1.1 CardType enumeration, pattern: `domain/coupon/DiscountType.kt:L2-L5`)
-- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransactionStatus.kt` - PgTransactionStatus enum (spec: section 1.1 PgTransactionStatus enumeration, pattern: `domain/coupon/DiscountType.kt:L2-L5`)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardType.kt` - CardType enum (spec: section 1.1
+  CardType enumeration, pattern: `domain/coupon/DiscountType.kt:L2-L5`)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransactionStatus.kt` - PgTransactionStatus
+  enum (spec: section 1.1 PgTransactionStatus enumeration, pattern: `domain/coupon/DiscountType.kt:L2-L5`)
 
 ### Tests
 
@@ -142,33 +145,38 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### TODO
 
-- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardInfo.kt` - CardInfo value object with cardNo validation (spec: section 1.1 CardInfo class diagram + section 1.3 CardInfo validation rules, pattern: `domain/coupon/DiscountAmount.kt:L9-L27`)
-  - cardType: CardType
-  - cardNo: String validated with regex `^\d{4}-\d{4}-\d{4}-\d{4}$`
-  - init block validates cardNo format, throws CoreException(ErrorType.BAD_REQUEST) on failure
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardInfo.kt` - CardInfo value object with cardNo
+  validation (spec: section 1.1 CardInfo class diagram + section 1.3 CardInfo validation rules, pattern:
+  `domain/coupon/DiscountAmount.kt:L9-L27`)
+    - cardType: CardType
+    - cardNo: String validated with regex `^\d{4}-\d{4}-\d{4}-\d{4}$`
+    - init block validates cardNo format, throws CoreException(ErrorType.BAD_REQUEST) on failure
 
-- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentRequest.kt` - PgPaymentRequest value object (spec: section 1.1 PgPaymentRequest class diagram, pattern: `domain/coupon/DiscountAmount.kt:L9-L27`)
-  - orderId: Long
-  - amount: Money
-  - cardInfo: CardInfo
-  - callbackUrl: String
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentRequest.kt` - PgPaymentRequest value
+  object (spec: section 1.1 PgPaymentRequest class diagram, pattern: `domain/coupon/DiscountAmount.kt:L9-L27`)
+    - orderId: Long
+    - amount: Money
+    - cardInfo: CardInfo
+    - callbackUrl: String
 
-- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransaction.kt` - PgTransaction value object (spec: section 1.1 PgTransaction class diagram)
-  - transactionKey: String
-  - orderId: Long
-  - cardType: CardType
-  - cardNo: String
-  - amount: Money
-  - status: PgTransactionStatus
-  - failureReason: String?
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransaction.kt` - PgTransaction value object (
+  spec: section 1.1 PgTransaction class diagram)
+    - transactionKey: String
+    - orderId: Long
+    - cardType: CardType
+    - cardNo: String
+    - amount: Money
+    - status: PgTransactionStatus
+    - failureReason: String?
 
 ### Tests
 
-- [x] Create `apps/commerce-api/src/test/kotlin/com/loopers/domain/pg/CardInfoTest.kt` - unit tests for CardInfo validation (pattern: `domain/coupon/DiscountAmountTest.kt` if exists, or use standard test pattern)
-  - Test: valid cardNo format "1234-5678-9012-3456" succeeds
-  - Test: invalid cardNo format "12345678901234567" throws CoreException
-  - Test: invalid cardNo format "1234-5678-9012-345" throws CoreException
-  - Test: invalid cardNo format with letters throws CoreException
+- [x] Create `apps/commerce-api/src/test/kotlin/com/loopers/domain/pg/CardInfoTest.kt` - unit tests for CardInfo
+  validation (pattern: `domain/coupon/DiscountAmountTest.kt` if exists, or use standard test pattern)
+    - Test: valid cardNo format "1234-5678-9012-3456" succeeds
+    - Test: invalid cardNo format "12345678901234567" throws CoreException
+    - Test: invalid cardNo format "1234-5678-9012-345" throws CoreException
+    - Test: invalid cardNo format with letters throws CoreException
 
 ### Done When
 
@@ -184,15 +192,18 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### TODO
 
-- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentCreateResult.kt` - sealed class with Accepted and Uncertain variants (spec: section 1.1 PgPaymentCreateResult class diagram, pattern: `application/payment/PaymentFacade.kt:L35-L44` PgQueryResult sealed class)
-  - sealed class PgPaymentCreateResult
-  - data class Accepted(val transactionKey: String) : PgPaymentCreateResult()
-  - data object Uncertain : PgPaymentCreateResult()
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentCreateResult.kt` - sealed class with
+  Accepted and Uncertain variants (spec: section 1.1 PgPaymentCreateResult class diagram, pattern:
+  `application/payment/PaymentFacade.kt:L35-L44` PgQueryResult sealed class)
+    - sealed class PgPaymentCreateResult
+    - data class Accepted(val transactionKey: String) : PgPaymentCreateResult()
+    - data object Uncertain : PgPaymentCreateResult()
 
-- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgClient.kt` - PgClient interface (spec: section 1.1 PgClient class diagram, pattern: `domain/coupon/DiscountPolicy.kt:L5-L8` for interface pattern)
-  - fun requestPayment(request: PgPaymentRequest): PgPaymentCreateResult
-  - fun findTransaction(transactionKey: String): PgTransaction
-  - fun findTransactionsByOrderId(orderId: Long): List<PgTransaction>
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgClient.kt` - PgClient interface (spec: section
+  1.1 PgClient class diagram, pattern: `domain/coupon/DiscountPolicy.kt:L5-L8` for interface pattern)
+    - fun requestPayment(request: PgPaymentRequest): PgPaymentCreateResult
+    - fun findTransaction(transactionKey: String): PgTransaction
+    - fun findTransactionsByOrderId(orderId: Long): List<PgTransaction>
 
 ### Tests
 
@@ -218,32 +229,32 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 ### TODO
 
 - [x] Modify `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClientImpl.kt` (L17-L172)
-  - Change import from infrastructure PgClient to domain PgClient: `import com.loopers.domain.pg.PgClient`
-  - Change interface implementation: `: PgClient` to use domain interface
-  - Keep existing Resilience4j integration (executeWithResilience, classifyAndThrow, handleResponse methods)
+    - Change import from infrastructure PgClient to domain PgClient: `import com.loopers.domain.payment.PgClient`
+    - Change interface implementation: `: PgClient` to use domain interface
+    - Keep existing Resilience4j integration (executeWithResilience, classifyAndThrow, handleResponse methods)
 
 - [x] Add `requestPayment(request: PgPaymentRequest): PgPaymentCreateResult` method in PgClientImpl
-  - Convert domain PgPaymentRequest to infrastructure PgPaymentRequest DTO
-  - Call existing HTTP logic
-  - Handle PgException.ResponseUncertain -> return Uncertain
-  - Convert PgPaymentResponse to Accepted(transactionKey)
-  - Pattern: see existing `requestPayment` method at L34-L61
+    - Convert domain PgPaymentRequest to infrastructure PgPaymentRequest DTO
+    - Call existing HTTP logic
+    - Handle PgException.ResponseUncertain -> return Uncertain
+    - Convert PgPaymentResponse to Accepted(transactionKey)
+    - Pattern: see existing `requestPayment` method at L34-L61
 
 - [x] Add `findTransaction(transactionKey: String): PgTransaction` method in PgClientImpl
-  - Call existing getPaymentByKey logic internally
-  - Convert PgPaymentDetailResponse to domain PgTransaction
-  - Pattern: see existing `getPaymentByKey` method at L63-L84
+    - Call existing getPaymentByKey logic internally
+    - Convert PgPaymentDetailResponse to domain PgTransaction
+    - Pattern: see existing `getPaymentByKey` method at L63-L84
 
 - [x] Add `findTransactionsByOrderId(orderId: Long): List<PgTransaction>` method in PgClientImpl
-  - Call existing getPaymentsByOrderId logic internally
-  - Convert PgPaymentListResponse.transactions to List<PgTransaction>
-  - Pattern: see existing `getPaymentsByOrderId` method at L86-L107
+    - Call existing getPaymentsByOrderId logic internally
+    - Convert PgPaymentListResponse.transactions to List<PgTransaction>
+    - Pattern: see existing `getPaymentsByOrderId` method at L86-L107
 
 - [x] Add private helper methods in PgClientImpl for type conversion
-  - `toInfraPaymentRequest(request: PgPaymentRequest): infrastructure.PgPaymentRequest`
-  - `toDomainTransaction(response: PgPaymentDetailResponse): PgTransaction`
-  - `toDomainTransactionStatus(status: String): PgTransactionStatus`
-  - `toDomainCardType(cardType: String): CardType`
+    - `toInfraPaymentRequest(request: PgPaymentRequest): infrastructure.PgPaymentRequest`
+    - `toDomainTransaction(response: PgPaymentDetailResponse): PgTransaction`
+    - `toDomainTransactionStatus(status: String): PgTransactionStatus`
+    - `toDomainCardType(cardType: String): CardType`
 
 ### Tests
 
@@ -252,8 +263,9 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 ### Done When
 
 - [x] `./gradlew :apps:commerce-api:compileKotlin` succeeds
-- [x] PgClientImpl implements `com.loopers.domain.pg.PgClient`
-- [x] Old methods (requestPaymentLegacy, getPaymentByKey, getPaymentsByOrderId) remain for backward compatibility during migration
+- [x] PgClientImpl implements `com.loopers.domain.payment.PgClient`
+- [x] Old methods (requestPaymentLegacy, getPaymentByKey, getPaymentsByOrderId) remain for backward compatibility during
+  migration
 
 ---
 
@@ -264,16 +276,16 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 ### TODO
 
 - [x] Modify `apps/commerce-api/src/main/kotlin/com/loopers/application/order/OrderFacade.kt` (L13)
-  - Change import: `com.loopers.infrastructure.pg.PgClient` -> `com.loopers.domain.pg.PgClient`
-  - Refactored requestPayment method to use domain types (CardInfo, PgPaymentRequest, PgPaymentCreateResult)
+    - Change import: `com.loopers.infrastructure.pg.PgClient` -> `com.loopers.domain.payment.PgClient`
+    - Refactored requestPayment method to use domain types (CardInfo, PgPaymentRequest, PgPaymentCreateResult)
 
 - [x] Modify `apps/commerce-api/src/main/kotlin/com/loopers/application/payment/PaymentFacade.kt` (L6)
-  - Change import: `com.loopers.infrastructure.pg.PgClient` -> `com.loopers.domain.pg.PgClient`
-  - Refactored queryPgStatus method to use domain types (findTransactionsByOrderId, PgTransaction)
+    - Change import: `com.loopers.infrastructure.pg.PgClient` -> `com.loopers.domain.payment.PgClient`
+    - Refactored queryPgStatus method to use domain types (findTransactionsByOrderId, PgTransaction)
 
 - [x] Update test files to use domain imports
-  - `apps/commerce-api/src/test/kotlin/com/loopers/application/payment/PaymentFacadeTest.kt` (L9)
-  - Updated mocks to use domain PgClient interface
+    - `apps/commerce-api/src/test/kotlin/com/loopers/application/payment/PaymentFacadeTest.kt` (L9)
+    - Updated mocks to use domain PgClient interface
 
 ### Tests
 
@@ -297,10 +309,11 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ### TODO
 
-- [x] Delete `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt` - old interface (now superseded by domain/pg/PgClient.kt)
+- [x] Delete `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt` - old interface (now
+  superseded by domain/pg/PgClient.kt)
 
 - [x] Verify no remaining imports of infrastructure PgClient
-  - Run: `grep -r "infrastructure.pg.PgClient" apps/`
+    - Run: `grep -r "infrastructure.pg.PgClient" apps/`
 
 ### Tests
 
@@ -316,61 +329,61 @@ infrastructure/pg/PgDto (HTTP DTOs - unchanged)
 
 ## Spec Requirement Mapping
 
-| Spec Section | Requirement | Milestone |
-|--------------|-------------|-----------|
-| 1.1 | PgClient interface | M3 |
-| 1.1 | PgPaymentRequest value object | M2 |
-| 1.1 | CardInfo value object | M2 |
-| 1.1 | CardType enum | M1 |
-| 1.1 | PgPaymentCreateResult sealed class | M3 |
-| 1.1 | PgTransaction value object | M2 |
-| 1.1 | PgTransactionStatus enum | M1 |
-| 1.3 | CardInfo.cardNo validation | M2 |
-| 1.3 | requestPayment returns Accepted/Uncertain | M4 |
+| Spec Section | Requirement                               | Milestone |
+|--------------|-------------------------------------------|-----------|
+| 1.1          | PgClient interface                        | M3        |
+| 1.1          | PgPaymentRequest value object             | M2        |
+| 1.1          | CardInfo value object                     | M2        |
+| 1.1          | CardType enum                             | M1        |
+| 1.1          | PgPaymentCreateResult sealed class        | M3        |
+| 1.1          | PgTransaction value object                | M2        |
+| 1.1          | PgTransactionStatus enum                  | M1        |
+| 1.3          | CardInfo.cardNo validation                | M2        |
+| 1.3          | requestPayment returns Accepted/Uncertain | M4        |
 
 ---
 
 ## Risk Assessment
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Breaking existing tests | Medium | High | Keep old methods during migration, run tests after each milestone |
-| Incorrect type mapping | Low | Medium | Comprehensive integration tests in M4 |
-| Missing import updates | Low | Low | Use grep to verify all imports updated |
+| Risk                    | Likelihood | Impact | Mitigation                                                        |
+|-------------------------|------------|--------|-------------------------------------------------------------------|
+| Breaking existing tests | Medium     | High   | Keep old methods during migration, run tests after each milestone |
+| Incorrect type mapping  | Low        | Medium | Comprehensive integration tests in M4                             |
+| Missing import updates  | Low        | Low    | Use grep to verify all imports updated                            |
 
 ---
 
 ## File Changes Summary
 
-| Action | File Path |
-|--------|-----------|
-| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardType.kt` |
-| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransactionStatus.kt` |
-| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardInfo.kt` |
-| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentRequest.kt` |
-| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransaction.kt` |
-| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentCreateResult.kt` |
-| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgClient.kt` |
-| CREATE | `apps/commerce-api/src/test/kotlin/com/loopers/domain/pg/CardInfoTest.kt` |
-| MODIFY | `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClientImpl.kt` |
-| CREATE | `apps/commerce-api/src/test/kotlin/com/loopers/infrastructure/pg/PgClientImplTest.kt` |
-| MODIFY | `apps/commerce-api/src/main/kotlin/com/loopers/application/order/OrderFacade.kt` |
-| MODIFY | `apps/commerce-api/src/main/kotlin/com/loopers/application/payment/PaymentFacade.kt` |
+| Action | File Path                                                                                |
+|--------|------------------------------------------------------------------------------------------|
+| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardType.kt`                    |
+| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransactionStatus.kt`         |
+| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/CardInfo.kt`                    |
+| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentRequest.kt`            |
+| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgTransaction.kt`               |
+| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgPaymentCreateResult.kt`       |
+| CREATE | `apps/commerce-api/src/main/kotlin/com/loopers/domain/pg/PgClient.kt`                    |
+| CREATE | `apps/commerce-api/src/test/kotlin/com/loopers/domain/pg/CardInfoTest.kt`                |
+| MODIFY | `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClientImpl.kt`        |
+| CREATE | `apps/commerce-api/src/test/kotlin/com/loopers/infrastructure/pg/PgClientImplTest.kt`    |
+| MODIFY | `apps/commerce-api/src/main/kotlin/com/loopers/application/order/OrderFacade.kt`         |
+| MODIFY | `apps/commerce-api/src/main/kotlin/com/loopers/application/payment/PaymentFacade.kt`     |
 | MODIFY | `apps/commerce-api/src/test/kotlin/com/loopers/application/payment/PaymentFacadeTest.kt` |
-| DELETE | `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt` |
+| DELETE | `apps/commerce-api/src/main/kotlin/com/loopers/infrastructure/pg/PgClient.kt`            |
 
 ---
 
 ## Pattern References
 
-| Pattern | Reference File | Lines | Usage |
-|---------|---------------|-------|-------|
-| Enum | `domain/coupon/DiscountType.kt` | L2-L5 | CardType, PgTransactionStatus |
-| Value Object with validation | `domain/coupon/DiscountAmount.kt` | L9-L27 | CardInfo |
-| Value Object | `support/values/Money.kt` | L9-L112 | PgPaymentRequest, PgTransaction |
-| Sealed class | `application/payment/PaymentFacade.kt` | L35-L44 | PgPaymentCreateResult |
-| Domain interface | `domain/coupon/DiscountPolicy.kt` | L5-L8 | PgClient |
-| Infrastructure adapter | `infrastructure/pg/PgClientImpl.kt` | L17-L172 | PgClientImpl changes |
+| Pattern                      | Reference File                         | Lines    | Usage                           |
+|------------------------------|----------------------------------------|----------|---------------------------------|
+| Enum                         | `domain/coupon/DiscountType.kt`        | L2-L5    | CardType, PgTransactionStatus   |
+| Value Object with validation | `domain/coupon/DiscountAmount.kt`      | L9-L27   | CardInfo                        |
+| Value Object                 | `support/values/Money.kt`              | L9-L112  | PgPaymentRequest, PgTransaction |
+| Sealed class                 | `application/payment/PaymentFacade.kt` | L35-L44  | PgPaymentCreateResult           |
+| Domain interface             | `domain/coupon/DiscountPolicy.kt`      | L5-L8    | PgClient                        |
+| Infrastructure adapter       | `infrastructure/pg/PgClientImpl.kt`    | L17-L172 | PgClientImpl changes            |
 
 ---
 

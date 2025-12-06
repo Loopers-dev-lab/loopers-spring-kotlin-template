@@ -1,7 +1,5 @@
-package com.loopers.domain.pg
+package com.loopers.domain.payment
 
-import com.loopers.domain.payment.CardInfo
-import com.loopers.domain.payment.CardType
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.assertj.core.api.Assertions.assertThat
