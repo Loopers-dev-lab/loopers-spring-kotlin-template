@@ -189,6 +189,7 @@ class PaymentService(
             is Payment.ConfirmResult.AlreadyProcessed -> {
                 CallbackResult.AlreadyProcessed(payment)
             }
+
             is Payment.ConfirmResult.Confirmed -> {
                 paymentRepository.save(payment)
                 CallbackResult.Confirmed(payment)
@@ -204,7 +205,6 @@ class PaymentService(
      * @param currentTime 현재 시각 (타임아웃 판단용)
      * @return CallbackResult - 결제 확정 결과
      * @throws CoreException 결제를 찾을 수 없는 경우
-     * @throws PgRequestNotReachedException PG 연결 실패 시
      */
     @Transactional
     fun processInProgressPayment(
@@ -220,6 +220,7 @@ class PaymentService(
             is Payment.ConfirmResult.AlreadyProcessed -> {
                 CallbackResult.AlreadyProcessed(payment)
             }
+
             is Payment.ConfirmResult.Confirmed -> {
                 paymentRepository.save(payment)
                 CallbackResult.Confirmed(payment)

@@ -6,10 +6,8 @@ import com.loopers.domain.payment.PgPaymentRequest
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.support.values.Money
-import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import com.loopers.domain.payment.CardType as DomainCardType
 
@@ -18,8 +16,6 @@ class PgClientImpl(
     private val pgFeignClient: PgFeignClient,
     private val exceptionClassifier: PgExceptionClassifier,
 ) : PgClient {
-
-    private val log = LoggerFactory.getLogger(javaClass)
 
     @CircuitBreaker(name = "pg", fallbackMethod = "requestPaymentFallback")
     @Retry(name = "pg")
@@ -35,29 +31,13 @@ class PgClientImpl(
         }
     }
 
-    @Suppress("unused") // Resilience4j fallbackMethod - 리플렉션으로 호출됨
+    @Suppress("unused")
     private fun requestPaymentFallback(
         request: PgPaymentRequest,
         e: Exception,
-    ): PgPaymentCreateResult {
-        log.warn("[PG] 결제 요청 실패 - fallback: {}", e.message)
-
-        return when (e) {
-            is PgResponseUncertainException -> {
-                log.warn("[PG] 응답 불확실 - 이중 결제 방지를 위해 Uncertain 반환")
-                PgPaymentCreateResult.Uncertain
-            }
-
-            is PgRequestNotReachedException, is CallNotPermittedException -> {
-                log.warn("[PG] 요청 미도달 - NotReached 반환")
-                PgPaymentCreateResult.NotReached
-            }
-
-            else -> {
-                log.error("[PG] 예상치 못한 예외", e)
-                PgPaymentCreateResult.NotReached
-            }
-        }
+    ): PgPaymentCreateResult = when (e) {
+        is PgResponseUncertainException -> PgPaymentCreateResult.Uncertain
+        else -> PgPaymentCreateResult.NotReached
     }
 
     @CircuitBreaker(name = "pg")
@@ -90,7 +70,7 @@ class PgClientImpl(
     private fun <T> extractData(response: PgResponse<T>): T =
         response.data ?: throw PgRequestNotReachedException("PG 응답 데이터 없음")
 
-    private fun PgPaymentRequest.toInfraRequest() = PgPaymentRequest(
+    private fun PgPaymentRequest.toInfraRequest() = com.loopers.infrastructure.payment.PgPaymentRequest(
         orderId = orderId.toString(),
         cardType = cardInfo.cardType.name,
         cardNo = cardInfo.cardNo,
