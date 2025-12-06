@@ -286,7 +286,7 @@ class PaymentServiceTest {
             verify(exactly = 1) { eventPublisher.publishEvent(ofType(PaymentFailedEvent::class)) }
         }
 
-        @DisplayName("결제 대기 상태는 아무 처리도 하지 않는다")
+        @DisplayName("결제 대기 상태는 상태를 변경하지 않고 저장만 한다")
         @Test
         fun handlePaymentCallback_whenPending_thenDoesNothing() {
             // given
@@ -308,6 +308,7 @@ class PaymentServiceTest {
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
             verify(exactly = 1) { paymentRepository.save(payment) }
+            verify(exactly = 0) { eventPublisher.publishEvent(any()) }
         }
     }
 
