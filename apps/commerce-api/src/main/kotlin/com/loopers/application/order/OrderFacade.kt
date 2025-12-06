@@ -61,7 +61,7 @@ class OrderFacade(
         val userId = command.userId
         val couponId = command.couponId
         val items = command.items
-        val paymentStatus = command.paymentMethod
+        val paymentMethod = command.paymentMethod
 
         val user = userService.getMyInfo(userId)
 
@@ -93,7 +93,8 @@ class OrderFacade(
         // 7. 최종 결제 금액 계산
         val finalAmount = totalAmount - discountAmount
 
-        when (paymentStatus) {
+        // TODO: 전략 패턴 적용
+        when (paymentMethod) {
             PaymentMethod.POINT -> {
                 // 8. 포인트 사용
                 pointService.use(
@@ -120,6 +121,9 @@ class OrderFacade(
             }
 
             PaymentMethod.CARD -> { // 재고 차감은 성공 콜백에서 진행
+                requireNotNull(command.cardType) { "카드 결제 시 cardType은 필수입니다" }
+                requireNotNull(command.cardNo) { "카드 결제 시 cardNo는 필수입니다" }
+
                 // 8. 주문 생성
                 val orderResult = orderService.createOrder(
                     OrderCommand.Create(
@@ -138,8 +142,8 @@ class OrderFacade(
                     PaymentCommand.Create(
                         userId = user.id,
                         orderId = orderResult.order.id,
-                        cardType = command.cardType!!,
-                        cardNo = command.cardNo!!,
+                        cardType = command.cardType,
+                        cardNo = command.cardNo,
                         amount = finalAmount,
                     ),
                 )

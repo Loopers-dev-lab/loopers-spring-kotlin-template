@@ -31,6 +31,8 @@ class PaymentStatusSyncScheduler(
 
     private val log = LoggerFactory.getLogger(PaymentStatusSyncScheduler::class.java)
 
+    // TODO: 결제 상태가 N분이상 'PENDING'인 경우 실패 처리하는 스케줄러 추가
+
     @Scheduled(fixedDelay = 300000) // 5분마다
     fun syncPendingPayments() {
         val fiveMinutesAgo = ZonedDateTime.now().minusMinutes(5)
@@ -73,11 +75,16 @@ class PaymentStatusSyncScheduler(
                             couponService.rollback(order.userId, order.couponId)
                             log.info("결제 상태 동기화 성공 (FAILED): orderId={}", orderId)
                         }
+
+                        else -> {
+                            // PG에서 아직 최종 상태가 아닌 경우 다음 스케줄에서 재시도
+                            log.debug("결제 상태가 아직 확정되지 않음: orderId={}", orderId)
+                        }
                     }
                 } else {
                     // PG 조회 실패 시 실패 처리
                     orderService.fail(orderId)
-                    payment.status = PaymentStatus.FAILED
+                    paymentService.fail(orderId, "PG 조회 실패로 인한 타임아웃")
                     couponService.rollback(order.userId, order.couponId)
                     log.warn("PG 조회 실패로 타임아웃 처리: orderId={}", orderId)
                 }

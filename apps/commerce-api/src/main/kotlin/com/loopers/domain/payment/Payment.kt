@@ -15,8 +15,8 @@ import jakarta.persistence.Table
     indexes = [
         Index(name = "uk_payment_transaction_key", columnList = "transaction_key", unique = true),
         Index(name = "idx_payment_status_created_at", columnList = "status, created_at"),
-        Index(name = "idx_orders_user_id", columnList = "ref_user_id"),
-        Index(name = "idx_orders_order_id", columnList = "ref_order_id"),
+        Index(name = "idx_payment_user_id", columnList = "ref_user_id"),
+        Index(name = "idx_payment_order_id", columnList = "ref_order_id"),
     ],
 )
 class Payment(
