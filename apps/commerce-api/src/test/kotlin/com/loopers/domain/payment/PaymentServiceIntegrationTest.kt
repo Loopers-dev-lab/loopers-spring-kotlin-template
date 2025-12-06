@@ -18,7 +18,6 @@ import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import java.time.Instant
-import java.time.ZonedDateTime
 
 @SpringBootTest
 class PaymentServiceIntegrationTest @Autowired constructor(
@@ -227,15 +226,14 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     @Nested
     inner class FindInProgressPayments {
 
-        @DisplayName("임계값보다 오래된 IN_PROGRESS 결제를 조회할 수 있다")
+        @DisplayName("IN_PROGRESS 상태의 결제를 조회할 수 있다")
         @Test
-        fun `find in progress payments older than threshold`() {
+        fun `find in progress payments`() {
             // given
             val inProgressPayment = createInProgressPayment()
-            val threshold = ZonedDateTime.now().plusMinutes(1) // future threshold
 
             // when
-            val payments = paymentService.findInProgressPayments(threshold)
+            val payments = paymentService.findInProgressPayments()
 
             // then
             assertThat(payments).hasSize(1)

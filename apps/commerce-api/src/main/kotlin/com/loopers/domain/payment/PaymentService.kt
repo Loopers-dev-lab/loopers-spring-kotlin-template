@@ -8,7 +8,6 @@ import com.loopers.support.values.Money
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
-import java.time.ZonedDateTime
 
 @Component
 class PaymentService(
@@ -98,16 +97,13 @@ class PaymentService(
 
     /**
      * 스케줄러에서 사용할 IN_PROGRESS 상태의 결제 목록을 조회합니다.
-     * 지정된 임계값보다 오래된 IN_PROGRESS 결제를 조회하여 복구 처리합니다.
      *
-     * @param threshold 조회 기준 시간 (이전에 업데이트된 결제만 조회)
      * @return IN_PROGRESS 상태의 Payment 목록
      */
     @Transactional(readOnly = true)
-    fun findInProgressPayments(threshold: ZonedDateTime): List<Payment> {
-        return paymentRepository.findByStatusInAndUpdatedAtBefore(
+    fun findInProgressPayments(): List<Payment> {
+        return paymentRepository.findByStatusIn(
             statuses = listOf(PaymentStatus.IN_PROGRESS),
-            before = threshold,
         )
     }
 

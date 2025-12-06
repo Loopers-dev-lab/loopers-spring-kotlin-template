@@ -10,8 +10,6 @@ import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
 import com.loopers.support.values.Money
 import org.springframework.stereotype.Component
-import java.time.ZonedDateTime
-
 /**
  * 결제 관련 비즈니스 로직을 오케스트레이션하는 Facade
  *
@@ -30,11 +28,10 @@ class PaymentFacade(
     /**
      * IN_PROGRESS 상태의 결제 목록을 조회합니다.
      *
-     * @param threshold 조회 기준 시간 (이전에 업데이트된 결제만 조회)
      * @return IN_PROGRESS 상태의 Payment 목록
      */
-    fun findInProgressPayments(threshold: ZonedDateTime): List<Payment> {
-        return paymentService.findInProgressPayments(threshold)
+    fun findInProgressPayments(): List<Payment> {
+        return paymentService.findInProgressPayments()
     }
 
     /**

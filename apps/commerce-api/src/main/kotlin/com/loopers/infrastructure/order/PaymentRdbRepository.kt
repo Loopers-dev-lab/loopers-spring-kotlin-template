@@ -5,8 +5,6 @@ import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentStatus
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Repository
-import java.time.ZonedDateTime
-
 @Repository
 class PaymentRdbRepository(
     private val paymentJpaRepository: PaymentJpaRepository,
@@ -23,11 +21,8 @@ class PaymentRdbRepository(
         return paymentJpaRepository.findByExternalPaymentKey(key)
     }
 
-    override fun findByStatusInAndUpdatedAtBefore(
-        statuses: List<PaymentStatus>,
-        before: ZonedDateTime,
-    ): List<Payment> {
-        return paymentJpaRepository.findByStatusInAndUpdatedAtBefore(statuses, before)
+    override fun findByStatusIn(statuses: List<PaymentStatus>): List<Payment> {
+        return paymentJpaRepository.findByStatusIn(statuses)
     }
 
     override fun save(payment: Payment): Payment {

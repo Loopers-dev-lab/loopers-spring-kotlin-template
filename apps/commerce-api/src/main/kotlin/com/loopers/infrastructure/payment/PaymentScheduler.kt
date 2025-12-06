@@ -5,14 +5,14 @@ import org.slf4j.LoggerFactory
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import java.time.ZonedDateTime
 
 /**
  * IN_PROGRESS 상태로 남아있는 결제를 주기적으로 확인하여 최종 상태로 전환하는 스케줄러
  *
  * - 1분마다 실행
- * - 1분 이상 IN_PROGRESS인 결제를 조회
+ * - 모든 IN_PROGRESS 결제를 조회
  * - PaymentFacade에 위임하여 PG 상태 확인 및 처리
+ * - 5분 타임아웃은 Payment 도메인에서 자동 처리
  */
 @Component
 class PaymentScheduler(
@@ -20,26 +20,20 @@ class PaymentScheduler(
 ) {
     private val logger = LoggerFactory.getLogger(PaymentScheduler::class.java)
 
-    companion object {
-        private const val CHECK_THRESHOLD_MINUTES = 1L
-    }
-
     /**
      * 매 1분마다 실행
      */
     @Scheduled(fixedRate = 60_000)
     fun checkInProgressPayments() {
-        val threshold = ZonedDateTime.now().minusMinutes(CHECK_THRESHOLD_MINUTES)
-        val inProgressPayments = paymentFacade.findInProgressPayments(threshold)
+        val inProgressPayments = paymentFacade.findInProgressPayments()
 
         if (inProgressPayments.isEmpty()) {
             return
         }
 
         logger.info(
-            "IN_PROGRESS 결제 상태 확인 시작 - count: {}, threshold: {}",
+            "IN_PROGRESS 결제 상태 확인 시작 - count: {}",
             inProgressPayments.size,
-            threshold,
         )
 
         var processedCount = 0

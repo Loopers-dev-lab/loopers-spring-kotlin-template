@@ -37,7 +37,7 @@ class PaymentSchedulerTest {
             // given
             val paymentId = 1L
             val payment = createMockPayment(id = paymentId)
-            every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment)
+            every { paymentFacade.findInProgressPayments() } returns listOf(payment)
 
             // when
             scheduler.checkInProgressPayments()
@@ -50,7 +50,7 @@ class PaymentSchedulerTest {
         @DisplayName("IN_PROGRESS 결제가 없으면 아무 작업도 하지 않는다")
         fun `does nothing when no IN_PROGRESS payments`() {
             // given
-            every { paymentFacade.findInProgressPayments(any()) } returns emptyList()
+            every { paymentFacade.findInProgressPayments() } returns emptyList()
 
             // when
             scheduler.checkInProgressPayments()
@@ -70,7 +70,7 @@ class PaymentSchedulerTest {
             val payment2 = createMockPayment(id = paymentId2)
             val payment3 = createMockPayment(id = paymentId3)
 
-            every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment1, payment2, payment3)
+            every { paymentFacade.findInProgressPayments() } returns listOf(payment1, payment2, payment3)
 
             // when
             scheduler.checkInProgressPayments()
@@ -95,7 +95,7 @@ class PaymentSchedulerTest {
             val payment1 = createMockPayment(id = paymentId1)
             val payment2 = createMockPayment(id = paymentId2)
 
-            every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment1, payment2)
+            every { paymentFacade.findInProgressPayments() } returns listOf(payment1, payment2)
 
             // payment1 - 낙관적 락 충돌
             every { paymentFacade.processInProgressPayment(paymentId1) } throws
@@ -123,7 +123,7 @@ class PaymentSchedulerTest {
             val payment1 = createMockPayment(id = paymentId1)
             val payment2 = createMockPayment(id = paymentId2)
 
-            every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment1, payment2)
+            every { paymentFacade.findInProgressPayments() } returns listOf(payment1, payment2)
 
             // payment1 - 예상치 못한 예외
             every { paymentFacade.processInProgressPayment(paymentId1) } throws RuntimeException("Unexpected error")
@@ -150,7 +150,7 @@ class PaymentSchedulerTest {
             val payment1 = createMockPayment(id = paymentId1)
             val payment2 = createMockPayment(id = paymentId2)
 
-            every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment1, payment2)
+            every { paymentFacade.findInProgressPayments() } returns listOf(payment1, payment2)
 
             // payment1 - PG 연결 실패
             every { paymentFacade.processInProgressPayment(paymentId1) } throws

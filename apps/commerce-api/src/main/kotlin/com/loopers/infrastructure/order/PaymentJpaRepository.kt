@@ -4,14 +4,9 @@ import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentStatus
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
-import java.time.ZonedDateTime
-
 @Repository
 interface PaymentJpaRepository : JpaRepository<Payment, Long> {
     fun findByOrderId(orderId: Long): Payment?
     fun findByExternalPaymentKey(key: String): Payment?
-    fun findByStatusInAndUpdatedAtBefore(
-        statuses: List<PaymentStatus>,
-        before: ZonedDateTime,
-    ): List<Payment>
+    fun findByStatusIn(statuses: List<PaymentStatus>): List<Payment>
 }
