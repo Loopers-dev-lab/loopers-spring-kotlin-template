@@ -1,5 +1,7 @@
 package com.loopers.domain.payment
 
+import com.loopers.domain.event.PaymentCompletedEvent
+import com.loopers.domain.event.PaymentFailedEvent
 import com.loopers.infrastructure.payment.client.CardTypeDto
 import com.loopers.infrastructure.payment.client.PgClient
 import com.loopers.infrastructure.payment.client.PgPaymentRequest
@@ -10,6 +12,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -18,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val pgClient: PgClient,
+    private val eventPublisher: ApplicationEventPublisher,
     @Value("\${pg.callback-url:http://localhost:8080}") private val callbackBaseUrl: String,
 ) {
     private val logger = LoggerFactory.getLogger(PaymentService::class.java)
@@ -140,10 +144,16 @@ class PaymentService(
             TransactionStatusDto.SUCCESS -> {
                 payment.complete(reason)
                 logger.info("결제 완료: transactionKey=$transactionKey, orderId=${payment.orderId}")
+
+                // 결제 완료 이벤트 발행
+                eventPublisher.publishEvent(PaymentCompletedEvent.from(payment))
             }
             TransactionStatusDto.FAILED -> {
                 payment.fail(reason ?: "결제 실패")
                 logger.warn("결제 실패: transactionKey=$transactionKey, reason=$reason")
+
+                // 결제 실패 이벤트 발행
+                eventPublisher.publishEvent(PaymentFailedEvent.from(payment))
             }
             TransactionStatusDto.PENDING -> {
                 logger.info("결제 대기 중: transactionKey=$transactionKey")

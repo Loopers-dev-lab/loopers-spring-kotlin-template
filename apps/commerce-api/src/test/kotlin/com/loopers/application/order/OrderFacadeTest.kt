@@ -18,6 +18,7 @@ import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import java.math.BigDecimal
@@ -30,6 +31,7 @@ class OrderFacadeTest {
     private val pointService: PointService = mockk(relaxed = true)
     private val couponService: CouponService = mockk(relaxed = true)
     private val paymentFacade: PaymentFacade = mockk(relaxed = true)
+    private val eventPublisher: ApplicationEventPublisher = mockk(relaxed = true)
 
     private val orderFacade = OrderFacade(
         orderService,
@@ -39,6 +41,7 @@ class OrderFacadeTest {
         pointService,
         couponService,
         paymentFacade,
+        eventPublisher,
     )
 
     @Test

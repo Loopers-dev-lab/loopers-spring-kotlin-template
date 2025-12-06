@@ -3,6 +3,9 @@ package com.loopers.application.order
 import com.loopers.application.payment.PaymentFacade
 import com.loopers.application.payment.PaymentRequest
 import com.loopers.domain.coupon.CouponService
+import com.loopers.domain.event.OrderCreatedEvent
+import com.loopers.domain.event.UserActionEvent
+import com.loopers.domain.event.UserActionType
 import com.loopers.domain.order.Money
 import com.loopers.domain.order.OrderItem
 import com.loopers.domain.order.OrderQueryService
@@ -15,6 +18,7 @@ import com.loopers.domain.product.StockService
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -30,6 +34,7 @@ class OrderFacade(
     private val pointService: PointService,
     private val couponService: CouponService,
     private val paymentFacade: PaymentFacade,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
 
@@ -38,7 +43,8 @@ class OrderFacade(
         val orderItems = validateAndCreateOrderItems(request)
         val totalMoney = calculateTotalAmount(orderItems)
 
-        val discountAmount = applyCoupon(userId, request.couponId, totalMoney)
+        // 쿠폰 할인 계산 (실제 사용은 이벤트로 처리)
+        val discountAmount = calculateCouponDiscount(userId, request.couponId, totalMoney)
         val finalAmount = totalMoney - discountAmount
 
         val paymentMethod = PaymentMethod.valueOf(request.paymentMethod)
@@ -54,6 +60,24 @@ class OrderFacade(
                 pointService.deductPoint(userId, finalAmount)
 
                 logger.info("포인트 결제 완료: orderId=${order.id}, amount=${finalAmount.amount}")
+
+                // 주문 생성 이벤트 발행
+                eventPublisher.publishEvent(OrderCreatedEvent.from(order, request.couponId))
+
+                // 유저 행동 로깅
+                eventPublisher.publishEvent(
+                    UserActionEvent(
+                        userId = userId,
+                        actionType = UserActionType.ORDER_CREATE,
+                        targetType = "ORDER",
+                        targetId = order.id,
+                        metadata = mapOf(
+                            "paymentMethod" to paymentMethod.name,
+                            "amount" to finalAmount.amount.toLong(),
+                        ),
+                    ),
+                )
+
                 return OrderCreateInfo.from(order)
             }
 
@@ -77,6 +101,23 @@ class OrderFacade(
                 try {
                     val paymentInfo = paymentFacade.requestCardPayment(paymentRequest)
                     logger.info("카드 결제 요청 완료: orderId=${order.id}, transactionKey=${paymentInfo.transactionKey}")
+
+                    // 주문 생성 이벤트 발행
+                    eventPublisher.publishEvent(OrderCreatedEvent.from(order, request.couponId))
+
+                    // 유저 행동 로깅
+                    eventPublisher.publishEvent(
+                        UserActionEvent(
+                            userId = userId,
+                            actionType = UserActionType.ORDER_CREATE,
+                            targetType = "ORDER",
+                            targetId = order.id,
+                            metadata = mapOf(
+                                "paymentMethod" to paymentMethod.name,
+                                "amount" to finalAmount.amount.toLong(),
+                            ),
+                        ),
+                    )
                 } catch (e: Exception) {
                     logger.error("카드 결제 요청 실패: orderId=${order.id}", e)
 
@@ -96,12 +137,23 @@ class OrderFacade(
         }
     }
 
-    private fun applyCoupon(userId: Long, couponId: Long?, totalAmount: Money): Money {
+    /**
+     * 쿠폰 할인 금액 계산
+     * 실제 쿠폰 사용은 이벤트 핸들러에서 비동기로 처리
+     */
+    private fun calculateCouponDiscount(userId: Long, couponId: Long?, totalAmount: Money): Money {
         if (couponId == null) {
             return Money(BigDecimal.ZERO, totalAmount.currency)
         }
 
-        val userCoupon = couponService.useUserCoupon(userId, couponId)
+        // 쿠폰 정보 조회 (실제 사용은 안 함)
+        val userCoupon = couponService.getUserCoupon(userId, couponId)
+
+        // 사용 가능 여부 검증
+        if (!userCoupon.canUse()) {
+            throw CoreException(ErrorType.BAD_REQUEST, "사용할 수 없는 쿠폰입니다")
+        }
+
         return userCoupon.coupon.calculateDiscount(totalAmount)
     }
 
