@@ -3,7 +3,6 @@ package com.loopers.infrastructure.payment
 import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgPaymentRequest
-import com.loopers.domain.payment.PgServiceUnavailableException
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.support.values.Money
@@ -50,36 +49,28 @@ class PgClientImpl(
         } catch (e: PgResponseUncertainException) {
             PgPaymentCreateResult.Uncertain
         } catch (e: PgRequestNotReachedException) {
-            throw PgServiceUnavailableException(e.message ?: "PG 서비스 불가", e)
+            PgPaymentCreateResult.NotReached
         }
     }
 
     override fun findTransaction(transactionKey: String): PgTransaction {
-        return try {
-            val response = executeWithResilience {
-                pgFeignClient.getPayment(transactionKey)
-            }
-            toDomainTransaction(extractData(response))
-        } catch (e: PgInfraException) {
-            throw PgServiceUnavailableException(e.message ?: "PG 서비스 불가", e)
+        val response = executeWithResilience {
+            pgFeignClient.getPayment(transactionKey)
         }
+        return toDomainTransaction(extractData(response))
     }
 
     override fun findTransactionsByOrderId(orderId: Long): List<PgTransaction> {
-        return try {
-            val response = executeWithResilience {
-                pgFeignClient.getPaymentsByOrderId(orderId.toString())
-            }
-            val data = extractData(response)
+        val response = executeWithResilience {
+            pgFeignClient.getPaymentsByOrderId(orderId.toString())
+        }
+        val data = extractData(response)
 
-            data.transactions.map { summary ->
-                val detail = executeWithResilience {
-                    pgFeignClient.getPayment(summary.transactionKey)
-                }
-                toDomainTransaction(extractData(detail))
+        return data.transactions.map { summary ->
+            val detail = executeWithResilience {
+                pgFeignClient.getPayment(summary.transactionKey)
             }
-        } catch (e: PgInfraException) {
-            throw PgServiceUnavailableException(e.message ?: "PG 서비스 불가", e)
+            toDomainTransaction(extractData(detail))
         }
     }
 

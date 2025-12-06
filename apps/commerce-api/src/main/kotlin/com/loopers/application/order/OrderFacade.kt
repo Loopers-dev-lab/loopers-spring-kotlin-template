@@ -11,10 +11,8 @@ import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgClient
-import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgPaymentRequest
 import com.loopers.domain.payment.PgTransaction
-import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
@@ -58,70 +56,71 @@ class OrderFacade(
         return retryTemplate.execute<OrderInfo.PlaceOrder, Exception> {
             // 1. 리소스 할당 (재고, 쿠폰, 포인트, Payment 생성)
             val allocationResult = allocateResources(criteria)
+            val payment = allocationResult.payment
 
-            // 2. Payment 상태에 따라 분기 (Payment가 이미 paidAmount로 결정함)
-            when {
-                allocationResult.payment.status == PaymentStatus.PAID -> {
-                    // 포인트+쿠폰 전액 결제 완료
+            // 2. 포인트+쿠폰 전액 결제 완료된 경우 (paidAmount == 0)
+            if (payment.status == PaymentStatus.PAID) {
+                updateProductCache(allocationResult.productViews)
+                return@execute OrderInfo.PlaceOrder(
+                    orderId = allocationResult.orderId,
+                    paymentId = payment.id,
+                    paymentStatus = PaymentStatus.PAID,
+                )
+            }
+
+            // 3. 카드 결제가 필요한데 카드 정보가 없는 경우
+            if (!criteria.requiresCardPayment()) {
+                throw CoreException(
+                    ErrorType.BAD_REQUEST,
+                    "포인트와 쿠폰만으로 결제할 수 없습니다. 카드 정보를 입력해주세요.",
+                )
+            }
+
+            // 4. PG 결제 요청 (트랜잭션 외부)
+            val cardInfo = CardInfo(
+                cardType = CardType.valueOf(criteria.cardType!!),
+                cardNo = criteria.cardNo!!,
+            )
+            val pgResult = pgClient.requestPayment(
+                PgPaymentRequest(
+                    orderId = allocationResult.orderId,
+                    amount = payment.paidAmount,
+                    cardInfo = cardInfo,
+                    callbackUrl = "$callbackBaseUrl/api/v1/payments/callback",
+                ),
+            )
+
+            // 5. 결제 개시 (PENDING → IN_PROGRESS 또는 FAILED)
+            val updatedPayment = transactionTemplate.execute { _ ->
+                paymentService.initiatePayment(
+                    paymentId = payment.id,
+                    result = pgResult,
+                )
+            }!!
+
+            // 6. 상태에 따른 후속 처리
+            when (updatedPayment.status) {
+                PaymentStatus.IN_PROGRESS -> {
+                    // 비동기 처리 중 - 콜백/스케줄러가 최종 결과 처리
                     updateProductCache(allocationResult.productViews)
                     OrderInfo.PlaceOrder(
                         orderId = allocationResult.orderId,
-                        paymentId = allocationResult.payment.id,
-                        paymentStatus = PaymentStatus.PAID,
+                        paymentId = payment.id,
+                        paymentStatus = PaymentStatus.IN_PROGRESS,
                     )
                 }
-
-                !criteria.requiresCardPayment() -> {
-                    // paidAmount > 0인데 카드 정보가 없음 → 포인트+쿠폰 부족
+                PaymentStatus.FAILED -> {
+                    // PG 서비스 불능 - 보상 트랜잭션
+                    transactionTemplate.execute { _ ->
+                        recoverResources(updatedPayment)
+                        orderService.cancelOrder(updatedPayment.orderId)
+                    }
                     throw CoreException(
-                        ErrorType.BAD_REQUEST,
-                        "포인트와 쿠폰만으로 결제할 수 없습니다. 카드 정보를 입력해주세요.",
+                        ErrorType.CIRCUIT_OPEN,
+                        "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
                     )
                 }
-
-                else -> {
-                    // PG 결제 필요 (paidAmount > 0, 카드 정보 있음)
-                    processCardPayment(criteria, allocationResult)
-                }
-            }
-        }
-    }
-
-    /**
-     * 카드 결제 처리
-     * PG 호출 → 결과에 따라 상태 전이
-     */
-    private fun processCardPayment(
-        criteria: OrderCriteria.PlaceOrder,
-        allocationResult: ResourceAllocationResult,
-    ): OrderInfo.PlaceOrder {
-        // PG 호출 (트랜잭션 외부)
-        val pgResult = requestPayment(criteria, allocationResult)
-
-        // 결과 처리
-        return when (pgResult) {
-            is PgPaymentCreateResult.Accepted -> {
-                handlePgSuccess(allocationResult, pgResult.transactionKey)
-            }
-
-            is PgPaymentCreateResult.Uncertain -> {
-                // 타임아웃 등으로 응답을 받지 못한 경우
-                // IN_PROGRESS로 전이하고 스케줄러가 나중에 처리
-                // PENDING → IN_PROGRESS (transactionKey 없이)
-                transactionTemplate.execute { _ ->
-                    paymentService.initiatePayment(
-                        paymentId = allocationResult.payment.id,
-                        result = PgPaymentCreateResult.Uncertain,
-                    )
-                }
-
-                updateProductCache(allocationResult.productViews)
-
-                OrderInfo.PlaceOrder(
-                    orderId = allocationResult.orderId,
-                    paymentId = allocationResult.payment.id,
-                    paymentStatus = PaymentStatus.IN_PROGRESS,
-                )
+                else -> throw IllegalStateException("Unexpected payment status: ${updatedPayment.status}")
             }
         }
     }
@@ -192,79 +191,6 @@ class OrderFacade(
                 productViews = productViews,
             )
         }!!
-    }
-
-    /**
-     * PG 결제 요청 (트랜잭션 외부)
-     */
-    private fun requestPayment(
-        criteria: OrderCriteria.PlaceOrder,
-        allocationResult: ResourceAllocationResult,
-    ): PgPaymentCreateResult {
-        val cardInfo = CardInfo(
-            cardType = CardType.valueOf(criteria.cardType!!),
-            cardNo = criteria.cardNo!!,
-        )
-
-        val request = PgPaymentRequest(
-            orderId = allocationResult.orderId,
-            amount = allocationResult.payment.paidAmount,
-            cardInfo = cardInfo,
-            callbackUrl = "$callbackBaseUrl/api/v1/payments/callback",
-        )
-
-        return pgClient.requestPayment(request)
-    }
-
-    /**
-     * PG 성공 처리
-     * - PENDING → IN_PROGRESS (initiate with Accepted)
-     * - IN_PROGRESS → PAID (confirmPayment)
-     */
-    private fun handlePgSuccess(
-        allocationResult: ResourceAllocationResult,
-        transactionKey: String,
-    ): OrderInfo.PlaceOrder {
-        transactionTemplate.execute { _ ->
-            // 1. 결제 개시 (PENDING → IN_PROGRESS, transactionKey 저장)
-            paymentService.initiatePayment(
-                paymentId = allocationResult.payment.id,
-                result = PgPaymentCreateResult.Accepted(transactionKey),
-            )
-
-            // 2. 결제 확정 (IN_PROGRESS → PAID)
-            val successTransaction = PgTransaction(
-                transactionKey = transactionKey,
-                orderId = allocationResult.payment.orderId,
-                cardType = CardType.KB,
-                cardNo = "0000-0000-0000-0000",
-                amount = allocationResult.payment.paidAmount,
-                status = PgTransactionStatus.SUCCESS,
-            )
-            val payment = paymentService.confirmPayment(
-                paymentId = allocationResult.payment.id,
-                transactions = listOf(successTransaction),
-                currentTime = Instant.now(),
-            )
-
-            when (payment.status) {
-                PaymentStatus.PAID -> orderService.completePayment(payment.orderId)
-                PaymentStatus.FAILED -> {
-                    recoverResources(payment)
-                    orderService.cancelOrder(payment.orderId)
-                }
-
-                else -> {}
-            }
-        }
-
-        updateProductCache(allocationResult.productViews)
-
-        return OrderInfo.PlaceOrder(
-            orderId = allocationResult.orderId,
-            paymentId = allocationResult.payment.id,
-            paymentStatus = PaymentStatus.PAID,
-        )
     }
 
     /**

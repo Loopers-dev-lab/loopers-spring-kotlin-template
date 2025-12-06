@@ -173,8 +173,8 @@ class PaymentConcurrencyTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("두 번째 처리 시도 시 상태 체크로 인해 예외가 발생한다")
-    fun `second processing attempt fails due to state check`() {
+    @DisplayName("두 번째 처리 시도 시 AlreadyProcessed 결과가 반환된다 (멱등성)")
+    fun `second processing attempt returns AlreadyProcessed`() {
         // given
         val payment = createInProgressPayment()
         val transactionKey = payment.externalPaymentKey!!
@@ -195,22 +195,16 @@ class PaymentConcurrencyTest @Autowired constructor(
         }
 
         // when - 두 번째 처리 시도
-        var exceptionOccurred = false
-        var exceptionMessage = ""
-        try {
-            transactionTemplate.execute { _ ->
-                // PAID 상태에서 다시 confirmPayment() 호출 시도
-                val existingPayment = paymentService.findById(payment.id)
-                existingPayment.confirmPayment(transaction, currentTime = Instant.now()) // 여기서 예외 발생해야 함
-            }
-        } catch (e: Exception) {
-            exceptionOccurred = true
-            exceptionMessage = e.message ?: ""
+        val result = transactionTemplate.execute { _ ->
+            // PAID 상태에서 다시 confirmPayment() 호출 시도
+            val existingPayment = paymentService.findById(payment.id)
+            existingPayment.confirmPayment(transaction, currentTime = Instant.now())
         }
 
-        // then
-        assertThat(exceptionOccurred).isTrue()
-        assertThat(exceptionMessage).contains("결제 진행 중 상태에서만 확정할 수 있습니다")
+        // then - AlreadyProcessed 결과 반환 (예외 아님)
+        assertThat(result).isInstanceOf(Payment.ConfirmResult.AlreadyProcessed::class.java)
+        val alreadyProcessed = result as Payment.ConfirmResult.AlreadyProcessed
+        assertThat(alreadyProcessed.status).isEqualTo(PaymentStatus.PAID)
     }
 
     private fun createProduct(

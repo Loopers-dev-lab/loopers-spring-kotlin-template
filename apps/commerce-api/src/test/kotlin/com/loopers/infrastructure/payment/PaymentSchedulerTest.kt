@@ -4,10 +4,8 @@ import com.loopers.application.payment.PaymentFacade
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.support.values.Money
-import io.mockk.Runs
 import io.mockk.clearAllMocks
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
@@ -25,7 +23,7 @@ class PaymentSchedulerTest {
     @BeforeEach
     fun setUp() {
         clearAllMocks()
-        paymentFacade = mockk()
+        paymentFacade = mockk(relaxed = true)
         scheduler = PaymentScheduler(paymentFacade)
     }
 
@@ -37,15 +35,15 @@ class PaymentSchedulerTest {
         @DisplayName("IN_PROGRESS 결제가 있으면 Facade에 위임하여 처리한다")
         fun `delegates to Facade when IN_PROGRESS payments exist`() {
             // given
-            val payment = createMockPayment(id = 1L)
+            val paymentId = 1L
+            val payment = createMockPayment(id = paymentId)
             every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment)
-            every { paymentFacade.processInProgressPayment(payment.id) } just Runs
 
             // when
             scheduler.checkInProgressPayments()
 
             // then
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment.id) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId) }
         }
 
         @Test
@@ -65,20 +63,22 @@ class PaymentSchedulerTest {
         @DisplayName("여러 결제를 순차적으로 처리한다")
         fun `processes multiple payments sequentially`() {
             // given
-            val payment1 = createMockPayment(id = 1L)
-            val payment2 = createMockPayment(id = 2L)
-            val payment3 = createMockPayment(id = 3L)
+            val paymentId1 = 1L
+            val paymentId2 = 2L
+            val paymentId3 = 3L
+            val payment1 = createMockPayment(id = paymentId1)
+            val payment2 = createMockPayment(id = paymentId2)
+            val payment3 = createMockPayment(id = paymentId3)
 
             every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment1, payment2, payment3)
-            every { paymentFacade.processInProgressPayment(any<Long>()) } just Runs
 
             // when
             scheduler.checkInProgressPayments()
 
             // then
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment1.id) }
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment2.id) }
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment3.id) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId1) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId2) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId3) }
         }
     }
 
@@ -90,24 +90,23 @@ class PaymentSchedulerTest {
         @DisplayName("낙관적 락 충돌 시 해당 결제를 건너뛰고 다음 결제를 처리한다")
         fun `skips payment on optimistic lock conflict and continues with next`() {
             // given
-            val payment1 = createMockPayment(id = 1L)
-            val payment2 = createMockPayment(id = 2L)
+            val paymentId1 = 1L
+            val paymentId2 = 2L
+            val payment1 = createMockPayment(id = paymentId1)
+            val payment2 = createMockPayment(id = paymentId2)
 
             every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment1, payment2)
 
             // payment1 - 낙관적 락 충돌
-            every { paymentFacade.processInProgressPayment(payment1.id) } throws
-                    ObjectOptimisticLockingFailureException(Payment::class.java, payment1.id)
-
-            // payment2 - 정상 처리
-            every { paymentFacade.processInProgressPayment(payment2.id) } just Runs
+            every { paymentFacade.processInProgressPayment(paymentId1) } throws
+                ObjectOptimisticLockingFailureException(Payment::class.java, paymentId1)
 
             // when
             scheduler.checkInProgressPayments()
 
             // then
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment1.id) }
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment2.id) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId1) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId2) }
         }
     }
 
@@ -119,23 +118,22 @@ class PaymentSchedulerTest {
         @DisplayName("예상치 못한 예외 발생 시 해당 결제를 건너뛰고 다음 결제를 처리한다")
         fun `skips payment on unexpected exception and continues with next`() {
             // given
-            val payment1 = createMockPayment(id = 1L)
-            val payment2 = createMockPayment(id = 2L)
+            val paymentId1 = 1L
+            val paymentId2 = 2L
+            val payment1 = createMockPayment(id = paymentId1)
+            val payment2 = createMockPayment(id = paymentId2)
 
             every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment1, payment2)
 
             // payment1 - 예상치 못한 예외
-            every { paymentFacade.processInProgressPayment(payment1.id) } throws RuntimeException("Unexpected error")
-
-            // payment2 - 정상 처리
-            every { paymentFacade.processInProgressPayment(payment2.id) } just Runs
+            every { paymentFacade.processInProgressPayment(paymentId1) } throws RuntimeException("Unexpected error")
 
             // when
             scheduler.checkInProgressPayments()
 
             // then
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment1.id) }
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment2.id) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId1) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId2) }
         }
     }
 
@@ -147,24 +145,23 @@ class PaymentSchedulerTest {
         @DisplayName("PG 연결 실패 시 해당 결제를 건너뛰고 다음 결제를 처리한다")
         fun `skips payment on PG connection failure and continues with next`() {
             // given
-            val payment1 = createMockPayment(id = 1L)
-            val payment2 = createMockPayment(id = 2L)
+            val paymentId1 = 1L
+            val paymentId2 = 2L
+            val payment1 = createMockPayment(id = paymentId1)
+            val payment2 = createMockPayment(id = paymentId2)
 
             every { paymentFacade.findInProgressPayments(any()) } returns listOf(payment1, payment2)
 
             // payment1 - PG 연결 실패
-            every { paymentFacade.processInProgressPayment(payment1.id) } throws
-                    PgRequestNotReachedException("PG 연결 실패")
-
-            // payment2 - 정상 처리
-            every { paymentFacade.processInProgressPayment(payment2.id) } just Runs
+            every { paymentFacade.processInProgressPayment(paymentId1) } throws
+                PgRequestNotReachedException("PG 연결 실패")
 
             // when
             scheduler.checkInProgressPayments()
 
             // then
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment1.id) }
-            verify(exactly = 1) { paymentFacade.processInProgressPayment(payment2.id) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId1) }
+            verify(exactly = 1) { paymentFacade.processInProgressPayment(paymentId2) }
         }
     }
 
@@ -175,7 +172,7 @@ class PaymentSchedulerTest {
         status: PaymentStatus = PaymentStatus.IN_PROGRESS,
         createdAt: ZonedDateTime = ZonedDateTime.now().minusMinutes(2),
     ): Payment {
-        val payment = mockk<Payment>()
+        val payment = mockk<Payment>(relaxed = true)
         every { payment.id } returns id
         every { payment.userId } returns userId
         every { payment.orderId } returns orderId

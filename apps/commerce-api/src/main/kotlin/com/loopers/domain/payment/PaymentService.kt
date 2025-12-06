@@ -14,6 +14,7 @@ import java.time.ZonedDateTime
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
+    private val pgClient: PgClient,
 ) {
     /**
      * 결제를 생성합니다.
@@ -133,5 +134,96 @@ class PaymentService(
     fun findById(paymentId: Long): Payment {
         return paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
+    }
+
+    /**
+     * 주문 ID로 결제를 조회합니다.
+     *
+     * @param orderId 주문 ID
+     * @return Payment
+     * @throws CoreException 결제를 찾을 수 없는 경우
+     */
+    @Transactional(readOnly = true)
+    fun findByOrderId(orderId: Long): Payment {
+        return paymentRepository.findByOrderId(orderId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
+    }
+
+    /**
+     * PG 콜백 결과
+     */
+    sealed class CallbackResult {
+        /**
+         * 이미 처리된 결제 (멱등성)
+         */
+        data class AlreadyProcessed(val payment: Payment) : CallbackResult()
+
+        /**
+         * 새로 확정된 결제
+         */
+        data class Confirmed(val payment: Payment) : CallbackResult()
+    }
+
+    /**
+     * PG 콜백을 처리합니다.
+     * orderId로 결제를 조회하고, externalPaymentKey로 PG 트랜잭션을 조회하여 결제를 확정합니다.
+     *
+     * @param orderId 주문 ID
+     * @param externalPaymentKey PG 외부 결제 키
+     * @param currentTime 현재 시각 (타임아웃 판단용)
+     * @return CallbackResult - 결제 확정 결과
+     * @throws CoreException 결제를 찾을 수 없는 경우
+     */
+    @Transactional
+    fun processCallback(
+        orderId: Long,
+        externalPaymentKey: String,
+        currentTime: Instant = Instant.now(),
+    ): CallbackResult {
+        val payment = paymentRepository.findByOrderId(orderId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
+
+        val transaction = pgClient.findTransaction(externalPaymentKey)
+
+        return when (val result = payment.confirmPayment(transaction, currentTime = currentTime)) {
+            is Payment.ConfirmResult.AlreadyProcessed -> {
+                CallbackResult.AlreadyProcessed(payment)
+            }
+            is Payment.ConfirmResult.Confirmed -> {
+                paymentRepository.save(payment)
+                CallbackResult.Confirmed(payment)
+            }
+        }
+    }
+
+    /**
+     * IN_PROGRESS 상태의 결제를 처리합니다.
+     * 스케줄러에서 호출됩니다. orderId로 PG 트랜잭션을 조회하여 결제를 확정합니다.
+     *
+     * @param paymentId 결제 ID
+     * @param currentTime 현재 시각 (타임아웃 판단용)
+     * @return CallbackResult - 결제 확정 결과
+     * @throws CoreException 결제를 찾을 수 없는 경우
+     * @throws PgRequestNotReachedException PG 연결 실패 시
+     */
+    @Transactional
+    fun processInProgressPayment(
+        paymentId: Long,
+        currentTime: Instant = Instant.now(),
+    ): CallbackResult {
+        val payment = paymentRepository.findById(paymentId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
+
+        val transactions = pgClient.findTransactionsByOrderId(payment.orderId)
+
+        return when (val result = payment.confirmPayment(*transactions.toTypedArray(), currentTime = currentTime)) {
+            is Payment.ConfirmResult.AlreadyProcessed -> {
+                CallbackResult.AlreadyProcessed(payment)
+            }
+            is Payment.ConfirmResult.Confirmed -> {
+                paymentRepository.save(payment)
+                CallbackResult.Confirmed(payment)
+            }
+        }
     }
 }
