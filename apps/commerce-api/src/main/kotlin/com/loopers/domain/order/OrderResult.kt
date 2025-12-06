@@ -1,8 +1,5 @@
-package com.loopers.application.order
+package com.loopers.domain.order
 
-import com.loopers.domain.order.Order
-import com.loopers.domain.order.OrderDetail
-import com.loopers.domain.order.OrderStatus
 import java.time.ZonedDateTime
 
 object OrderResult {
@@ -73,4 +70,9 @@ object OrderResult {
             }
         }
     }
+
+    data class Create(
+        val order: Order,
+        val orderDetails: List<OrderDetail>,
+    )
 }

@@ -25,4 +25,16 @@ class CouponService(
         couponIssue.use()
         return coupon.calculateDiscount(totalAmount)
     }
+
+    @Transactional
+    fun rollback(userId: Long, couponId: Long?) {
+        if (couponId == null) {
+            return
+        }
+
+        val couponIssue = couponIssueRepository.findBy(userId, couponId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "사용자가 발급 받은 적 없는 쿠폰입니다. userId: $userId, couponId: $couponId")
+
+        couponIssue.rollback()
+    }
 }

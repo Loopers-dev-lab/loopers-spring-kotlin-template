@@ -2,8 +2,11 @@ package com.loopers.domain.product
 
 import com.loopers.IntegrationTest
 import com.loopers.domain.brand.Brand
+import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderCommand
+import com.loopers.domain.order.OrderDetail
 import com.loopers.infrastructure.brand.BrandJpaRepository
+import com.loopers.infrastructure.order.OrderJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
 import com.loopers.infrastructure.product.StockJpaRepository
 import com.loopers.support.error.CoreException
@@ -29,6 +32,9 @@ class ProductServiceTest : IntegrationTest() {
 
     @Autowired
     private lateinit var brandJpaRepository: BrandJpaRepository
+
+    @Autowired
+    private lateinit var orderJpaRepository: OrderJpaRepository
 
     @Autowired
     private lateinit var stockJpaRepository: StockJpaRepository
@@ -322,19 +328,22 @@ class ProductServiceTest : IntegrationTest() {
         @Test
         fun `여러 상품의 재고를 차감하고 DB에 저장한다`() {
             // given
+            val userId = 1L
             val brand = createAndSaveBrand("테스트브랜드")
             val product1 = createAndSaveProduct("상품1", 10000L, brand.id)
             val product2 = createAndSaveProduct("상품2", 20000L, brand.id)
             val stock1 = createAndSaveStock(100L, product1.id)
             val stock2 = createAndSaveStock(200L, product2.id)
+            val order = createAndSaveOrder(5000000L, userId)
 
-            val items = listOf(
-                OrderCommand.OrderDetailCommand(productId = product1.id, quantity = 10L),
-                OrderCommand.OrderDetailCommand(productId = product2.id, quantity = 20L),
+            val orderDetails = listOf(
+                OrderDetail.create(10L, brand, product1, order),
+                OrderDetail.create(20L, brand, product2, order),
             )
+
             // when
             transactionTemplate.execute {
-                productService.deductAllStock(items)
+                productService.deductAllStock(orderDetails)
             }
 
             // then
@@ -350,19 +359,21 @@ class ProductServiceTest : IntegrationTest() {
         @Test
         fun `동일 상품에 대한 중복 주문 항목 수량을 합산하여 차감한다`() {
             // given
+            val userId = 1L
             val brand = createAndSaveBrand("테스트브랜드")
             val product = createAndSaveProduct("상품1", 10000L, brand.id)
             val stock = createAndSaveStock(100L, product.id)
+            val order = createAndSaveOrder(5000000L, userId)
 
-            val items = listOf(
-                OrderCommand.OrderDetailCommand(productId = product.id, quantity = 10L),
-                OrderCommand.OrderDetailCommand(productId = product.id, quantity = 20L),
-                OrderCommand.OrderDetailCommand(productId = product.id, quantity = 30L),
+            val orderDetails = listOf(
+                OrderDetail.create(10L, brand, product, order),
+                OrderDetail.create(20L, brand, product, order),
+                OrderDetail.create(30L, brand, product, order),
             )
 
             // when
             transactionTemplate.execute {
-                productService.deductAllStock(items)
+                productService.deductAllStock(orderDetails)
             }
 
             // then
@@ -373,17 +384,19 @@ class ProductServiceTest : IntegrationTest() {
         @Test
         fun `재고가 부족하면 예외가 발생한다`() {
             // given
+            val userId = 1L
             val brand = createAndSaveBrand("테스트브랜드")
             val product = createAndSaveProduct("상품1", 10000L, brand.id)
             createAndSaveStock(10L, product.id)
+            val order = createAndSaveOrder(5000000L, userId)
 
-            val items = listOf(
-                OrderCommand.OrderDetailCommand(productId = product.id, quantity = 20L),
+            val orderDetails = listOf(
+                OrderDetail.create(20L, brand, product, order),
             )
 
             // when & then
             assertThatThrownBy {
-                productService.deductAllStock(items)
+                productService.deductAllStock(orderDetails)
             }
                 .isInstanceOf(CoreException::class.java)
                 .hasFieldOrPropertyWithValue("errorType", ErrorType.INSUFFICIENT_STOCK)
@@ -392,19 +405,22 @@ class ProductServiceTest : IntegrationTest() {
         @Test
         fun `재고 차감 중 예외가 발생하면 DB에 반영되지 않는다`() {
             // given
+            val userId = 1L
             val brand = createAndSaveBrand("테스트브랜드")
             val product1 = createAndSaveProduct("상품1", 10000L, brand.id)
             val product2 = createAndSaveProduct("상품2", 20000L, brand.id)
             val stock1 = createAndSaveStock(100L, product1.id)
             createAndSaveStock(10L, product2.id)
+            val order = createAndSaveOrder(5000000L, userId)
 
-            val items = listOf(
-                OrderCommand.OrderDetailCommand(productId = product1.id, quantity = 10L),
-                OrderCommand.OrderDetailCommand(productId = product2.id, quantity = 20L),
+            val orderDetails = listOf(
+                OrderDetail.create(10L, brand, product1, order),
+                OrderDetail.create(20L, brand, product2, order),
             )
+
             // when
             try {
-                productService.deductAllStock(items)
+                productService.deductAllStock(orderDetails)
                 stockJpaRepository.flush()
             } catch (e: CoreException) {
                 // 예외 무시
@@ -421,6 +437,10 @@ class ProductServiceTest : IntegrationTest() {
 
     private fun createAndSaveProduct(name: String, price: Long, brandId: Long): Product {
         return productJpaRepository.save(Product.create(name, price, brandId))
+    }
+
+    private fun createAndSaveOrder(totalAmunt: Long, userId: Long): Order {
+        return orderJpaRepository.save(Order.create(totalAmunt, userId))
     }
 
     private fun createAndSaveStock(quantity: Long, productId: Long): Stock {

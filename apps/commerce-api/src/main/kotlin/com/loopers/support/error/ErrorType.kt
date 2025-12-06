@@ -18,8 +18,12 @@ enum class ErrorType(val status: HttpStatus, val code: String, val message: Stri
 
     /** 주문 에러 */
     ORDER_NOT_COMPLETABLE(HttpStatus.CONFLICT, "ORDER_NOT_COMPLETABLE", "대기 중인 주문만 완료 처리할 수 있습니다."),
+    ORDER_NOT_PAYMENT_FAILED(HttpStatus.CONFLICT, "ORDER_NOT_PAYMENT_FAILED", "대기 중인 주문만 결제 실패 처리할 수 있습니다."),
     ORDER_NOT_CANCELLABLE(HttpStatus.CONFLICT, "ORDER_NOT_CANCELLABLE", "대기 중인 주문만 취소할 수 있습니다."),
 
     /** 쿠폰 에러 */
     COUPON_ALREADY_USED(HttpStatus.CONFLICT, "COUPON_IS_USED", "이미 사용된 쿠폰입니다."),
+
+    /** PG 에러 */
+    PG_SYSTEM_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "PG_SYSTEM_ERROR", "결제 시스템에 일시적인 오류가 발생했습니다."),
 }

@@ -18,6 +18,12 @@ class OrderService(
     }
 
     @Transactional(readOnly = true)
+    fun getById(id: Long): Order {
+        return orderRepository.findById(id)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다: $id")
+    }
+
+    @Transactional(readOnly = true)
     fun getOrder(id: Long, userId: Long): Order {
         val order = orderRepository.findById(id) ?: throw CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다: $id")
 
@@ -47,20 +53,42 @@ class OrderService(
     }
 
     @Transactional
-    fun createOrder(param: OrderCommand.Create) {
+    fun createOrder(command: OrderCommand.Create): OrderResult.Create {
         val order = orderRepository.save(
             Order.create(
-                totalAmount = param.totalAmount,
-                userId = param.userId,
+                totalAmount = command.totalAmount,
+                userId = command.userId,
+                couponId = command.couponId,
+                status = command.status,
             ),
         )
 
         val orderDetails = OrderDetail.create(
-            items = param.items,
-            brands = param.brands,
-            products = param.products,
+            items = command.items,
+            brands = command.brands,
+            products = command.products,
             order = order,
         )
         orderRepository.saveAllOrderDetail(orderDetails)
+        return OrderResult.Create(
+            order = order,
+            orderDetails = orderDetails,
+        )
+    }
+
+    fun update(orderId: Long, orderStatus: OrderStatus) {
+        orderRepository.update(orderId, orderStatus)
+    }
+
+    @Transactional
+    fun complete(orderId: Long) {
+        val order = getById(orderId)
+        order.complete()
+    }
+
+    @Transactional
+    fun fail(orderId: Long) {
+        val order = getById(orderId)
+        order.paymentFailed()
     }
 }

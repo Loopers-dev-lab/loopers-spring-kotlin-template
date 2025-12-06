@@ -4,19 +4,21 @@ import com.loopers.domain.brand.BrandService
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderCommand
+import com.loopers.domain.order.OrderResult
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.payment.CardType
+import com.loopers.domain.payment.PaymentMethod
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PgService
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.Gender
 import com.loopers.domain.user.UserService
-import com.loopers.support.fixtures.BrandFixtures
 import com.loopers.support.fixtures.BrandFixtures.createBrand
 import com.loopers.support.fixtures.OrderFixtures.createOrder
 import com.loopers.support.fixtures.OrderFixtures.createOrderDetail
-import com.loopers.support.fixtures.ProductFixtures
 import com.loopers.support.fixtures.ProductFixtures.createProduct
-import com.loopers.support.fixtures.UserFixtures
 import com.loopers.support.fixtures.UserFixtures.createUser
 import io.mockk.every
 import io.mockk.justRun
@@ -40,7 +42,9 @@ class OrderFacadeTest {
     private val brandService: BrandService = mockk()
     private val productService: ProductService = mockk()
     private val pointService: PointService = mockk()
-    private val orderFacade = OrderFacade(couponService, orderService, userService, brandService, productService, pointService)
+    private val paymentService: PaymentService = mockk()
+    private val pgService: PgService = mockk()
+    private val orderFacade = OrderFacade(couponService, orderService, userService, brandService, productService, pointService, paymentService, pgService)
 
     private val pageable: Pageable = PageRequest.of(0, 20)
 
@@ -54,7 +58,7 @@ class OrderFacadeTest {
             val userId = "1"
             val userIdLong = 1L
 
-            val user = UserFixtures.createUser(userIdLong, "userId", "test@example.com", "1990-01-01", Gender.MALE)
+            val user = createUser(userIdLong, "userId", "test@example.com", "1990-01-01", Gender.MALE)
 
             val order1 = createOrder(1L, OrderStatus.PENDING, 10000L, userIdLong)
             val order2 = createOrder(2L, OrderStatus.COMPLETED, 20000L, userIdLong)
@@ -154,15 +158,19 @@ class OrderFacadeTest {
     inner class PlaceOrder {
 
         @Test
-        fun `주문 생성 시 모든 서비스가 올바른 순서로 호출된다`() {
+        fun `포인트 결제로 주문 생성 시 모든 서비스가 올바른 순서로 호출된다`() {
             // given
             val userId = "user123"
             val userIdLong = 1L
+            val orderId = 1L
             val couponId = 100L
 
-            val user = UserFixtures.createUser(id = userIdLong)
-            val brand = BrandFixtures.createBrand(id = 1L)
-            val product = ProductFixtures.createProduct(id = 1L, brandId = 1L)
+            val user = createUser(id = userIdLong)
+            val brand = createBrand(id = 1L)
+            val product = createProduct(id = 1L, brandId = 1L)
+            val order = createOrder(id = orderId)
+            val orderDetail = createOrderDetail(1L, 1L, brand, product, order)
+            val orderResult = OrderResult.Create(order = order, orderDetails = listOf(orderDetail))
             val items = listOf(OrderCommand.OrderDetailCommand(productId = 1L, quantity = 1))
             val totalAmount = 10000L
             val discountAmount = 1000L
@@ -171,26 +179,98 @@ class OrderFacadeTest {
             every { userService.getMyInfo(userId) } returns user
             every { productService.getProducts(any()) } returns listOf(product)
             justRun { productService.validateProductsExist(any(), any()) }
+            justRun { productService.validateStockAvailability(any()) }
             every { brandService.getAllBrand(any()) } returns listOf(brand)
             every { orderService.calculateTotalAmount(any(), any()) } returns totalAmount
             every { couponService.applyCoupon(any(), any(), any()) } returns discountAmount
             justRun { pointService.use(any(), any()) }
             justRun { productService.deductAllStock(any()) }
-            justRun { orderService.createOrder(any()) }
+            every { orderService.createOrder(any()) } returns orderResult
 
             // when
-            orderFacade.placeOrder(userId, couponId, items)
+            orderFacade.placeOrder(
+                OrderCommand.Place(
+                    userId = userId,
+                    couponId = couponId,
+                    items = items,
+                    paymentMethod = PaymentMethod.POINT,
+                ),
+            )
 
             // then - 호출 순서 검증
             verify(exactly = 1) { userService.getMyInfo(userId) }
             verify(exactly = 1) { productService.getProducts(any()) }
             verify(exactly = 1) { productService.validateProductsExist(any(), any()) }
+            verify(exactly = 1) { productService.validateStockAvailability(any()) }
             verify(exactly = 1) { brandService.getAllBrand(any()) }
             verify(exactly = 1) { orderService.calculateTotalAmount(any(), any()) }
             verify(exactly = 1) { couponService.applyCoupon(userIdLong, couponId, totalAmount) }
             verify(exactly = 1) { pointService.use(userIdLong, finalTotalAmount) }
-            verify(exactly = 1) { productService.deductAllStock(items) }
+            verify(exactly = 1) { productService.deductAllStock(any()) }
             verify(exactly = 1) { orderService.createOrder(any()) }
+        }
+
+        @Test
+        fun `카드 결제로 주문 생성 시 모든 서비스가 올바른 순서로 호출된다`() {
+            // given
+            val userId = "user123"
+            val userIdLong = 1L
+            val orderId = 1L
+            val couponId = 100L
+            val cardType = CardType.KB
+            val cardNo = "1234-5678-9814-1451"
+            val transactionKey = "txn_123"
+
+            val user = createUser(id = userIdLong)
+            val brand = createBrand(id = 1L)
+            val product = createProduct(id = 1L, brandId = 1L)
+            val order = createOrder(id = orderId)
+            val orderDetail = createOrderDetail(1L, 1L, brand, product, order)
+            val orderResult = OrderResult.Create(order = order, orderDetails = listOf(orderDetail))
+            val payment = mockk<com.loopers.domain.payment.Payment>(relaxed = true)
+            val items = listOf(OrderCommand.OrderDetailCommand(productId = 1L, quantity = 1))
+            val totalAmount = 10000L
+            val discountAmount = 1000L
+
+            every { userService.getMyInfo(userId) } returns user
+            every { productService.getProducts(any()) } returns listOf(product)
+            justRun { productService.validateProductsExist(any(), any()) }
+            justRun { productService.validateStockAvailability(any()) }
+            every { brandService.getAllBrand(any()) } returns listOf(brand)
+            every { orderService.calculateTotalAmount(any(), any()) } returns totalAmount
+            every { couponService.applyCoupon(any(), any(), any()) } returns discountAmount
+            every { orderService.createOrder(any()) } returns orderResult
+            every { paymentService.create(any()) } returns payment
+            every { payment.id } returns 1L
+            every { pgService.requestPayment(any()) } returns transactionKey
+            justRun { paymentService.updateTransactionKey(any(), any()) }
+
+            // when
+            orderFacade.placeOrder(
+                OrderCommand.Place(
+                    userId = userId,
+                    couponId = couponId,
+                    items = items,
+                    paymentMethod = PaymentMethod.CARD,
+                    cardType = cardType,
+                    cardNo = cardNo,
+                ),
+            )
+
+            // then - 호출 순서 검증
+            verify(exactly = 1) { userService.getMyInfo(userId) }
+            verify(exactly = 1) { productService.getProducts(any()) }
+            verify(exactly = 1) { productService.validateProductsExist(any(), any()) }
+            verify(exactly = 1) { productService.validateStockAvailability(any()) }
+            verify(exactly = 1) { brandService.getAllBrand(any()) }
+            verify(exactly = 1) { orderService.calculateTotalAmount(any(), any()) }
+            verify(exactly = 1) { couponService.applyCoupon(userIdLong, couponId, totalAmount) }
+            verify(exactly = 1) { orderService.createOrder(any()) }
+            verify(exactly = 1) { paymentService.create(any()) }
+            verify(exactly = 1) { pgService.requestPayment(any()) }
+            verify(exactly = 1) { paymentService.updateTransactionKey(any(), any()) }
+            // 카드 결제는 재고 차감이 콜백에서 발생하므로 여기서는 호출되지 않음
+            verify(exactly = 0) { productService.deductAllStock(any()) }
         }
     }
 }

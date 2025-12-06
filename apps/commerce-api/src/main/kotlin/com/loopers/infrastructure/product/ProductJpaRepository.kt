@@ -13,7 +13,7 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
         value = """
         SELECT p
         FROM ProductLikeCount plc
-        JOIN Product p ON p.id = plc.productId
+        RIGHT JOIN Product p ON p.id = plc.productId
         WHERE p.brandId = :brandId
         ORDER BY plc.likeCount DESC
     """,
@@ -31,7 +31,7 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
         value = """
         SELECT p
         FROM ProductLikeCount plc
-        JOIN Product p ON p.id = plc.productId
+        RIGHT JOIN Product p ON p.id = plc.productId
         ORDER BY plc.likeCount DESC
     """,
         countQuery = """

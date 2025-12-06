@@ -21,23 +21,27 @@ class Order(
 
     @Column(name = "status", nullable = false)
     @Enumerated(value = STRING)
-    var status: OrderStatus,
+    var status: OrderStatus = OrderStatus.PENDING,
 
     @Column(nullable = false)
     val totalAmount: Long,
 
     @Column(name = "ref_user_id", nullable = false)
     val userId: Long,
+
+    @Column(name = "ref_coupon_id", nullable = true)
+    val couponId: Long? = null,
 ) : BaseEntity() {
 
     companion object {
-        fun create(totalAmount: Long, userId: Long): Order {
+        fun create(totalAmount: Long, userId: Long, couponId: Long? = null, status: OrderStatus = OrderStatus.PENDING): Order {
             require(totalAmount > 0) { "주문 총액은 0보다 커야 합니다." }
 
             return Order(
-                status = OrderStatus.PENDING,
+                status = status,
                 totalAmount = totalAmount,
                 userId = userId,
+                couponId = couponId,
             )
         }
     }
@@ -53,6 +57,13 @@ class Order(
             throw CoreException(ErrorType.ORDER_NOT_COMPLETABLE)
         }
         this.status = OrderStatus.COMPLETED
+    }
+
+    fun paymentFailed() {
+        if (status != OrderStatus.PENDING) {
+            throw CoreException(ErrorType.ORDER_NOT_PAYMENT_FAILED)
+        }
+        this.status = OrderStatus.PAYMENT_FAILED
     }
 
     fun cancel() {

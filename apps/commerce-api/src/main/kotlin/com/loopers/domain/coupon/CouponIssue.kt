@@ -52,6 +52,12 @@ class CouponIssue(
         this.usedAt = ZonedDateTime.now()
     }
 
+    fun rollback() {
+        require(status == CouponStatus.USED) { "사용된 쿠폰만 롤백할 수 있습니다" }
+        this.status = CouponStatus.ISSUED
+        this.usedAt = null
+    }
+
     private fun isUsable(): Boolean {
         return status == CouponStatus.ISSUED
     }

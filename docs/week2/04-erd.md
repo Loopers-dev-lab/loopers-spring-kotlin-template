@@ -47,9 +47,10 @@ erDiagram
 %% 주문
     ORDER {
         bigint id PK "주문 기본키"
-        varchar status "주문 상태 (PENDING, COMPLETED, CANCELLED)"
+        varchar status "주문 상태 (PENDING, COMPLETED, CANCELLED, PAYMENT_FAILED)"
         bigint total_amount "총 주문 금액"
         bigint ref_user_id FK "주문자 ID (USER 참조)"
+        bigint ref_coupon_id FK "쿠폰 ID (COUPON 참조) - nullable"
         timestamp created_at "생성일시"
         timestamp updated_at "수정일시"
         timestamp deleted_at "삭제일시"
@@ -65,6 +66,22 @@ erDiagram
         bigint ref_brand_id FK "브랜드 ID (BRAND 참조)"
         bigint ref_product_id FK "상품 ID (PRODUCT 참조)"
         bigint ref_order_id FK "주문 ID (ORDER 참조)"
+        timestamp created_at "생성일시"
+        timestamp updated_at "수정일시"
+        timestamp deleted_at "삭제일시"
+    }
+
+%% 결제
+    PAYMENT {
+        bigint id PK "결제 기본키"
+        varchar transaction_key "PG 트랜잭션 key"
+        varchar card_type "카드 종류"
+        varchar card_no "카드 번호"
+        bigint amount "결제 금액"
+        varchar status "결제 상태 (PENDING, COMPLETED, FAILED, TIMEOUT)"
+        varchar reason "결제 사유"
+        bigint ref_order_id FK "주문 ID (ORDER 참조)"
+        bigint ref_user_id FK "사용자 ID (USER 참조)"
         timestamp created_at "생성일시"
         timestamp updated_at "수정일시"
         timestamp deleted_at "삭제일시"
@@ -88,14 +105,43 @@ erDiagram
         timestamp deleted_at "삭제일시"
     }
 
+%% 쿠폰
+    COUPON {
+        bigint id PK "쿠폰 기본키"
+        varchar name "쿠폰명"
+        varchar discount_type "할인 타입 (FIXED, RATE)"
+        bigint discount_value "할인 값"
+        timestamp created_at "생성일시"
+        timestamp updated_at "수정일시"
+        timestamp deleted_at "삭제일시"
+    }
+
+%% 쿠폰 발급
+    COUPON_ISSUE {
+        bigint id PK "쿠폰 발급 기본키"
+        bigint ref_coupon_id FK "쿠폰 ID (COUPON 참조)"
+        bigint ref_user_id FK "사용자 ID (USER 참조)"
+        varchar status "쿠폰 상태 (ISSUED, USED)"
+        timestamp used_at "사용일시"
+        timestamp issued_at "발급일시"
+        bigint version "낙관적 락 버전"
+        timestamp created_at "생성일시"
+        timestamp updated_at "수정일시"
+        timestamp deleted_at "삭제일시"
+    }
+
 %% 관계
     USER ||--o{ ORDER: "주문"
     USER ||--|| POINT: "보유"
+    USER ||--o{ COUPON_ISSUE: "보유"
     BRAND ||--o{ PRODUCT: "소속"
     PRODUCT ||--|| STOCK: "재고"
     PRODUCT ||--o{ PRODUCT_LIKE: "좋아요"
     PRODUCT ||--o{ ORDER_DETAIL: "포함됨"
     ORDER ||--|{ ORDER_DETAIL: "주문 상품"
+    ORDER ||--o{ PAYMENT: "결제 정보"
+    ORDER ||--o| COUPON_ISSUE: "사용"
+    COUPON ||--o{ COUPON_ISSUE: "발급"
 ```
 
 # 🗂️ 테이블별 인덱스 & 제약조건
@@ -219,5 +265,49 @@ erDiagram
 **인덱스**
 
 - `idx_point_user_id` (`user_id`)
+
+---
+
+## COUPON
+
+**제약조건**
+
+- PRIMARY KEY: `id`
+
+**인덱스**
+
+- 없음 (기본 PK 인덱스만 사용)
+
+---
+
+## COUPON_ISSUE
+
+**제약조건**
+
+- PRIMARY KEY: `id`
+- FOREIGN KEY: `coupon_id` → `COUPON(id)`
+- FOREIGN KEY: `user_id` → `USER(id)`
+- UNIQUE: (`user_id`, `coupon_id`) - 사용자당 쿠폰 1회만 발급
+
+**인덱스**
+
+- `idx_coupon_issue_user_id` (`user_id`) - 사용자별 쿠폰 조회
+- `idx_coupon_issue_coupon_id` (`coupon_id`) - 쿠폰별 발급 내역 조회
+
+---
+
+## PAYMENT
+
+**제약조건**
+
+- PRIMARY KEY: `id`
+- FOREIGN KEY: `order_id` → `ORDER(id)`
+- FOREIGN KEY: `user_id` → `USER(id)`
+
+**인덱스**
+
+- `idx_payment_order_id` (`order_id`) - 주문별 결제 조회
+- `idx_payment_user_id` (`user_id`) - 사용자별 결제 내역
+- `idx_payment_status` (`status`) - 상태별 결제 조회
 
 ---
