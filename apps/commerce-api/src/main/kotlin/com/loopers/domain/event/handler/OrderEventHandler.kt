@@ -94,9 +94,6 @@ class OrderEventHandler(
 
             logger.info("주문 상태 업데이트 완료: orderId=${event.orderId}, status=${order.status}")
 
-            // 데이터 플랫폼에 결제 완료 정보 전송
-            dataPlatformClient.sendPaymentCompleted(event)
-
             // 유저 행동 로깅
             eventPublisher.publishEvent(
                 UserActionEvent(
@@ -113,6 +110,23 @@ class OrderEventHandler(
         } catch (e: Exception) {
             logger.error("주문 상태 업데이트 실패: orderId=${event.orderId}", e)
             throw e
+        }
+    }
+
+    /**
+     * 결제 완료 후 데이터 플랫폼 전송
+     * 트랜잭션 커밋 후 비동기로 처리
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun handlePaymentCompletedForDataPlatform(event: PaymentCompletedEvent) {
+        try {
+            logger.info("결제 완료 데이터 플랫폼 전송 시작: orderId=${event.orderId}, paymentId=${event.paymentId}")
+            dataPlatformClient.sendPaymentCompleted(event)
+            logger.info("결제 완료 데이터 플랫폼 전송 완료: orderId=${event.orderId}")
+        } catch (e: Exception) {
+            // 데이터 플랫폼 전송 실패는 주문에 영향을 주지 않음
+            logger.error("결제 완료 데이터 플랫폼 전송 실패: orderId=${event.orderId}", e)
         }
     }
 

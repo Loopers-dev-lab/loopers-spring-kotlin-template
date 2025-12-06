@@ -1,6 +1,6 @@
 package com.loopers.domain.event
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 /**
  * 유저 행동 이벤트
@@ -12,7 +12,7 @@ data class UserActionEvent(
     val targetType: String,
     val targetId: Long?,
     val metadata: Map<String, Any>? = null,
-    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val createdAt: ZonedDateTime = ZonedDateTime.now(),
 )
 
 /**
