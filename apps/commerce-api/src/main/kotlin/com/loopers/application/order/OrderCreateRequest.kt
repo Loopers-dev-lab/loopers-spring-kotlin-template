@@ -6,7 +6,21 @@ import com.loopers.support.error.ErrorType
 data class OrderCreateRequest(
     val items: List<OrderItemRequest>,
     val couponId: Long? = null,
-)
+    // POINT, CARD or MIXED
+    val paymentMethod: String = "POINT",
+    val cardType: String? = null,
+    val cardNo: String? = null,
+) {
+    init {
+        val allowedPaymentMethods = setOf("POINT", "CARD", "MIXED")
+        if (paymentMethod !in allowedPaymentMethods) {
+            throw CoreException(
+                ErrorType.BAD_REQUEST,
+                "유효하지 않은 결제 방법입니다: $paymentMethod. 허용된 값: ${allowedPaymentMethods.joinToString(", ")}",
+            )
+        }
+    }
+}
 
 data class OrderItemRequest(
     val productId: Long,

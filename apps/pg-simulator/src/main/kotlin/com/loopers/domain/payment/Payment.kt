@@ -18,7 +18,7 @@ import java.time.LocalDateTime
         Index(name = "idx_user_transaction", columnList = "user_id, transaction_key"),
         Index(name = "idx_user_order", columnList = "user_id, order_id"),
         Index(name = "idx_unique_user_order_transaction", columnList = "user_id, order_id, transaction_key", unique = true),
-    ]
+    ],
 )
 class Payment(
     @Id

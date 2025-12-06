@@ -23,6 +23,7 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+      - resilience.yml
 
 springdoc:
   use-fqn: true
