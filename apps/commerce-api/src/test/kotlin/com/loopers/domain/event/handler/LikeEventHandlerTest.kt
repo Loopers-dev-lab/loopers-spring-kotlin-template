@@ -2,6 +2,7 @@ package com.loopers.domain.event.handler
 
 import com.loopers.domain.event.LikeAddedEvent
 import com.loopers.domain.event.LikeRemovedEvent
+import com.loopers.domain.event.UserActionEvent
 import com.loopers.domain.product.ProductCacheRepository
 import com.loopers.domain.product.ProductLikeCountService
 import io.mockk.every
@@ -38,12 +39,20 @@ class LikeEventHandlerTest {
                 createdAt = LocalDateTime.now(),
             )
 
-            justRun { productLikeCountService.increment(100L) }
+            every { productLikeCountService.increment(100L) } returns 5L
+            every { productCacheRepository.buildProductDetailCacheKey(100L) } returns "product:detail:100"
+            every { productCacheRepository.getProductListCachePattern() } returns "product:list:*"
 
-            // when & then (예외가 발생하지 않아야 함)
+            // when
             likeEventHandler.handleLikeAdded(event)
 
-            // verify는 relaxed mock으로 인해 정확한 호출 검증이 어려우므로 생략
+            // then
+            verify(exactly = 1) { productLikeCountService.increment(100L) }
+            verify(exactly = 1) { productCacheRepository.buildProductDetailCacheKey(100L) }
+            verify(exactly = 1) { productCacheRepository.delete("product:detail:100") }
+            verify(exactly = 1) { productCacheRepository.getProductListCachePattern() }
+            verify(exactly = 1) { productCacheRepository.deleteByPattern("product:list:*") }
+            verify(exactly = 1) { eventPublisher.publishEvent(ofType(UserActionEvent::class)) }
         }
 
         @DisplayName("집계 처리 실패 시에도 예외가 전파되지 않는다")
@@ -97,12 +106,20 @@ class LikeEventHandlerTest {
                 createdAt = LocalDateTime.now(),
             )
 
-            justRun { productLikeCountService.decrement(100L) }
+            every { productLikeCountService.decrement(100L) } returns 4L
+            every { productCacheRepository.buildProductDetailCacheKey(100L) } returns "product:detail:100"
+            every { productCacheRepository.getProductListCachePattern() } returns "product:list:*"
 
-            // when & then (예외가 발생하지 않아야 함)
+            // when
             likeEventHandler.handleLikeRemoved(event)
 
-            // verify는 relaxed mock으로 인해 정확한 호출 검증이 어려우므로 생략
+            // then
+            verify(exactly = 1) { productLikeCountService.decrement(100L) }
+            verify(exactly = 1) { productCacheRepository.buildProductDetailCacheKey(100L) }
+            verify(exactly = 1) { productCacheRepository.delete("product:detail:100") }
+            verify(exactly = 1) { productCacheRepository.getProductListCachePattern() }
+            verify(exactly = 1) { productCacheRepository.deleteByPattern("product:list:*") }
+            verify(exactly = 1) { eventPublisher.publishEvent(ofType(UserActionEvent::class)) }
         }
 
         @DisplayName("집계 처리 실패 시에도 예외가 전파되지 않는다")

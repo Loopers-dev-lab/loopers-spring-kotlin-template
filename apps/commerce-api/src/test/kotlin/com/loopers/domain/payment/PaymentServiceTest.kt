@@ -1,5 +1,7 @@
 package com.loopers.domain.payment
 
+import com.loopers.domain.event.PaymentCompletedEvent
+import com.loopers.domain.event.PaymentFailedEvent
 import com.loopers.infrastructure.payment.client.CardTypeDto
 import com.loopers.infrastructure.payment.client.PgApiResponse
 import com.loopers.infrastructure.payment.client.PgClient
@@ -258,6 +260,7 @@ class PaymentServiceTest {
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.COMPLETED)
             verify(exactly = 1) { paymentRepository.save(payment) }
+            verify(exactly = 1) { eventPublisher.publishEvent(ofType(PaymentCompletedEvent::class)) }
         }
 
         @DisplayName("결제 실패 시 결제를 실패 처리하고 이벤트를 발행한다")
@@ -272,17 +275,15 @@ class PaymentServiceTest {
                 cardType = "SAMSUNG",
                 cardNo = "1234-5678-9012-3456",
             )
-
             every { paymentRepository.findByTransactionKey("txn_123456") } returns payment
             every { paymentRepository.save(any()) } answers { firstArg() }
-
             // when
             paymentService.handlePaymentCallback("txn_123456", TransactionStatusDto.FAILED, "카드 한도 초과")
-
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(payment.failureReason).isEqualTo("카드 한도 초과")
             verify(exactly = 1) { paymentRepository.save(payment) }
+            verify(exactly = 1) { eventPublisher.publishEvent(ofType(PaymentFailedEvent::class)) }
         }
 
         @DisplayName("결제 대기 상태는 아무 처리도 하지 않는다")
