@@ -1,7 +1,6 @@
 package com.loopers.integration
 
 import com.loopers.application.order.OrderFacade
-import com.loopers.application.order.PaymentResultHandler
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.payment.Payment
@@ -47,7 +46,6 @@ import java.time.Instant
 class PaymentIdempotencyTest @Autowired constructor(
     private val webhookController: PaymentWebhookController,
     private val paymentService: PaymentService,
-    private val paymentResultHandler: PaymentResultHandler,
     private val orderFacade: OrderFacade,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
@@ -83,7 +81,7 @@ class PaymentIdempotencyTest @Autowired constructor(
             )
 
             // 결제 성공 처리 (첫 번째 콜백)
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(transaction),
                 currentTime = Instant.now(),
@@ -121,13 +119,6 @@ class PaymentIdempotencyTest @Autowired constructor(
             val transactionKey = payment.externalPaymentKey!!
 
             // 결제 실패 처리
-            val order = orderRepository.findById(payment.orderId)!!
-            val orderItems = order.orderItems.map {
-                PaymentResultHandler.OrderItemInfo(
-                    productId = it.productId,
-                    quantity = it.quantity,
-                )
-            }
             val failedTransaction = createTransaction(
                 transactionKey = transactionKey,
                 orderId = payment.orderId,
@@ -135,11 +126,10 @@ class PaymentIdempotencyTest @Autowired constructor(
                 status = PgTransactionStatus.FAILED,
                 failureReason = "테스트 실패",
             )
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(failedTransaction),
                 currentTime = Instant.now(),
-                orderItems = orderItems,
             )
 
             // 동일한 콜백 요청

@@ -16,18 +16,15 @@ import com.loopers.domain.payment.PgPaymentRequest
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointService
+import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductView
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
 import jakarta.annotation.PostConstruct
-import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.orm.ObjectOptimisticLockingFailureException
-import org.springframework.retry.RetryCallback
-import org.springframework.retry.RetryContext
-import org.springframework.retry.RetryListener
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
@@ -41,13 +38,11 @@ class OrderFacade(
     val couponService: CouponService,
     val paymentService: PaymentService,
     val pgClient: PgClient,
-    val paymentResultHandler: PaymentResultHandler,
     private val transactionTemplate: TransactionTemplate,
     private val cacheTemplate: CacheTemplate,
     @Value("\${pg.callback-base-url}")
     private val callbackBaseUrl: String,
 ) {
-    private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
     private lateinit var retryTemplate: RetryTemplate
 
     @PostConstruct
@@ -56,22 +51,6 @@ class OrderFacade(
             .maxAttempts(2)
             .uniformRandomBackoff(100, 500)
             .retryOn(ObjectOptimisticLockingFailureException::class.java)
-            .withListener(
-                object : RetryListener {
-                    override fun <T : Any?, E : Throwable?> onError(
-                        context: RetryContext,
-                        callback: RetryCallback<T, E>,
-                        throwable: Throwable,
-                    ) {
-                        if (throwable is ObjectOptimisticLockingFailureException) {
-                            logger.warn(
-                                "낙관적 락 충돌 발생 - 재시도 횟수: {}",
-                                context.retryCount,
-                            )
-                        }
-                    }
-                },
-            )
             .build()
     }
 
@@ -128,11 +107,6 @@ class OrderFacade(
             is PgPaymentCreateResult.Uncertain -> {
                 // 타임아웃 등으로 응답을 받지 못한 경우
                 // IN_PROGRESS로 전이하고 스케줄러가 나중에 처리
-                logger.warn(
-                    "PG 응답 불확실 - paymentId: {}",
-                    allocationResult.payment.id,
-                )
-
                 // PENDING → IN_PROGRESS (transactionKey 없이)
                 transactionTemplate.execute { _ ->
                     paymentService.initiatePayment(
@@ -216,12 +190,6 @@ class OrderFacade(
                 orderId = order.id,
                 payment = payment,
                 productViews = productViews,
-                orderItems = criteria.items.map {
-                    PaymentResultHandler.OrderItemInfo(
-                        productId = it.productId,
-                        quantity = it.quantity,
-                    )
-                },
             )
         }!!
     }
@@ -251,7 +219,7 @@ class OrderFacade(
     /**
      * PG 성공 처리
      * - PENDING → IN_PROGRESS (initiate with Accepted)
-     * - IN_PROGRESS → PAID (confirmPayment via handlePaymentResult)
+     * - IN_PROGRESS → PAID (confirmPayment)
      */
     private fun handlePgSuccess(
         allocationResult: ResourceAllocationResult,
@@ -273,12 +241,21 @@ class OrderFacade(
                 amount = allocationResult.payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
-            paymentResultHandler.handlePaymentResult(
+            val payment = paymentService.confirmPayment(
                 paymentId = allocationResult.payment.id,
                 transactions = listOf(successTransaction),
                 currentTime = Instant.now(),
-                orderItems = allocationResult.orderItems,
             )
+
+            when (payment.status) {
+                PaymentStatus.PAID -> orderService.completePayment(payment.orderId)
+                PaymentStatus.FAILED -> {
+                    recoverResources(payment)
+                    orderService.cancelOrder(payment.orderId)
+                }
+
+                else -> {}
+            }
         }
 
         updateProductCache(allocationResult.productViews)
@@ -312,20 +289,31 @@ class OrderFacade(
         transactions: List<PgTransaction>,
         currentTime: Instant,
     ) {
-        val payment = paymentService.findById(paymentId)
-        val order = orderService.findById(payment.orderId)
-        val orderItems = order.orderItems.map {
-            PaymentResultHandler.OrderItemInfo(
-                productId = it.productId,
-                quantity = it.quantity,
-            )
+        val payment = paymentService.confirmPayment(paymentId, transactions, currentTime)
+        if (payment.status == PaymentStatus.PAID) {
+            orderService.completePayment(payment.orderId)
+            return
         }
-        paymentResultHandler.handlePaymentResult(
-            paymentId = paymentId,
-            transactions = transactions,
-            currentTime = currentTime,
-            orderItems = orderItems,
-        )
+
+        recoverResources(payment)
+        orderService.cancelOrder(payment.orderId)
+    }
+
+    /**
+     * 리소스 복구 (포인트, 쿠폰, 재고)
+     */
+    private fun recoverResources(payment: Payment) {
+        if (payment.usedPoint > Money.ZERO_KRW) {
+            pointService.restore(payment.userId, payment.usedPoint)
+        }
+        payment.issuedCouponId?.let { couponId ->
+            couponService.cancelCouponUse(couponId)
+        }
+        val order = orderService.findById(payment.orderId)
+        val increaseUnits = order.orderItems.map {
+            ProductCommand.IncreaseStockUnit(productId = it.productId, amount = it.quantity)
+        }
+        productService.increaseStocks(ProductCommand.IncreaseStocks(units = increaseUnits))
     }
 
     /**
@@ -335,6 +323,5 @@ class OrderFacade(
         val orderId: Long,
         val payment: Payment,
         val productViews: List<ProductView>,
-        val orderItems: List<PaymentResultHandler.OrderItemInfo>,
     )
 }

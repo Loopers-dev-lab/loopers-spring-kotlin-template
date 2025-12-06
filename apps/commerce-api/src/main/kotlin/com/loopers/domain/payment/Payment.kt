@@ -101,7 +101,7 @@ class Payment(
 
         when (result) {
             is PgPaymentCreateResult.Accepted -> externalPaymentKey = result.transactionKey
-            is PgPaymentCreateResult.Uncertain -> { /* externalPaymentKey remains null */ }
+            else -> {}
         }
     }
 
@@ -128,11 +128,13 @@ class Payment(
                 status = PaymentStatus.PAID
                 externalPaymentKey = matched.transactionKey
             }
+
             matched?.status == PgTransactionStatus.FAILED -> {
                 status = PaymentStatus.FAILED
                 externalPaymentKey = matched.transactionKey
                 failureMessage = matched.failureReason
             }
+
             isTimedOut(currentTime) -> {
                 status = PaymentStatus.FAILED
                 failureMessage = "결제 시간 초과"

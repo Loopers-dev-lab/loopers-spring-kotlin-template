@@ -47,8 +47,15 @@ class PaymentScheduler(
 
         for (payment in inProgressPayments) {
             try {
-                paymentFacade.processInProgressPayment(payment)
+                paymentFacade.processInProgressPayment(payment.id)
                 processedCount++
+            } catch (e: PgRequestNotReachedException) {
+                // PG 연결 실패 - 다음 스케줄에 재시도
+                logger.warn(
+                    "PG 연결 실패, 다음 스케줄에 재시도 - paymentId: {}",
+                    payment.id,
+                )
+                skippedCount++
             } catch (e: ObjectOptimisticLockingFailureException) {
                 // 콜백과 동시 처리로 인한 충돌 - 정상 케이스이므로 skip
                 logger.debug(

@@ -1,6 +1,6 @@
 package com.loopers.integration
 
-import com.loopers.application.order.PaymentResultHandler
+import com.loopers.application.order.OrderFacade
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.payment.Payment
@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @DisplayName("결제 동시성 테스트")
 class PaymentConcurrencyTest @Autowired constructor(
     private val paymentService: PaymentService,
-    private val paymentResultHandler: PaymentResultHandler,
+    private val orderFacade: OrderFacade,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
@@ -87,7 +87,7 @@ class PaymentConcurrencyTest @Autowired constructor(
             executor.submit {
                 try {
                     transactionTemplate.execute { _ ->
-                        paymentResultHandler.handlePaymentResult(
+                        orderFacade.handlePaymentResult(
                             paymentId = payment.id,
                             transactions = listOf(transaction),
                             currentTime = Instant.now(),
@@ -129,17 +129,10 @@ class PaymentConcurrencyTest @Autowired constructor(
             amount = payment.paidAmount,
             status = PgTransactionStatus.SUCCESS,
         )
-        val order = orderRepository.findById(payment.orderId)!!
-        val orderItems = order.orderItems.map {
-            PaymentResultHandler.OrderItemInfo(
-                productId = it.productId,
-                quantity = it.quantity,
-            )
-        }
 
         // 콜백 먼저 성공 처리
         transactionTemplate.execute { _ ->
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(successTransaction),
                 currentTime = Instant.now(),
@@ -160,11 +153,10 @@ class PaymentConcurrencyTest @Autowired constructor(
         try {
             transactionTemplate.execute { _ ->
                 // 이미 PAID 상태이므로 상태 체크에서 예외 발생
-                paymentResultHandler.handlePaymentResult(
+                orderFacade.handlePaymentResult(
                     paymentId = payment.id,
                     transactions = listOf(failedTransaction),
                     currentTime = Instant.now(),
-                    orderItems = orderItems,
                 )
             }
         } catch (e: Exception) {
@@ -195,7 +187,7 @@ class PaymentConcurrencyTest @Autowired constructor(
 
         // 첫 번째 처리 - 성공
         transactionTemplate.execute { _ ->
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(transaction),
                 currentTime = Instant.now(),

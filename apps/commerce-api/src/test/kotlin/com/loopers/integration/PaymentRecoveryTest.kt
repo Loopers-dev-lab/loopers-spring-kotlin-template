@@ -1,6 +1,6 @@
 package com.loopers.integration
 
-import com.loopers.application.order.PaymentResultHandler
+import com.loopers.application.order.OrderFacade
 import com.loopers.domain.coupon.Coupon
 import com.loopers.domain.coupon.CouponRepository
 import com.loopers.domain.coupon.DiscountAmount
@@ -50,7 +50,7 @@ import java.time.Instant
 @DisplayName("결제 복구 테스트")
 class PaymentRecoveryTest @Autowired constructor(
     private val paymentService: PaymentService,
-    private val paymentResultHandler: PaymentResultHandler,
+    private val orderFacade: OrderFacade,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
@@ -86,13 +86,6 @@ class PaymentRecoveryTest @Autowired constructor(
                 usedPoint = usedPoint,
             )
 
-            val order = orderRepository.findById(payment.orderId)!!
-            val orderItems = order.orderItems.map {
-                PaymentResultHandler.OrderItemInfo(
-                    productId = it.productId,
-                    quantity = it.quantity,
-                )
-            }
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 orderId = payment.orderId,
@@ -102,11 +95,10 @@ class PaymentRecoveryTest @Autowired constructor(
             )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(failedTransaction),
                 currentTime = Instant.now(),
-                orderItems = orderItems,
             )
 
             // then - 포인트가 복구됨
@@ -131,13 +123,6 @@ class PaymentRecoveryTest @Autowired constructor(
                 usedPoint = Money.ZERO_KRW,
             )
 
-            val order = orderRepository.findById(payment.orderId)!!
-            val orderItems = order.orderItems.map {
-                PaymentResultHandler.OrderItemInfo(
-                    productId = it.productId,
-                    quantity = it.quantity,
-                )
-            }
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 orderId = payment.orderId,
@@ -147,11 +132,10 @@ class PaymentRecoveryTest @Autowired constructor(
             )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(failedTransaction),
                 currentTime = Instant.now(),
-                orderItems = orderItems,
             )
 
             // then - 포인트 잔액 그대로
@@ -177,13 +161,6 @@ class PaymentRecoveryTest @Autowired constructor(
                 issuedCoupon = issuedCoupon,
             )
 
-            val order = orderRepository.findById(payment.orderId)!!
-            val orderItems = order.orderItems.map {
-                PaymentResultHandler.OrderItemInfo(
-                    productId = it.productId,
-                    quantity = it.quantity,
-                )
-            }
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 orderId = payment.orderId,
@@ -193,11 +170,10 @@ class PaymentRecoveryTest @Autowired constructor(
             )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(failedTransaction),
                 currentTime = Instant.now(),
-                orderItems = orderItems,
             )
 
             // then - 쿠폰 상태가 AVAILABLE로 복구됨
@@ -216,13 +192,6 @@ class PaymentRecoveryTest @Autowired constructor(
                 usedPoint = Money.krw(5000),
             )
 
-            val order = orderRepository.findById(payment.orderId)!!
-            val orderItems = order.orderItems.map {
-                PaymentResultHandler.OrderItemInfo(
-                    productId = it.productId,
-                    quantity = it.quantity,
-                )
-            }
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 orderId = payment.orderId,
@@ -232,11 +201,10 @@ class PaymentRecoveryTest @Autowired constructor(
             )
 
             // when - 결제 실패 처리 (쿠폰 없음)
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(failedTransaction),
                 currentTime = Instant.now(),
-                orderItems = orderItems,
             )
 
             // then - 결제가 실패됨 (쿠폰 관련 에러 없음)
@@ -265,13 +233,6 @@ class PaymentRecoveryTest @Autowired constructor(
                 quantity = orderQuantity,
             )
 
-            val order = orderRepository.findById(payment.orderId)!!
-            val orderItems = order.orderItems.map {
-                PaymentResultHandler.OrderItemInfo(
-                    productId = it.productId,
-                    quantity = it.quantity,
-                )
-            }
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 orderId = payment.orderId,
@@ -281,11 +242,10 @@ class PaymentRecoveryTest @Autowired constructor(
             )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(failedTransaction),
                 currentTime = Instant.now(),
-                orderItems = orderItems,
             )
 
             // then - 재고가 복구됨
@@ -329,10 +289,6 @@ class PaymentRecoveryTest @Autowired constructor(
                 attemptedAt = Instant.now(),
             )
 
-            val orderItems = listOf(
-                PaymentResultHandler.OrderItemInfo(productId = product1.id, quantity = 5),
-                PaymentResultHandler.OrderItemInfo(productId = product2.id, quantity = 3),
-            )
             val failedTransaction = createTransaction(
                 transactionKey = initiatedPayment.externalPaymentKey!!,
                 orderId = initiatedPayment.orderId,
@@ -342,11 +298,10 @@ class PaymentRecoveryTest @Autowired constructor(
             )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = initiatedPayment.id,
                 transactions = listOf(failedTransaction),
                 currentTime = Instant.now(),
-                orderItems = orderItems,
             )
 
             // then - 모든 재고가 복구됨
@@ -374,13 +329,6 @@ class PaymentRecoveryTest @Autowired constructor(
                 usedPoint = Money.krw(5000),
             )
 
-            val order = orderRepository.findById(payment.orderId)!!
-            val orderItems = order.orderItems.map {
-                PaymentResultHandler.OrderItemInfo(
-                    productId = it.productId,
-                    quantity = it.quantity,
-                )
-            }
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 orderId = payment.orderId,
@@ -390,11 +338,10 @@ class PaymentRecoveryTest @Autowired constructor(
             )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(failedTransaction),
                 currentTime = Instant.now(),
-                orderItems = orderItems,
             )
 
             // then - 주문 상태가 CANCELLED
@@ -419,7 +366,7 @@ class PaymentRecoveryTest @Autowired constructor(
             )
 
             // when - 결제 성공 처리
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = payment.id,
                 transactions = listOf(successTransaction),
                 currentTime = Instant.now(),
@@ -485,9 +432,6 @@ class PaymentRecoveryTest @Autowired constructor(
                 attemptedAt = Instant.now(),
             )
 
-            val orderItems = listOf(
-                PaymentResultHandler.OrderItemInfo(productId = product.id, quantity = orderQuantity),
-            )
             val failedTransaction = createTransaction(
                 transactionKey = initiatedPayment.externalPaymentKey!!,
                 orderId = initiatedPayment.orderId,
@@ -497,11 +441,10 @@ class PaymentRecoveryTest @Autowired constructor(
             )
 
             // when - 결제 실패 처리
-            paymentResultHandler.handlePaymentResult(
+            orderFacade.handlePaymentResult(
                 paymentId = initiatedPayment.id,
                 transactions = listOf(failedTransaction),
                 currentTime = Instant.now(),
-                orderItems = orderItems,
             )
 
             // then - 모든 리소스 복구
