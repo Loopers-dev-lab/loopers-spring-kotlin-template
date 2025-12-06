@@ -2,12 +2,16 @@ package com.loopers.domain.event.handler
 
 import com.loopers.domain.event.UserActionEvent
 import com.loopers.domain.event.UserActionType
+import com.loopers.infrastructure.analytics.client.AnalyticsClient
+import io.mockk.mockk
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 
 class UserActionEventHandlerTest {
-    private val userActionEventHandler = UserActionEventHandler()
+    private val analyticsClient = mockk<AnalyticsClient>(relaxed = true)
+
+    private val userActionEventHandler = UserActionEventHandler(analyticsClient)
 
     @DisplayName("유저 행동 이벤트를 처리할 때,")
     @Test

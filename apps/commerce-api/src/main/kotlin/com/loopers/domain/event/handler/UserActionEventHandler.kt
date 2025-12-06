@@ -2,6 +2,7 @@ package com.loopers.domain.event.handler
 
 import com.loopers.domain.event.UserActionEvent
 import com.loopers.domain.event.UserActionType
+import com.loopers.infrastructure.analytics.client.AnalyticsClient
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async
@@ -12,7 +13,9 @@ import org.springframework.stereotype.Component
  * 유저의 행동을 로깅하고 추적
  */
 @Component
-class UserActionEventHandler {
+class UserActionEventHandler(
+    private val analyticsClient: AnalyticsClient,
+) {
     private val logger = LoggerFactory.getLogger(UserActionEventHandler::class.java)
 
     /**
@@ -25,9 +28,7 @@ class UserActionEventHandler {
         try {
             val logMessage = buildLogMessage(event)
             logger.info(logMessage)
-
-            // TODO: 실제 분석 시스템에 전송 (예: Kafka, Data Platform)
-            sendToAnalyticsSystem(event)
+            analyticsClient.sendUserAction(event)
         } catch (e: Exception) {
             logger.error("유저 행동 로깅 실패: userId=${event.userId}, action=${event.actionType}", e)
         }
@@ -63,10 +64,5 @@ class UserActionEventHandler {
             UserActionType.COUPON_USE ->
                 "[USER_ACTION] 쿠폰 사용 - userId=${event.userId}, couponId=${event.targetId}, $metadata"
         }
-    }
-
-    private fun sendToAnalyticsSystem(event: UserActionEvent) {
-        // TODO: 실제 분석 시스템에 전송 구현
-        logger.debug("분석 시스템 전송 (Mock): ${event.actionType} - userId=${event.userId}")
     }
 }

@@ -7,6 +7,7 @@ import com.loopers.domain.event.PaymentFailedEvent
 import com.loopers.domain.event.UserActionEvent
 import com.loopers.domain.event.UserActionType
 import com.loopers.domain.order.OrderRepository
+import com.loopers.infrastructure.dataplatform.client.DataPlatformClient
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
@@ -24,6 +25,7 @@ class OrderEventHandler(
     private val couponService: CouponService,
     private val orderRepository: OrderRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val dataPlatformClient: DataPlatformClient,
 ) {
     private val logger = LoggerFactory.getLogger(OrderEventHandler::class.java)
 
@@ -66,8 +68,7 @@ class OrderEventHandler(
     fun handleOrderCreatedForDataPlatform(event: OrderCreatedEvent) {
         try {
             logger.info("데이터 플랫폼 전송 시작: orderId=${event.orderId}")
-            // TODO: 실제 데이터 플랫폼 API 호출
-            sendToDataPlatform(event)
+            dataPlatformClient.sendOrderCreated(event)
             logger.info("데이터 플랫폼 전송 완료: orderId=${event.orderId}")
         } catch (e: Exception) {
             // 데이터 플랫폼 전송 실패는 주문에 영향을 주지 않음
@@ -94,7 +95,7 @@ class OrderEventHandler(
             logger.info("주문 상태 업데이트 완료: orderId=${event.orderId}, status=${order.status}")
 
             // 데이터 플랫폼에 결제 완료 정보 전송
-            sendPaymentCompletedToDataPlatform(event)
+            dataPlatformClient.sendPaymentCompleted(event)
 
             // 유저 행동 로깅
             eventPublisher.publishEvent(
@@ -148,19 +149,5 @@ class OrderEventHandler(
         } catch (e: Exception) {
             logger.error("결제 실패 처리 중 오류: orderId=${event.orderId}", e)
         }
-    }
-
-    private fun sendToDataPlatform(event: OrderCreatedEvent) {
-        // TODO: 실제 데이터 플랫폼 API 호출 구현
-        logger.debug(
-            "데이터 플랫폼 전송 (Mock): orderId=${event.orderId}, userId=${event.userId}, amount=${event.amount}",
-        )
-    }
-
-    private fun sendPaymentCompletedToDataPlatform(event: PaymentCompletedEvent) {
-        // TODO: 실제 데이터 플랫폼 API 호출 구현
-        logger.debug(
-            "결제 완료 데이터 플랫폼 전송 (Mock): orderId=${event.orderId}, paymentId=${event.paymentId}",
-        )
     }
 }

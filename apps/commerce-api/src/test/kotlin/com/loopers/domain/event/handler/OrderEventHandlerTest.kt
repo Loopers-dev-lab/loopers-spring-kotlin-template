@@ -10,6 +10,7 @@ import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
 import com.loopers.fixtures.createTestOrder
+import com.loopers.infrastructure.dataplatform.client.DataPlatformClient
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
@@ -26,11 +27,13 @@ class OrderEventHandlerTest {
     private val couponService = mockk<CouponService>()
     private val orderRepository = mockk<OrderRepository>()
     private val eventPublisher = mockk<ApplicationEventPublisher>(relaxed = true)
+    private val dataPlatformClient = mockk<DataPlatformClient>(relaxed = true)
 
     private val orderEventHandler = OrderEventHandler(
         couponService,
         orderRepository,
         eventPublisher,
+        dataPlatformClient,
     )
 
     @DisplayName("주문 생성 이벤트를 처리할 때,")
