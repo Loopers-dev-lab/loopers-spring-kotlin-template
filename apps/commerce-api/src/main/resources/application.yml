@@ -58,6 +58,7 @@ resilience4j:
     instances:
       pg:
         base-config: default
+    circuit-breaker-aspect-order: 1
 
   retry:
     configs:
@@ -74,6 +75,7 @@ resilience4j:
     instances:
       pg:
         base-config: default
+    retry-aspect-order: 2
 
 ---
 spring:
