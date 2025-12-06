@@ -30,10 +30,10 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
-import org.mockito.kotlin.whenever
+import com.ninjasquad.springmockk.MockkBean
+import io.mockk.every
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.HttpEntity
@@ -58,7 +58,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
 ) {
-    @MockBean
+    @MockkBean
     private lateinit var pgClient: PgClient
 
     @AfterEach
@@ -84,8 +84,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
-            whenever(pgClient.findTransaction(externalPaymentKey))
-                .thenReturn(successTransaction)
+            every { pgClient.findTransaction(externalPaymentKey) } returns successTransaction
 
             val request = PaymentWebhookV1Request.Callback(
                 orderId = payment.orderId,
@@ -124,8 +123,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
                 status = PgTransactionStatus.FAILED,
                 failureReason = "잔액 부족",
             )
-            whenever(pgClient.findTransaction(externalPaymentKey))
-                .thenReturn(failedTransaction)
+            every { pgClient.findTransaction(externalPaymentKey) } returns failedTransaction
 
             val request = PaymentWebhookV1Request.Callback(
                 orderId = payment.orderId,
@@ -163,8 +161,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
-            whenever(pgClient.findTransaction(externalPaymentKey))
-                .thenReturn(successTransaction)
+            every { pgClient.findTransaction(externalPaymentKey) } returns successTransaction
 
             val request = PaymentWebhookV1Request.Callback(
                 orderId = payment.orderId,
@@ -215,8 +212,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
             val payment = createInProgressPayment()
             val wrongKey = "wrong_transaction_key"
 
-            whenever(pgClient.findTransaction(wrongKey))
-                .thenThrow(RuntimeException("Transaction not found"))
+            every { pgClient.findTransaction(wrongKey) } throws RuntimeException("Transaction not found")
 
             val request = PaymentWebhookV1Request.Callback(
                 orderId = payment.orderId,

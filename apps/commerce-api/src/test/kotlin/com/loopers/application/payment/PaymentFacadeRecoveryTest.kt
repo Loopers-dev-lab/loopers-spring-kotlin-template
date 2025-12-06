@@ -37,10 +37,10 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
-import org.mockito.kotlin.whenever
+import com.ninjasquad.springmockk.MockkBean
+import io.mockk.every
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
 import java.time.Instant
 
 /**
@@ -64,7 +64,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
 ) {
-    @MockBean
+    @MockkBean
     private lateinit var pgClient: PgClient
 
     @AfterEach
@@ -99,8 +99,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "PG 연결 실패",
             )
 
-            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
-                .thenReturn(listOf(failedTransaction))
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -135,8 +134,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "카드 한도 초과",
             )
 
-            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
-                .thenReturn(listOf(failedTransaction))
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -172,8 +170,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "서킷 브레이커 오픈",
             )
 
-            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
-                .thenReturn(listOf(failedTransaction))
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -202,8 +199,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "PG 거부",
             )
 
-            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
-                .thenReturn(listOf(failedTransaction))
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리 (쿠폰 없음)
             paymentFacade.processInProgressPayment(payment.id)
@@ -242,8 +238,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "잔액 부족",
             )
 
-            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
-                .thenReturn(listOf(failedTransaction))
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -297,8 +292,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "타임아웃",
             )
 
-            whenever(pgClient.findTransactionsByOrderId(initiatedPayment.orderId))
-                .thenReturn(listOf(failedTransaction))
+            every { pgClient.findTransactionsByOrderId(initiatedPayment.orderId) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(initiatedPayment.id)
@@ -336,8 +330,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "결제 거부",
             )
 
-            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
-                .thenReturn(listOf(failedTransaction))
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -363,8 +356,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 status = PgTransactionStatus.SUCCESS,
             )
 
-            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
-                .thenReturn(listOf(successTransaction))
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(successTransaction)
 
             // when - 결제 성공 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -437,8 +429,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "PG 서버 오류",
             )
 
-            whenever(pgClient.findTransactionsByOrderId(initiatedPayment.orderId))
-                .thenReturn(listOf(failedTransaction))
+            every { pgClient.findTransactionsByOrderId(initiatedPayment.orderId) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(initiatedPayment.id)

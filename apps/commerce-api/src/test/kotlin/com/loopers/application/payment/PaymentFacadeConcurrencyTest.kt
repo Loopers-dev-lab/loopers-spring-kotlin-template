@@ -28,10 +28,10 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.whenever
+import com.ninjasquad.springmockk.MockkBean
+import io.mockk.every
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import java.time.Instant
 import java.util.concurrent.CountDownLatch
@@ -57,7 +57,7 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
 ) {
-    @MockBean
+    @MockkBean
     private lateinit var pgClient: PgClient
 
     @AfterEach
@@ -82,8 +82,7 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
                 status = PgTransactionStatus.SUCCESS,
             )
 
-            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
-                .thenReturn(listOf(successTransaction))
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(successTransaction)
 
             val threadCount = 5
             val executor = Executors.newFixedThreadPool(threadCount)
@@ -128,8 +127,7 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
                 status = PgTransactionStatus.SUCCESS,
             )
 
-            whenever(pgClient.findTransactionsByOrderId(payment.orderId))
-                .thenReturn(listOf(successTransaction))
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(successTransaction)
 
             // 첫 번째 처리 - 성공
             paymentFacade.processInProgressPayment(payment.id)

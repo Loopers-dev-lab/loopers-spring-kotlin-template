@@ -1,11 +1,8 @@
-package com.loopers.domain.order
+package com.loopers.domain.payment
 
-import com.loopers.domain.payment.CardType
-import com.loopers.domain.payment.Payment
-import com.loopers.domain.payment.PaymentStatus
-import com.loopers.domain.payment.PgPaymentCreateResult
-import com.loopers.domain.payment.PgTransaction
-import com.loopers.domain.payment.PgTransactionStatus
+import com.loopers.domain.order.Order
+import com.loopers.domain.order.OrderItem
+import com.loopers.domain.order.OrderStatus
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -634,7 +631,7 @@ class PaymentTest {
         productName: String = "테스트 상품",
         unitPrice: Money = Money.krw(10000),
     ): OrderItem {
-        return OrderItem.create(
+        return OrderItem.Companion.create(
             productId = productId,
             quantity = quantity,
             productName = productName,
@@ -646,6 +643,6 @@ class PaymentTest {
         userId: Long = 1L,
         orderItems: MutableList<OrderItem> = mutableListOf(createOrderItem()),
     ): Order {
-        return Order.of(userId, Money.krw(10000), OrderStatus.PAID, orderItems)
+        return Order.Companion.of(userId, Money.krw(10000), OrderStatus.PAID, orderItems)
     }
 }

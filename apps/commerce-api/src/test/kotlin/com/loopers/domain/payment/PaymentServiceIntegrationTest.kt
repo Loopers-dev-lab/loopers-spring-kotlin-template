@@ -1,17 +1,13 @@
-package com.loopers.domain.order
+package com.loopers.domain.payment
 
-import com.loopers.domain.payment.CardType
-import com.loopers.domain.payment.Payment
-import com.loopers.domain.payment.PaymentRepository
-import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PaymentStatus
-import com.loopers.domain.payment.PgPaymentCreateResult
-import com.loopers.domain.payment.PgTransaction
-import com.loopers.domain.payment.PgTransactionStatus
+import com.loopers.domain.order.Order
+import com.loopers.domain.order.OrderRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
+import com.ninjasquad.springmockk.MockkBean
+import io.mockk.every
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -31,6 +27,9 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     private val orderRepository: OrderRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
+    @MockkBean
+    private lateinit var pgClient: PgClient
+
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
@@ -273,11 +272,260 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         }
     }
 
+    @DisplayName("PG 콜백 처리 통합테스트")
+    @Nested
+    inner class ProcessCallback {
+
+        @DisplayName("SUCCESS 트랜잭션 콜백을 받으면 PAID로 전이된다")
+        @Test
+        fun `transitions to PAID when SUCCESS callback received`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "pg_tx_success")
+            val successTransaction = createTransaction(
+                transactionKey = "pg_tx_success",
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.SUCCESS,
+            )
+            every { pgClient.findTransaction("pg_tx_success") } returns successTransaction
+
+            // when
+            val result = paymentService.processCallback(
+                orderId = payment.orderId,
+                externalPaymentKey = "pg_tx_success",
+            )
+
+            // then
+            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
+            val confirmed = result as PaymentService.CallbackResult.Confirmed
+            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.PAID)
+        }
+
+        @DisplayName("FAILED 트랜잭션 콜백을 받으면 FAILED로 전이된다")
+        @Test
+        fun `transitions to FAILED when FAILED callback received`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "pg_tx_failed")
+            val failureReason = "카드 한도 초과"
+            val failedTransaction = createTransaction(
+                transactionKey = "pg_tx_failed",
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = failureReason,
+            )
+            every { pgClient.findTransaction("pg_tx_failed") } returns failedTransaction
+
+            // when
+            val result = paymentService.processCallback(
+                orderId = payment.orderId,
+                externalPaymentKey = "pg_tx_failed",
+            )
+
+            // then
+            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
+            val confirmed = result as PaymentService.CallbackResult.Confirmed
+            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(confirmed.payment.failureMessage).isEqualTo(failureReason)
+        }
+
+        @DisplayName("이미 처리된 결제에 콜백이 오면 AlreadyProcessed를 반환한다")
+        @Test
+        fun `returns AlreadyProcessed when payment already processed`() {
+            // given
+            val payment = createPaidPayment()
+            val transaction = createTransaction(
+                transactionKey = "pg_tx_already",
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.SUCCESS,
+            )
+            every { pgClient.findTransaction("pg_tx_already") } returns transaction
+
+            // when
+            val result = paymentService.processCallback(
+                orderId = payment.orderId,
+                externalPaymentKey = "pg_tx_already",
+            )
+
+            // then
+            assertThat(result).isInstanceOf(PaymentService.CallbackResult.AlreadyProcessed::class.java)
+        }
+
+        @DisplayName("존재하지 않는 주문 ID로 콜백이 오면 예외가 발생한다")
+        @Test
+        fun `throws exception when order not found`() {
+            // when
+            val exception = assertThrows<CoreException> {
+                paymentService.processCallback(
+                    orderId = 999L,
+                    externalPaymentKey = "pg_tx_not_found",
+                )
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+        }
+    }
+
+    @DisplayName("IN_PROGRESS 결제 처리 통합테스트")
+    @Nested
+    inner class ProcessInProgressPayment {
+
+        @DisplayName("매칭되는 SUCCESS 트랜잭션이 있으면 PAID로 전이된다")
+        @Test
+        fun `transitions to PAID when matching SUCCESS transaction found`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "pg_tx_match")
+            val successTransaction = createTransaction(
+                transactionKey = "pg_tx_match",
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.SUCCESS,
+            )
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(successTransaction)
+
+            // when
+            val result = paymentService.processInProgressPayment(
+                paymentId = payment.id,
+            )
+
+            // then
+            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
+            val confirmed = result as PaymentService.CallbackResult.Confirmed
+            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.PAID)
+        }
+
+        @DisplayName("매칭되는 FAILED 트랜잭션이 있으면 FAILED로 전이된다")
+        @Test
+        fun `transitions to FAILED when matching FAILED transaction found`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "pg_tx_fail_match")
+            val failureReason = "잔액 부족"
+            val failedTransaction = createTransaction(
+                transactionKey = "pg_tx_fail_match",
+                amount = payment.paidAmount,
+                status = PgTransactionStatus.FAILED,
+                failureReason = failureReason,
+            )
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
+
+            // when
+            val result = paymentService.processInProgressPayment(
+                paymentId = payment.id,
+            )
+
+            // then
+            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
+            val confirmed = result as PaymentService.CallbackResult.Confirmed
+            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(confirmed.payment.failureMessage).isEqualTo(failureReason)
+        }
+
+        @DisplayName("매칭되는 트랜잭션이 없고 타임아웃이면 FAILED로 전이된다")
+        @Test
+        fun `transitions to FAILED when no match and timeout`() {
+            // given - 5분 1초 전에 시도된 결제
+            val attemptedAt = Instant.now().minusSeconds(301)
+            val payment = createInProgressPaymentWithAttemptedAt(attemptedAt = attemptedAt)
+            // 금액이 다른 트랜잭션 (매칭 안됨)
+            val unmatchedTransaction = createTransaction(
+                transactionKey = "pg_tx_unmatched",
+                amount = Money.krw(99999),
+                status = PgTransactionStatus.SUCCESS,
+            )
+            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(unmatchedTransaction)
+
+            // when
+            val result = paymentService.processInProgressPayment(
+                paymentId = payment.id,
+            )
+
+            // then
+            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
+            val confirmed = result as PaymentService.CallbackResult.Confirmed
+            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(confirmed.payment.failureMessage).isEqualTo("결제 시간 초과")
+        }
+
+        @DisplayName("존재하지 않는 결제 ID면 예외가 발생한다")
+        @Test
+        fun `throws exception when payment not found`() {
+            // when
+            val exception = assertThrows<CoreException> {
+                paymentService.processInProgressPayment(
+                    paymentId = 999L,
+                )
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+        }
+    }
+
+    @DisplayName("결제 ID로 조회 통합테스트")
+    @Nested
+    inner class FindById {
+
+        @DisplayName("존재하는 결제를 조회할 수 있다")
+        @Test
+        fun `find existing payment by id`() {
+            // given
+            val payment = createPendingPayment()
+
+            // when
+            val foundPayment = paymentService.findById(payment.id)
+
+            // then
+            assertThat(foundPayment.id).isEqualTo(payment.id)
+            assertThat(foundPayment.status).isEqualTo(PaymentStatus.PENDING)
+        }
+
+        @DisplayName("존재하지 않는 결제 ID면 예외가 발생한다")
+        @Test
+        fun `throws exception when payment not found`() {
+            // when
+            val exception = assertThrows<CoreException> {
+                paymentService.findById(999L)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+        }
+    }
+
+    @DisplayName("주문 ID로 결제 조회 통합테스트")
+    @Nested
+    inner class FindByOrderId {
+
+        @DisplayName("존재하는 결제를 조회할 수 있다")
+        @Test
+        fun `find existing payment by order id`() {
+            // given
+            val payment = createPendingPayment()
+
+            // when
+            val foundPayment = paymentService.findByOrderId(payment.orderId)
+
+            // then
+            assertThat(foundPayment.id).isEqualTo(payment.id)
+            assertThat(foundPayment.orderId).isEqualTo(payment.orderId)
+        }
+
+        @DisplayName("존재하지 않는 주문 ID면 예외가 발생한다")
+        @Test
+        fun `throws exception when order not found`() {
+            // when
+            val exception = assertThrows<CoreException> {
+                paymentService.findByOrderId(999L)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+        }
+    }
+
     private fun createOrder(
         userId: Long = 1L,
         totalAmount: Money = Money.krw(10000),
     ): Order {
-        val order = Order.place(userId)
+        val order = Order.Companion.place(userId)
         order.addOrderItem(
             productId = 1L,
             quantity = 1,
@@ -303,6 +551,26 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     private fun createInProgressPayment(externalPaymentKey: String = "tx_test"): Payment {
         val payment = createPendingPayment()
         payment.initiate(PgPaymentCreateResult.Accepted(externalPaymentKey), Instant.now())
+        return paymentRepository.save(payment)
+    }
+
+    private fun createInProgressPaymentWithAttemptedAt(
+        externalPaymentKey: String = "tx_test",
+        attemptedAt: Instant,
+    ): Payment {
+        val payment = createPendingPayment()
+        payment.initiate(PgPaymentCreateResult.Accepted(externalPaymentKey), attemptedAt)
+        return paymentRepository.save(payment)
+    }
+
+    private fun createPaidPayment(): Payment {
+        val payment = createInProgressPayment(externalPaymentKey = "tx_paid")
+        val successTransaction = createTransaction(
+            transactionKey = "tx_paid",
+            amount = payment.paidAmount,
+            status = PgTransactionStatus.SUCCESS,
+        )
+        payment.confirmPayment(successTransaction, currentTime = Instant.now())
         return paymentRepository.save(payment)
     }
 

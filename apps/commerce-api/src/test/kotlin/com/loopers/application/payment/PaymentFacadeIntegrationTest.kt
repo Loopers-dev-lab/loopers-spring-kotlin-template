@@ -36,6 +36,8 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
+import com.ninjasquad.springmockk.MockkBean
+import io.mockk.every
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -43,10 +45,8 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
-import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
 import java.time.Instant
 
 /**
@@ -72,7 +72,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
 ) {
-    @MockBean
+    @MockkBean
     private lateinit var pgClient: PgClient
 
     @AfterEach
@@ -80,10 +80,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
         databaseCleanUp.truncateAllTables()
         redisCleanUp.truncateAll()
     }
-
-    // ===========================================
-    // 경계값 테스트
-    // ===========================================
 
     @Nested
     @DisplayName("placeOrder - 포인트 전액 결제")
@@ -285,10 +281,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
         }
     }
 
-    // ===========================================
-    // 멱등성 테스트
-    // ===========================================
-
     @Nested
     @DisplayName("processCallback - 중복 콜백 처리")
     inner class `processCallback - DuplicateCallbackHandling` {
@@ -307,8 +299,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             )
 
             // PG 조회 Mock - 첫 번째 콜백 처리용
-            whenever(pgClient.findTransaction(externalPaymentKey))
-                .thenReturn(transaction)
+            every { pgClient.findTransaction(externalPaymentKey) } returns transaction
 
             // 결제 성공 처리 (첫 번째)
             paymentFacade.processCallback(
@@ -352,8 +343,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             )
 
             // PG 조회 Mock
-            whenever(pgClient.findTransaction(externalPaymentKey))
-                .thenReturn(failedTransaction)
+            every { pgClient.findTransaction(externalPaymentKey) } returns failedTransaction
 
             paymentFacade.processCallback(
                 PaymentCriteria.ProcessCallback(
@@ -398,8 +388,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
-            whenever(pgClient.findTransaction(externalPaymentKey))
-                .thenReturn(successTransaction)
+            every { pgClient.findTransaction(externalPaymentKey) } returns successTransaction
 
             val request = PaymentWebhookV1Request.Callback(
                 orderId = payment.orderId,
@@ -465,8 +454,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             )
 
             // PG에서 wrong_key로 조회 시 예외 발생
-            whenever(pgClient.findTransaction(wrongKey))
-                .thenThrow(RuntimeException("Transaction not found"))
+            every { pgClient.findTransaction(wrongKey) } throws RuntimeException("Transaction not found")
 
             // when & then
             assertThrows<RuntimeException> {
