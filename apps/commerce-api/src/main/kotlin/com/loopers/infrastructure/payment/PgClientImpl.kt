@@ -6,164 +6,105 @@ import com.loopers.domain.payment.PgPaymentRequest
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.support.values.Money
-import feign.FeignException
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException
-import io.github.resilience4j.circuitbreaker.CircuitBreaker
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
-import io.github.resilience4j.retry.Retry
-import io.github.resilience4j.retry.RetryRegistry
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketException
-import java.net.SocketTimeoutException
 import com.loopers.domain.payment.CardType as DomainCardType
 
 @Component
 class PgClientImpl(
     private val pgFeignClient: PgFeignClient,
-    circuitBreakerRegistry: CircuitBreakerRegistry,
-    retryRegistry: RetryRegistry,
+    private val exceptionClassifier: PgExceptionClassifier,
 ) : PgClient {
 
-    private val circuitBreaker: CircuitBreaker = circuitBreakerRegistry.circuitBreaker("pg")
-    private val retry: Retry = retryRegistry.retry("pg")
+    private val log = LoggerFactory.getLogger(javaClass)
 
+    @CircuitBreaker(name = "pg", fallbackMethod = "requestPaymentFallback")
+    @Retry(name = "pg")
     override fun requestPayment(request: PgPaymentRequest): PgPaymentCreateResult {
+        val infraRequest = request.toInfraRequest()
+
         return try {
-            val infraRequest = PgPaymentRequest(
-                orderId = request.orderId.toString(),
-                cardType = request.cardInfo.cardType.name,
-                cardNo = request.cardInfo.cardNo,
-                amount = request.amount.amount.toLong(),
-                callbackUrl = request.callbackUrl,
-            )
-
-            val response = executeWithResilience {
-                pgFeignClient.requestPayment(infraRequest)
-            }
-
+            val response = pgFeignClient.requestPayment(infraRequest)
             val data = extractData(response)
-
             PgPaymentCreateResult.Accepted(data.transactionKey)
-        } catch (e: PgResponseUncertainException) {
-            PgPaymentCreateResult.Uncertain
-        } catch (e: PgRequestNotReachedException) {
-            PgPaymentCreateResult.NotReached
+        } catch (e: Exception) {
+            throw exceptionClassifier.classify(e)
         }
     }
 
-    override fun findTransaction(transactionKey: String): PgTransaction {
-        val response = executeWithResilience {
-            pgFeignClient.getPayment(transactionKey)
-        }
-        return toDomainTransaction(extractData(response))
-    }
+    @Suppress("unused") // Resilience4j fallbackMethod - 리플렉션으로 호출됨
+    private fun requestPaymentFallback(
+        request: PgPaymentRequest,
+        e: Exception,
+    ): PgPaymentCreateResult {
+        log.warn("[PG] 결제 요청 실패 - fallback: {}", e.message)
 
-    override fun findTransactionsByOrderId(orderId: Long): List<PgTransaction> {
-        val response = executeWithResilience {
-            pgFeignClient.getPaymentsByOrderId(orderId.toString())
-        }
-        val data = extractData(response)
-
-        return data.transactions.map { summary ->
-            val detail = executeWithResilience {
-                pgFeignClient.getPayment(summary.transactionKey)
-            }
-            toDomainTransaction(extractData(detail))
-        }
-    }
-
-    /**
-     * Resilience 적용 + 예외 분류
-     *
-     * 실행 순서: CircuitBreaker(Retry(실제 호출))
-     * - Retry가 안쪽: 일시적 오류를 재시도로 흡수
-     * - CircuitBreaker가 바깥쪽: 재시도 후 최종 결과만 서킷에 기록
-     */
-    private fun <T> executeWithResilience(block: () -> T): T {
-        val retrySupplier = Retry.decorateSupplier(retry) {
-            try {
-                block()
-            } catch (e: Exception) {
-                throw classifyException(e)
-            }
-        }
-
-        return try {
-            circuitBreaker.executeSupplier(retrySupplier)
-        } catch (e: CallNotPermittedException) {
-            throw PgRequestNotReachedException("서킷 브레이커 오픈. ${e.message}", e)
-        } catch (e: PgInfraException) {
-            throw e
-        }
-    }
-
-    /**
-     * 예외를 PgInfraException으로 분류
-     *
-     * 핵심 분류 기준:
-     * - 요청 도달 불확실 (ResponseUncertain): Read Timeout, Connection Reset
-     * - 요청 미도달 확실 (RequestNotReached): Connection Timeout, Connection Refused, HTTP 에러
-     */
-    private fun classifyException(e: Exception): PgInfraException {
-        val cause = findRootCause(e)
-        val message = cause.message?.lowercase() ?: ""
-
-        return when {
-            cause is FeignException -> {
-                val status = cause.status()
-                val detail = "status=$status, message=${cause.message}"
-                when (status) {
-                    in 500..599, 429 -> PgRequestNotReachedException("PG 서버 오류. $detail", cause)
-                    else -> PgRequestNotReachedException("PG 요청 오류. $detail", cause)
-                }
+        return when (e) {
+            is PgResponseUncertainException -> {
+                log.warn("[PG] 응답 불확실 - 이중 결제 방지를 위해 Uncertain 반환")
+                PgPaymentCreateResult.Uncertain
             }
 
-            cause is SocketTimeoutException && message.contains("read timed out") -> {
-                PgResponseUncertainException("응답 타임아웃. ${cause.message}", cause)
-            }
-
-            (cause is SocketException || cause is IOException) && message.contains("connection reset") -> {
-                PgResponseUncertainException("연결 끊김. ${cause.message}", cause)
-            }
-
-            cause is SocketTimeoutException -> {
-                PgRequestNotReachedException("연결 타임아웃. ${cause.message}", cause)
-            }
-
-            cause is ConnectException -> {
-                PgRequestNotReachedException("연결 실패. ${cause.message}", cause)
+            is PgRequestNotReachedException, is CallNotPermittedException -> {
+                log.warn("[PG] 요청 미도달 - NotReached 반환")
+                PgPaymentCreateResult.NotReached
             }
 
             else -> {
-                PgRequestNotReachedException("네트워크 오류. ${cause.message}", cause)
+                log.error("[PG] 예상치 못한 예외", e)
+                PgPaymentCreateResult.NotReached
             }
         }
     }
 
-    private fun findRootCause(e: Throwable): Throwable {
-        var cause: Throwable = e
-        while (cause.cause != null && cause.cause !== cause) {
-            cause = cause.cause!!
+    @CircuitBreaker(name = "pg")
+    @Retry(name = "pg")
+    override fun findTransaction(transactionKey: String): PgTransaction {
+        return try {
+            pgFeignClient.getPayment(transactionKey)
+                .let { extractData(it) }
+                .let { toDomainTransaction(it) }
+        } catch (e: Exception) {
+            throw exceptionClassifier.classify(e)
         }
-        return cause
     }
 
-    private fun <T> extractData(response: PgResponse<T>): T {
-        return response.data
-            ?: throw PgRequestNotReachedException("PG 응답 데이터 없음")
+    @CircuitBreaker(name = "pg")
+    @Retry(name = "pg")
+    override fun findTransactionsByOrderId(orderId: Long): List<PgTransaction> {
+        return try {
+            val response = pgFeignClient.getPaymentsByOrderId(orderId.toString())
+            extractData(response).transactions.map { summary ->
+                pgFeignClient.getPayment(summary.transactionKey)
+                    .let { extractData(it) }
+                    .let { toDomainTransaction(it) }
+            }
+        } catch (e: Exception) {
+            throw exceptionClassifier.classify(e)
+        }
     }
 
-    private fun toDomainTransaction(response: PgPaymentDetailResponse): PgTransaction {
-        return PgTransaction(
-            transactionKey = response.transactionKey,
-            orderId = response.orderId.toLong(),
-            cardType = DomainCardType.valueOf(response.cardType),
-            cardNo = response.cardNo,
-            amount = Money.krw(response.amount),
-            status = PgTransactionStatus.valueOf(response.status),
-            failureReason = response.reason,
-        )
-    }
+    private fun <T> extractData(response: PgResponse<T>): T =
+        response.data ?: throw PgRequestNotReachedException("PG 응답 데이터 없음")
+
+    private fun PgPaymentRequest.toInfraRequest() = PgPaymentRequest(
+        orderId = orderId.toString(),
+        cardType = cardInfo.cardType.name,
+        cardNo = cardInfo.cardNo,
+        amount = amount.amount.toLong(),
+        callbackUrl = callbackUrl,
+    )
+
+    private fun toDomainTransaction(response: PgPaymentDetailResponse) = PgTransaction(
+        transactionKey = response.transactionKey,
+        orderId = response.orderId.toLong(),
+        cardType = DomainCardType.valueOf(response.cardType),
+        cardNo = response.cardNo,
+        amount = Money.krw(response.amount),
+        status = PgTransactionStatus.valueOf(response.status),
+        failureReason = response.reason,
+    )
 }
