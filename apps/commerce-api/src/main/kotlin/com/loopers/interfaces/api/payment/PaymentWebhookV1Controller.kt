@@ -28,12 +28,6 @@ class PaymentWebhookV1Controller(
     override fun handleCallback(
         @RequestBody request: PaymentWebhookV1Request.Callback,
     ): ApiResponse<Unit> {
-        logger.info(
-            "PG 콜백 수신 - orderId: {}, externalPaymentKey: {}",
-            request.orderId,
-            request.externalPaymentKey,
-        )
-
         paymentFacade.processCallback(
             PaymentCriteria.ProcessCallback(
                 orderId = request.orderId,
@@ -41,7 +35,6 @@ class PaymentWebhookV1Controller(
             ),
         )
 
-        logger.info("PG 콜백 처리 완료 - orderId: {}", request.orderId)
         return ApiResponse.success(Unit)
     }
 }
