@@ -500,47 +500,6 @@ class PaymentTest {
             assertThat(payment.failureMessage).isEqualTo("카드 한도 초과")
         }
 
-        @DisplayName("매칭 없고 5분 경과 시 FAILED로 전이된다")
-        @Test
-        fun `transitions to FAILED when no match and 5 minutes elapsed`() {
-            // given
-            val attemptedAt = Instant.now().minusSeconds(301) // 5분 1초 전
-            val payment = createInProgressPayment(attemptedAt = attemptedAt)
-            // 다른 금액의 트랜잭션 생성
-            val transaction = createTransaction(
-                transactionKey = "tx_different",
-                amount = Money.krw(99999),
-                status = PgTransactionStatus.SUCCESS,
-            )
-
-            // when
-            payment.confirmPayment(transaction, currentTime = Instant.now())
-
-            // then
-            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
-            assertThat(payment.failureMessage).isEqualTo("결제 시간 초과")
-        }
-
-        @DisplayName("매칭 없고 5분 미경과 시 IN_PROGRESS 유지된다")
-        @Test
-        fun `stays IN_PROGRESS when no match and less than 5 minutes elapsed`() {
-            // given - 4분 59초 전
-            val attemptedAt = Instant.now().minusSeconds(299)
-            val payment = createInProgressPayment(attemptedAt = attemptedAt)
-            // 다른 금액의 트랜잭션 생성
-            val transaction = createTransaction(
-                transactionKey = "tx_different",
-                amount = Money.krw(99999),
-                status = PgTransactionStatus.SUCCESS,
-            )
-
-            // when
-            payment.confirmPayment(transaction, currentTime = Instant.now())
-
-            // then
-            assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
-        }
-
         @DisplayName("IN_PROGRESS가 아닌 상태에서 호출 시 예외가 발생한다")
         @Test
         fun `throws exception when called from non-IN_PROGRESS state`() {
@@ -558,18 +517,95 @@ class PaymentTest {
             assertThat(exception.message).isEqualTo("결제 진행 중 상태에서만 확정할 수 있습니다")
         }
 
-        @DisplayName("PENDING 트랜잭션만 있는 경우 IN_PROGRESS 유지된다")
+        @DisplayName("빈 트랜잭션 목록이면 FAILED로 전이된다")
         @Test
-        fun `stays IN_PROGRESS when only PENDING transactions exist`() {
+        fun `transitions to FAILED when transaction list is empty`() {
             // given
+            val payment = createInProgressPayment()
+
+            // when
+            val result = payment.confirmPayment(currentTime = Instant.now())
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
+            assertThat(result).isInstanceOf(Payment.ConfirmResult.Confirmed::class.java)
+        }
+
+        @DisplayName("매칭되는 트랜잭션이 없으면 FAILED로 전이된다")
+        @Test
+        fun `transitions to FAILED when no matching transaction exists`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
+            val unmatchedTransaction = createTransaction(
+                transactionKey = "tx_different",
+                status = PgTransactionStatus.SUCCESS,
+            )
+
+            // when
+            val result = payment.confirmPayment(unmatchedTransaction, currentTime = Instant.now())
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
+        }
+
+        @DisplayName("PENDING 트랜잭션만 있으면 FAILED로 전이된다 (externalPaymentKey 없는 경우)")
+        @Test
+        fun `transitions to FAILED when only PENDING transactions exist without key`() {
+            // given - externalPaymentKey가 null이면 PENDING 트랜잭션은 매칭 대상 아님
             val payment = createInProgressPayment(externalPaymentKey = null)
-            val transaction = createTransaction(
+            val pendingTransaction = createTransaction(
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.PENDING,
             )
 
             // when
-            payment.confirmPayment(transaction, currentTime = Instant.now())
+            val result = payment.confirmPayment(pendingTransaction, currentTime = Instant.now())
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
+        }
+
+        @DisplayName("PENDING 트랜잭션 매칭 시 5분 경과하면 FAILED로 전이된다")
+        @Test
+        fun `transitions to FAILED when matched PENDING and 5 minutes elapsed`() {
+            // given - externalPaymentKey가 있으면 PENDING도 매칭됨
+            val attemptedAt = Instant.now().minusSeconds(301) // 5분 1초 전
+            val payment = createInProgressPayment(
+                externalPaymentKey = "tx_12345",
+                attemptedAt = attemptedAt,
+            )
+            val pendingTransaction = createTransaction(
+                transactionKey = "tx_12345",
+                status = PgTransactionStatus.PENDING,
+            )
+
+            // when
+            payment.confirmPayment(pendingTransaction, currentTime = Instant.now())
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(payment.failureMessage).isEqualTo("결제 시간 초과")
+        }
+
+        @DisplayName("PENDING 트랜잭션 매칭 시 5분 미경과면 IN_PROGRESS 유지된다")
+        @Test
+        fun `stays IN_PROGRESS when matched PENDING and less than 5 minutes elapsed`() {
+            // given - externalPaymentKey가 있으면 PENDING도 매칭됨
+            val attemptedAt = Instant.now().minusSeconds(299) // 4분 59초 전
+            val payment = createInProgressPayment(
+                externalPaymentKey = "tx_12345",
+                attemptedAt = attemptedAt,
+            )
+            val pendingTransaction = createTransaction(
+                transactionKey = "tx_12345",
+                status = PgTransactionStatus.PENDING,
+            )
+
+            // when
+            payment.confirmPayment(pendingTransaction, currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)

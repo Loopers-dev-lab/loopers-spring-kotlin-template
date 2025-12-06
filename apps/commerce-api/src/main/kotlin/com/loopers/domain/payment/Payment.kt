@@ -167,6 +167,11 @@ class Payment(
                 failureMessage = matched.failureReason
             }
 
+            matched == null -> {
+                status = PaymentStatus.FAILED
+                failureMessage = "매칭되는 PG 트랜잭션이 없습니다"
+            }
+
             isTimedOut(currentTime) -> {
                 status = PaymentStatus.FAILED
                 failureMessage = "결제 시간 초과"

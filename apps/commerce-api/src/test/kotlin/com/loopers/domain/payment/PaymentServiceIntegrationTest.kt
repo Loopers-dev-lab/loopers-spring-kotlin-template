@@ -416,12 +416,11 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             assertThat(confirmed.payment.failureMessage).isEqualTo(failureReason)
         }
 
-        @DisplayName("매칭되는 트랜잭션이 없고 타임아웃이면 FAILED로 전이된다")
+        @DisplayName("매칭되는 트랜잭션이 없으면 FAILED로 전이된다")
         @Test
-        fun `transitions to FAILED when no match and timeout`() {
-            // given - 5분 1초 전에 시도된 결제
-            val attemptedAt = Instant.now().minusSeconds(301)
-            val payment = createInProgressPaymentWithAttemptedAt(attemptedAt = attemptedAt)
+        fun `transitions to FAILED when no matching transaction exists`() {
+            // given
+            val payment = createInProgressPayment()
             // 금액이 다른 트랜잭션 (매칭 안됨)
             val unmatchedTransaction = createTransaction(
                 transactionKey = "pg_tx_unmatched",
@@ -439,7 +438,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
             val confirmed = result as PaymentService.CallbackResult.Confirmed
             assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.FAILED)
-            assertThat(confirmed.payment.failureMessage).isEqualTo("결제 시간 초과")
+            assertThat(confirmed.payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
         }
 
         @DisplayName("존재하지 않는 결제 ID면 예외가 발생한다")
