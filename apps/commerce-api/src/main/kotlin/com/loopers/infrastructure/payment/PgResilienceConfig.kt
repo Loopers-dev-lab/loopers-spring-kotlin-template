@@ -22,46 +22,47 @@ class PgResilienceConfig(
 
     @PostConstruct
     fun registerEventListeners() {
-        // 결제용 서킷 상태 전환 로깅 (CLOSED ↔ OPEN ↔ HALF_OPEN)
-        circuitBreakerRegistry.circuitBreaker("pg-payment").eventPublisher
-            .onStateTransition { event ->
-                log.warn(
-                    "[PG Payment CircuitBreaker] 상태 전환: {} → {}",
-                    event.stateTransition.fromState,
-                    event.stateTransition.toState,
-                )
+        listOf("pg-payment", "pg-query").forEach { name ->
+            circuitBreakerRegistry.circuitBreaker(name).eventPublisher.apply {
+                // 상태 전환
+                onStateTransition { event ->
+                    log.warn(
+                        "[{} CB] 상태 전환: {} → {}",
+                        name,
+                        event.stateTransition.fromState,
+                        event.stateTransition.toState,
+                    )
+                }
+
+                // 실패율 임계치 초과 - "왜" OPEN 됐는지 알 수 있음
+                onFailureRateExceeded { event ->
+                    log.error(
+                        "[{} CB] 실패율 임계치 초과: {}% (OPEN 전환 예정)",
+                        name,
+                        event.failureRate,
+                    )
+                }
+
+                // 느린 호출 비율 임계치 초과 - slowCallRateThreshold 설정 시
+                onSlowCallRateExceeded { event ->
+                    log.error(
+                        "[{} CB] 느린 호출 비율 초과: {}% (OPEN 전환 예정)",
+                        name,
+                        event.slowCallRate,
+                    )
+                }
             }
 
-        // 조회용 서킷 상태 전환 로깅
-        circuitBreakerRegistry.circuitBreaker("pg-query").eventPublisher
-            .onStateTransition { event ->
-                log.warn(
-                    "[PG Query CircuitBreaker] 상태 전환: {} → {}",
-                    event.stateTransition.fromState,
-                    event.stateTransition.toState,
-                )
+            retryRegistry.retry(name).eventPublisher.apply {
+                onRetry { event ->
+                    log.warn(
+                        "[{} Retry] 재시도 #{} - 원인: {}",
+                        name,
+                        event.numberOfRetryAttempts,
+                        event.lastThrowable?.javaClass?.simpleName,
+                    )
+                }
             }
-
-        // 결제용 재시도 발생 시 로깅
-        retryRegistry.retry("pg-payment").eventPublisher
-            .onRetry { event ->
-                log.warn(
-                    "[PG Payment Retry] 재시도 #{} - 대기: {}ms, 원인: {}",
-                    event.numberOfRetryAttempts,
-                    event.waitInterval.toMillis(),
-                    event.lastThrowable?.message,
-                )
-            }
-
-        // 조회용 재시도 발생 시 로깅
-        retryRegistry.retry("pg-query").eventPublisher
-            .onRetry { event ->
-                log.warn(
-                    "[PG Query Retry] 재시도 #{} - 대기: {}ms, 원인: {}",
-                    event.numberOfRetryAttempts,
-                    event.waitInterval.toMillis(),
-                    event.lastThrowable?.message,
-                )
-            }
+        }
     }
 }

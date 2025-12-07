@@ -15,6 +15,10 @@ spring:
     web-application-type: servlet
   application:
     name: commerce-api
+  task:
+    scheduling:
+      pool:
+        size: 1  # 동일 @Scheduled 메서드의 동시 실행 방지
   profiles:
     active: local
   config:

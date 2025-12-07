@@ -25,59 +25,70 @@ class PaymentScheduler(
 
     /**
      * 매 1분마다 실행
+     * - 모든 IN_PROGRESS 결제를 페이지네이션으로 조회하여 처리
+     * - pool.size=1 설정으로 동시 실행 방지 (application.yml)
      */
     @Scheduled(fixedRate = 60_000)
     fun checkInProgressPayments() {
-        val criteria = PaymentCriteria.FindPayments(
-            statuses = listOf(PaymentStatus.IN_PROGRESS),
-            sort = PaymentSortType.CREATED_AT_ASC,
-        )
-        val inProgressPayments = paymentFacade.findPayments(criteria).content
+        var totalProcessed = 0
+        var totalSkipped = 0
+        val attemptedIds = mutableSetOf<Long>()
 
-        if (inProgressPayments.isEmpty()) {
-            return
-        }
+        logger.info("checkInProgressPayments scheduler start")
 
-        logger.info(
-            "IN_PROGRESS 결제 상태 확인 시작 - count: {}",
-            inProgressPayments.size,
-        )
+        // 처리된 결제는 상태가 변경되어 조건에서 제외되므로 항상 page=0으로 조회
+        // 스킵된 결제를 중복 시도하지 않기 위해 attemptedIds로 추적
+        while (true) {
+            val criteria = PaymentCriteria.FindPayments(
+                page = 0,
+                statuses = listOf(PaymentStatus.IN_PROGRESS),
+                sort = PaymentSortType.CREATED_AT_ASC,
+            )
+            val slice = paymentFacade.findPayments(criteria)
 
-        var processedCount = 0
-        var skippedCount = 0
+            // 아직 시도하지 않은 결제만 필터링
+            val newPayments = slice.content.filter { it.id !in attemptedIds }
 
-        for (payment in inProgressPayments) {
-            try {
-                paymentFacade.processInProgressPayment(payment.id)
-                processedCount++
-            } catch (e: PgRequestNotReachedException) {
-                // PG 연결 실패 - 다음 스케줄에 재시도
-                logger.warn(
-                    "PG 연결 실패, 다음 스케줄에 재시도 - paymentId: {}",
-                    payment.id,
-                )
-                skippedCount++
-            } catch (e: ObjectOptimisticLockingFailureException) {
-                // 콜백과 동시 처리로 인한 충돌 - 정상 케이스이므로 skip
-                logger.debug(
-                    "결제 상태 확인 중 낙관적 락 충돌 - paymentId: {} (이미 다른 곳에서 처리됨)",
-                    payment.id,
-                )
-                skippedCount++
-            } catch (e: Exception) {
-                logger.error(
-                    "결제 상태 확인 중 예상치 못한 오류 - paymentId: {}",
-                    payment.id,
-                    e,
-                )
-                skippedCount++
+            if (newPayments.isEmpty()) {
+                break
+            }
+
+            for (payment in newPayments) {
+                attemptedIds.add(payment.id)
+                try {
+                    paymentFacade.processInProgressPayment(payment.id)
+                    totalProcessed++
+                } catch (e: PgRequestNotReachedException) {
+                    // PG 연결 실패 - 다음 스케줄에 재시도
+                    logger.warn(
+                        "PG 연결 실패, 다음 스케줄에 재시도 - paymentId: {}",
+                        payment.id,
+                    )
+                    totalSkipped++
+                } catch (e: ObjectOptimisticLockingFailureException) {
+                    // 콜백과 동시 처리로 인한 충돌 - 정상 케이스이므로 skip
+                    logger.debug(
+                        "낙관적 락 충돌 - paymentId: {} (이미 처리됨)",
+                        payment.id,
+                    )
+                    totalSkipped++
+                } catch (e: Exception) {
+                    logger.error(
+                        "예상치 못한 오류 - paymentId: {}",
+                        payment.id,
+                        e,
+                    )
+                    totalSkipped++
+                }
             }
         }
 
-        logger.info(
-            "IN_PROGRESS 결제 상태 확인 완료 - processed: {}, skipped: {}",
-            processedCount,
-            skippedCount,
-        )
+        if (totalProcessed > 0 || totalSkipped > 0) {
+            logger.info(
+                "checkInProgressPayments scheduler end - processed: {}, skipped: {}",
+                totalProcessed,
+                totalSkipped,
+            )
+        }
     }
 }
