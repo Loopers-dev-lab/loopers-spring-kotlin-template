@@ -254,7 +254,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         @Test
         fun `pagination works correctly`() {
             // given
-            repeat(5) { createInProgressPayment() }
+            repeat(5) { index -> createInProgressPayment(externalPaymentKey = "tx_pagination_$index") }
 
             // when
             val command = PaymentCommand.FindPayments(
@@ -402,7 +402,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                 transactionKey = "pg_tx_match",
                 status = PgTransactionStatus.SUCCESS,
             )
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(successTransaction)
+            every { pgClient.findTransaction("pg_tx_match") } returns successTransaction
 
             // when
             val result = paymentService.processInProgressPayment(
@@ -426,7 +426,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                 status = PgTransactionStatus.FAILED,
                 failureReason = failureReason,
             )
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
+            every { pgClient.findTransaction("pg_tx_fail_match") } returns failedTransaction
 
             // when
             val result = paymentService.processInProgressPayment(
@@ -444,10 +444,13 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         @Test
         fun `transitions to FAILED when no matching transaction exists`() {
             // given
-            val payment = createInProgressPayment()
-            // transactionKey가 다른 트랜잭션 (매칭 안됨)
+            // externalPaymentKey가 없으면 findTransactionsByPaymentId로 fallback
+            val payment = createInProgressPayment(externalPaymentKey = null)
+            // paymentId가 다른 트랜잭션 (매칭 안됨)
+            // externalPaymentKey가 null이면 paymentId로 매칭하므로 다르게 설정
             val unmatchedTransaction = createTransaction(
                 transactionKey = "pg_tx_unmatched",
+                paymentId = payment.id + 1,
                 status = PgTransactionStatus.SUCCESS,
             )
             every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(unmatchedTransaction)
@@ -568,9 +571,14 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         return paymentRepository.save(payment)
     }
 
-    private fun createInProgressPayment(externalPaymentKey: String = "tx_test"): Payment {
+    private fun createInProgressPayment(externalPaymentKey: String? = "tx_test"): Payment {
         val payment = createPendingPayment()
-        payment.initiate(PgPaymentCreateResult.Accepted(externalPaymentKey), Instant.now())
+        val result = if (externalPaymentKey != null) {
+            PgPaymentCreateResult.Accepted(externalPaymentKey)
+        } else {
+            PgPaymentCreateResult.Uncertain
+        }
+        payment.initiate(result, Instant.now())
         return paymentRepository.save(payment)
     }
 

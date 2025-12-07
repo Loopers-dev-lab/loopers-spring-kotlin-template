@@ -82,7 +82,7 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
                 status = PgTransactionStatus.SUCCESS,
             )
 
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(successTransaction)
+            every { pgClient.findTransaction(payment.externalPaymentKey!!) } returns successTransaction
 
             val threadCount = 5
             val executor = Executors.newFixedThreadPool(threadCount)

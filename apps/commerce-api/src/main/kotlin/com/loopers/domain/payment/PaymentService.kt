@@ -190,7 +190,9 @@ class PaymentService(
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
-        val transactions = pgClient.findTransactionsByPaymentId(payment.id)
+        val transactions = payment.externalPaymentKey?.let { key ->
+            listOf(pgClient.findTransaction(key))
+        } ?: pgClient.findTransactionsByPaymentId(payment.id)
 
         val result = payment.confirmPayment(*transactions.toTypedArray(), currentTime = currentTime)
 

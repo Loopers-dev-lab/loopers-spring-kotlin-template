@@ -95,7 +95,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "PG 연결 실패",
             )
 
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
+            every { pgClient.findTransaction(payment.externalPaymentKey!!) } returns failedTransaction
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -129,7 +129,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "서킷 브레이커 오픈",
             )
 
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
+            every { pgClient.findTransaction(payment.externalPaymentKey!!) } returns failedTransaction
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -163,7 +163,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "잔액 부족",
             )
 
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
+            every { pgClient.findTransaction(payment.externalPaymentKey!!) } returns failedTransaction
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -215,7 +215,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "타임아웃",
             )
 
-            every { pgClient.findTransactionsByPaymentId(initiatedPayment.id) } returns listOf(failedTransaction)
+            every { pgClient.findTransaction(initiatedPayment.externalPaymentKey!!) } returns failedTransaction
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(initiatedPayment.id)
@@ -286,7 +286,7 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 failureReason = "PG 서버 오류",
             )
 
-            every { pgClient.findTransactionsByPaymentId(initiatedPayment.id) } returns listOf(failedTransaction)
+            every { pgClient.findTransaction(initiatedPayment.externalPaymentKey!!) } returns failedTransaction
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(initiatedPayment.id)

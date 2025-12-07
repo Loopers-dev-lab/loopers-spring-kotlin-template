@@ -56,12 +56,10 @@ class PaymentSchedulerIntegrationTest @Autowired constructor(
             val paymentCount = 3
             val payments = (1..paymentCount).map { idx ->
                 val payment = createInProgressPayment(externalPaymentKey = "tx_multi_$idx")
-                every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(
-                    createTransaction(
-                        transactionKey = "tx_multi_$idx",
-                        paymentId = payment.id,
-                        status = PgTransactionStatus.SUCCESS,
-                    ),
+                every { pgClient.findTransaction("tx_multi_$idx") } returns createTransaction(
+                    transactionKey = "tx_multi_$idx",
+                    paymentId = payment.id,
+                    status = PgTransactionStatus.SUCCESS,
                 )
                 payment
             }
@@ -85,23 +83,19 @@ class PaymentSchedulerIntegrationTest @Autowired constructor(
             val payment3 = createInProgressPayment(externalPaymentKey = "tx_error_3")
 
             // payment1 - 예외 발생
-            every { pgClient.findTransactionsByPaymentId(payment1.id) } throws
-                    RuntimeException("PG 연결 오류")
+            every { pgClient.findTransaction("tx_error_1") } throws
+                RuntimeException("PG 연결 오류")
 
             // payment2, payment3 - 정상 처리
-            every { pgClient.findTransactionsByPaymentId(payment2.id) } returns listOf(
-                createTransaction(
-                    transactionKey = "tx_error_2",
-                    paymentId = payment2.id,
-                    status = PgTransactionStatus.SUCCESS,
-                ),
+            every { pgClient.findTransaction("tx_error_2") } returns createTransaction(
+                transactionKey = "tx_error_2",
+                paymentId = payment2.id,
+                status = PgTransactionStatus.SUCCESS,
             )
-            every { pgClient.findTransactionsByPaymentId(payment3.id) } returns listOf(
-                createTransaction(
-                    transactionKey = "tx_error_3",
-                    paymentId = payment3.id,
-                    status = PgTransactionStatus.SUCCESS,
-                ),
+            every { pgClient.findTransaction("tx_error_3") } returns createTransaction(
+                transactionKey = "tx_error_3",
+                paymentId = payment3.id,
+                status = PgTransactionStatus.SUCCESS,
             )
 
             // when
