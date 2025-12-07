@@ -61,22 +61,7 @@ class OrderFacade(
 
                 logger.info("포인트 결제 완료: orderId=${order.id}, amount=${finalAmount.amount}")
 
-                // 주문 생성 이벤트 발행
-                eventPublisher.publishEvent(OrderCreatedEvent.from(order, request.couponId))
-
-                // 유저 행동 로깅
-                eventPublisher.publishEvent(
-                    UserActionEvent(
-                        userId = userId,
-                        actionType = UserActionType.ORDER_CREATE,
-                        targetType = "ORDER",
-                        targetId = order.id,
-                        metadata = mapOf(
-                            "paymentMethod" to paymentMethod.name,
-                            "amount" to finalAmount.amount.toLong(),
-                        ),
-                    ),
-                )
+                publishOrderEvents(order, userId, request.couponId, paymentMethod, finalAmount)
 
                 return OrderCreateInfo.from(order)
             }
@@ -102,22 +87,7 @@ class OrderFacade(
                     val paymentInfo = paymentFacade.requestCardPayment(paymentRequest)
                     logger.info("카드 결제 요청 완료: orderId=${order.id}, transactionKey=${paymentInfo.transactionKey}")
 
-                    // 주문 생성 이벤트 발행
-                    eventPublisher.publishEvent(OrderCreatedEvent.from(order, request.couponId))
-
-                    // 유저 행동 로깅
-                    eventPublisher.publishEvent(
-                        UserActionEvent(
-                            userId = userId,
-                            actionType = UserActionType.ORDER_CREATE,
-                            targetType = "ORDER",
-                            targetId = order.id,
-                            metadata = mapOf(
-                                "paymentMethod" to paymentMethod.name,
-                                "amount" to finalAmount.amount.toLong(),
-                            ),
-                        ),
-                    )
+                    publishOrderEvents(order, userId, request.couponId, paymentMethod, finalAmount)
                 } catch (e: Exception) {
                     logger.error("카드 결제 요청 실패: orderId=${order.id}", e)
 
@@ -138,15 +108,45 @@ class OrderFacade(
     }
 
     /**
+     * 주문 생성 관련 이벤트를 발행합니다.
+     * OrderCreatedEvent와 UserActionEvent를 발행하여 주문 생성을 알립니다.
+     */
+    private fun publishOrderEvents(
+        order: com.loopers.domain.order.Order,
+        userId: Long,
+        couponId: Long?,
+        paymentMethod: PaymentMethod,
+        finalAmount: Money,
+    ) {
+        // 주문 생성 이벤트 발행
+        eventPublisher.publishEvent(OrderCreatedEvent.from(order, couponId))
+
+        // 유저 행동 로깅
+        eventPublisher.publishEvent(
+            UserActionEvent(
+                userId = userId,
+                actionType = UserActionType.ORDER_CREATE,
+                targetType = "ORDER",
+                targetId = order.id,
+                metadata = mapOf(
+                    "paymentMethod" to paymentMethod.name,
+                    "amount" to finalAmount.amount.toLong(),
+                ),
+            ),
+        )
+    }
+
+    /**
      * 쿠폰 할인 금액 계산
-     * 실제 쿠폰 사용은 이벤트 핸들러에서 비동기로 처리
+     * 쿠폰 유효성을 검증하고 할인 금액을 계산합니다.
+     * 실제 쿠폰 사용 처리(상태 변경)는 OrderCreatedEvent 핸들러에서 비동기로 수행됩니다.
      */
     private fun calculateCouponDiscount(userId: Long, couponId: Long?, totalAmount: Money): Money {
         if (couponId == null) {
             return Money(BigDecimal.ZERO, totalAmount.currency)
         }
 
-        // 쿠폰 정보 조회 (실제 사용은 안 함)
+        // 쿠폰 정보 조회 및 사용 가능 여부 검증
         val userCoupon = couponService.getUserCoupon(userId, couponId)
 
         // 사용 가능 여부 검증
