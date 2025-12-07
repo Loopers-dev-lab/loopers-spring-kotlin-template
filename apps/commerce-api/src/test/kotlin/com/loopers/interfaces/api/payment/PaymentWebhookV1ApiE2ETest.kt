@@ -2,7 +2,6 @@ package com.loopers.interfaces.api.payment
 
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
-import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
@@ -81,7 +80,6 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
             val successTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
             every { pgClient.findTransaction(externalPaymentKey) } returns successTransaction
@@ -119,7 +117,6 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "잔액 부족",
             )
@@ -158,7 +155,6 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
             val successTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
             every { pgClient.findTransaction(externalPaymentKey) } returns successTransaction
@@ -288,16 +284,12 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
     private fun createTransaction(
         transactionKey: String,
         paymentId: Long,
-        amount: Money,
         status: PgTransactionStatus,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
             paymentId = paymentId,
-            cardType = CardType.KB,
-            cardNo = "0000-0000-0000-0000",
-            amount = amount,
             status = status,
             failureReason = failureReason,
         )

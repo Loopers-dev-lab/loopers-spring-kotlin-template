@@ -4,14 +4,12 @@ import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
-import com.loopers.support.values.Money
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
-import com.loopers.domain.payment.CardType as DomainCardType
 import com.loopers.domain.payment.PgPaymentRequest as DomainPgPaymentRequest
 
 @Component
@@ -74,10 +72,14 @@ class PgClientImpl(
         return try {
             // 도메인의 paymentId를 외부 PG API의 orderId 파라미터로 전달
             val response = pgFeignClient.getPaymentsByOrderId(paymentId.toString().padStart(6, '0'))
-            val result = extractData(response).transactions.map { summary ->
-                pgFeignClient.getPayment(summary.transactionKey)
-                    .let { extractData(it) }
-                    .let { toDomainTransaction(it) }
+            val data = extractData(response)
+            val result = data.transactions.map { summary ->
+                PgTransaction(
+                    transactionKey = summary.transactionKey,
+                    paymentId = data.orderId.toLong(),
+                    status = PgTransactionStatus.valueOf(summary.status),
+                    failureReason = summary.reason,
+                )
             }
             recordSuccess(sample, "findTransactionsByPaymentId")
             result
@@ -103,9 +105,6 @@ class PgClientImpl(
         transactionKey = response.transactionKey,
         // 외부 PG API의 orderId 응답을 도메인의 paymentId로 변환
         paymentId = response.orderId.toLong(),
-        cardType = DomainCardType.valueOf(response.cardType),
-        cardNo = response.cardNo,
-        amount = Money.krw(response.amount),
         status = PgTransactionStatus.valueOf(response.status),
         failureReason = response.reason,
     )

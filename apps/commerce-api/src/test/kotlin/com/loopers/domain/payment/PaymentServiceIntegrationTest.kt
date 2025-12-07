@@ -166,7 +166,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             val payment = createInProgressPayment()
             val transaction = createTransaction(
                 transactionKey = "tx_test",
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
 
@@ -192,7 +191,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             val failureReason = "잔액 부족"
             val transaction = createTransaction(
                 transactionKey = "tx_test",
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = failureReason,
             )
@@ -290,7 +288,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             val payment = createInProgressPayment(externalPaymentKey = "pg_tx_success")
             val successTransaction = createTransaction(
                 transactionKey = "pg_tx_success",
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
             every { pgClient.findTransaction("pg_tx_success") } returns successTransaction
@@ -315,7 +312,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             val failureReason = "카드 한도 초과"
             val failedTransaction = createTransaction(
                 transactionKey = "pg_tx_failed",
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = failureReason,
             )
@@ -341,7 +337,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             val payment = createPaidPayment()
             val transaction = createTransaction(
                 transactionKey = "pg_tx_already",
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
             every { pgClient.findTransaction("pg_tx_already") } returns transaction
@@ -383,7 +378,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             val payment = createInProgressPayment(externalPaymentKey = "pg_tx_match")
             val successTransaction = createTransaction(
                 transactionKey = "pg_tx_match",
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
             every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(successTransaction)
@@ -407,7 +401,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             val failureReason = "잔액 부족"
             val failedTransaction = createTransaction(
                 transactionKey = "pg_tx_fail_match",
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = failureReason,
             )
@@ -430,10 +423,9 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         fun `transitions to FAILED when no matching transaction exists`() {
             // given
             val payment = createInProgressPayment()
-            // 금액이 다른 트랜잭션 (매칭 안됨)
+            // transactionKey가 다른 트랜잭션 (매칭 안됨)
             val unmatchedTransaction = createTransaction(
                 transactionKey = "pg_tx_unmatched",
-                amount = Money.krw(99999),
                 status = PgTransactionStatus.SUCCESS,
             )
             every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(unmatchedTransaction)
@@ -573,7 +565,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         val payment = createInProgressPayment(externalPaymentKey = "tx_paid")
         val successTransaction = createTransaction(
             transactionKey = "tx_paid",
-            amount = payment.paidAmount,
             status = PgTransactionStatus.SUCCESS,
         )
         payment.confirmPayment(successTransaction, currentTime = Instant.now())
@@ -583,16 +574,12 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     private fun createTransaction(
         transactionKey: String = "tx_default",
         paymentId: Long = 1L,
-        amount: Money = Money.krw(10000),
         status: PgTransactionStatus = PgTransactionStatus.SUCCESS,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
             paymentId = paymentId,
-            cardType = CardType.KB,
-            cardNo = "0000-0000-0000-0000",
-            amount = amount,
             status = status,
             failureReason = failureReason,
         )

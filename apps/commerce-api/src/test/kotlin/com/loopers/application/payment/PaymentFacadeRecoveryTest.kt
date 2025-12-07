@@ -10,7 +10,6 @@ import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.OrderStatus
-import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
@@ -94,7 +93,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "PG 연결 실패",
             )
@@ -129,7 +127,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "카드 한도 초과",
             )
@@ -160,7 +157,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "서킷 브레이커 오픈",
             )
@@ -189,7 +185,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "PG 거부",
             )
@@ -223,7 +218,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "잔액 부족",
             )
@@ -276,7 +270,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = initiatedPayment.externalPaymentKey!!,
                 paymentId = initiatedPayment.id,
-                amount = initiatedPayment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "타임아웃",
             )
@@ -309,7 +302,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "결제 거부",
             )
@@ -336,7 +328,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val successTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
 
@@ -402,7 +393,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = initiatedPayment.externalPaymentKey!!,
                 paymentId = initiatedPayment.id,
-                amount = initiatedPayment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "PG 서버 오류",
             )
@@ -606,16 +596,12 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
     private fun createTransaction(
         transactionKey: String,
         paymentId: Long,
-        amount: Money,
         status: PgTransactionStatus,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
             paymentId = paymentId,
-            cardType = CardType.KB,
-            cardNo = "0000-0000-0000-0000",
-            amount = amount,
             status = status,
             failureReason = failureReason,
         )

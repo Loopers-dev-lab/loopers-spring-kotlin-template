@@ -11,7 +11,6 @@ import com.loopers.domain.coupon.IssuedCouponRepository
 import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
-import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
@@ -246,7 +245,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val transaction = createTransaction(
                 transactionKey = externalPaymentKey,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
 
@@ -289,7 +287,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val failedTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "테스트 실패",
             )
@@ -332,7 +329,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val successTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
             every { pgClient.findTransaction(externalPaymentKey) } returns successTransaction
@@ -484,16 +480,12 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     private fun createTransaction(
         transactionKey: String,
         paymentId: Long,
-        amount: Money,
         status: PgTransactionStatus,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
             paymentId = paymentId,
-            cardType = CardType.KB,
-            cardNo = "0000-0000-0000-0000",
-            amount = amount,
             status = status,
             failureReason = failureReason,
         )

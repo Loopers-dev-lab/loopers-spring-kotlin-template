@@ -468,7 +468,6 @@ class PaymentTest {
             val transaction = createTransaction(
                 transactionKey = "tx_new_12345",
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
 
@@ -488,7 +487,6 @@ class PaymentTest {
             val transaction = createTransaction(
                 transactionKey = "tx_failed_12345",
                 paymentId = payment.id,
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "카드 한도 초과",
             )
@@ -558,7 +556,6 @@ class PaymentTest {
             // given - externalPaymentKey가 null이면 PENDING 트랜잭션은 매칭 대상 아님
             val payment = createInProgressPayment(externalPaymentKey = null)
             val pendingTransaction = createTransaction(
-                amount = payment.paidAmount,
                 status = PgTransactionStatus.PENDING,
             )
 
@@ -648,16 +645,12 @@ class PaymentTest {
     private fun createTransaction(
         transactionKey: String = "tx_default",
         paymentId: Long = 1L,
-        amount: Money = Money.krw(10000),
         status: PgTransactionStatus = PgTransactionStatus.SUCCESS,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
             paymentId = paymentId,
-            cardType = CardType.KB,
-            cardNo = "0000-0000-0000-0000",
-            amount = amount,
             status = status,
             failureReason = failureReason,
         )
