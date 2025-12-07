@@ -1,0 +1,63 @@
+### 주문 생성 (쿠폰 없음)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-USER-ID: 1
+
+{
+  "orderItems": [
+    {
+      "productId": 1,
+      "quantity": 2,
+      "productPrice": 10000
+    }
+  ],
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456",
+  "couponId": null
+}
+
+### 주문 생성 (쿠폰 있음)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-USER-ID: 1
+
+{
+  "orderItems": [
+    {
+      "productId": 1,
+      "quantity": 1,
+      "productPrice": 50000
+    }
+  ],
+  "cardType": "DEBIT",
+  "cardNo": "9876-5432-1098-7654",
+  "couponId": 1
+}
+
+### 주문 생성 (여러 상품)
+POST {{commerce-api}}/api/v1/orders
+Content-Type: application/json
+X-USER-ID: 2
+
+{
+  "orderItems": [
+    {
+      "productId": 1,
+      "quantity": 1,
+      "productPrice": 10000
+    },
+    {
+      "productId": 2,
+      "quantity": 2,
+      "productPrice": 15000
+    },
+    {
+      "productId": 3,
+      "quantity": 3,
+      "productPrice": 20000
+    }
+  ],
+  "cardType": "CREDIT",
+  "cardNo": "1111-2222-3333-4444",
+  "couponId": null
+}

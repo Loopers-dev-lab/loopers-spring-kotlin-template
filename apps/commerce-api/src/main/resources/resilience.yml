@@ -1,0 +1,32 @@
+resilience4j:
+  circuitbreaker:
+    instances:
+      payment:
+        failureRateThreshold: 50  # 실패율이 50%를 넘으면 Circuit Open
+        slowCallRateThreshold: 100        # 느린 호출 비율이 100%를 넘으면 Circuit Open
+        slowCallDurationThreshold: 3s         # 몇 초 이상 걸리면 느린 호출로 간주
+        slidingWindowSize: 10         # 최근 N개의 호출을 기준으로 실패율 계산
+        slidingWindowType: COUNT_BASED         # COUNT_BASED (개수 기반) 또는 TIME_BASED (시간 기반)
+        waitDurationInOpenState: 10s          # Circuit이 Open된 후 Half-Open으로 전환되기까지 대기 시간
+        permittedNumberOfCallsInHalfOpenState: 5         # Half-Open 상태에서 테스트할 호출 수
+        minimumNumberOfCalls: 5         # 최소 호출 횟수 (이 수 이상이어야 실패율 계산)
+        automaticTransitionFromOpenToHalfOpenEnabled: true         # Half-Open에서 Open으로 자동 전환 활성화
+        ignoreExceptions: # 무시할 예외 (Circuit Breaker 통계에 포함 안 함)
+        recordExceptions: # 기록할 예외 (Circuit Breaker 통계에 포함)
+          - feign.FeignException.InternalServerError
+          - feign.FeignException.ServiceUnavailable
+
+  retry:
+    instances:
+      payment:
+        maxAttempts: 2         # 최대 재시도 횟수 (초기 호출 포함 시 총 3번 시도)
+        waitDuration: 1000ms         # 재시도 간 대기 시간
+        retryExceptions: # 재시도할 예외
+          - feign.FeignException.InternalServerError
+          - feign.FeignException.ServiceUnavailable
+        ignoreExceptions:        # 재시도하지 않을 예외
+        # Exponential Backoff 활성화
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        enableRandomizedWait: false        # 랜덤 지연 추가 (동시 재시도 분산)
+
