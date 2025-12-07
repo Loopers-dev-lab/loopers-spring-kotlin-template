@@ -165,16 +165,17 @@ class PaymentService(
 
     @Transactional
     fun syncPaymentStatus(payment: Payment) {
-        if (payment.transactionKey == null) {
+        val transactionKey = payment.transactionKey
+        if (transactionKey == null) {
             logger.warn("거래 키가 없는 결제는 상태 동기화를 건너뜁니다: paymentId=${payment.id}")
             return
         }
 
         try {
-            val status = checkPaymentStatus(payment.userId, payment.transactionKey!!)
-            handlePaymentCallback(payment.transactionKey!!, status, null)
+            val status = checkPaymentStatus(payment.userId, transactionKey)
+            handlePaymentCallback(transactionKey, status, null)
         } catch (e: Exception) {
-            logger.error("결제 상태 동기화 실패: paymentId=${payment.id}, transactionKey=${payment.transactionKey}", e)
+            logger.error("결제 상태 동기화 실패: paymentId=${payment.id}, transactionKey=$transactionKey", e)
         }
     }
 

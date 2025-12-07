@@ -77,7 +77,7 @@ class OrderFacade(
 
                 val paymentRequest = PaymentRequest(
                     userId = userId,
-                    orderId = order.id!!,
+                    orderId = requireNotNull(order.id) { "Order id must not be null after creation" },
                     amount = finalAmount.amount.toLong(),
                     cardType = request.cardType,
                     cardNo = request.cardNo,

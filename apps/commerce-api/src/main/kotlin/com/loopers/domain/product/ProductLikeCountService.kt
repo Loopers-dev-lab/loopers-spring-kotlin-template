@@ -42,7 +42,7 @@ class ProductLikeCountService(
         val result = productLikeCountRedisRepository.incrementIfExists(productId)
 
         return if (isKeyExists(result)) {
-            result!!
+            requireNotNull(result) { "Result should not be null when key exists for productId=$productId" }
         } else {
             initializeAndIncrement(productId)
         }
@@ -52,7 +52,7 @@ class ProductLikeCountService(
         val result = productLikeCountRedisRepository.decrementIfPositive(productId)
 
         return if (isKeyExists(result)) {
-            result!!
+            requireNotNull(result) { "Result should not be null when key exists for productId=$productId" }
         } else {
             initializeAndDecrement(productId)
         }

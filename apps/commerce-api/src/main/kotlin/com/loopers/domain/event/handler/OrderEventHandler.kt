@@ -78,10 +78,11 @@ class OrderEventHandler(
 
     /**
      * 결제 완료 후 주문 상태 업데이트
-     * 새로운 트랜잭션에서 처리
+     * 결제 트랜잭션 커밋 후 새로운 트랜잭션에서 처리
+     * AFTER_COMMIT을 사용하여 결제가 성공적으로 커밋된 후에만 주문을 확정함
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handlePaymentCompleted(event: PaymentCompletedEvent) {
         try {
             logger.info("주문 상태 업데이트 시작: orderId=${event.orderId}, paymentId=${event.paymentId}")
