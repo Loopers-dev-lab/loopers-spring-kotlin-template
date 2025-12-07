@@ -22,13 +22,14 @@ import com.loopers.domain.product.Stock
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
+import com.ninjasquad.springmockk.MockkBean
+import io.mockk.every
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import com.ninjasquad.springmockk.MockkBean
-import io.mockk.every
+import org.junit.jupiter.api.assertAll
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.orm.ObjectOptimisticLockingFailureException
@@ -109,14 +110,18 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
             executor.shutdown()
 
             // then - 하나만 성공하고 나머지는 실패 또는 AlreadyProcessed
+            assertAll(
+                { assertThat(successCount.get()).isEqualTo(1) },
+                { assertThat(failureCount.get()).isEqualTo(threadCount - 1) },
+            )
             val finalPayment = paymentRepository.findById(payment.id)!!
             assertThat(finalPayment.status).isEqualTo(PaymentStatus.PAID)
         }
     }
 
-    // ===========================================
-    // 헬퍼 메서드
-    // ===========================================
+// ===========================================
+// 헬퍼 메서드
+// ===========================================
 
     private fun createProduct(
         price: Money = Money.krw(10000),
