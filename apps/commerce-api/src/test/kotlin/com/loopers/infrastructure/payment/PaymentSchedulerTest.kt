@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.payment
 
+import com.loopers.application.payment.PaymentCriteria
 import com.loopers.application.payment.PaymentFacade
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentStatus
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.springframework.data.domain.SliceImpl
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import java.time.ZonedDateTime
 
@@ -37,7 +39,8 @@ class PaymentSchedulerTest {
             // given
             val paymentId = 1L
             val payment = createMockPayment(id = paymentId)
-            every { paymentFacade.findInProgressPayments() } returns listOf(payment)
+            every { paymentFacade.findPayments(any<PaymentCriteria.FindPayments>()) } returns
+                SliceImpl(listOf(payment))
 
             // when
             scheduler.checkInProgressPayments()
@@ -50,7 +53,8 @@ class PaymentSchedulerTest {
         @DisplayName("IN_PROGRESS 결제가 없으면 아무 작업도 하지 않는다")
         fun `does nothing when no IN_PROGRESS payments`() {
             // given
-            every { paymentFacade.findInProgressPayments() } returns emptyList()
+            every { paymentFacade.findPayments(any<PaymentCriteria.FindPayments>()) } returns
+                SliceImpl(emptyList())
 
             // when
             scheduler.checkInProgressPayments()
@@ -70,7 +74,8 @@ class PaymentSchedulerTest {
             val payment2 = createMockPayment(id = paymentId2)
             val payment3 = createMockPayment(id = paymentId3)
 
-            every { paymentFacade.findInProgressPayments() } returns listOf(payment1, payment2, payment3)
+            every { paymentFacade.findPayments(any<PaymentCriteria.FindPayments>()) } returns
+                SliceImpl(listOf(payment1, payment2, payment3))
 
             // when
             scheduler.checkInProgressPayments()
@@ -95,7 +100,8 @@ class PaymentSchedulerTest {
             val payment1 = createMockPayment(id = paymentId1)
             val payment2 = createMockPayment(id = paymentId2)
 
-            every { paymentFacade.findInProgressPayments() } returns listOf(payment1, payment2)
+            every { paymentFacade.findPayments(any<PaymentCriteria.FindPayments>()) } returns
+                SliceImpl(listOf(payment1, payment2))
 
             // payment1 - 낙관적 락 충돌
             every { paymentFacade.processInProgressPayment(paymentId1) } throws
@@ -123,7 +129,8 @@ class PaymentSchedulerTest {
             val payment1 = createMockPayment(id = paymentId1)
             val payment2 = createMockPayment(id = paymentId2)
 
-            every { paymentFacade.findInProgressPayments() } returns listOf(payment1, payment2)
+            every { paymentFacade.findPayments(any<PaymentCriteria.FindPayments>()) } returns
+                SliceImpl(listOf(payment1, payment2))
 
             // payment1 - 예상치 못한 예외
             every { paymentFacade.processInProgressPayment(paymentId1) } throws RuntimeException("Unexpected error")
@@ -150,7 +157,8 @@ class PaymentSchedulerTest {
             val payment1 = createMockPayment(id = paymentId1)
             val payment2 = createMockPayment(id = paymentId2)
 
-            every { paymentFacade.findInProgressPayments() } returns listOf(payment1, payment2)
+            every { paymentFacade.findPayments(any<PaymentCriteria.FindPayments>()) } returns
+                SliceImpl(listOf(payment1, payment2))
 
             // payment1 - PG 연결 실패
             every { paymentFacade.processInProgressPayment(paymentId1) } throws

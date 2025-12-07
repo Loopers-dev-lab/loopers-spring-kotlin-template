@@ -19,7 +19,7 @@ import java.time.Instant
 @Table(
     name = "payments",
     indexes = [
-        Index(name = "idx_payment_status_updated_at", columnList = "status, updated_at"),
+        Index(name = "idx_payment_status_created_at", columnList = "status, created_at"),
     ],
 )
 @Entity

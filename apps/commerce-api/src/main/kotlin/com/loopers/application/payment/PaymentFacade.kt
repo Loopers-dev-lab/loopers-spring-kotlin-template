@@ -5,6 +5,7 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
+import org.springframework.data.domain.Slice
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
@@ -37,12 +38,14 @@ class PaymentFacade(
         .build(),
 ) {
     /**
-     * IN_PROGRESS 상태의 결제 목록을 조회합니다.
+     * 결제 목록을 조회합니다.
+     * pagination과 동적 조건(status)을 지원합니다.
      *
-     * @return IN_PROGRESS 상태의 Payment 목록
+     * @param criteria 조회 조건 (page, size, sort, statuses)
+     * @return Slice<Payment> 결제 목록
      */
-    fun findInProgressPayments(): List<Payment> {
-        return paymentService.findInProgressPayments()
+    fun findPayments(criteria: PaymentCriteria.FindPayments): Slice<Payment> {
+        return paymentService.findPayments(criteria.toCommand())
     }
 
     /**

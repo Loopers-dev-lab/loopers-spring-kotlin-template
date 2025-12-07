@@ -1,6 +1,9 @@
 package com.loopers.infrastructure.payment
 
+import com.loopers.application.payment.PaymentCriteria
 import com.loopers.application.payment.PaymentFacade
+import com.loopers.domain.payment.PaymentSortType
+import com.loopers.domain.payment.PaymentStatus
 import org.slf4j.LoggerFactory
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.scheduling.annotation.Scheduled
@@ -25,7 +28,11 @@ class PaymentScheduler(
      */
     @Scheduled(fixedRate = 60_000)
     fun checkInProgressPayments() {
-        val inProgressPayments = paymentFacade.findInProgressPayments()
+        val criteria = PaymentCriteria.FindPayments(
+            statuses = listOf(PaymentStatus.IN_PROGRESS),
+            sort = PaymentSortType.CREATED_AT_ASC,
+        )
+        val inProgressPayments = paymentFacade.findPayments(criteria).content
 
         if (inProgressPayments.isEmpty()) {
             return
@@ -72,9 +79,5 @@ class PaymentScheduler(
             processedCount,
             skippedCount,
         )
-    }
-
-    companion object {
-        private const val METRIC_IN_PROGRESS_COUNT = "payment_in_progress_count"
     }
 }

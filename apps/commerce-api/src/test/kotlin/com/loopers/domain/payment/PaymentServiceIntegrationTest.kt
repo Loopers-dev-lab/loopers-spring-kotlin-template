@@ -229,22 +229,44 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         }
     }
 
-    @DisplayName("IN_PROGRESS 결제 조회 통합테스트")
+    @DisplayName("결제 조회 통합테스트 (pagination 지원)")
     @Nested
-    inner class FindInProgressPayments {
+    inner class FindPayments {
 
-        @DisplayName("IN_PROGRESS 상태의 결제를 조회할 수 있다")
+        @DisplayName("상태별 결제를 조회할 수 있다")
         @Test
-        fun `find in progress payments`() {
+        fun `find payments by status`() {
             // given
             val inProgressPayment = createInProgressPayment()
 
             // when
-            val payments = paymentService.findInProgressPayments()
+            val command = PaymentCommand.FindPayments(
+                statuses = listOf(PaymentStatus.IN_PROGRESS),
+            )
+            val payments = paymentService.findPayments(command)
 
             // then
-            assertThat(payments).hasSize(1)
-            assertThat(payments[0].id).isEqualTo(inProgressPayment.id)
+            assertThat(payments.content).hasSize(1)
+            assertThat(payments.content[0].id).isEqualTo(inProgressPayment.id)
+        }
+
+        @DisplayName("pagination이 동작한다")
+        @Test
+        fun `pagination works correctly`() {
+            // given
+            repeat(5) { createInProgressPayment() }
+
+            // when
+            val command = PaymentCommand.FindPayments(
+                statuses = listOf(PaymentStatus.IN_PROGRESS),
+                page = 0,
+                size = 2,
+            )
+            val payments = paymentService.findPayments(command)
+
+            // then
+            assertThat(payments.content).hasSize(2)
+            assertThat(payments.hasNext()).isTrue()
         }
     }
 

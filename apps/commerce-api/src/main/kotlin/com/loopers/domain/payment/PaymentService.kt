@@ -7,6 +7,7 @@ import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.data.domain.Slice
 import java.time.Instant
 
 @Component
@@ -72,15 +73,16 @@ class PaymentService(
     }
 
     /**
-     * 스케줄러에서 사용할 IN_PROGRESS 상태의 결제 목록을 조회합니다.
+     * 결제 목록을 조회합니다.
+     * pagination과 동적 조건(status)을 지원합니다.
      *
-     * @return IN_PROGRESS 상태의 Payment 목록
+     * @param command 조회 조건 (page, size, sort, statuses)
+     * @return Slice<Payment> 결제 목록
      */
     @Transactional(readOnly = true)
-    fun findInProgressPayments(): List<Payment> {
-        return paymentRepository.findByStatusInOrderByCreatedAtAsc(
-            statuses = listOf(PaymentStatus.IN_PROGRESS),
-        )
+    fun findPayments(command: PaymentCommand.FindPayments): Slice<Payment> {
+        val query = command.toQuery()
+        return paymentRepository.findAllBy(query)
     }
 
     /**
