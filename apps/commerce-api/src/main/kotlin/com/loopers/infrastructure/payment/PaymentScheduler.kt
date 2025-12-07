@@ -1,8 +1,6 @@
 package com.loopers.infrastructure.payment
 
 import com.loopers.application.payment.PaymentFacade
-import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.scheduling.annotation.Scheduled
@@ -19,15 +17,8 @@ import org.springframework.stereotype.Component
 @Component
 class PaymentScheduler(
     private val paymentFacade: PaymentFacade,
-    meterRegistry: MeterRegistry,
 ) {
     private val logger = LoggerFactory.getLogger(PaymentScheduler::class.java)
-
-    init {
-        Gauge.builder(METRIC_IN_PROGRESS_COUNT) { paymentFacade.findInProgressPayments().size.toDouble() }
-            .description("Number of payments in IN_PROGRESS status")
-            .register(meterRegistry)
-    }
 
     /**
      * 매 1분마다 실행
