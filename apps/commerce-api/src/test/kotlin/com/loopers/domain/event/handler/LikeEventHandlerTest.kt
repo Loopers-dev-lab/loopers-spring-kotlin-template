@@ -52,7 +52,7 @@ class LikeEventHandlerTest {
             verify(exactly = 1) { productCacheRepository.delete("product:detail:100") }
             verify(exactly = 1) { productCacheRepository.getProductListCachePattern() }
             verify(exactly = 1) { productCacheRepository.deleteByPattern("product:list:*") }
-            verify(exactly = 1) { eventPublisher.publishEvent(ofType(UserActionEvent::class)) }
+            verify(exactly = 1) { eventPublisher.publishEvent(ofType<UserActionEvent>()) }
         }
 
         @DisplayName("집계 처리 실패 시에도 예외가 전파되지 않는다")
@@ -119,7 +119,7 @@ class LikeEventHandlerTest {
             verify(exactly = 1) { productCacheRepository.delete("product:detail:100") }
             verify(exactly = 1) { productCacheRepository.getProductListCachePattern() }
             verify(exactly = 1) { productCacheRepository.deleteByPattern("product:list:*") }
-            verify(exactly = 1) { eventPublisher.publishEvent(ofType(UserActionEvent::class)) }
+            verify(exactly = 1) { eventPublisher.publishEvent(ofType<UserActionEvent>()) }
         }
 
         @DisplayName("집계 처리 실패 시에도 예외가 전파되지 않는다")

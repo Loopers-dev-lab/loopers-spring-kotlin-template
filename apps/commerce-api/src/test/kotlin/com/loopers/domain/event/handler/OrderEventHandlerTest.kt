@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.springframework.context.ApplicationEventPublisher
 import java.math.BigDecimal
 import java.time.ZonedDateTime
@@ -111,6 +112,8 @@ class OrderEventHandlerTest {
                 createdAt = ZonedDateTime.now(),
             )
 
+            every { dataPlatformClient.sendOrderCreated(any()) } throws RuntimeException("전송 실패")
+
             // when & then (예외가 발생하지 않아야 함)
             orderEventHandler.handleOrderCreatedForDataPlatform(event)
         }
@@ -173,11 +176,10 @@ class OrderEventHandlerTest {
             every { orderRepository.findById(999L) } returns null
 
             // when & then
-            try {
+            val exception = assertThrows<Exception> {
                 orderEventHandler.handlePaymentCompleted(event)
-            } catch (e: Exception) {
-                assertThat(e.message).contains("주문을 찾을 수 없습니다")
             }
+            assertThat(exception.message).contains("주문을 찾을 수 없습니다")
         }
     }
 
