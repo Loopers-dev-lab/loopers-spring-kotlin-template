@@ -78,6 +78,8 @@ resilience4j:
         enable-exponential-backoff: true
         exponential-backoff-multiplier: 2
         exponential-max-wait-duration: 1s
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.1
         retry-exceptions:
           - com.loopers.infrastructure.payment.PgRequestNotReachedException
         ignore-exceptions:
