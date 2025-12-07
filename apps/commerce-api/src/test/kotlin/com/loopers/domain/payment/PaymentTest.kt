@@ -674,6 +674,8 @@ class PaymentTest {
         userId: Long = 1L,
         orderItems: MutableList<OrderItem> = mutableListOf(createOrderItem()),
     ): Order {
-        return Order.Companion.of(userId, Money.krw(10000), OrderStatus.PAID, orderItems)
+        val totalAmount = orderItems.sumOf { it.unitPrice.amount * it.quantity.toBigDecimal() }
+            .let { Money.krw(it.toLong()) }
+        return Order.Companion.of(userId, totalAmount, OrderStatus.PAID, orderItems)
     }
 }

@@ -259,14 +259,17 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
                 ),
             )
 
+            val paidPayment = paymentRepository.findById(payment.id)!!
+            assertThat(paidPayment.status).isEqualTo(PaymentStatus.PAID)
+
             // 동일한 콜백 요청 (두 번째 - 멱등성 테스트)
-            val duplicateRequest = PaymentWebhookV1Request.Callback(
+            val request = PaymentWebhookV1Request.Callback(
                 orderId = payment.orderId,
                 externalPaymentKey = externalPaymentKey,
             )
 
-            // when - PgClient는 호출되지 않음 (이미 처리됨)
-            val response = webhookController.handleCallback(duplicateRequest)
+            // when - 두 번째 콜백 (멱등성)
+            val response = webhookController.handleCallback(request)
 
             // then
             assertThat(response.meta.result).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
