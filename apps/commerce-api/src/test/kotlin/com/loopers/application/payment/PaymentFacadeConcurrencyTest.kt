@@ -68,7 +68,7 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
 
     @Nested
     @DisplayName("processInProgressPayment")
-    inner class `processInProgressPayment` {
+    inner class ProcessInProgressPayment {
 
         @Test
         @DisplayName("동시에 같은 결제를 처리하면 낙관적 락으로 하나만 성공한다")

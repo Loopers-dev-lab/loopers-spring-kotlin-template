@@ -82,8 +82,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("placeOrder - 포인트 전액 결제")
-    inner class `placeOrder - PointOnlyPayment` {
+    @DisplayName("placeOrder")
+    inner class PlaceOrder {
 
         @Test
         @DisplayName("포인트로만 결제하면 paidAmount가 0이고 즉시 PAID 상태가 된다")
@@ -157,11 +157,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val usedCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
             assertThat(usedCoupon.status).isEqualTo(UsageStatus.USED)
         }
-    }
-
-    @Nested
-    @DisplayName("placeOrder - 쿠폰 할인 적용")
-    inner class `placeOrder - CouponDiscountPayment` {
 
         @Test
         @DisplayName("정률 할인 쿠폰 적용 시 할인 금액이 올바르게 계산된다")
@@ -239,8 +234,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("processCallback - 중복 콜백 처리")
-    inner class `processCallback - DuplicateCallbackHandling` {
+    @DisplayName("processCallback")
+    inner class ProcessCallback {
 
         @Test
         @DisplayName("이미 PAID 상태인 결제에 콜백이 오면 SUCCESS를 반환한다")
@@ -325,11 +320,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val unchangedPayment = paymentRepository.findById(payment.id)!!
             assertThat(unchangedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
-    }
-
-    @Nested
-    @DisplayName("processCallback - 여러 번 콜백 처리")
-    inner class `processCallback - MultipleCallbackProcessing` {
 
         @Test
         @DisplayName("동일한 결제에 대해 여러 번 콜백이 와도 한 번만 처리된다")
@@ -373,11 +363,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // then
             assertThat(response3.meta.result).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
         }
-    }
-
-    @Nested
-    @DisplayName("processCallback - 존재하지 않는 결제")
-    inner class `processCallback - NonExistentPaymentCallback` {
 
         @Test
         @DisplayName("존재하지 않는 orderId로 콜백이 오면 예외가 발생한다")
@@ -393,11 +378,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
                 webhookController.handleCallback(request)
             }
         }
-    }
-
-    @Nested
-    @DisplayName("processCallback - externalPaymentKey 검증")
-    inner class `processCallback - ExternalPaymentKeyValidation` {
 
         @Test
         @DisplayName("잘못된 externalPaymentKey로 조회 시 PG에서 예외가 발생한다")

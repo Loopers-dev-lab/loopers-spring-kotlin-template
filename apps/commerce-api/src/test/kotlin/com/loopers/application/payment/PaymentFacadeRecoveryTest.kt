@@ -74,8 +74,8 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("processInProgressPayment - 포인트 복구")
-    inner class `processInProgressPayment - PointRecovery` {
+    @DisplayName("processInProgressPayment")
+    inner class ProcessInProgressPayment {
 
         @Test
         @DisplayName("결제 실패 시 차감된 포인트가 복구된다")
@@ -143,11 +143,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val account = pointAccountRepository.findByUserId(userId)!!
             assertThat(account.balance).isEqualTo(initialBalance)
         }
-    }
-
-    @Nested
-    @DisplayName("processInProgressPayment - 쿠폰 복구")
-    inner class `processInProgressPayment - CouponRecovery` {
 
         @Test
         @DisplayName("결제 실패 시 사용된 쿠폰이 복구된다")
@@ -208,11 +203,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val failedPayment = paymentRepository.findById(payment.id)!!
             assertThat(failedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
-    }
-
-    @Nested
-    @DisplayName("processInProgressPayment - 재고 복구")
-    inner class `processInProgressPayment - StockRecovery` {
 
         @Test
         @DisplayName("결제 실패 시 차감된 재고가 복구된다")
@@ -305,11 +295,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 { assertThat(restoredProduct2.stock.amount).isEqualTo(50) },
             )
         }
-    }
-
-    @Nested
-    @DisplayName("processInProgressPayment - 주문 상태 변경")
-    inner class `processInProgressPayment - OrderStatusChange` {
 
         @Test
         @DisplayName("결제 실패 시 주문 상태가 CANCELLED로 변경된다")
@@ -364,11 +349,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val paidOrder = orderRepository.findById(payment.orderId)!!
             assertThat(paidOrder.status).isEqualTo(OrderStatus.PAID)
         }
-    }
-
-    @Nested
-    @DisplayName("processInProgressPayment - 전체 리소스 복구")
-    inner class `processInProgressPayment - FullResourceRecovery` {
 
         @Test
         @DisplayName("결제 실패 시 모든 리소스(포인트, 쿠폰, 재고)가 복구된다")
