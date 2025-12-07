@@ -155,80 +155,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         }
     }
 
-    @DisplayName("결제 확정 (IN_PROGRESS -> PAID/FAILED) 통합테스트")
-    @Nested
-    inner class ConfirmPayment {
-
-        @DisplayName("SUCCESS 트랜잭션으로 확정하면 PAID로 전이된다")
-        @Test
-        fun `confirm payment with SUCCESS transaction transitions to PAID`() {
-            // given
-            val payment = createInProgressPayment()
-            val transaction = createTransaction(
-                transactionKey = "tx_test",
-                status = PgTransactionStatus.SUCCESS,
-            )
-
-            // when
-            val updatedPayment = paymentService.confirmPayment(
-                paymentId = payment.id,
-                transactions = listOf(transaction),
-                currentTime = Instant.now(),
-            )
-
-            // then
-            assertAll(
-                { assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID) },
-                { assertThat(updatedPayment.externalPaymentKey).isEqualTo("tx_test") },
-            )
-        }
-
-        @DisplayName("FAILED 트랜잭션으로 확정하면 FAILED로 전이된다")
-        @Test
-        fun `confirm payment with FAILED transaction transitions to FAILED`() {
-            // given
-            val payment = createInProgressPayment()
-            val failureReason = "잔액 부족"
-            val transaction = createTransaction(
-                transactionKey = "tx_test",
-                status = PgTransactionStatus.FAILED,
-                failureReason = failureReason,
-            )
-
-            // when
-            val updatedPayment = paymentService.confirmPayment(
-                paymentId = payment.id,
-                transactions = listOf(transaction),
-                currentTime = Instant.now(),
-            )
-
-            // then
-            assertAll(
-                { assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED) },
-                { assertThat(updatedPayment.failureMessage).isEqualTo(failureReason) },
-            )
-        }
-
-        @DisplayName("존재하지 않는 결제 ID로 확정하면 예외가 발생한다")
-        @Test
-        fun `throw exception when payment not found`() {
-            // given
-            val transaction = createTransaction()
-
-            // when
-            val exception = assertThrows<CoreException> {
-                paymentService.confirmPayment(
-                    paymentId = 999L,
-                    transactions = listOf(transaction),
-                    currentTime = Instant.now(),
-                )
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
-        }
-    }
-
     @DisplayName("결제 조회 통합테스트 (pagination 지원)")
     @Nested
     inner class FindPayments {
@@ -267,35 +193,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             // then
             assertThat(payments.content).hasSize(2)
             assertThat(payments.hasNext()).isTrue()
-        }
-    }
-
-    @DisplayName("외부 결제 키로 결제 조회 통합테스트")
-    @Nested
-    inner class FindByExternalPaymentKey {
-
-        @DisplayName("외부 결제 키로 결제를 조회할 수 있다")
-        @Test
-        fun `find payment by external key`() {
-            // given - createInProgressPayment()에서 이미 externalPaymentKey가 설정됨
-            val payment = createInProgressPayment(externalPaymentKey = "pg_tx_12345")
-
-            // when
-            val foundPayment = paymentService.findByExternalPaymentKey("pg_tx_12345")
-
-            // then
-            assertThat(foundPayment).isNotNull
-            assertThat(foundPayment?.id).isEqualTo(payment.id)
-        }
-
-        @DisplayName("존재하지 않는 외부 결제 키로 조회하면 null을 반환한다")
-        @Test
-        fun `return null when external key not found`() {
-            // when
-            val foundPayment = paymentService.findByExternalPaymentKey("non_existent_key")
-
-            // then
-            assertThat(foundPayment).isNull()
         }
     }
 
@@ -482,68 +379,6 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         }
     }
 
-    @DisplayName("결제 ID로 조회 통합테스트")
-    @Nested
-    inner class FindById {
-
-        @DisplayName("존재하는 결제를 조회할 수 있다")
-        @Test
-        fun `find existing payment by id`() {
-            // given
-            val payment = createPendingPayment()
-
-            // when
-            val foundPayment = paymentService.findById(payment.id)
-
-            // then
-            assertThat(foundPayment.id).isEqualTo(payment.id)
-            assertThat(foundPayment.status).isEqualTo(PaymentStatus.PENDING)
-        }
-
-        @DisplayName("존재하지 않는 결제 ID면 예외가 발생한다")
-        @Test
-        fun `throws exception when payment not found`() {
-            // when
-            val exception = assertThrows<CoreException> {
-                paymentService.findById(999L)
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
-        }
-    }
-
-    @DisplayName("주문 ID로 결제 조회 통합테스트")
-    @Nested
-    inner class FindByOrderId {
-
-        @DisplayName("존재하는 결제를 조회할 수 있다")
-        @Test
-        fun `find existing payment by order id`() {
-            // given
-            val payment = createPendingPayment()
-
-            // when
-            val foundPayment = paymentService.findByOrderId(payment.orderId)
-
-            // then
-            assertThat(foundPayment.id).isEqualTo(payment.id)
-            assertThat(foundPayment.orderId).isEqualTo(payment.orderId)
-        }
-
-        @DisplayName("존재하지 않는 주문 ID면 예외가 발생한다")
-        @Test
-        fun `throws exception when order not found`() {
-            // when
-            val exception = assertThrows<CoreException> {
-                paymentService.findByOrderId(999L)
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
-        }
-    }
-
     private fun createOrder(
         userId: Long = 1L,
         totalAmount: Money = Money.krw(10000),
@@ -597,7 +432,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             transactionKey = "tx_paid",
             status = PgTransactionStatus.SUCCESS,
         )
-        payment.confirmPayment(successTransaction, currentTime = Instant.now())
+        payment.confirmPayment(listOf(successTransaction), currentTime = Instant.now())
         return paymentRepository.save(payment)
     }
 

@@ -1,19 +1,17 @@
 package com.loopers.domain.payment
 
 import com.loopers.domain.order.Order
-import com.loopers.domain.order.OrderRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
+import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.data.domain.Slice
 import java.time.Instant
 
 @Component
 class PaymentService(
     private val paymentRepository: PaymentRepository,
-    private val orderRepository: OrderRepository,
     private val pgClient: PgClient,
 ) {
     /**
@@ -49,30 +47,6 @@ class PaymentService(
     }
 
     /**
-     * PG 트랜잭션 결과로 결제 상태를 확정합니다.
-     * Payment.confirmPayment()를 호출하여 상태를 결정합니다.
-     *
-     * @param paymentId 결제 ID
-     * @param transactions PG에서 조회한 트랜잭션 목록
-     * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return 상태가 변경된 Payment
-     * @throws CoreException 결제를 찾을 수 없는 경우
-     */
-    @Transactional
-    fun confirmPayment(
-        paymentId: Long,
-        transactions: List<PgTransaction>,
-        currentTime: Instant,
-    ): Payment {
-        val payment = paymentRepository.findById(paymentId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
-
-        payment.confirmPayment(*transactions.toTypedArray(), currentTime = currentTime)
-
-        return paymentRepository.save(payment)
-    }
-
-    /**
      * 결제 목록을 조회합니다.
      * pagination과 동적 조건(status)을 지원합니다.
      *
@@ -83,44 +57,6 @@ class PaymentService(
     fun findPayments(command: PaymentCommand.FindPayments): Slice<Payment> {
         val query = command.toQuery()
         return paymentRepository.findAllBy(query)
-    }
-
-    /**
-     * 외부 결제 키로 결제를 조회합니다.
-     * PG 콜백에서 거래를 식별할 때 사용됩니다.
-     *
-     * @param key PG사 거래 키
-     * @return Payment (nullable)
-     */
-    @Transactional(readOnly = true)
-    fun findByExternalPaymentKey(key: String): Payment? {
-        return paymentRepository.findByExternalPaymentKey(key)
-    }
-
-    /**
-     * 결제 ID로 결제를 조회합니다.
-     *
-     * @param paymentId 결제 ID
-     * @return Payment
-     * @throws CoreException 결제를 찾을 수 없는 경우
-     */
-    @Transactional(readOnly = true)
-    fun findById(paymentId: Long): Payment {
-        return paymentRepository.findById(paymentId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
-    }
-
-    /**
-     * 주문 ID로 결제를 조회합니다.
-     *
-     * @param orderId 주문 ID
-     * @return Payment
-     * @throws CoreException 결제를 찾을 수 없는 경우
-     */
-    @Transactional(readOnly = true)
-    fun findByOrderId(orderId: Long): Payment {
-        return paymentRepository.findByOrderId(orderId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
     }
 
     /**
@@ -159,7 +95,7 @@ class PaymentService(
 
         val transaction = pgClient.findTransaction(externalPaymentKey)
 
-        val result = payment.confirmPayment(transaction, currentTime = currentTime)
+        val result = payment.confirmPayment(listOf(transaction), currentTime = currentTime)
 
         return when (result) {
             is Payment.ConfirmResult.AlreadyProcessed -> {
@@ -194,7 +130,7 @@ class PaymentService(
             listOf(pgClient.findTransaction(key))
         } ?: pgClient.findTransactionsByPaymentId(payment.id)
 
-        val result = payment.confirmPayment(*transactions.toTypedArray(), currentTime = currentTime)
+        val result = payment.confirmPayment(transactions, currentTime = currentTime)
 
         return when (result) {
             is Payment.ConfirmResult.AlreadyProcessed -> {

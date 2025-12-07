@@ -433,7 +433,7 @@ class PaymentTest {
             )
 
             // when
-            payment.confirmPayment(transaction, currentTime = Instant.now())
+            payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
@@ -452,7 +452,7 @@ class PaymentTest {
             )
 
             // when
-            payment.confirmPayment(transaction, currentTime = Instant.now())
+            payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
@@ -472,7 +472,7 @@ class PaymentTest {
             )
 
             // when
-            payment.confirmPayment(transaction, currentTime = Instant.now())
+            payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
@@ -492,7 +492,7 @@ class PaymentTest {
             )
 
             // when
-            payment.confirmPayment(transaction, currentTime = Instant.now())
+            payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
@@ -509,7 +509,7 @@ class PaymentTest {
 
             // when
             val exception = assertThrows<CoreException> {
-                payment.confirmPayment(transaction, currentTime = Instant.now())
+                payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
             }
 
             // then
@@ -524,7 +524,7 @@ class PaymentTest {
             val payment = createInProgressPayment()
 
             // when
-            val result = payment.confirmPayment(currentTime = Instant.now())
+            val result = payment.confirmPayment(emptyList(), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
@@ -543,7 +543,7 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(unmatchedTransaction, currentTime = Instant.now())
+            val result = payment.confirmPayment(listOf(unmatchedTransaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
@@ -560,7 +560,7 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(pendingTransaction, currentTime = Instant.now())
+            val result = payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
@@ -582,7 +582,7 @@ class PaymentTest {
             )
 
             // when
-            payment.confirmPayment(pendingTransaction, currentTime = Instant.now())
+            payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
@@ -604,7 +604,7 @@ class PaymentTest {
             )
 
             // when
-            payment.confirmPayment(pendingTransaction, currentTime = Instant.now())
+            payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)

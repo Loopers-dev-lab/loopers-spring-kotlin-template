@@ -151,7 +151,7 @@ class Payment(
      * @return ConfirmResult - AlreadyProcessed 또는 Confirmed
      * @throws CoreException PENDING 상태인 경우 (아직 결제 시작 안됨)
      */
-    fun confirmPayment(vararg transactions: PgTransaction, currentTime: Instant): ConfirmResult {
+    fun confirmPayment(transactions: List<PgTransaction>, currentTime: Instant): ConfirmResult {
         // 멱등성: 이미 처리된 결제
         if (status == PaymentStatus.PAID || status == PaymentStatus.FAILED) {
             return ConfirmResult.AlreadyProcessed(status)
@@ -162,7 +162,7 @@ class Payment(
             throw CoreException(ErrorType.BAD_REQUEST, "결제 진행 중 상태에서만 확정할 수 있습니다")
         }
 
-        val matched = findMatchingTransaction(transactions.toList())
+        val matched = findMatchingTransaction(transactions)
 
         when {
             matched?.status == PgTransactionStatus.SUCCESS -> {
