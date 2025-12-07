@@ -34,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import java.time.Instant
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -88,7 +89,8 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
             val latch = CountDownLatch(threadCount)
 
             val successCount = AtomicInteger(0)
-            val failureCount = AtomicInteger(0)
+            val optimisticLockFailureCount = AtomicInteger(0)
+            val unexpectedExceptions = ConcurrentLinkedQueue<Throwable>()
 
             // when - 5개 스레드가 동시에 같은 결제를 처리 시도
             repeat(threadCount) {
@@ -97,9 +99,10 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
                         paymentFacade.processInProgressPayment(payment.id)
                         successCount.incrementAndGet()
                     } catch (e: ObjectOptimisticLockingFailureException) {
-                        failureCount.incrementAndGet()
+                        optimisticLockFailureCount.incrementAndGet()
                     } catch (e: Exception) {
-                        failureCount.incrementAndGet()
+                        // 예기치 않은 예외는 별도 추적
+                        unexpectedExceptions.add(e)
                     } finally {
                         latch.countDown()
                     }
@@ -112,7 +115,14 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
             // then - 하나만 성공하고 나머지는 실패 또는 AlreadyProcessed
             assertAll(
                 { assertThat(successCount.get()).isEqualTo(1) },
-                { assertThat(failureCount.get()).isEqualTo(threadCount - 1) },
+                { assertThat(optimisticLockFailureCount.get()).isEqualTo(threadCount - 1) },
+                {
+                    assertThat(unexpectedExceptions)
+                        .withFailMessage {
+                            "예상치 못한 예외 발생: ${unexpectedExceptions.map { it.message }}"
+                        }
+                        .isEmpty()
+                },
             )
             val finalPayment = paymentRepository.findById(payment.id)!!
             assertThat(finalPayment.status).isEqualTo(PaymentStatus.PAID)
