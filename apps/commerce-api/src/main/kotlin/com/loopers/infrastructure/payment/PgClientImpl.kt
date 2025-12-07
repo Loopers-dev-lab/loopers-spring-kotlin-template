@@ -72,7 +72,7 @@ class PgClientImpl(
         val sample = Timer.start(meterRegistry)
 
         return try {
-            val response = pgFeignClient.getPaymentsByOrderId(orderId.toString())
+            val response = pgFeignClient.getPaymentsByOrderId(orderId.toString().padStart(6, '0'))
             val result = extractData(response).transactions.map { summary ->
                 pgFeignClient.getPayment(summary.transactionKey)
                     .let { extractData(it) }
@@ -90,7 +90,7 @@ class PgClientImpl(
         response.data ?: throw PgRequestNotReachedException("PG 응답 데이터 없음")
 
     private fun PgPaymentRequest.toInfraRequest(callbackUrl: String) = PgPaymentRequest(
-        orderId = orderId.toString(),
+        orderId = orderId.toString().padStart(6, '0'),
         cardType = cardInfo.cardType.name,
         cardNo = cardInfo.cardNo,
         amount = amount.amount.toLong(),
