@@ -10,6 +10,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import com.loopers.domain.payment.CardType as DomainCardType
 
@@ -18,13 +19,15 @@ class PgClientImpl(
     private val pgFeignClient: PgFeignClient,
     private val exceptionClassifier: PgExceptionClassifier,
     private val meterRegistry: MeterRegistry,
+    @Value("\${pg.callback-base-url}")
+    private val callbackBaseUrl: String,
 ) : PgClient {
 
     @CircuitBreaker(name = "pg", fallbackMethod = "requestPaymentFallback")
     @Retry(name = "pg")
     override fun requestPayment(request: PgPaymentRequest): PgPaymentCreateResult {
         val sample = Timer.start(meterRegistry)
-        val infraRequest = request.toInfraRequest()
+        val infraRequest = request.toInfraRequest(callbackBaseUrl)
 
         return try {
             val response = pgFeignClient.requestPayment(infraRequest)
@@ -86,7 +89,7 @@ class PgClientImpl(
     private fun <T> extractData(response: PgResponse<T>): T =
         response.data ?: throw PgRequestNotReachedException("PG 응답 데이터 없음")
 
-    private fun PgPaymentRequest.toInfraRequest() = com.loopers.infrastructure.payment.PgPaymentRequest(
+    private fun PgPaymentRequest.toInfraRequest(callbackUrl: String) = PgPaymentRequest(
         orderId = orderId.toString(),
         cardType = cardInfo.cardType.name,
         cardNo = cardInfo.cardNo,

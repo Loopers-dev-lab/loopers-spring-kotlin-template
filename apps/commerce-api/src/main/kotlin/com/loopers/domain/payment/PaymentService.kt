@@ -48,30 +48,6 @@ class PaymentService(
     }
 
     /**
-     * 결제를 개시합니다. PENDING → IN_PROGRESS 상태 전이.
-     * PG 결제 요청 후 결과를 받은 시점에 호출됩니다.
-     *
-     * @param paymentId 결제 ID
-     * @param result PG 결제 요청 결과 (Accepted/Uncertain)
-     * @param attemptedAt 결제 시도 시각
-     * @return 상태가 변경된 Payment
-     * @throws CoreException 결제를 찾을 수 없는 경우
-     */
-    @Transactional
-    fun initiatePayment(
-        paymentId: Long,
-        result: PgPaymentCreateResult,
-        attemptedAt: Instant = Instant.now(),
-    ): Payment {
-        val payment = paymentRepository.findById(paymentId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
-
-        payment.initiate(result, attemptedAt)
-
-        return paymentRepository.save(payment)
-    }
-
-    /**
      * PG 트랜잭션 결과로 결제 상태를 확정합니다.
      * Payment.confirmPayment()를 호출하여 상태를 결정합니다.
      *
@@ -181,7 +157,9 @@ class PaymentService(
 
         val transaction = pgClient.findTransaction(externalPaymentKey)
 
-        return when (val result = payment.confirmPayment(transaction, currentTime = currentTime)) {
+        val result = payment.confirmPayment(transaction, currentTime = currentTime)
+
+        return when (result) {
             is Payment.ConfirmResult.AlreadyProcessed -> {
                 CallbackResult.AlreadyProcessed(payment)
             }
@@ -212,7 +190,9 @@ class PaymentService(
 
         val transactions = pgClient.findTransactionsByOrderId(payment.orderId)
 
-        return when (val result = payment.confirmPayment(*transactions.toTypedArray(), currentTime = currentTime)) {
+        val result = payment.confirmPayment(*transactions.toTypedArray(), currentTime = currentTime)
+
+        return when (result) {
             is Payment.ConfirmResult.AlreadyProcessed -> {
                 CallbackResult.AlreadyProcessed(payment)
             }
@@ -222,5 +202,33 @@ class PaymentService(
                 CallbackResult.Confirmed(payment)
             }
         }
+    }
+
+    /**
+     * PG 결제를 요청하고 결제 상태를 업데이트합니다.
+     * 이 메서드는 트랜잭션 없이 실행되며, PG 호출 후 상태 업데이트만 트랜잭션으로 처리합니다.
+     *
+     * @param paymentId 결제 ID
+     * @param cardInfo 카드 정보
+     * @return 상태가 업데이트된 Payment
+     */
+    fun requestPgPayment(
+        paymentId: Long,
+        cardInfo: CardInfo,
+        currentTime: Instant = Instant.now(),
+    ): Payment {
+        val payment = paymentRepository.findById(paymentId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
+
+        val pgResult = pgClient.requestPayment(
+            PgPaymentRequest(
+                orderId = payment.orderId,
+                amount = payment.paidAmount,
+                cardInfo = cardInfo,
+            ),
+        )
+
+        payment.initiate(pgResult, currentTime)
+        return paymentRepository.save(payment)
     }
 }

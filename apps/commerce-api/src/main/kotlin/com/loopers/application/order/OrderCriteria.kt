@@ -12,11 +12,6 @@ class OrderCriteria {
         val cardType: String? = null,
         val cardNo: String? = null,
     ) {
-        /**
-         * 카드 결제가 필요한지 여부
-         */
-        fun requiresCardPayment(): Boolean = cardType != null && cardNo != null
-
         fun to(): ProductCommand.DecreaseStocks {
             return ProductCommand.DecreaseStocks(
                 units = items.map {

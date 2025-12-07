@@ -10,8 +10,6 @@ import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
-import com.loopers.domain.payment.PgClient
-import com.loopers.domain.payment.PgPaymentRequest
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
@@ -19,8 +17,6 @@ import com.loopers.domain.product.ProductView
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
-import jakarta.annotation.PostConstruct
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
@@ -33,93 +29,64 @@ class OrderFacade(
     val pointService: PointService,
     val couponService: CouponService,
     val paymentService: PaymentService,
-    val pgClient: PgClient,
     private val transactionTemplate: TransactionTemplate,
     private val cacheTemplate: CacheTemplate,
-    @Value("\${pg.callback-base-url}")
-    private val callbackBaseUrl: String,
+    private val retryTemplate: RetryTemplate = RetryTemplate.builder()
+        .maxAttempts(2)
+        .uniformRandomBackoff(100, 500)
+        .retryOn(ObjectOptimisticLockingFailureException::class.java)
+        .build(),
 ) {
-    private lateinit var retryTemplate: RetryTemplate
-
-    @PostConstruct
-    fun init() {
-        this.retryTemplate = RetryTemplate.builder()
-            .maxAttempts(2)
-            .uniformRandomBackoff(100, 500)
-            .retryOn(ObjectOptimisticLockingFailureException::class.java)
-            .build()
-    }
-
     fun placeOrder(criteria: OrderCriteria.PlaceOrder): OrderInfo.PlaceOrder {
-        return retryTemplate.execute<OrderInfo.PlaceOrder, Exception> {
-            // 1. 리소스 할당 (재고, 쿠폰, 포인트, Payment 생성)
-            val allocationResult = allocateResources(criteria)
-            val payment = allocationResult.payment
+        // 1. 리소스 할당 (with retry)
+        val allocationResult = retryTemplate.execute<ResourceAllocationResult, Exception> {
+            allocateResources(criteria)
+        }
+        val payment = allocationResult.payment
+        updateProductCache(allocationResult.productViews)
 
-            // 2. 포인트+쿠폰 전액 결제 완료된 경우 (paidAmount == 0)
-            if (payment.status == PaymentStatus.PAID) {
-                updateProductCache(allocationResult.productViews)
-                return@execute OrderInfo.PlaceOrder(
+        // 2. 포인트+쿠폰 전액 결제 완료된 경우
+        if (payment.status == PaymentStatus.PAID) {
+            return OrderInfo.PlaceOrder(
+                orderId = allocationResult.orderId,
+                paymentId = payment.id,
+                paymentStatus = PaymentStatus.PAID,
+            )
+        }
+
+        // 3. PG 결제 요청
+        val cardInfo = CardInfo(
+            cardType = CardType.valueOf(
+                criteria.cardType
+                    ?: throw CoreException(ErrorType.BAD_REQUEST, "카드 타입이 필요합니다."),
+            ),
+            cardNo = criteria.cardNo
+                ?: throw CoreException(ErrorType.BAD_REQUEST, "카드 번호가 필요합니다."),
+        )
+        val updatedPayment = paymentService.requestPgPayment(payment.id, cardInfo)
+
+        // 4. 상태에 따른 후속 처리
+        return when (updatedPayment.status) {
+            PaymentStatus.IN_PROGRESS -> {
+                OrderInfo.PlaceOrder(
                     orderId = allocationResult.orderId,
                     paymentId = payment.id,
-                    paymentStatus = PaymentStatus.PAID,
+                    paymentStatus = PaymentStatus.IN_PROGRESS,
                 )
             }
 
-            // 3. 카드 결제가 필요한데 카드 정보가 없는 경우
-            if (!criteria.requiresCardPayment()) {
+            PaymentStatus.FAILED -> {
+                // 보상 트랜잭션 (with retry)
+                retryTemplate.execute<Unit, Exception> {
+                    recoverResources(updatedPayment)
+                }
                 throw CoreException(
-                    ErrorType.BAD_REQUEST,
-                    "포인트와 쿠폰만으로 결제할 수 없습니다. 카드 정보를 입력해주세요.",
+                    ErrorType.INTERNAL_ERROR,
+                    "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
                 )
             }
 
-            // 4. PG 결제 요청 (트랜잭션 외부)
-            val cardInfo = CardInfo(
-                cardType = CardType.valueOf(criteria.cardType!!),
-                cardNo = criteria.cardNo!!,
-            )
-            val pgResult = pgClient.requestPayment(
-                PgPaymentRequest(
-                    orderId = allocationResult.orderId,
-                    amount = payment.paidAmount,
-                    cardInfo = cardInfo,
-                    callbackUrl = "$callbackBaseUrl/api/v1/payments/callback",
-                ),
-            )
-
-            // 5. 결제 개시 (PENDING → IN_PROGRESS 또는 FAILED)
-            val updatedPayment = transactionTemplate.execute { _ ->
-                paymentService.initiatePayment(
-                    paymentId = payment.id,
-                    result = pgResult,
-                )
-            }!!
-
-            // 6. 상태에 따른 후속 처리
-            when (updatedPayment.status) {
-                PaymentStatus.IN_PROGRESS -> {
-                    // 비동기 처리 중 - 콜백/스케줄러가 최종 결과 처리
-                    updateProductCache(allocationResult.productViews)
-                    OrderInfo.PlaceOrder(
-                        orderId = allocationResult.orderId,
-                        paymentId = payment.id,
-                        paymentStatus = PaymentStatus.IN_PROGRESS,
-                    )
-                }
-                PaymentStatus.FAILED -> {
-                    // PG 서비스 불능 - 보상 트랜잭션
-                    transactionTemplate.execute { _ ->
-                        recoverResources(updatedPayment)
-                        orderService.cancelOrder(updatedPayment.orderId)
-                    }
-                    throw CoreException(
-                        ErrorType.CIRCUIT_OPEN,
-                        "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
-                    )
-                }
-                else -> throw IllegalStateException("Unexpected payment status: ${updatedPayment.status}")
-            }
+            else -> throw CoreException(ErrorType.INTERNAL_ERROR)
         }
     }
 
@@ -204,17 +171,21 @@ class OrderFacade(
      * 리소스 복구 (포인트, 쿠폰, 재고)
      */
     private fun recoverResources(payment: Payment) {
-        if (payment.usedPoint > Money.ZERO_KRW) {
-            pointService.restore(payment.userId, payment.usedPoint)
+        transactionTemplate.execute { _ ->
+            if (payment.usedPoint > Money.ZERO_KRW) {
+                pointService.restore(payment.userId, payment.usedPoint)
+            }
+            payment.issuedCouponId?.let { couponId ->
+                couponService.cancelCouponUse(couponId)
+            }
+            val order = orderService.findById(payment.orderId)
+            val increaseUnits = order.orderItems.map {
+                ProductCommand.IncreaseStockUnit(productId = it.productId, amount = it.quantity)
+            }
+            productService.increaseStocks(ProductCommand.IncreaseStocks(units = increaseUnits))
+
+            orderService.cancelOrder(payment.orderId)
         }
-        payment.issuedCouponId?.let { couponId ->
-            couponService.cancelCouponUse(couponId)
-        }
-        val order = orderService.findById(payment.orderId)
-        val increaseUnits = order.orderItems.map {
-            ProductCommand.IncreaseStockUnit(productId = it.productId, amount = it.quantity)
-        }
-        productService.increaseStocks(ProductCommand.IncreaseStocks(units = increaseUnits))
     }
 
     /**
