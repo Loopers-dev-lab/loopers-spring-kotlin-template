@@ -8,8 +8,12 @@ import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
+import com.loopers.infrastructure.payment.PgRequestNotReachedException
 import com.loopers.support.values.Money
+import org.springframework.orm.ObjectOptimisticLockingFailureException
+import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
+
 /**
  * 결제 관련 비즈니스 로직을 오케스트레이션하는 Facade
  *
@@ -24,6 +28,11 @@ class PaymentFacade(
     private val pointService: PointService,
     private val couponService: CouponService,
     private val productService: ProductService,
+    private val retryTemplate: RetryTemplate = RetryTemplate.builder()
+        .maxAttempts(2)
+        .uniformRandomBackoff(100, 500)
+        .retryOn(ObjectOptimisticLockingFailureException::class.java)
+        .build(),
 ) {
     /**
      * IN_PROGRESS 상태의 결제 목록을 조회합니다.
@@ -47,13 +56,12 @@ class PaymentFacade(
         )
 
         when (result) {
-            is PaymentService.CallbackResult.AlreadyProcessed -> {
-                // 멱등성: 이미 처리된 결제는 아무것도 안함
-                return
-            }
-
             is PaymentService.CallbackResult.Confirmed -> {
                 handleConfirmedPayment(result.payment)
+            }
+
+            else -> {
+                return
             }
         }
     }
@@ -68,8 +76,9 @@ class PaymentFacade(
             }
 
             PaymentStatus.FAILED -> {
-                recoverResources(payment)
-                orderService.cancelOrder(payment.orderId)
+                retryTemplate.execute<Unit, Exception> {
+                    recoverResources(payment)
+                }
             }
 
             else -> {}
@@ -87,13 +96,12 @@ class PaymentFacade(
         val result = paymentService.processInProgressPayment(paymentId)
 
         when (result) {
-            is PaymentService.CallbackResult.AlreadyProcessed -> {
-                // 멱등성: 이미 처리된 결제는 아무것도 안함안함
-                return
-            }
-
             is PaymentService.CallbackResult.Confirmed -> {
                 handleConfirmedPayment(result.payment)
+            }
+
+            else -> {
+                return
             }
         }
     }
@@ -116,5 +124,6 @@ class PaymentFacade(
             ProductCommand.IncreaseStockUnit(productId = it.productId, amount = it.quantity)
         }
         productService.increaseStocks(ProductCommand.IncreaseStocks(units = increaseUnits))
+        orderService.cancelOrder(payment.orderId)
     }
 }
