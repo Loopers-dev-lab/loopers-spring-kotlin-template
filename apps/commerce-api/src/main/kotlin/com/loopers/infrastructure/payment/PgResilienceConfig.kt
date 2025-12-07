@@ -22,21 +22,42 @@ class PgResilienceConfig(
 
     @PostConstruct
     fun registerEventListeners() {
-        // 서킷 상태 전환만 로깅 (CLOSED ↔ OPEN ↔ HALF_OPEN)
-        circuitBreakerRegistry.circuitBreaker("pg").eventPublisher
+        // 결제용 서킷 상태 전환 로깅 (CLOSED ↔ OPEN ↔ HALF_OPEN)
+        circuitBreakerRegistry.circuitBreaker("pg-payment").eventPublisher
             .onStateTransition { event ->
                 log.warn(
-                    "[PG CircuitBreaker] 상태 전환: {} → {}",
+                    "[PG Payment CircuitBreaker] 상태 전환: {} → {}",
                     event.stateTransition.fromState,
                     event.stateTransition.toState,
                 )
             }
 
-        // 재시도 발생 시 로깅
-        retryRegistry.retry("pg").eventPublisher
+        // 조회용 서킷 상태 전환 로깅
+        circuitBreakerRegistry.circuitBreaker("pg-query").eventPublisher
+            .onStateTransition { event ->
+                log.warn(
+                    "[PG Query CircuitBreaker] 상태 전환: {} → {}",
+                    event.stateTransition.fromState,
+                    event.stateTransition.toState,
+                )
+            }
+
+        // 결제용 재시도 발생 시 로깅
+        retryRegistry.retry("pg-payment").eventPublisher
             .onRetry { event ->
-                log.info(
-                    "[PG Retry] 재시도 #{} - 대기: {}ms, 원인: {}",
+                log.warn(
+                    "[PG Payment Retry] 재시도 #{} - 대기: {}ms, 원인: {}",
+                    event.numberOfRetryAttempts,
+                    event.waitInterval.toMillis(),
+                    event.lastThrowable?.message,
+                )
+            }
+
+        // 조회용 재시도 발생 시 로깅
+        retryRegistry.retry("pg-query").eventPublisher
+            .onRetry { event ->
+                log.warn(
+                    "[PG Query Retry] 재시도 #{} - 대기: {}ms, 원인: {}",
                     event.numberOfRetryAttempts,
                     event.waitInterval.toMillis(),
                     event.lastThrowable?.message,

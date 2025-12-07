@@ -14,21 +14,22 @@ import com.loopers.domain.payment.PgPaymentRequest as DomainPgPaymentRequest
 
 @Component
 class PgClientImpl(
-    private val pgFeignClient: PgFeignClient,
+    private val pgPaymentFeignClient: PgPaymentFeignClient,
+    private val pgQueryFeignClient: PgQueryFeignClient,
     private val exceptionClassifier: PgExceptionClassifier,
     private val meterRegistry: MeterRegistry,
     @Value("\${pg.callback-base-url}")
     private val callbackBaseUrl: String,
 ) : PgClient {
 
-    @CircuitBreaker(name = "pg", fallbackMethod = "requestPaymentFallback")
-    @Retry(name = "pg")
+    @CircuitBreaker(name = "pg-payment", fallbackMethod = "requestPaymentFallback")
+    @Retry(name = "pg-payment")
     override fun requestPayment(request: DomainPgPaymentRequest): PgPaymentCreateResult {
         val sample = Timer.start(meterRegistry)
         val infraRequest = request.toInfraRequest(callbackBaseUrl)
 
         return try {
-            val response = pgFeignClient.requestPayment(infraRequest)
+            val response = pgPaymentFeignClient.requestPayment(infraRequest)
             val data = extractData(response)
             recordSuccess(sample, "requestPayment")
             PgPaymentCreateResult.Accepted(data.transactionKey)
@@ -47,13 +48,13 @@ class PgClientImpl(
         else -> PgPaymentCreateResult.NotReached
     }
 
-    @CircuitBreaker(name = "pg")
-    @Retry(name = "pg")
+    @CircuitBreaker(name = "pg-query")
+    @Retry(name = "pg-query")
     override fun findTransaction(transactionKey: String): PgTransaction {
         val sample = Timer.start(meterRegistry)
 
         return try {
-            val result = pgFeignClient.getPayment(transactionKey)
+            val result = pgQueryFeignClient.getPayment(transactionKey)
                 .let { extractData(it) }
                 .let { toDomainTransaction(it) }
             recordSuccess(sample, "findTransaction")
@@ -64,14 +65,14 @@ class PgClientImpl(
         }
     }
 
-    @CircuitBreaker(name = "pg")
-    @Retry(name = "pg")
+    @CircuitBreaker(name = "pg-query")
+    @Retry(name = "pg-query")
     override fun findTransactionsByPaymentId(paymentId: Long): List<PgTransaction> {
         val sample = Timer.start(meterRegistry)
 
         return try {
             // 도메인의 paymentId를 외부 PG API의 orderId 파라미터로 전달
-            val response = pgFeignClient.getPaymentsByOrderId(paymentId.toString().padStart(6, '0'))
+            val response = pgQueryFeignClient.getPaymentsByOrderId(paymentId.toString().padStart(6, '0'))
             val data = extractData(response)
             val result = data.transactions.map { summary ->
                 PgTransaction(

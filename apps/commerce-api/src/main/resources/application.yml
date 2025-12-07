@@ -27,9 +27,12 @@ spring:
     openfeign:
       client:
         config:
-          pg:
+          pg-payment:
             connect-timeout: 1000
             read-timeout: 1000
+          pg-query:
+            connect-timeout: 1000
+            read-timeout: 500
 
 springdoc:
   use-fqn: true
@@ -44,7 +47,7 @@ pg:
 resilience4j:
   circuitbreaker:
     configs:
-      default:
+      pg-base:
         sliding-window-type: COUNT_BASED
         sliding-window-size: 10
         minimum-number-of-calls: 5
@@ -57,13 +60,19 @@ resilience4j:
           - com.loopers.infrastructure.payment.PgRequestNotReachedException
           - com.loopers.infrastructure.payment.PgResponseUncertainException
     instances:
-      pg:
-        base-config: default
+      pg-payment:
+        base-config: pg-base
+      pg-query:
+        base-config: pg-base
+        sliding-window-size: 5
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 20
+        slow-call-duration-threshold: 400ms
     circuit-breaker-aspect-order: 1
 
   retry:
     configs:
-      default:
+      pg-base:
         max-attempts: 4
         wait-duration: 100ms
         enable-exponential-backoff: true
@@ -74,8 +83,11 @@ resilience4j:
         ignore-exceptions:
           - com.loopers.infrastructure.payment.PgResponseUncertainException
     instances:
-      pg:
-        base-config: default
+      pg-payment:
+        base-config: pg-base
+      pg-query:
+        base-config: pg-base
+        max-attempts: 2
     retry-aspect-order: 2
 
 ---
