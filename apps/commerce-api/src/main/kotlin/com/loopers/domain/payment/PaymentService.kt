@@ -173,7 +173,7 @@ class PaymentService(
 
     /**
      * IN_PROGRESS 상태의 결제를 처리합니다.
-     * 스케줄러에서 호출됩니다. orderId로 PG 트랜잭션을 조회하여 결제를 확정합니다.
+     * 스케줄러에서 호출됩니다. paymentId로 PG 트랜잭션을 조회하여 결제를 확정합니다.
      *
      * @param paymentId 결제 ID
      * @param currentTime 현재 시각 (타임아웃 판단용)
@@ -188,7 +188,7 @@ class PaymentService(
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
-        val transactions = pgClient.findTransactionsByOrderId(payment.orderId)
+        val transactions = pgClient.findTransactionsByPaymentId(payment.id)
 
         val result = payment.confirmPayment(*transactions.toTypedArray(), currentTime = currentTime)
 
@@ -222,7 +222,7 @@ class PaymentService(
 
         val pgResult = pgClient.requestPayment(
             PgPaymentRequest(
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 cardInfo = cardInfo,
             ),

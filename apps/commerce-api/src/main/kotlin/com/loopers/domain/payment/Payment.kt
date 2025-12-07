@@ -104,9 +104,11 @@ class Payment(
                 status = PaymentStatus.IN_PROGRESS
                 externalPaymentKey = result.transactionKey
             }
+
             is PgPaymentCreateResult.Uncertain -> {
                 status = PaymentStatus.IN_PROGRESS
             }
+
             is PgPaymentCreateResult.NotReached -> {
                 status = PaymentStatus.FAILED
             }
@@ -186,7 +188,7 @@ class Payment(
             transactions.find { it.transactionKey == externalPaymentKey }
         } else {
             transactions.find {
-                it.amount == paidAmount && it.status != PgTransactionStatus.PENDING
+                it.paymentId == this.id
             }
         }
     }

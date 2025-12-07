@@ -4,7 +4,6 @@ import com.loopers.application.payment.PaymentFacade
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.support.values.Money
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
@@ -25,7 +24,7 @@ class PaymentSchedulerTest {
     fun setUp() {
         clearAllMocks()
         paymentFacade = mockk(relaxed = true)
-        scheduler = PaymentScheduler(paymentFacade, SimpleMeterRegistry())
+        scheduler = PaymentScheduler(paymentFacade)
     }
 
     @Nested

@@ -386,7 +386,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(successTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(successTransaction)
 
             // when
             val result = paymentService.processInProgressPayment(
@@ -411,7 +411,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                 status = PgTransactionStatus.FAILED,
                 failureReason = failureReason,
             )
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
 
             // when
             val result = paymentService.processInProgressPayment(
@@ -436,7 +436,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                 amount = Money.krw(99999),
                 status = PgTransactionStatus.SUCCESS,
             )
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(unmatchedTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(unmatchedTransaction)
 
             // when
             val result = paymentService.processInProgressPayment(
@@ -582,14 +582,14 @@ class PaymentServiceIntegrationTest @Autowired constructor(
 
     private fun createTransaction(
         transactionKey: String = "tx_default",
-        orderId: Long = 1L,
+        paymentId: Long = 1L,
         amount: Money = Money.krw(10000),
         status: PgTransactionStatus = PgTransactionStatus.SUCCESS,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
-            orderId = orderId,
+            paymentId = paymentId,
             cardType = CardType.KB,
             cardNo = "0000-0000-0000-0000",
             amount = amount,

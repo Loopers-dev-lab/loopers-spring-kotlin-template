@@ -460,13 +460,14 @@ class PaymentTest {
             assertThat(payment.failureMessage).isEqualTo("잔액 부족")
         }
 
-        @DisplayName("paidAmount로 SUCCESS 매칭 시 PAID로 전이하고 키가 설정된다")
+        @DisplayName("paymentId로 SUCCESS 매칭 시 PAID로 전이하고 키가 설정된다")
         @Test
-        fun `transitions to PAID and sets key when matched by paidAmount with SUCCESS`() {
+        fun `transitions to PAID and sets key when matched by paymentId with SUCCESS`() {
             // given - Uncertain으로 initiate된 경우 externalPaymentKey가 null
             val payment = createInProgressPayment(externalPaymentKey = null)
             val transaction = createTransaction(
                 transactionKey = "tx_new_12345",
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
@@ -479,13 +480,14 @@ class PaymentTest {
             assertThat(payment.externalPaymentKey).isEqualTo("tx_new_12345")
         }
 
-        @DisplayName("paidAmount로 FAILED 매칭 시 FAILED로 전이하고 키가 설정된다")
+        @DisplayName("paymentId로 FAILED 매칭 시 FAILED로 전이하고 키가 설정된다")
         @Test
-        fun `transitions to FAILED and sets key when matched by paidAmount with FAILED`() {
+        fun `transitions to FAILED and sets key when matched by paymentId with FAILED`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = null)
             val transaction = createTransaction(
                 transactionKey = "tx_failed_12345",
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "카드 한도 초과",
@@ -645,14 +647,14 @@ class PaymentTest {
 
     private fun createTransaction(
         transactionKey: String = "tx_default",
-        orderId: Long = 1L,
+        paymentId: Long = 1L,
         amount: Money = Money.krw(10000),
         status: PgTransactionStatus = PgTransactionStatus.SUCCESS,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
-            orderId = orderId,
+            paymentId = paymentId,
             cardType = CardType.KB,
             cardNo = "0000-0000-0000-0000",
             amount = amount,

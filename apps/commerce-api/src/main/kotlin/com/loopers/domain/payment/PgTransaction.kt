@@ -4,7 +4,7 @@ import com.loopers.support.values.Money
 
 data class PgTransaction(
     val transactionKey: String,
-    val orderId: Long,
+    val paymentId: Long,
     val cardType: CardType,
     val cardNo: String,
     val amount: Money,

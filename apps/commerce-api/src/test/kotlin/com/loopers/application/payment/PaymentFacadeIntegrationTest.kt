@@ -245,7 +245,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val externalPaymentKey = payment.externalPaymentKey!!
             val transaction = createTransaction(
                 transactionKey = externalPaymentKey,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
@@ -288,7 +288,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // 결제 실패 처리
             val failedTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "테스트 실패",
@@ -331,7 +331,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // PgClient Mock 설정 - externalPaymentKey로 조회 시 SUCCESS 트랜잭션 반환
             val successTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
@@ -483,14 +483,14 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
 
     private fun createTransaction(
         transactionKey: String,
-        orderId: Long,
+        paymentId: Long,
         amount: Money,
         status: PgTransactionStatus,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
-            orderId = orderId,
+            paymentId = paymentId,
             cardType = CardType.KB,
             cardNo = "0000-0000-0000-0000",
             amount = amount,

@@ -77,12 +77,12 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
             val payment = createInProgressPayment()
             val successTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
 
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(successTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(successTransaction)
 
             val threadCount = 5
             val executor = Executors.newFixedThreadPool(threadCount)
@@ -172,14 +172,14 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
 
     private fun createTransaction(
         transactionKey: String,
-        orderId: Long,
+        paymentId: Long,
         amount: Money,
         status: PgTransactionStatus,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
-            orderId = orderId,
+            paymentId = paymentId,
             cardType = CardType.KB,
             cardNo = "0000-0000-0000-0000",
             amount = amount,

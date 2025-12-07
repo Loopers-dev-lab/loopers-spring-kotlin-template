@@ -80,7 +80,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
 
             val successTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
@@ -118,7 +118,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
 
             val failedTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "잔액 부족",
@@ -157,7 +157,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
 
             val successTransaction = createTransaction(
                 transactionKey = externalPaymentKey,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
@@ -287,14 +287,14 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
 
     private fun createTransaction(
         transactionKey: String,
-        orderId: Long,
+        paymentId: Long,
         amount: Money,
         status: PgTransactionStatus,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
-            orderId = orderId,
+            paymentId = paymentId,
             cardType = CardType.KB,
             cardNo = "0000-0000-0000-0000",
             amount = amount,

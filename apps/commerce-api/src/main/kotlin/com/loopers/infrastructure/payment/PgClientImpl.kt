@@ -2,7 +2,6 @@ package com.loopers.infrastructure.payment
 
 import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
-import com.loopers.domain.payment.PgPaymentRequest
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.support.values.Money
@@ -13,6 +12,7 @@ import io.micrometer.core.instrument.Timer
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import com.loopers.domain.payment.CardType as DomainCardType
+import com.loopers.domain.payment.PgPaymentRequest as DomainPgPaymentRequest
 
 @Component
 class PgClientImpl(
@@ -25,7 +25,7 @@ class PgClientImpl(
 
     @CircuitBreaker(name = "pg", fallbackMethod = "requestPaymentFallback")
     @Retry(name = "pg")
-    override fun requestPayment(request: PgPaymentRequest): PgPaymentCreateResult {
+    override fun requestPayment(request: DomainPgPaymentRequest): PgPaymentCreateResult {
         val sample = Timer.start(meterRegistry)
         val infraRequest = request.toInfraRequest(callbackBaseUrl)
 
@@ -42,7 +42,7 @@ class PgClientImpl(
 
     @Suppress("unused")
     private fun requestPaymentFallback(
-        request: PgPaymentRequest,
+        request: DomainPgPaymentRequest,
         e: Exception,
     ): PgPaymentCreateResult = when (e) {
         is PgResponseUncertainException -> PgPaymentCreateResult.Uncertain
@@ -68,20 +68,21 @@ class PgClientImpl(
 
     @CircuitBreaker(name = "pg")
     @Retry(name = "pg")
-    override fun findTransactionsByOrderId(orderId: Long): List<PgTransaction> {
+    override fun findTransactionsByPaymentId(paymentId: Long): List<PgTransaction> {
         val sample = Timer.start(meterRegistry)
 
         return try {
-            val response = pgFeignClient.getPaymentsByOrderId(orderId.toString().padStart(6, '0'))
+            // 도메인의 paymentId를 외부 PG API의 orderId 파라미터로 전달
+            val response = pgFeignClient.getPaymentsByOrderId(paymentId.toString().padStart(6, '0'))
             val result = extractData(response).transactions.map { summary ->
                 pgFeignClient.getPayment(summary.transactionKey)
                     .let { extractData(it) }
                     .let { toDomainTransaction(it) }
             }
-            recordSuccess(sample, "findTransactionsByOrderId")
+            recordSuccess(sample, "findTransactionsByPaymentId")
             result
         } catch (e: Exception) {
-            recordFailure(sample, "findTransactionsByOrderId", e)
+            recordFailure(sample, "findTransactionsByPaymentId", e)
             throw exceptionClassifier.classify(e)
         }
     }
@@ -89,8 +90,9 @@ class PgClientImpl(
     private fun <T> extractData(response: PgResponse<T>): T =
         response.data ?: throw PgRequestNotReachedException("PG 응답 데이터 없음")
 
-    private fun PgPaymentRequest.toInfraRequest(callbackUrl: String) = PgPaymentRequest(
-        orderId = orderId.toString().padStart(6, '0'),
+    private fun DomainPgPaymentRequest.toInfraRequest(callbackUrl: String) = PgPaymentRequest(
+        // 도메인의 paymentId를 외부 PG API의 orderId 필드로 변환
+        orderId = paymentId.toString().padStart(6, '0'),
         cardType = cardInfo.cardType.name,
         cardNo = cardInfo.cardNo,
         amount = amount.amount.toLong(),
@@ -99,7 +101,8 @@ class PgClientImpl(
 
     private fun toDomainTransaction(response: PgPaymentDetailResponse) = PgTransaction(
         transactionKey = response.transactionKey,
-        orderId = response.orderId.toLong(),
+        // 외부 PG API의 orderId 응답을 도메인의 paymentId로 변환
+        paymentId = response.orderId.toLong(),
         cardType = DomainCardType.valueOf(response.cardType),
         cardNo = response.cardNo,
         amount = Money.krw(response.amount),

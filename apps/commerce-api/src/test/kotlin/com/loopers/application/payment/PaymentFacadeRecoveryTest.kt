@@ -93,13 +93,13 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
 
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "PG 연결 실패",
             )
 
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -128,13 +128,13 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
 
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "카드 한도 초과",
             )
 
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -159,13 +159,13 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
 
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "서킷 브레이커 오픈",
             )
 
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -188,13 +188,13 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
 
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "PG 거부",
             )
 
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리 (쿠폰 없음)
             paymentFacade.processInProgressPayment(payment.id)
@@ -222,13 +222,13 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
 
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "잔액 부족",
             )
 
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -275,13 +275,13 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
 
             val failedTransaction = createTransaction(
                 transactionKey = initiatedPayment.externalPaymentKey!!,
-                orderId = initiatedPayment.orderId,
+                paymentId = initiatedPayment.id,
                 amount = initiatedPayment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "타임아웃",
             )
 
-            every { pgClient.findTransactionsByOrderId(initiatedPayment.orderId) } returns listOf(failedTransaction)
+            every { pgClient.findTransactionsByPaymentId(initiatedPayment.id) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(initiatedPayment.id)
@@ -308,13 +308,13 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
 
             val failedTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "결제 거부",
             )
 
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(failedTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -335,12 +335,12 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             )
             val successTransaction = createTransaction(
                 transactionKey = payment.externalPaymentKey!!,
-                orderId = payment.orderId,
+                paymentId = payment.id,
                 amount = payment.paidAmount,
                 status = PgTransactionStatus.SUCCESS,
             )
 
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(successTransaction)
+            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(successTransaction)
 
             // when - 결제 성공 처리
             paymentFacade.processInProgressPayment(payment.id)
@@ -401,13 +401,13 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
 
             val failedTransaction = createTransaction(
                 transactionKey = initiatedPayment.externalPaymentKey!!,
-                orderId = initiatedPayment.orderId,
+                paymentId = initiatedPayment.id,
                 amount = initiatedPayment.paidAmount,
                 status = PgTransactionStatus.FAILED,
                 failureReason = "PG 서버 오류",
             )
 
-            every { pgClient.findTransactionsByOrderId(initiatedPayment.orderId) } returns listOf(failedTransaction)
+            every { pgClient.findTransactionsByPaymentId(initiatedPayment.id) } returns listOf(failedTransaction)
 
             // when - 결제 실패 처리
             paymentFacade.processInProgressPayment(initiatedPayment.id)
@@ -605,14 +605,14 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
 
     private fun createTransaction(
         transactionKey: String,
-        orderId: Long,
+        paymentId: Long,
         amount: Money,
         status: PgTransactionStatus,
         failureReason: String? = null,
     ): PgTransaction {
         return PgTransaction(
             transactionKey = transactionKey,
-            orderId = orderId,
+            paymentId = paymentId,
             cardType = CardType.KB,
             cardNo = "0000-0000-0000-0000",
             amount = amount,

@@ -22,15 +22,15 @@ class PgPaymentRequestTest {
         @DisplayName("양수 금액으로 생성하면 성공한다")
         fun `succeeds with positive amount`() {
             // given
-            val orderId = 1L
+            val paymentId = 1L
             val amount = Money.krw(10000)
             val cardInfo = CardInfo(CardType.SAMSUNG, "1234-5678-9012-3456")
 
             // when
-            val request = PgPaymentRequest(orderId, amount, cardInfo)
+            val request = PgPaymentRequest(paymentId, amount, cardInfo)
 
             // then
-            assertThat(request.orderId).isEqualTo(orderId)
+            assertThat(request.paymentId).isEqualTo(paymentId)
             assertThat(request.amount).isEqualTo(amount)
             assertThat(request.cardInfo).isEqualTo(cardInfo)
         }
@@ -40,13 +40,13 @@ class PgPaymentRequestTest {
         @DisplayName("금액이 0 이하이면 예외가 발생한다")
         fun `throws exception when amount is zero or negative`(amountValue: Long) {
             // given
-            val orderId = 1L
+            val paymentId = 1L
             val amount = Money.krw(amountValue)
             val cardInfo = CardInfo(CardType.KB, "1234-5678-9012-3456")
 
             // when
             val exception = assertThrows<CoreException> {
-                PgPaymentRequest(orderId, amount, cardInfo)
+                PgPaymentRequest(paymentId, amount, cardInfo)
             }
 
             // then
