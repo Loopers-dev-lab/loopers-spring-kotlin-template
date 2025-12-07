@@ -163,8 +163,23 @@ class OrderEventHandler(
                     ),
                 ),
             )
+        } catch (e: CoreException) {
+            when (e.errorType) {
+                ErrorType.NOT_FOUND -> {
+                    // 주문을 찾을 수 없는 경우 - 정상적인 상황은 아니지만 복구 불가능
+                    logger.error("결제 실패 처리 중 주문을 찾을 수 없음: orderId=${event.orderId}", e)
+                    // 모니터링을 위한 실패 이벤트 발행 (향후 확장 가능)
+                }
+                else -> {
+                    // 예상하지 못한 CoreException - 트랜잭션 롤백 및 재시도를 위해 재발생
+                    logger.error("결제 실패 처리 중 예상치 못한 CoreException: orderId=${event.orderId}", e)
+                    throw e
+                }
+            }
         } catch (e: Exception) {
-            logger.error("결제 실패 처리 중 오류: orderId=${event.orderId}", e)
+            // 데이터베이스 오류나 기타 예상치 못한 시스템 오류 - 트랜잭션 롤백 및 상위 재시도/알림을 위해 재발생
+            logger.error("결제 실패 처리 중 시스템 오류: orderId=${event.orderId}", e)
+            throw e
         }
     }
 }

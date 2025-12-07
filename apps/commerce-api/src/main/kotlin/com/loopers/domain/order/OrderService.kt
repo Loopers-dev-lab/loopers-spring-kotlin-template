@@ -16,8 +16,8 @@ class OrderService(
     private val orderRepository: OrderRepository,
     private val stockService: StockService,
 ) {
-    fun createOrder(userId: Long, orderItems: List<OrderItem>, totalAmount: Money? = null): Order {
-        val order = Order(userId = userId, items = orderItems, totalAmount = totalAmount)
+    fun createOrder(userId: Long, orderItems: List<OrderItem>): Order {
+        val order = Order(userId = userId, items = orderItems)
         return orderRepository.save(order)
     }
 

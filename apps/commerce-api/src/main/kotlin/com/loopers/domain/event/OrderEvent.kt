@@ -18,7 +18,7 @@ data class OrderCreatedEvent(
     companion object {
         fun from(order: Order, couponId: Long?): OrderCreatedEvent {
             return OrderCreatedEvent(
-                orderId = order.id!!,
+                orderId = requireNotNull(order.id) { "Order id must not be null when creating OrderCreatedEvent" },
                 userId = order.userId,
                 amount = order.totalAmount.amount.toLong(),
                 couponId = couponId,
@@ -42,13 +42,20 @@ data class PaymentCompletedEvent(
 ) {
     companion object {
         fun from(payment: Payment): PaymentCompletedEvent {
+            val completedAt = try {
+                payment.updatedAt
+            } catch (e: UninitializedPropertyAccessException) {
+                // updatedAt이 초기화되지 않은 경우(테스트 등) 현재 시각 사용
+                ZonedDateTime.now()
+            }
+
             return PaymentCompletedEvent(
-                paymentId = payment.id!!,
+                paymentId = requireNotNull(payment.id) { "Payment id must not be null when creating PaymentCompletedEvent" },
                 orderId = payment.orderId,
                 userId = payment.userId,
                 amount = payment.amount,
                 transactionKey = payment.transactionKey,
-                completedAt = ZonedDateTime.now(),
+                completedAt = completedAt,
             )
         }
     }
@@ -68,13 +75,20 @@ data class PaymentFailedEvent(
 ) {
     companion object {
         fun from(payment: Payment): PaymentFailedEvent {
+            val failedAt = try {
+                payment.updatedAt
+            } catch (e: UninitializedPropertyAccessException) {
+                // updatedAt이 초기화되지 않은 경우(테스트 등) 현재 시각 사용
+                ZonedDateTime.now()
+            }
+
             return PaymentFailedEvent(
-                paymentId = payment.id!!,
+                paymentId = requireNotNull(payment.id) { "Payment id must not be null when creating PaymentFailedEvent" },
                 orderId = payment.orderId,
                 userId = payment.userId,
                 amount = payment.amount,
                 reason = payment.failureReason,
-                failedAt = ZonedDateTime.now(),
+                failedAt = failedAt,
             )
         }
     }
