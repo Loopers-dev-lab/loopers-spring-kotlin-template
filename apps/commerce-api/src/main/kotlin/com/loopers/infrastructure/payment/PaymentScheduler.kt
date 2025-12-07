@@ -72,6 +72,7 @@ class PaymentScheduler(
                     payment.id,
                     e,
                 )
+                skippedCount++
             }
         }
 
