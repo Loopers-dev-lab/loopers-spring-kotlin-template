@@ -20,6 +20,7 @@ import java.time.Instant
     name = "payments",
     indexes = [
         Index(name = "idx_payment_status_created_at", columnList = "status, created_at"),
+        Index(name = "idx_payment_external_payment_key", columnList = "external_payment_key", unique = true),
     ],
 )
 @Entity
