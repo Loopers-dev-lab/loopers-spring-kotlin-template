@@ -9,22 +9,20 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class PaymentService(
-    private val paymentClient: PaymentClient,
-    private val paymentRepository: PaymentRepository,
-) {
+class PaymentService(private val paymentClient: PaymentClient, private val paymentRepository: PaymentRepository) {
 
     companion object {
         private val logger = LoggerFactory.getLogger(PaymentService::class.java)
     }
 
     @Transactional
-    fun pay(userId: Long, request: PaymentDto.Request): PaymentDto.Result {
+    fun pay(request: PaymentDto.Request): PaymentDto.Result {
         val payment = PaymentModel.create(
-            refUserId = userId,
             refOrderKey = request.orderId,
             amount = Money(request.amount),
             transactionKey = "",
+            cardType = request.cardType,
+            cardNo = request.cardNo,
         )
 
         val savedPayment = paymentRepository.save(payment)
@@ -32,11 +30,12 @@ class PaymentService(
         return try {
             val response = paymentClient.requestPayment(request)
             savedPayment.updateTransactionKey(response.data?.transactionKey ?: "")
-            savedPayment.updateStatus(response.data?.status ?: "PENDING")
+            savedPayment.updateStatus(PaymentStatus.SUCCESS)
 
             PaymentDto.Result.Success(paymentRepository.save(savedPayment))
         } catch (e: Exception) {
             logger.error("Payment request failed: ${e.message}")
+            savedPayment.updateStatus(PaymentStatus.NOT_STARTED)
             PaymentDto.Result.Failed("결제 요청 실패: ${e.message}")
         }
     }
@@ -48,7 +47,11 @@ class PaymentService(
         val payment = paymentRepository.findByTransactionKey(transactionKey)
             ?: throw CoreException(ErrorType.NOT_FOUND, "[ $transactionKey ] 해당 결제 정보가 존재하지 않습니다.")
 
-        payment.updateStatus(status)
+        payment.updateStatus(PaymentStatus.valueOf(status))
+
         return paymentRepository.save(payment)
     }
+
+    fun findFailedPaymentByOrderKey(orderKey: String): PaymentModel? =
+        paymentRepository.findFirstByRefOrderKeyAndStatusOrderByCreatedAtDesc(orderKey, PaymentStatus.NOT_STARTED)
 }

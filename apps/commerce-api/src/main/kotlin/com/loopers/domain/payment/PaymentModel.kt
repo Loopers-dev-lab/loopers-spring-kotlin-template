@@ -13,13 +13,16 @@ class PaymentModel(
     val refOrderKey: String,
 
     @Column
-    val refUserId: Long,
-
-    @Column
     var transactionKey: String,
 
     @Column
     val amount: Money,
+
+    @Column
+    val cardType: String,
+
+    @Column
+    val cardNo: String,
 
     @Column
     var status: PaymentStatus = PaymentStatus.NOT_STARTED,
@@ -29,16 +32,18 @@ class PaymentModel(
         this.transactionKey = transactionKey
     }
 
-    fun updateStatus(status: String) {
-        if (status == "COMPLETE") {
-            this.status = PaymentStatus.SUCCESS
-        } else {
-            this.status = PaymentStatus.FAIL
-        }
+    fun updateStatus(status: PaymentStatus) {
+        this.status = status
     }
 
     companion object {
-        fun create(refUserId: Long, refOrderKey: String, transactionKey: String, amount: Money): PaymentModel =
-            PaymentModel(refOrderKey, refUserId, transactionKey, amount)
+        fun create(
+            refOrderKey: String,
+            transactionKey: String,
+            amount: Money,
+            cardType: String,
+            cardNo: String,
+        ): PaymentModel =
+            PaymentModel(refOrderKey, transactionKey, amount, cardType, cardNo)
     }
 }

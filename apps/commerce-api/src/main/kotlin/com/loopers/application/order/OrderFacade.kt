@@ -6,8 +6,6 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.dto.PaymentDto
 import com.loopers.domain.product.ProductService
-import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -35,18 +33,17 @@ class OrderFacade(
         val order = orderService.prepare(userId, command)
 
         // 4. 결제 요청
-        when (
-            val result = paymentService.pay(
-                userId,
+        return when (
+            paymentService.pay(
                 PaymentDto.Request.from(order.orderKey, command.cardType, command.cardNo, discountPrice),
             )
         ) {
             is PaymentDto.Result.Success -> {
-                return orderService.requestPayment(order)
+                orderService.requestPayment(order)
             }
 
             is PaymentDto.Result.Failed -> {
-                throw CoreException(ErrorType.INTERNAL_ERROR, result.errorMessage)
+                order
             }
         }
     }

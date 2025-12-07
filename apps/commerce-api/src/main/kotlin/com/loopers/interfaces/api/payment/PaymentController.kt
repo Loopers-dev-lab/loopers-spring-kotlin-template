@@ -20,8 +20,7 @@ class PaymentController(private val paymentFacade: PaymentFacade) : PaymentApiSp
     override fun handlePaymentCallback(
         @RequestBody request: PaymentDto.CallbackRequest,
     ): ApiResponse<PaymentDto.CallbackResponse> {
-        logger.info("Payment callback received: transactionKey=${request.transactionKey}, status=${request.status}")
-
+        logger.info("Payment callback received: $request")
         paymentFacade.handleCallback(request.transactionKey, request.status)
 
         return ApiResponse.success(

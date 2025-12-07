@@ -20,9 +20,11 @@ class OrderService(private val orderRepository: OrderRepository) {
             ?: throw CoreException(ErrorType.NOT_FOUND, "주문이 존재하지 않습니다.")
 
         when (status) {
-            "COMPLETE" -> order.complete()  // "COMPLETE"로 통일
-            else -> order.fail()  // 그 외 모두 실패 처리
+            "SUCCESS" -> order.complete()
+            else -> order.fail() // 그 외 모두 실패 처리
         }
         orderRepository.save(order)
     }
+
+    fun findByStatus(status: OrderStatus): List<OrderModel> = orderRepository.findByStatus(status)
 }

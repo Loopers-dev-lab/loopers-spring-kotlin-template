@@ -7,4 +7,6 @@ interface OrderRepository {
     fun findByOrderId(orderId: Long): OrderModel?
 
     fun findByOrderKey(orderKey: String): OrderModel?
+
+    fun findByStatus(status: OrderStatus): List<OrderModel>
 }
