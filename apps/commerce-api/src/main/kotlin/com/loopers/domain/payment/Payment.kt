@@ -215,6 +215,9 @@ class Payment(
             if (usedPoint < Money.ZERO_KRW) {
                 throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트는 0 이상이어야 합니다")
             }
+            if (couponDiscount < Money.ZERO_KRW) {
+                throw CoreException(ErrorType.BAD_REQUEST, "쿠폰 할인은 0 이상이어야 합니다")
+            }
 
             val paidAmount = order.totalAmount - usedPoint - couponDiscount
 
