@@ -1,7 +1,6 @@
 package com.loopers.domain.payment
 
 import com.loopers.domain.BaseEntity
-import com.loopers.domain.order.Order
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -214,10 +213,11 @@ class Payment(
          */
         fun create(
             userId: Long,
-            order: Order,
+            orderId: Long,
+            totalAmount: Money,
             usedPoint: Money,
-            issuedCouponId: Long? = null,
-            couponDiscount: Money = Money.ZERO_KRW,
+            issuedCouponId: Long?,
+            couponDiscount: Money,
         ): Payment {
             if (usedPoint < Money.ZERO_KRW) {
                 throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트는 0 이상이어야 합니다")
@@ -226,7 +226,7 @@ class Payment(
                 throw CoreException(ErrorType.BAD_REQUEST, "쿠폰 할인은 0 이상이어야 합니다")
             }
 
-            val paidAmount = order.totalAmount - usedPoint - couponDiscount
+            val paidAmount = totalAmount - usedPoint - couponDiscount
 
             if (paidAmount < Money.ZERO_KRW) {
                 throw CoreException(ErrorType.BAD_REQUEST, "포인트와 쿠폰 할인의 합이 주문 금액을 초과합니다")
@@ -235,9 +235,9 @@ class Payment(
             val status = if (paidAmount == Money.ZERO_KRW) PaymentStatus.PAID else PaymentStatus.PENDING
 
             return Payment(
-                orderId = order.id,
+                orderId = orderId,
                 userId = userId,
-                totalAmount = order.totalAmount,
+                totalAmount = totalAmount,
                 usedPoint = usedPoint,
                 paidAmount = paidAmount,
                 status = status,

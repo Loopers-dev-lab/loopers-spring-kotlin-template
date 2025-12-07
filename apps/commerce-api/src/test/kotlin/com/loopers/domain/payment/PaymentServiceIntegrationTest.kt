@@ -34,9 +34,9 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         databaseCleanUp.truncateAllTables()
     }
 
-    @DisplayName("PENDING 결제 생성 통합테스트")
+    @DisplayName("결제 생성 통합테스트")
     @Nested
-    inner class CreatePending {
+    inner class Create {
 
         @DisplayName("PENDING 상태의 결제를 생성할 수 있다")
         @Test
@@ -46,10 +46,15 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             val usedPoint = Money.krw(5000)
 
             // when
-            val payment = paymentService.createPending(
-                userId = order.userId,
-                order = order,
-                usedPoint = usedPoint,
+            val payment = paymentService.create(
+                PaymentCommand.Create(
+                    userId = order.userId,
+                    orderId = order.id,
+                    totalAmount = order.totalAmount,
+                    usedPoint = usedPoint,
+                    issuedCouponId = null,
+                    couponDiscount = Money.ZERO_KRW,
+                ),
             )
 
             // then - paidAmount = 10000 - 5000 = 5000 자동 계산
@@ -70,12 +75,15 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             val couponDiscount = Money.krw(3000)
 
             // when
-            val payment = paymentService.createPending(
-                userId = order.userId,
-                order = order,
-                usedPoint = usedPoint,
-                issuedCouponId = 1L,
-                couponDiscount = couponDiscount,
+            val payment = paymentService.create(
+                PaymentCommand.Create(
+                    userId = order.userId,
+                    orderId = order.id,
+                    totalAmount = order.totalAmount,
+                    usedPoint = usedPoint,
+                    issuedCouponId = 1L,
+                    couponDiscount = couponDiscount,
+                ),
             )
 
             // then - paidAmount = 15000 - 5000 - 3000 = 7000 자동 계산
@@ -400,8 +408,11 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         val order = createOrder()
         val payment = Payment.create(
             userId = userId,
-            order = order,
+            orderId = order.id,
+            totalAmount = order.totalAmount,
             usedPoint = usedPoint,
+            issuedCouponId = null,
+            couponDiscount = Money.ZERO_KRW,
         )
         return paymentRepository.save(payment)
     }

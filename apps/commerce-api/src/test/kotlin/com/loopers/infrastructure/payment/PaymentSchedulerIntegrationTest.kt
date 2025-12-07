@@ -139,8 +139,11 @@ class PaymentSchedulerIntegrationTest @Autowired constructor(
         val order = createOrder()
         val payment = Payment.create(
             userId = userId,
-            order = order,
+            orderId = order.id,
+            totalAmount = order.totalAmount,
             usedPoint = Money.krw(5000),
+            issuedCouponId = null,
+            couponDiscount = Money.ZERO_KRW,
         )
         payment.initiate(PgPaymentCreateResult.Accepted(externalPaymentKey), Instant.now())
         return paymentRepository.save(payment)

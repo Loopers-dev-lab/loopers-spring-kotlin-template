@@ -1,8 +1,5 @@
 package com.loopers.domain.payment
 
-import com.loopers.domain.order.Order
-import com.loopers.domain.order.OrderItem
-import com.loopers.domain.order.OrderStatus
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -24,33 +21,40 @@ class PaymentTest {
         fun `create payment when provide order`() {
             // given
             val userId = 1L
-            val order = createOrder(userId = userId)
+            val orderId = 1L
+            val totalAmount = Money.krw(10000)
 
             // when
             val payment = Payment.create(
                 userId = userId,
-                order = order,
-                usedPoint = order.totalAmount,
+                orderId = orderId,
+                totalAmount = totalAmount,
+                usedPoint = totalAmount,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // then
-            assertThat(payment.orderId).isEqualTo(order.id)
+            assertThat(payment.orderId).isEqualTo(orderId)
             assertThat(payment.userId).isEqualTo(userId)
-            assertThat(payment.totalAmount).isEqualTo(order.totalAmount)
-            assertThat(payment.usedPoint).isEqualTo(order.totalAmount)
+            assertThat(payment.totalAmount).isEqualTo(totalAmount)
+            assertThat(payment.usedPoint).isEqualTo(totalAmount)
         }
 
         @DisplayName("포인트로 전액 결제하면 PAID 상태로 생성된다")
         @Test
         fun `have paid status when point covers total amount`() {
             // given
-            val order = createOrder()
+            val totalAmount = Money.krw(10000)
 
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
-                usedPoint = order.totalAmount,
+                orderId = 1L,
+                totalAmount = totalAmount,
+                usedPoint = totalAmount,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // then
@@ -61,33 +65,39 @@ class PaymentTest {
         @Test
         fun `have pending status when point does not cover total amount`() {
             // given
-            val order = createOrder()
+            val totalAmount = Money.krw(10000)
 
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
+                orderId = 1L,
+                totalAmount = totalAmount,
                 usedPoint = Money.ZERO_KRW,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
-            assertThat(payment.paidAmount).isEqualTo(order.totalAmount)
+            assertThat(payment.paidAmount).isEqualTo(totalAmount)
         }
 
         @DisplayName("사용 포인트가 음수이면 예외가 발생한다")
         @Test
         fun `throws exception when used point is negative`() {
             // given
-            val order = createOrder()
+            val totalAmount = Money.krw(10000)
             val negativePoint = Money.krw(-1000)
 
             // when
             val exception = assertThrows<CoreException> {
                 Payment.create(
                     userId = 1L,
-                    order = order,
+                    orderId = 1L,
+                    totalAmount = totalAmount,
                     usedPoint = negativePoint,
+                    issuedCouponId = null,
+                    couponDiscount = Money.ZERO_KRW,
                 )
             }
 
@@ -100,14 +110,17 @@ class PaymentTest {
         @Test
         fun `throws exception when point plus coupon exceeds total amount`() {
             // given
-            val order = createOrder() // totalAmount = 10000
+            val totalAmount = Money.krw(10000)
 
             // when - 포인트 11000 > 주문금액 10000
             val exception = assertThrows<CoreException> {
                 Payment.create(
                     userId = 1L,
-                    order = order,
+                    orderId = 1L,
+                    totalAmount = totalAmount,
                     usedPoint = Money.krw(11000),
+                    issuedCouponId = null,
+                    couponDiscount = Money.ZERO_KRW,
                 )
             }
 
@@ -120,11 +133,7 @@ class PaymentTest {
         @Test
         fun `create payment with coupon discount`() {
             // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
+            val totalAmount = Money.krw(10000)
             val couponDiscount = Money.krw(3000)
             val usedPoint = Money.krw(7000)
             val issuedCouponId = 100L
@@ -132,7 +141,8 @@ class PaymentTest {
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
+                orderId = 1L,
+                totalAmount = totalAmount,
                 usedPoint = usedPoint,
                 issuedCouponId = issuedCouponId,
                 couponDiscount = couponDiscount,
@@ -150,34 +160,29 @@ class PaymentTest {
         @Test
         fun `create payment without coupon has zero discount`() {
             // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
+            val totalAmount = Money.krw(10000)
 
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
-                usedPoint = order.totalAmount,
+                orderId = 1L,
+                totalAmount = totalAmount,
+                usedPoint = totalAmount,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // then
             assertThat(payment.couponDiscount).isEqualTo(Money.ZERO_KRW)
             assertThat(payment.issuedCouponId).isNull()
-            assertThat(payment.usedPoint).isEqualTo(order.totalAmount)
+            assertThat(payment.usedPoint).isEqualTo(totalAmount)
         }
 
         @DisplayName("쿠폰 할인이 주문 금액과 같으면 포인트는 0원이어야 한다")
         @Test
         fun `used point should be zero when coupon discount equals order amount`() {
             // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
+            val totalAmount = Money.krw(10000)
 
             // 쿠폰 할인이 주문 금액과 같음
             val couponDiscount = Money.krw(10000)
@@ -185,7 +190,8 @@ class PaymentTest {
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
+                orderId = 1L,
+                totalAmount = totalAmount,
                 usedPoint = Money.ZERO_KRW,
                 issuedCouponId = 100L,
                 couponDiscount = couponDiscount,
@@ -202,18 +208,17 @@ class PaymentTest {
         @Test
         fun `create mixed payment with point and card`() {
             // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
+            val totalAmount = Money.krw(10000)
             val usedPoint = Money.krw(3000)
 
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
+                orderId = 1L,
+                totalAmount = totalAmount,
                 usedPoint = usedPoint,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // then - paidAmount = 10000 - 3000 = 7000 자동 계산
@@ -226,17 +231,16 @@ class PaymentTest {
         @Test
         fun `create card only payment`() {
             // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
+            val totalAmount = Money.krw(10000)
 
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
+                orderId = 1L,
+                totalAmount = totalAmount,
                 usedPoint = Money.ZERO_KRW,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // then - paidAmount = 10000 자동 계산
@@ -249,18 +253,15 @@ class PaymentTest {
         @Test
         fun `create payment with coupon point and card`() {
             // given
-            val order = createOrder(
-                orderItems = mutableListOf(
-                    createOrderItem(unitPrice = Money.krw(10000)),
-                ),
-            )
+            val totalAmount = Money.krw(10000)
             val couponDiscount = Money.krw(3000)
             val usedPoint = Money.krw(2000)
 
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
+                orderId = 1L,
+                totalAmount = totalAmount,
                 usedPoint = usedPoint,
                 issuedCouponId = 100L,
                 couponDiscount = couponDiscount,
@@ -315,13 +316,16 @@ class PaymentTest {
         @Test
         fun `externalPaymentKey is initialized as null`() {
             // given
-            val order = createOrder()
+            val totalAmount = Money.krw(10000)
 
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
-                usedPoint = order.totalAmount,
+                orderId = 1L,
+                totalAmount = totalAmount,
+                usedPoint = totalAmount,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // then
@@ -332,13 +336,16 @@ class PaymentTest {
         @Test
         fun `failureMessage is initialized as null`() {
             // given
-            val order = createOrder()
+            val totalAmount = Money.krw(10000)
 
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
-                usedPoint = order.totalAmount,
+                orderId = 1L,
+                totalAmount = totalAmount,
+                usedPoint = totalAmount,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // then
@@ -349,13 +356,16 @@ class PaymentTest {
         @Test
         fun `version is initialized as 0`() {
             // given
-            val order = createOrder()
+            val totalAmount = Money.krw(10000)
 
             // when
             val payment = Payment.create(
                 userId = 1L,
-                order = order,
-                usedPoint = order.totalAmount,
+                orderId = 1L,
+                totalAmount = totalAmount,
+                usedPoint = totalAmount,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
             )
 
             // then
@@ -613,25 +623,33 @@ class PaymentTest {
 
     private fun createPendingPayment(
         userId: Long = 1L,
-        order: Order = createOrder(),
+        orderId: Long = 1L,
+        totalAmount: Money = Money.krw(10000),
     ): Payment {
         return Payment.create(
             userId = userId,
-            order = order,
+            orderId = orderId,
+            totalAmount = totalAmount,
             usedPoint = Money.ZERO_KRW,
+            issuedCouponId = null,
+            couponDiscount = Money.ZERO_KRW,
         )
     }
 
     private fun createInProgressPayment(
         userId: Long = 1L,
-        order: Order = createOrder(),
+        orderId: Long = 1L,
+        totalAmount: Money = Money.krw(10000),
         externalPaymentKey: String? = "tx_12345",
         attemptedAt: Instant = Instant.now(),
     ): Payment {
         val payment = Payment.create(
             userId = userId,
-            order = order,
+            orderId = orderId,
+            totalAmount = totalAmount,
             usedPoint = Money.ZERO_KRW,
+            issuedCouponId = null,
+            couponDiscount = Money.ZERO_KRW,
         )
         val result = if (externalPaymentKey != null) {
             PgPaymentCreateResult.Accepted(externalPaymentKey)
@@ -654,28 +672,5 @@ class PaymentTest {
             status = status,
             failureReason = failureReason,
         )
-    }
-
-    private fun createOrderItem(
-        productId: Long = 1L,
-        quantity: Int = 1,
-        productName: String = "테스트 상품",
-        unitPrice: Money = Money.krw(10000),
-    ): OrderItem {
-        return OrderItem.Companion.create(
-            productId = productId,
-            quantity = quantity,
-            productName = productName,
-            unitPrice = unitPrice,
-        )
-    }
-
-    private fun createOrder(
-        userId: Long = 1L,
-        orderItems: MutableList<OrderItem> = mutableListOf(createOrderItem()),
-    ): Order {
-        val totalAmount = orderItems.sumOf { it.unitPrice.amount * it.quantity.toBigDecimal() }
-            .let { Money.krw(it.toLong()) }
-        return Order.Companion.of(userId, totalAmount, OrderStatus.PAID, orderItems)
     }
 }

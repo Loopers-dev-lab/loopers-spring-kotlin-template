@@ -1,6 +1,17 @@
 package com.loopers.domain.payment
 
+import com.loopers.support.values.Money
+
 class PaymentCommand {
+    data class Create(
+        val userId: Long,
+        val orderId: Long,
+        val totalAmount: Money,
+        val usedPoint: Money,
+        val issuedCouponId: Long?,
+        val couponDiscount: Money,
+    )
+
     data class FindPayments(
         val page: Int? = null,
         val size: Int? = null,

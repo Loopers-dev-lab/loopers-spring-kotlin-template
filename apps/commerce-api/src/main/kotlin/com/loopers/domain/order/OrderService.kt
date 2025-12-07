@@ -1,6 +1,5 @@
 package com.loopers.domain.order
 
-import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -23,29 +22,6 @@ class OrderService(
             }
 
         return orderRepository.save(newOrder)
-    }
-
-    @Transactional
-    fun pay(command: OrderCommand.Pay): Payment {
-        val order = orderRepository.findById(command.orderId)
-            ?: throw com.loopers.support.error.CoreException(
-                com.loopers.support.error.ErrorType.NOT_FOUND,
-                "주문을 찾을 수 없습니다.",
-            )
-
-        order.pay()
-
-        orderRepository.save(order)
-
-        val payment = Payment.create(
-            userId = command.userId,
-            order = order,
-            usedPoint = command.usePoint,
-            issuedCouponId = command.issuedCouponId,
-            couponDiscount = command.couponDiscount,
-        )
-
-        return paymentRepository.save(payment)
     }
 
     /**

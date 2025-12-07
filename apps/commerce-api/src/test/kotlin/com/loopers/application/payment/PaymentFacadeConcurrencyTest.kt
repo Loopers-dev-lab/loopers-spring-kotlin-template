@@ -4,6 +4,7 @@ import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
+import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgClient
@@ -172,10 +173,15 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
         )
         val savedOrder = orderRepository.save(order)
 
-        val payment = paymentService.createPending(
-            userId = userId,
-            order = savedOrder,
-            usedPoint = Money.krw(5000),
+        val payment = paymentService.create(
+            PaymentCommand.Create(
+                userId = userId,
+                orderId = savedOrder.id,
+                totalAmount = savedOrder.totalAmount,
+                usedPoint = Money.krw(5000),
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
+            ),
         )
 
         // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정

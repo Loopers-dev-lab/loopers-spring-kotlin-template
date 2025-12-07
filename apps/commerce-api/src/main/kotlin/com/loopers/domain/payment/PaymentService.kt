@@ -1,9 +1,7 @@
 package com.loopers.domain.payment
 
-import com.loopers.domain.order.Order
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import com.loopers.support.values.Money
 import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -20,27 +18,18 @@ class PaymentService(
      * - paidAmount가 0이면 (포인트+쿠폰으로 전액 결제) → PAID
      * - paidAmount가 0보다 크면 (PG 결제 필요) → PENDING
      *
-     * @param userId 사용자 ID
-     * @param order 주문 엔티티
-     * @param usedPoint 사용할 포인트
-     * @param issuedCouponId 사용할 쿠폰 ID (nullable)
-     * @param couponDiscount 쿠폰 할인 금액
+     * @param command 결제 생성 커맨드
      * @return 생성된 Payment
      */
     @Transactional
-    fun createPending(
-        userId: Long,
-        order: Order,
-        usedPoint: Money,
-        issuedCouponId: Long? = null,
-        couponDiscount: Money = Money.ZERO_KRW,
-    ): Payment {
+    fun create(command: PaymentCommand.Create): Payment {
         val payment = Payment.create(
-            userId = userId,
-            order = order,
-            usedPoint = usedPoint,
-            issuedCouponId = issuedCouponId,
-            couponDiscount = couponDiscount,
+            userId = command.userId,
+            orderId = command.orderId,
+            totalAmount = command.totalAmount,
+            usedPoint = command.usedPoint,
+            issuedCouponId = command.issuedCouponId,
+            couponDiscount = command.couponDiscount,
         )
 
         return paymentRepository.save(payment)

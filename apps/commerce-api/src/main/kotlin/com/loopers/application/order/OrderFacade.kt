@@ -8,6 +8,7 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.CardInfo
 import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointService
@@ -141,12 +142,15 @@ class OrderFacade(
             }
 
             // 6. PENDING 결제 생성 (paidAmount = totalAmount - usePoint - couponDiscount 자동 계산)
-            val payment = paymentService.createPending(
-                userId = criteria.userId,
-                order = order,
-                usedPoint = criteria.usePoint,
-                issuedCouponId = criteria.issuedCouponId,
-                couponDiscount = couponDiscount,
+            val payment = paymentService.create(
+                PaymentCommand.Create(
+                    userId = criteria.userId,
+                    orderId = order.id,
+                    totalAmount = order.totalAmount,
+                    usedPoint = criteria.usePoint,
+                    issuedCouponId = criteria.issuedCouponId,
+                    couponDiscount = couponDiscount,
+                ),
             )
 
             // 결제는 PENDING 상태로 유지, PG 결과 수신 후 initiate()로 IN_PROGRESS 전이

@@ -12,6 +12,7 @@ import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
+import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
@@ -198,10 +199,15 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             productRepository.save(updatedProduct2)
 
             // Payment 생성 (usedPoint < totalAmount면 PENDING 상태)
-            val payment = paymentService.createPending(
-                userId = userId,
-                order = savedOrder,
-                usedPoint = Money.krw(50000),
+            val payment = paymentService.create(
+                PaymentCommand.Create(
+                    userId = userId,
+                    orderId = savedOrder.id,
+                    totalAmount = savedOrder.totalAmount,
+                    usedPoint = Money.krw(50000),
+                    issuedCouponId = null,
+                    couponDiscount = Money.ZERO_KRW,
+                ),
             )
 
             // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
@@ -267,12 +273,15 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             issuedCouponRepository.save(couponToUse)
 
             // Payment 생성 (couponDiscount 포함, paidAmount = 20000 - 5000 - 3000 = 12000 자동 계산)
-            val payment = paymentService.createPending(
-                userId = userId,
-                order = savedOrder,
-                usedPoint = usedPoint,
-                issuedCouponId = issuedCoupon.id,
-                couponDiscount = Money.krw(3000),
+            val payment = paymentService.create(
+                PaymentCommand.Create(
+                    userId = userId,
+                    orderId = savedOrder.id,
+                    totalAmount = savedOrder.totalAmount,
+                    usedPoint = usedPoint,
+                    issuedCouponId = issuedCoupon.id,
+                    couponDiscount = Money.krw(3000),
+                ),
             )
 
             // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
@@ -385,10 +394,15 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
         require(usedPoint < Money.krw(10000)) { "usedPoint must be < totalAmount for PENDING state" }
 
         // Payment 생성 (PENDING -> IN_PROGRESS), paidAmount = 10000 - usedPoint 자동 계산
-        val payment = paymentService.createPending(
-            userId = userId,
-            order = savedOrder,
-            usedPoint = usedPoint,
+        val payment = paymentService.create(
+            PaymentCommand.Create(
+                userId = userId,
+                orderId = savedOrder.id,
+                totalAmount = savedOrder.totalAmount,
+                usedPoint = usedPoint,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
+            ),
         )
 
         // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
@@ -428,12 +442,15 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
         pointAccountRepository.save(pointAccount)
 
         // Payment 생성 (PENDING -> IN_PROGRESS)
-        val payment = paymentService.createPending(
-            userId = userId,
-            order = savedOrder,
-            usedPoint = usedPoint,
-            issuedCouponId = issuedCoupon.id,
-            couponDiscount = couponDiscount,
+        val payment = paymentService.create(
+            PaymentCommand.Create(
+                userId = userId,
+                orderId = savedOrder.id,
+                totalAmount = savedOrder.totalAmount,
+                usedPoint = usedPoint,
+                issuedCouponId = issuedCoupon.id,
+                couponDiscount = couponDiscount,
+            ),
         )
 
         // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
@@ -471,10 +488,15 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
         pointAccountRepository.save(pointAccount)
 
         // Payment 생성 (PENDING -> IN_PROGRESS)
-        val payment = paymentService.createPending(
-            userId = userId,
-            order = savedOrder,
-            usedPoint = usedPoint,
+        val payment = paymentService.create(
+            PaymentCommand.Create(
+                userId = userId,
+                orderId = savedOrder.id,
+                totalAmount = savedOrder.totalAmount,
+                usedPoint = usedPoint,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
+            ),
         )
 
         // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
