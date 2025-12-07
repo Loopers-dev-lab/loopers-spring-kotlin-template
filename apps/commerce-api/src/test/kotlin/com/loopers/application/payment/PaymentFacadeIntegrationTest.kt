@@ -28,9 +28,6 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
-import com.loopers.interfaces.api.ApiResponse
-import com.loopers.interfaces.api.payment.PaymentWebhookV1Controller
-import com.loopers.interfaces.api.payment.PaymentWebhookV1Request
 import com.loopers.support.error.CoreException
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
@@ -43,6 +40,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
+import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -59,7 +57,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     private val orderFacade: OrderFacade,
     private val paymentFacade: PaymentFacade,
     private val paymentService: PaymentService,
-    private val webhookController: PaymentWebhookV1Controller,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
@@ -233,55 +230,12 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("processCallback")
-    inner class ProcessCallback {
+    @DisplayName("handleCallback - 결제 콜백 처리")
+    inner class HandleCallback {
 
         @Test
-        @DisplayName("이미 PAID 상태인 결제에 콜백이 오면 SUCCESS를 반환한다")
-        fun `duplicate callback for PAID payment returns SUCCESS`() {
-            // given
-            val payment = createInProgressPayment()
-            val externalPaymentKey = payment.externalPaymentKey!!
-            val transaction = createTransaction(
-                transactionKey = externalPaymentKey,
-                paymentId = payment.id,
-                status = PgTransactionStatus.SUCCESS,
-            )
-
-            // PG 조회 Mock - 첫 번째 콜백 처리용
-            every { pgClient.findTransaction(externalPaymentKey) } returns transaction
-
-            // 결제 성공 처리 (첫 번째)
-            paymentFacade.processCallback(
-                PaymentCriteria.ProcessCallback(
-                    orderId = payment.orderId,
-                    externalPaymentKey = externalPaymentKey,
-                ),
-            )
-
-            val paidPayment = paymentRepository.findById(payment.id)!!
-            assertThat(paidPayment.status).isEqualTo(PaymentStatus.PAID)
-
-            // 동일한 콜백 요청 (두 번째 - 멱등성 테스트)
-            val request = PaymentWebhookV1Request.Callback(
-                orderId = payment.orderId,
-                externalPaymentKey = externalPaymentKey,
-            )
-
-            // when - 두 번째 콜백 (멱등성)
-            val response = webhookController.handleCallback(request)
-
-            // then
-            assertThat(response.meta.result).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
-
-            // 결제 상태는 여전히 PAID
-            val unchangedPayment = paymentRepository.findById(payment.id)!!
-            assertThat(unchangedPayment.status).isEqualTo(PaymentStatus.PAID)
-        }
-
-        @Test
-        @DisplayName("이미 FAILED 상태인 결제에 콜백이 오면 SUCCESS를 반환한다")
-        fun `callback for FAILED payment returns SUCCESS`() {
+        @DisplayName("이미 처리된 결제(FAILED)에 대한 콜백은 멱등하게 처리된다")
+        fun `callback for already failed payment is idempotent`() {
             // given
             val payment = createInProgressPayment()
             val externalPaymentKey = payment.externalPaymentKey!!
@@ -297,6 +251,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // PG 조회 Mock
             every { pgClient.findTransaction(externalPaymentKey) } returns failedTransaction
 
+            // 첫 번째 콜백으로 FAILED 상태로 변경
             paymentFacade.processCallback(
                 PaymentCriteria.ProcessCallback(
                     orderId = payment.orderId,
@@ -304,19 +259,17 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
                 ),
             )
 
-            // 콜백 요청
-            val callbackRequest = PaymentWebhookV1Request.Callback(
-                orderId = payment.orderId,
-                externalPaymentKey = externalPaymentKey,
-            )
+            // when - 두 번째 콜백 (멱등성 확인)
+            assertDoesNotThrow {
+                paymentFacade.processCallback(
+                    PaymentCriteria.ProcessCallback(
+                        orderId = payment.orderId,
+                        externalPaymentKey = externalPaymentKey,
+                    ),
+                )
+            }
 
-            // when
-            val response = webhookController.handleCallback(callbackRequest)
-
-            // then
-            assertThat(response.meta.result).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
-
-            // 결제 상태는 여전히 FAILED
+            // then - 결제 상태는 여전히 FAILED
             val unchangedPayment = paymentRepository.findById(payment.id)!!
             assertThat(unchangedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
@@ -336,45 +289,41 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             )
             every { pgClient.findTransaction(externalPaymentKey) } returns successTransaction
 
-            val request = PaymentWebhookV1Request.Callback(
+            val criteria = PaymentCriteria.ProcessCallback(
                 orderId = payment.orderId,
                 externalPaymentKey = externalPaymentKey,
             )
 
             // when - 첫 번째 콜백 (실제 처리)
-            val response1 = webhookController.handleCallback(request)
+            assertDoesNotThrow { paymentFacade.processCallback(criteria) }
 
             // then
-            assertThat(response1.meta.result).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
-
             val paidPayment = paymentRepository.findById(payment.id)!!
             assertThat(paidPayment.status).isEqualTo(PaymentStatus.PAID)
 
-            // when - 두 번째 콜백 (멱등성 - PgClient 호출 없이 바로 반환)
-            val response2 = webhookController.handleCallback(request)
-
-            // then
-            assertThat(response2.meta.result).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+            // when - 두 번째 콜백 (멱등성)
+            assertDoesNotThrow { paymentFacade.processCallback(criteria) }
 
             // when - 세 번째 콜백 (멱등성)
-            val response3 = webhookController.handleCallback(request)
+            assertDoesNotThrow { paymentFacade.processCallback(criteria) }
 
-            // then
-            assertThat(response3.meta.result).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+            // then - 상태 유지 확인
+            val finalPayment = paymentRepository.findById(payment.id)!!
+            assertThat(finalPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test
         @DisplayName("존재하지 않는 orderId로 콜백이 오면 예외가 발생한다")
         fun `callback with non-existent orderId throws exception`() {
             // given
-            val request = PaymentWebhookV1Request.Callback(
+            val criteria = PaymentCriteria.ProcessCallback(
                 orderId = 999999L,
                 externalPaymentKey = "non_existent_tx_key",
             )
 
             // when & then
             assertThrows<CoreException> {
-                webhookController.handleCallback(request)
+                paymentFacade.processCallback(criteria)
             }
         }
 
@@ -384,7 +333,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // given
             val payment = createInProgressPayment()
             val wrongKey = "wrong_key"
-            val request = PaymentWebhookV1Request.Callback(
+            val criteria = PaymentCriteria.ProcessCallback(
                 orderId = payment.orderId,
                 externalPaymentKey = wrongKey,
             )
@@ -394,7 +343,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
 
             // when & then
             assertThrows<RuntimeException> {
-                webhookController.handleCallback(request)
+                paymentFacade.processCallback(criteria)
             }
 
             // 결제 상태 변경 없음
