@@ -13,6 +13,7 @@ import com.loopers.support.values.Money
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
+import org.springframework.transaction.support.TransactionTemplate
 
 /**
  * 결제 관련 비즈니스 로직을 오케스트레이션하는 Facade
@@ -28,6 +29,7 @@ class PaymentFacade(
     private val pointService: PointService,
     private val couponService: CouponService,
     private val productService: ProductService,
+    private val transactionTemplate: TransactionTemplate,
     private val retryTemplate: RetryTemplate = RetryTemplate.builder()
         .maxAttempts(2)
         .uniformRandomBackoff(100, 500)
@@ -113,17 +115,19 @@ class PaymentFacade(
      * - 재고 복구
      */
     private fun recoverResources(payment: Payment) {
-        if (payment.usedPoint > Money.ZERO_KRW) {
-            pointService.restore(payment.userId, payment.usedPoint)
+        transactionTemplate.execute { _ ->
+            if (payment.usedPoint > Money.ZERO_KRW) {
+                pointService.restore(payment.userId, payment.usedPoint)
+            }
+            payment.issuedCouponId?.let { couponId ->
+                couponService.cancelCouponUse(couponId)
+            }
+            val order = orderService.findById(payment.orderId)
+            val increaseUnits = order.orderItems.map {
+                ProductCommand.IncreaseStockUnit(productId = it.productId, amount = it.quantity)
+            }
+            productService.increaseStocks(ProductCommand.IncreaseStocks(units = increaseUnits))
+            orderService.cancelOrder(payment.orderId)
         }
-        payment.issuedCouponId?.let { couponId ->
-            couponService.cancelCouponUse(couponId)
-        }
-        val order = orderService.findById(payment.orderId)
-        val increaseUnits = order.orderItems.map {
-            ProductCommand.IncreaseStockUnit(productId = it.productId, amount = it.quantity)
-        }
-        productService.increaseStocks(ProductCommand.IncreaseStocks(units = increaseUnits))
-        orderService.cancelOrder(payment.orderId)
     }
 }
