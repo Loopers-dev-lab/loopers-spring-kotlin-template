@@ -131,7 +131,8 @@ class OrderEventHandler(
     }
 
     /**
-     * 결제 실패 후 주문 취소 처리
+     * 결제 실패 후 주문 관련 후속 처리
+     * 현재 정책: 주문 상태는 변경하지 않고 유지하며, 로그 및 유저 행동 이벤트만 기록
      * 새로운 트랜잭션에서 처리
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -170,6 +171,7 @@ class OrderEventHandler(
                     logger.error("결제 실패 처리 중 주문을 찾을 수 없음: orderId=${event.orderId}", e)
                     // 모니터링을 위한 실패 이벤트 발행 (향후 확장 가능)
                 }
+
                 else -> {
                     // 예상하지 못한 CoreException - 트랜잭션 롤백 및 재시도를 위해 재발생
                     logger.error("결제 실패 처리 중 예상치 못한 CoreException: orderId=${event.orderId}", e)
