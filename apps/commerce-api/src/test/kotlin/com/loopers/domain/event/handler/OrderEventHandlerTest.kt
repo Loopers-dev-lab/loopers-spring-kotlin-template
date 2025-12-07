@@ -116,6 +116,8 @@ class OrderEventHandlerTest {
 
             // when & then (예외가 발생하지 않아야 함)
             orderEventHandler.handleOrderCreatedForDataPlatform(event)
+
+            verify(exactly = 1) { dataPlatformClient.sendOrderCreated(event) }
         }
     }
 
