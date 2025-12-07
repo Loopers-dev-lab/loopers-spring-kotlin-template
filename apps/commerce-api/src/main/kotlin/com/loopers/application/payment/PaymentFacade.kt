@@ -74,7 +74,9 @@ class PaymentFacade(
     private fun handleConfirmedPayment(payment: Payment) {
         when (payment.status) {
             PaymentStatus.PAID -> {
-                orderService.completePayment(payment.orderId)
+                retryTemplate.execute<Unit, Exception> {
+                    orderService.completePayment(payment.orderId)
+                }
             }
 
             PaymentStatus.FAILED -> {
