@@ -25,6 +25,8 @@ class Order(
     val userId: Long,
 
     items: List<OrderItem>,
+
+    totalAmount: Money? = null,
 ) : BaseEntity() {
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
@@ -38,7 +40,7 @@ class Order(
         AttributeOverride(name = "amount", column = Column(name = "total_amount", nullable = false, precision = 15, scale = 2)),
         AttributeOverride(name = "currency", column = Column(name = "currency", nullable = false, length = 3)),
     )
-    var totalAmount: Money = calculateTotalAmount()
+    var totalAmount: Money = totalAmount ?: calculateTotalAmount()
         protected set
 
     @Enumerated(EnumType.STRING)

@@ -55,7 +55,7 @@ class OrderFacade(
                 // 포인트 결제: 포인트 검증 → 주문 생성 → 재고 차감 → 포인트 차감
                 pointService.validateUserPoint(userId, finalAmount)
 
-                val order = orderService.createOrder(userId, orderItems)
+                val order = orderService.createOrder(userId, orderItems, totalMoney)
                 deductStocks(request.items)
                 pointService.deductPoint(userId, finalAmount)
 
@@ -88,7 +88,7 @@ class OrderFacade(
                 }
 
                 deductStocks(request.items)
-                val order = orderService.createOrder(userId, orderItems)
+                val order = orderService.createOrder(userId, orderItems, totalMoney)
 
                 val paymentRequest = PaymentRequest(
                     userId = userId,

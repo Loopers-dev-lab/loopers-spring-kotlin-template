@@ -12,12 +12,11 @@ data class OrderCreateInfo(
 ) {
     companion object {
         fun from(order: Order): OrderCreateInfo {
-            val totalAmount = order.calculateTotalAmount()
             return OrderCreateInfo(
                 orderId = order.id,
                 userId = order.userId,
-                totalAmount = totalAmount.amount,
-                currency = totalAmount.currency.name,
+                totalAmount = order.totalAmount.amount,
+                currency = order.totalAmount.currency.name,
                 status = order.status.name,
             )
         }

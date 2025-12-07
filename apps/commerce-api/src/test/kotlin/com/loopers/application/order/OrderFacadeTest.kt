@@ -66,7 +66,7 @@ class OrderFacadeTest {
         )
         val order = createTestOrder(id = 1L, userId = userId, items = items)
 
-        every { orderService.createOrder(userId, any()) } returns order
+        every { orderService.createOrder(userId, any(), any()) } returns order
 
         // when
         val result = orderFacade.createOrder(userId, request)
@@ -74,7 +74,7 @@ class OrderFacadeTest {
         // then
         assertThat(result.orderId).isEqualTo(1L)
         assertThat(result.userId).isEqualTo(userId)
-        verify { orderService.createOrder(userId, any()) }
+        verify { orderService.createOrder(userId, any(), any()) }
     }
 
     @Test
