@@ -278,11 +278,10 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 order = savedOrder,
                 usedPoint = Money.krw(50000),
             )
-            val initiatedPayment = paymentService.initiatePayment(
-                paymentId = payment.id,
-                result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
-                attemptedAt = Instant.now(),
-            )
+
+            // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
+            payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
+            val initiatedPayment = paymentRepository.save(payment)
 
             val failedTransaction = createTransaction(
                 transactionKey = initiatedPayment.externalPaymentKey!!,
@@ -415,11 +414,10 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 issuedCouponId = issuedCoupon.id,
                 couponDiscount = Money.krw(3000),
             )
-            val initiatedPayment = paymentService.initiatePayment(
-                paymentId = payment.id,
-                result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
-                attemptedAt = Instant.now(),
-            )
+
+            // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
+            payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
+            val initiatedPayment = paymentRepository.save(payment)
 
             val failedTransaction = createTransaction(
                 transactionKey = initiatedPayment.externalPaymentKey!!,
@@ -534,11 +532,9 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             usedPoint = usedPoint,
         )
 
-        return paymentService.initiatePayment(
-            paymentId = payment.id,
-            result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
-            attemptedAt = Instant.now(),
-        )
+        // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
+        payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
+        return paymentRepository.save(payment)
     }
 
     private fun createInProgressPaymentWithCoupon(
@@ -581,11 +577,9 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             couponDiscount = couponDiscount,
         )
 
-        return paymentService.initiatePayment(
-            paymentId = payment.id,
-            result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
-            attemptedAt = Instant.now(),
-        )
+        // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
+        payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
+        return paymentRepository.save(payment)
     }
 
     private fun createInProgressPaymentWithProduct(
@@ -624,11 +618,9 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             usedPoint = usedPoint,
         )
 
-        return paymentService.initiatePayment(
-            paymentId = payment.id,
-            result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
-            attemptedAt = Instant.now(),
-        )
+        // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
+        payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
+        return paymentRepository.save(payment)
     }
 
     private fun createTransaction(

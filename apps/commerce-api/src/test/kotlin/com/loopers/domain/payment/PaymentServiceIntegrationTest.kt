@@ -88,21 +88,24 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         }
     }
 
-    @DisplayName("결제 개시 (PENDING -> IN_PROGRESS) 통합테스트")
+    @DisplayName("PG 결제 요청 통합테스트")
     @Nested
-    inner class InitiatePayment {
+    inner class RequestPgPayment {
 
-        @DisplayName("Accepted로 initiate하면 IN_PROGRESS로 전이되고 transactionKey가 저장된다")
+        @DisplayName("Accepted 결과 시 IN_PROGRESS로 전이되고 transactionKey가 저장된다")
         @Test
-        fun `initiate payment with Accepted transitions to IN_PROGRESS with transactionKey`() {
+        fun `request pg payment with Accepted transitions to IN_PROGRESS with transactionKey`() {
             // given
             val payment = createPendingPayment()
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
             val transactionKey = "tx_test_123"
 
+            every { pgClient.requestPayment(any()) } returns PgPaymentCreateResult.Accepted(transactionKey)
+
             // when
-            val updatedPayment = paymentService.initiatePayment(
+            val updatedPayment = paymentService.requestPgPayment(
                 paymentId = payment.id,
-                result = PgPaymentCreateResult.Accepted(transactionKey),
+                cardInfo = cardInfo,
             )
 
             // then
@@ -113,16 +116,19 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
         }
 
-        @DisplayName("Uncertain으로 initiate하면 IN_PROGRESS로 전이되고 transactionKey는 null이다")
+        @DisplayName("Uncertain 결과 시 IN_PROGRESS로 전이되고 transactionKey는 null이다")
         @Test
-        fun `initiate payment with Uncertain transitions to IN_PROGRESS without transactionKey`() {
+        fun `request pg payment with Uncertain transitions to IN_PROGRESS without transactionKey`() {
             // given
             val payment = createPendingPayment()
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
+
+            every { pgClient.requestPayment(any()) } returns PgPaymentCreateResult.Uncertain
 
             // when
-            val updatedPayment = paymentService.initiatePayment(
+            val updatedPayment = paymentService.requestPgPayment(
                 paymentId = payment.id,
-                result = PgPaymentCreateResult.Uncertain,
+                cardInfo = cardInfo,
             )
 
             // then
@@ -133,12 +139,15 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
         }
 
-        @DisplayName("존재하지 않는 결제 ID로 개시하면 예외가 발생한다")
+        @DisplayName("존재하지 않는 결제 ID로 요청하면 예외가 발생한다")
         @Test
         fun `throw exception when payment not found`() {
+            // given
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
+
             // when
             val exception = assertThrows<CoreException> {
-                paymentService.initiatePayment(999L, PgPaymentCreateResult.Accepted("tx"))
+                paymentService.requestPgPayment(999L, cardInfo)
             }
 
             // then

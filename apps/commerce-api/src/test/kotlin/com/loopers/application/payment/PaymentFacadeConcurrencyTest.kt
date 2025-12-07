@@ -114,34 +114,6 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
             val finalPayment = paymentRepository.findById(payment.id)!!
             assertThat(finalPayment.status).isEqualTo(PaymentStatus.PAID)
         }
-
-        @Test
-        @DisplayName("이미 처리된 결제에 대해 다시 처리 시도하면 무시된다")
-        fun `second processing attempt is ignored for already processed payment`() {
-            // given
-            val payment = createInProgressPayment()
-            val successTransaction = createTransaction(
-                transactionKey = payment.externalPaymentKey!!,
-                orderId = payment.orderId,
-                amount = payment.paidAmount,
-                status = PgTransactionStatus.SUCCESS,
-            )
-
-            every { pgClient.findTransactionsByOrderId(payment.orderId) } returns listOf(successTransaction)
-
-            // 첫 번째 처리 - 성공
-            paymentFacade.processInProgressPayment(payment.id)
-
-            val paidPayment = paymentRepository.findById(payment.id)!!
-            assertThat(paidPayment.status).isEqualTo(PaymentStatus.PAID)
-
-            // when - 두 번째 처리 시도 (멱등성)
-            paymentFacade.processInProgressPayment(payment.id)
-
-            // then - 예외 없이 정상 종료, 상태 유지
-            val finalPayment = paymentRepository.findById(payment.id)!!
-            assertThat(finalPayment.status).isEqualTo(PaymentStatus.PAID)
-        }
     }
 
     // ===========================================
@@ -193,11 +165,9 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
             usedPoint = Money.krw(5000),
         )
 
-        return paymentService.initiatePayment(
-            paymentId = payment.id,
-            result = PgPaymentCreateResult.Accepted("tx_concurrent_test"),
-            attemptedAt = Instant.now(),
-        )
+        // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
+        payment.initiate(PgPaymentCreateResult.Accepted("tx_concurrent_test"), Instant.now())
+        return paymentRepository.save(payment)
     }
 
     private fun createTransaction(

@@ -281,11 +281,8 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
         )
 
         // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
-        return paymentService.initiatePayment(
-            paymentId = payment.id,
-            result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
-            attemptedAt = Instant.now(),
-        )
+        payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
+        return paymentRepository.save(payment)
     }
 
     private fun createTransaction(

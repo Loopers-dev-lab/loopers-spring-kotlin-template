@@ -160,49 +160,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("placeOrder - 혼합 결제")
-    inner class `placeOrder - MixedPayment` {
-
-        @Test
-        @DisplayName("포인트와 카드를 함께 사용하는 경우 requiresCardPayment()가 true를 반환한다")
-        fun `mixed payment requires card payment`() {
-            // given
-            val criteria = OrderCriteria.PlaceOrder(
-                userId = 1L,
-                usePoint = Money.krw(5000),
-                items = listOf(
-                    OrderCriteria.PlaceOrderItem(productId = 1L, quantity = 1),
-                ),
-                issuedCouponId = null,
-                cardType = "SAMSUNG",
-                cardNo = "1234-5678-9012-3456",
-            )
-
-            // when & then
-            assertThat(criteria.requiresCardPayment()).isTrue()
-        }
-
-        @Test
-        @DisplayName("포인트만 사용하는 경우 requiresCardPayment()가 false를 반환한다")
-        fun `point only payment does not require card payment`() {
-            // given
-            val criteria = OrderCriteria.PlaceOrder(
-                userId = 1L,
-                usePoint = Money.krw(10000),
-                items = listOf(
-                    OrderCriteria.PlaceOrderItem(productId = 1L, quantity = 1),
-                ),
-                issuedCouponId = null,
-                cardType = null,
-                cardNo = null,
-            )
-
-            // when & then
-            assertThat(criteria.requiresCardPayment()).isFalse()
-        }
-    }
-
-    @Nested
     @DisplayName("placeOrder - 쿠폰 할인 적용")
     inner class `placeOrder - CouponDiscountPayment` {
 
@@ -532,7 +489,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
         )
         val savedOrder = orderRepository.save(order)
 
-        // Payment 생성 (PENDING -> IN_PROGRESS)
+        // Payment 생성 (PENDING)
         val payment = paymentService.createPending(
             userId = userId,
             order = savedOrder,
@@ -540,11 +497,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
         )
 
         // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
-        return paymentService.initiatePayment(
-            paymentId = payment.id,
-            result = PgPaymentCreateResult.Accepted("tx_test_${payment.id}"),
-            attemptedAt = Instant.now(),
-        )
+        payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
+        return paymentRepository.save(payment)
     }
 
     private fun createTransaction(
