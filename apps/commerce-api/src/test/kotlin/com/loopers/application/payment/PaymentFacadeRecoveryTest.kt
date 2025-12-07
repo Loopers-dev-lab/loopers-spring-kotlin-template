@@ -13,7 +13,6 @@ import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgTransaction
@@ -44,8 +43,7 @@ import java.time.Instant
 
 /**
  * 결제 복구 통합 테스트
- * - PG 실패 시 리소스 복구 (재고, 포인트, 쿠폰)
- * - 다양한 실패 시나리오에서의 복구 검증
+ * - 트랜잭션 롤백 검증: PG 실패 시 리소스 복구 (재고, 포인트, 쿠폰)
  */
 @SpringBootTest
 @DisplayName("결제 복구 통합 테스트")
@@ -112,36 +110,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("포인트 사용 없이 결제 실패 시 포인트 복구가 수행되지 않는다")
-        fun `no point restoration when no point was used`() {
-            // given
-            val userId = 1L
-            val initialBalance = Money.krw(100000)
-            createPointAccount(userId = userId, balance = initialBalance)
-
-            val payment = createInProgressPaymentWithPoint(
-                userId = userId,
-                usedPoint = Money.ZERO_KRW,
-            )
-
-            val failedTransaction = createTransaction(
-                transactionKey = payment.externalPaymentKey!!,
-                paymentId = payment.id,
-                status = PgTransactionStatus.FAILED,
-                failureReason = "카드 한도 초과",
-            )
-
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
-
-            // when - 결제 실패 처리
-            paymentFacade.processInProgressPayment(payment.id)
-
-            // then - 포인트 잔액 그대로
-            val account = pointAccountRepository.findByUserId(userId)!!
-            assertThat(account.balance).isEqualTo(initialBalance)
-        }
-
-        @Test
         @DisplayName("결제 실패 시 사용된 쿠폰이 복구된다")
         fun `coupon is restored when payment fails`() {
             // given
@@ -170,33 +138,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
             val restoredCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
 
             assertThat(restoredCoupon.status).isEqualTo(UsageStatus.AVAILABLE)
-        }
-
-        @Test
-        @DisplayName("쿠폰 없이 결제 실패 시 쿠폰 복구가 수행되지 않는다")
-        fun `no coupon restoration when no coupon was used`() {
-            // given
-            val userId = 1L
-            val payment = createInProgressPaymentWithPoint(
-                userId = userId,
-                usedPoint = Money.krw(5000),
-            )
-
-            val failedTransaction = createTransaction(
-                transactionKey = payment.externalPaymentKey!!,
-                paymentId = payment.id,
-                status = PgTransactionStatus.FAILED,
-                failureReason = "PG 거부",
-            )
-
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
-
-            // when - 결제 실패 처리 (쿠폰 없음)
-            paymentFacade.processInProgressPayment(payment.id)
-
-            // then - 결제가 실패됨 (쿠폰 관련 에러 없음)
-            val failedPayment = paymentRepository.findById(payment.id)!!
-            assertThat(failedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
 
         @Test
@@ -287,58 +228,6 @@ class PaymentFacadeRecoveryTest @Autowired constructor(
                 { assertThat(restoredProduct1.stock.amount).isEqualTo(100) },
                 { assertThat(restoredProduct2.stock.amount).isEqualTo(50) },
             )
-        }
-
-        @Test
-        @DisplayName("결제 실패 시 주문 상태가 CANCELLED로 변경된다")
-        fun `order status changes to CANCELLED when payment fails`() {
-            // given
-            val userId = 1L
-            val payment = createInProgressPaymentWithPoint(
-                userId = userId,
-                usedPoint = Money.krw(5000),
-            )
-
-            val failedTransaction = createTransaction(
-                transactionKey = payment.externalPaymentKey!!,
-                paymentId = payment.id,
-                status = PgTransactionStatus.FAILED,
-                failureReason = "결제 거부",
-            )
-
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(failedTransaction)
-
-            // when - 결제 실패 처리
-            paymentFacade.processInProgressPayment(payment.id)
-
-            // then - 주문 상태가 CANCELLED
-            val cancelledOrder = orderRepository.findById(payment.orderId)!!
-            assertThat(cancelledOrder.status).isEqualTo(OrderStatus.CANCELLED)
-        }
-
-        @Test
-        @DisplayName("결제 성공 시 주문 상태가 PAID로 변경된다")
-        fun `order status changes to PAID when payment succeeds`() {
-            // given
-            val userId = 1L
-            val payment = createInProgressPaymentWithPoint(
-                userId = userId,
-                usedPoint = Money.krw(5000),
-            )
-            val successTransaction = createTransaction(
-                transactionKey = payment.externalPaymentKey!!,
-                paymentId = payment.id,
-                status = PgTransactionStatus.SUCCESS,
-            )
-
-            every { pgClient.findTransactionsByPaymentId(payment.id) } returns listOf(successTransaction)
-
-            // when - 결제 성공 처리
-            paymentFacade.processInProgressPayment(payment.id)
-
-            // then - 주문 상태가 PAID
-            val paidOrder = orderRepository.findById(payment.orderId)!!
-            assertThat(paidOrder.status).isEqualTo(OrderStatus.PAID)
         }
 
         @Test

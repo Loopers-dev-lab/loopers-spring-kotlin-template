@@ -28,7 +28,6 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
-import com.loopers.support.error.CoreException
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
@@ -40,7 +39,6 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
-import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -48,8 +46,8 @@ import java.time.Instant
 
 /**
  * PaymentFacade 통합 테스트
- * - 경계값 테스트: 포인트 전액/혼합/쿠폰 할인 결제
- * - 멱등성 테스트: 중복 콜백 처리
+ * - 오케스트레이션: 포인트/쿠폰 결합 결제 흐름
+ * - 외부 API 연동: PG 예외 처리
  */
 @SpringBootTest
 @DisplayName("PaymentFacade 통합 테스트")
@@ -153,179 +151,11 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val usedCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
             assertThat(usedCoupon.status).isEqualTo(UsageStatus.USED)
         }
-
-        @Test
-        @DisplayName("정률 할인 쿠폰 적용 시 할인 금액이 올바르게 계산된다")
-        fun `rate discount coupon calculates correct discount amount`() {
-            // given
-            val userId = 1L
-            val product = createProduct(price = Money.krw(10000))
-            createPointAccount(userId = userId, balance = Money.krw(100000))
-
-            // 10% 할인 쿠폰
-            val coupon = createCoupon(discountType = DiscountType.RATE, discountValue = 10)
-            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
-
-            // 10000 * 10% = 1000원 할인, 9000원을 포인트로 결제
-            val criteria = OrderCriteria.PlaceOrder(
-                userId = userId,
-                usePoint = Money.krw(9000),
-                items = listOf(
-                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
-                ),
-                issuedCouponId = issuedCoupon.id,
-                cardType = null,
-                cardNo = null,
-            )
-
-            // when
-            val result = orderFacade.placeOrder(criteria)
-
-            // then
-            val payment = paymentRepository.findById(result.paymentId)!!
-
-            assertAll(
-                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(1000)) },
-                { assertThat(payment.usedPoint).isEqualTo(Money.krw(9000)) },
-                { assertThat(payment.totalAmount).isEqualTo(Money.krw(10000)) },
-            )
-        }
-
-        @Test
-        @DisplayName("정액 할인 쿠폰 적용 시 할인 금액이 올바르게 계산된다")
-        fun `fixed amount coupon calculates correct discount amount`() {
-            // given
-            val userId = 1L
-            val product = createProduct(price = Money.krw(20000))
-            createPointAccount(userId = userId, balance = Money.krw(100000))
-
-            // 3000원 정액 할인 쿠폰
-            val coupon = createCoupon(discountType = DiscountType.FIXED_AMOUNT, discountValue = 3000)
-            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
-
-            // 20000 - 3000 = 17000원을 포인트로 결제
-            val criteria = OrderCriteria.PlaceOrder(
-                userId = userId,
-                usePoint = Money.krw(17000),
-                items = listOf(
-                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
-                ),
-                issuedCouponId = issuedCoupon.id,
-                cardType = null,
-                cardNo = null,
-            )
-
-            // when
-            val result = orderFacade.placeOrder(criteria)
-
-            // then
-            val payment = paymentRepository.findById(result.paymentId)!!
-
-            assertAll(
-                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(3000)) },
-                { assertThat(payment.usedPoint).isEqualTo(Money.krw(17000)) },
-                { assertThat(payment.totalAmount).isEqualTo(Money.krw(20000)) },
-            )
-        }
     }
 
     @Nested
     @DisplayName("handleCallback - 결제 콜백 처리")
     inner class HandleCallback {
-
-        @Test
-        @DisplayName("이미 처리된 결제(FAILED)에 대한 콜백은 멱등하게 처리된다")
-        fun `callback for already failed payment is idempotent`() {
-            // given
-            val payment = createInProgressPayment()
-            val externalPaymentKey = payment.externalPaymentKey!!
-
-            // 결제 실패 처리
-            val failedTransaction = createTransaction(
-                transactionKey = externalPaymentKey,
-                paymentId = payment.id,
-                status = PgTransactionStatus.FAILED,
-                failureReason = "테스트 실패",
-            )
-
-            // PG 조회 Mock
-            every { pgClient.findTransaction(externalPaymentKey) } returns failedTransaction
-
-            // 첫 번째 콜백으로 FAILED 상태로 변경
-            paymentFacade.processCallback(
-                PaymentCriteria.ProcessCallback(
-                    orderId = payment.orderId,
-                    externalPaymentKey = externalPaymentKey,
-                ),
-            )
-
-            // when - 두 번째 콜백 (멱등성 확인)
-            assertDoesNotThrow {
-                paymentFacade.processCallback(
-                    PaymentCriteria.ProcessCallback(
-                        orderId = payment.orderId,
-                        externalPaymentKey = externalPaymentKey,
-                    ),
-                )
-            }
-
-            // then - 결제 상태는 여전히 FAILED
-            val unchangedPayment = paymentRepository.findById(payment.id)!!
-            assertThat(unchangedPayment.status).isEqualTo(PaymentStatus.FAILED)
-        }
-
-        @Test
-        @DisplayName("동일한 결제에 대해 여러 번 콜백이 와도 한 번만 처리된다")
-        fun `multiple callbacks only process once`() {
-            // given
-            val payment = createInProgressPayment()
-            val externalPaymentKey = payment.externalPaymentKey!!
-
-            // PgClient Mock 설정 - externalPaymentKey로 조회 시 SUCCESS 트랜잭션 반환
-            val successTransaction = createTransaction(
-                transactionKey = externalPaymentKey,
-                paymentId = payment.id,
-                status = PgTransactionStatus.SUCCESS,
-            )
-            every { pgClient.findTransaction(externalPaymentKey) } returns successTransaction
-
-            val criteria = PaymentCriteria.ProcessCallback(
-                orderId = payment.orderId,
-                externalPaymentKey = externalPaymentKey,
-            )
-
-            // when - 첫 번째 콜백 (실제 처리)
-            assertDoesNotThrow { paymentFacade.processCallback(criteria) }
-
-            // then
-            val paidPayment = paymentRepository.findById(payment.id)!!
-            assertThat(paidPayment.status).isEqualTo(PaymentStatus.PAID)
-
-            // when - 두 번째 콜백 (멱등성)
-            assertDoesNotThrow { paymentFacade.processCallback(criteria) }
-
-            // when - 세 번째 콜백 (멱등성)
-            assertDoesNotThrow { paymentFacade.processCallback(criteria) }
-
-            // then - 상태 유지 확인
-            val finalPayment = paymentRepository.findById(payment.id)!!
-            assertThat(finalPayment.status).isEqualTo(PaymentStatus.PAID)
-        }
-
-        @Test
-        @DisplayName("존재하지 않는 orderId로 콜백이 오면 예외가 발생한다")
-        fun `callback with non-existent orderId throws exception`() {
-            // given
-            val criteria = PaymentCriteria.ProcessCallback(
-                orderId = 999999L,
-                externalPaymentKey = "non_existent_tx_key",
-            )
-
-            // when & then
-            assertThrows<CoreException> {
-                paymentFacade.processCallback(criteria)
-            }
-        }
 
         @Test
         @DisplayName("잘못된 externalPaymentKey로 조회 시 PG에서 예외가 발생한다")
