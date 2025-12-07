@@ -21,8 +21,8 @@ class PaymentRdbRepository(
         return paymentJpaRepository.findByExternalPaymentKey(key)
     }
 
-    override fun findByStatusIn(statuses: List<PaymentStatus>): List<Payment> {
-        return paymentJpaRepository.findByStatusIn(statuses)
+    override fun findByStatusInOrderByCreatedAtAsc(statuses: List<PaymentStatus>): List<Payment> {
+        return paymentJpaRepository.findByStatusInOrderByCreatedAtAsc(statuses)
     }
 
     override fun save(payment: Payment): Payment {

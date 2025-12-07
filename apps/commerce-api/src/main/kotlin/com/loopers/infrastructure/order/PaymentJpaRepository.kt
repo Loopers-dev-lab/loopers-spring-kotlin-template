@@ -8,5 +8,5 @@ import org.springframework.stereotype.Repository
 interface PaymentJpaRepository : JpaRepository<Payment, Long> {
     fun findByOrderId(orderId: Long): Payment?
     fun findByExternalPaymentKey(key: String): Payment?
-    fun findByStatusIn(statuses: List<PaymentStatus>): List<Payment>
+    fun findByStatusInOrderByCreatedAtAsc(statuses: List<PaymentStatus>): List<Payment>
 }

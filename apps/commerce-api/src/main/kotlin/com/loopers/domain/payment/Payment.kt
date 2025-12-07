@@ -11,11 +11,17 @@ import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.Version
 import java.time.Instant
 
-@Table(name = "payments")
+@Table(
+    name = "payments",
+    indexes = [
+        Index(name = "idx_payment_status_updated_at", columnList = "status, updated_at"),
+    ],
+)
 @Entity
 class Payment(
     orderId: Long,

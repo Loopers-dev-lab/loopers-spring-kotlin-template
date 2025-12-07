@@ -78,7 +78,7 @@ class PaymentService(
      */
     @Transactional(readOnly = true)
     fun findInProgressPayments(): List<Payment> {
-        return paymentRepository.findByStatusIn(
+        return paymentRepository.findByStatusInOrderByCreatedAtAsc(
             statuses = listOf(PaymentStatus.IN_PROGRESS),
         )
     }
