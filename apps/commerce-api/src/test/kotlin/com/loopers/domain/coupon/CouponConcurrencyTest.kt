@@ -43,7 +43,6 @@ class CouponConcurrencyTest : IntegrationTest() {
             discountValue = 10L,
         )
         val couponIssue = createAndSaveCouponIssue(user.id, coupon.id)
-        val totalAmount = 10000L
         val threadCount = 10
 
         val executor = Executors.newFixedThreadPool(threadCount)
@@ -63,7 +62,7 @@ class CouponConcurrencyTest : IntegrationTest() {
                     startLatch.await()
 
                     log.info("[$threadName] 시작")
-                    couponService.applyCoupon(user.id, coupon.id, totalAmount)
+                    couponService.applyCoupon(user.id, coupon.id)
                     successCount.incrementAndGet()
                     log.info("[$threadName] 성공")
                 } catch (e: ObjectOptimisticLockingFailureException) {

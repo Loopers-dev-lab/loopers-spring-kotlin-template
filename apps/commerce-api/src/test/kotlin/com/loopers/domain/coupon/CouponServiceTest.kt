@@ -43,7 +43,7 @@ class CouponServiceTest : IntegrationTest() {
             val totalAmount = 10000L
 
             // when
-            val discountAmount = couponService.applyCoupon(user.id, null, totalAmount)
+            val discountAmount = couponService.calculateCouponDiscount(user.id, null, totalAmount)
 
             // then
             assertThat(discountAmount).isEqualTo(0L)
@@ -58,18 +58,15 @@ class CouponServiceTest : IntegrationTest() {
                 discountType = DiscountType.FIXED,
                 discountValue = 5000L,
             )
-            val couponIssue = createCouponIssue(user.id, coupon.id)
+            createCouponIssue(user.id, coupon.id)
             val totalAmount = 10000L
 
             // when
-            val discountAmount = couponService.applyCoupon(user.id, coupon.id, totalAmount)
+            val discountAmount = couponService.calculateCouponDiscount(user.id, coupon.id, totalAmount)
 
             // then
-            val updatedCouponIssue = couponIssueJpaRepository.findById(couponIssue.id!!).orElseThrow()
             assertSoftly { softly ->
                 softly.assertThat(discountAmount).isEqualTo(5000L)
-                softly.assertThat(updatedCouponIssue.status).isEqualTo(CouponStatus.USED)
-                softly.assertThat(updatedCouponIssue.usedAt).isNotNull()
             }
         }
 
@@ -82,18 +79,15 @@ class CouponServiceTest : IntegrationTest() {
                 discountType = DiscountType.RATE,
                 discountValue = 10L,
             )
-            val couponIssue = createCouponIssue(user.id, coupon.id)
+            createCouponIssue(user.id, coupon.id)
             val totalAmount = 10000L
 
             // when
-            val discountAmount = couponService.applyCoupon(user.id, coupon.id, totalAmount)
+            val discountAmount = couponService.calculateCouponDiscount(user.id, coupon.id, totalAmount)
 
             // then
-            val updatedCouponIssue = couponIssueJpaRepository.findById(couponIssue.id!!).orElseThrow()
             assertSoftly { softly ->
                 softly.assertThat(discountAmount).isEqualTo(1000L)
-                softly.assertThat(updatedCouponIssue.status).isEqualTo(CouponStatus.USED)
-                softly.assertThat(updatedCouponIssue.usedAt).isNotNull()
             }
         }
 
@@ -106,7 +100,7 @@ class CouponServiceTest : IntegrationTest() {
 
             // when & then
             assertThatThrownBy {
-                couponService.applyCoupon(user.id, nonExistentCouponId, totalAmount)
+                couponService.calculateCouponDiscount(user.id, nonExistentCouponId, totalAmount)
             }
                 .isInstanceOf(CoreException::class.java)
                 .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND)
@@ -124,7 +118,7 @@ class CouponServiceTest : IntegrationTest() {
 
             // when & then
             assertThatThrownBy {
-                couponService.applyCoupon(user.id, coupon.id, totalAmount)
+                couponService.calculateCouponDiscount(user.id, coupon.id, totalAmount)
             }
                 .isInstanceOf(CoreException::class.java)
                 .hasFieldOrPropertyWithValue("errorType", ErrorType.NOT_FOUND)
@@ -136,15 +130,14 @@ class CouponServiceTest : IntegrationTest() {
             // given
             val user = createUser()
             val coupon = createCoupon()
-            val couponIssue = createCouponIssue(user.id, coupon.id)
-            val totalAmount = 10000L
+            createCouponIssue(user.id, coupon.id)
 
             // 첫 번째 사용
-            couponService.applyCoupon(user.id, coupon.id, totalAmount)
+            couponService.applyCoupon(user.id, coupon.id)
 
             // when & then - 두 번째 사용 시도
             assertThatThrownBy {
-                couponService.applyCoupon(user.id, coupon.id, totalAmount)
+                couponService.applyCoupon(user.id, coupon.id)
             }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessage("이미 사용된 쿠폰입니다")
@@ -159,11 +152,11 @@ class CouponServiceTest : IntegrationTest() {
                 discountType = DiscountType.FIXED,
                 discountValue = 5000L,
             )
-            val couponIssue = createCouponIssue(user.id, coupon.id)
+            createCouponIssue(user.id, coupon.id)
             val totalAmount = 3000L // 할인액보다 작은 주문 금액
 
             // when
-            val discountAmount = couponService.applyCoupon(user.id, coupon.id, totalAmount)
+            val discountAmount = couponService.calculateCouponDiscount(user.id, coupon.id, totalAmount)
 
             // then
             assertThat(discountAmount).isEqualTo(3000L) // 5000원이 아닌 3000원만 할인
@@ -183,18 +176,16 @@ class CouponServiceTest : IntegrationTest() {
             val totalAmount = 10000L
 
             // when
-            val discountAmount1 = couponService.applyCoupon(user1.id, coupon.id, totalAmount)
-            val discountAmount2 = couponService.applyCoupon(user2.id, coupon.id, totalAmount)
+            val discountAmount1 = couponService.calculateCouponDiscount(user1.id, coupon.id, totalAmount)
+            val discountAmount2 = couponService.calculateCouponDiscount(user2.id, coupon.id, totalAmount)
 
             // then
-            val updatedCouponIssue1 = couponIssueJpaRepository.findById(couponIssue1.id!!).orElseThrow()
-            val updatedCouponIssue2 = couponIssueJpaRepository.findById(couponIssue2.id!!).orElseThrow()
+            couponIssueJpaRepository.findById(couponIssue1.id!!).orElseThrow()
+            couponIssueJpaRepository.findById(couponIssue2.id!!).orElseThrow()
 
             assertSoftly { softly ->
                 softly.assertThat(discountAmount1).isEqualTo(5000L)
                 softly.assertThat(discountAmount2).isEqualTo(5000L)
-                softly.assertThat(updatedCouponIssue1.status).isEqualTo(CouponStatus.USED)
-                softly.assertThat(updatedCouponIssue2.status).isEqualTo(CouponStatus.USED)
             }
         }
     }
