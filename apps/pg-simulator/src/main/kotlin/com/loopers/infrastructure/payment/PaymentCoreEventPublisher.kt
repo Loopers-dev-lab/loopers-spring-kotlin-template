@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component
 class PaymentCoreEventPublisher(
     private val applicationEventPublisher: ApplicationEventPublisher,
 ) : PaymentEventPublisher {
-    override fun publish(event: PaymentEvent.PaymentCreated) {
+    override fun publish(event: PaymentEvent.PaymentRequest) {
         applicationEventPublisher.publishEvent(event)
     }
 

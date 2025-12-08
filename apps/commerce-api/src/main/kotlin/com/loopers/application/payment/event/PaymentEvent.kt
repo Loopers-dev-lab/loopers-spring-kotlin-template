@@ -6,7 +6,7 @@ object PaymentEvent {
     /**
      * 결제가 생성되고 PG 요청이 필요할 때 발생하는 이벤트
      */
-    data class PaymentCreated(
+    data class PaymentRequest(
         val paymentId: Long,
         val orderId: String,
         val userId: String,

@@ -44,14 +44,14 @@ class PaymentEventListenerTest {
     )
 
     @Nested
-    @DisplayName("결제 생성 이벤트 처리 - PG API 요청")
-    inner class HandlePaymentCreated {
+    @DisplayName("결제 요청 이벤트 처리 - PG API 요청")
+    inner class HandlePaymentRequest {
 
         @Test
         @DisplayName("PG API를 호출하고 transactionKey를 업데이트한다")
         fun `should request payment to PG and update transaction key`() {
             // given
-            val event = PaymentEvent.PaymentCreated(
+            val event = PaymentEvent.PaymentRequest(
                 paymentId = 1L,
                 orderId = "100",
                 userId = "user123",
@@ -76,7 +76,7 @@ class PaymentEventListenerTest {
             justRun { paymentService.updateTransactionKey(any(), any()) }
 
             // when
-            paymentEventListener.handlePaymentCreated(event)
+            paymentEventListener.handlePaymentRequest(event)
 
             // then
             verify(exactly = 1) {
@@ -97,7 +97,7 @@ class PaymentEventListenerTest {
         @DisplayName("PG 요청 실패 시 예외가 전파되지 않는다")
         fun `should not propagate exception when PG request fails`() {
             // given
-            val event = PaymentEvent.PaymentCreated(
+            val event = PaymentEvent.PaymentRequest(
                 paymentId = 1L,
                 orderId = "100",
                 userId = "user123",
@@ -109,7 +109,7 @@ class PaymentEventListenerTest {
             every { pgService.requestPayment(any()) } throws RuntimeException("PG 연결 실패")
 
             // when
-            paymentEventListener.handlePaymentCreated(event)
+            paymentEventListener.handlePaymentRequest(event)
 
             // then
             verify(exactly = 1) { pgService.requestPayment(any()) }

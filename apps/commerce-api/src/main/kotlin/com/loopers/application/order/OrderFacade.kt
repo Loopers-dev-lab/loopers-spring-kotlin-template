@@ -40,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional
  * 2. CARD 결제:
  *    - 주문 생성 → 결제 생성 → 이벤트 발행
  *    - 재고 차감은 PG 결제 성공 후 PaymentEventListener에서 처리
- *    - PaymentCreated 이벤트 → PG API 요청 (AFTER_COMMIT)
+ *    - PaymentRequest 이벤트 → PG API 요청 (AFTER_COMMIT)
  *    - OrderCreated 이벤트 → 쿠폰 사용 (BEFORE_COMMIT), 로깅 (AFTER_COMMIT)
  */
 @Component
@@ -184,7 +184,7 @@ class OrderFacade(
 
                 // 10. PG 결제 요청 이벤트 발행 (AFTER_COMMIT에서 처리)
                 applicationEventPublisher.publishEvent(
-                    PaymentEvent.PaymentCreated(
+                    PaymentEvent.PaymentRequest(
                         paymentId = payment.id,
                         orderId = orderResult.order.id.toString(),
                         userId = userId,

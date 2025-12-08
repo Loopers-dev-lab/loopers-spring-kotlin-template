@@ -1,11 +1,11 @@
 package com.loopers.domain.payment
 
 object PaymentEvent {
-    data class PaymentCreated(
+    data class PaymentRequest(
         val transactionKey: String,
     ) {
         companion object {
-            fun from(payment: Payment): PaymentCreated = PaymentCreated(transactionKey = payment.transactionKey)
+            fun from(payment: Payment): PaymentRequest = PaymentRequest(transactionKey = payment.transactionKey)
         }
     }
 

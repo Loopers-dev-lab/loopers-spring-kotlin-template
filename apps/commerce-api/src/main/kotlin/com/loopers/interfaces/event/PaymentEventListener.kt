@@ -21,7 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate
  * 결제 관련 이벤트를 처리하는 리스너
  *
  * 이벤트 처리 흐름:
- * 1. PaymentCreated (결제 생성)
+ * 1. PaymentRequest (결제 요청)
  *    - AFTER_COMMIT: PG API 요청 (비동기, 외부 I/O)
  *
  * 2. PaymentSucceeded (결제 성공)
@@ -46,7 +46,7 @@ class PaymentEventListener(
     private val log = LoggerFactory.getLogger(PaymentEventListener::class.java)
 
     /**
-     * 결제 생성 이벤트 처리 - PG API 요청
+     * 결제 요청 이벤트 처리 - PG API 요청
      *
      * AFTER_COMMIT: 주문/결제 트랜잭션 커밋 후 PG API 호출
      * - 외부 API 호출을 트랜잭션 밖에서 처리하여 성능 개선
@@ -55,7 +55,7 @@ class PaymentEventListener(
      */
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun handlePaymentCreated(event: PaymentEvent.PaymentCreated) {
+    fun handlePaymentRequest(event: PaymentEvent.PaymentRequest) {
         log.info("결제 생성 - PG 요청 시작: paymentId=${event.paymentId}, orderId=${event.orderId}, amount=${event.amount}")
 
         try {

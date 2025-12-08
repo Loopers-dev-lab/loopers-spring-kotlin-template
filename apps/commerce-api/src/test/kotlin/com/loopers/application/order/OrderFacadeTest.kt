@@ -244,7 +244,7 @@ class OrderFacadeTest {
             every { orderService.createOrder(any()) } returns orderResult
             every { paymentService.create(any()) } returns payment
             every { payment.id } returns 1L
-            justRun { applicationEventPublisher.publishEvent(any<PaymentEvent.PaymentCreated>()) }
+            justRun { applicationEventPublisher.publishEvent(any<PaymentEvent.PaymentRequest>()) }
             justRun { applicationEventPublisher.publishEvent(any<OrderEvent.OrderCreated>()) }
 
             // when
@@ -270,7 +270,7 @@ class OrderFacadeTest {
             verify(exactly = 1) { orderService.createOrder(any()) }
             verify(exactly = 1) { paymentService.create(any()) }
             // PG 결제 요청은 이벤트로 처리됨
-            verify(exactly = 1) { applicationEventPublisher.publishEvent(ofType<PaymentEvent.PaymentCreated>()) }
+            verify(exactly = 1) { applicationEventPublisher.publishEvent(ofType<PaymentEvent.PaymentRequest>()) }
             verify(exactly = 1) { applicationEventPublisher.publishEvent(ofType<OrderEvent.OrderCreated>()) }
             // 카드 결제는 재고 차감이 콜백에서 발생하므로 여기서는 호출되지 않음
             verify(exactly = 0) { productService.deductAllStock(any()) }
