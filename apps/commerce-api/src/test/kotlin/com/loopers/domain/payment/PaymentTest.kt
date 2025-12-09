@@ -20,12 +20,13 @@ class PaymentTest {
         val cardType = "SAMSUNG"
         val cardNo = "1234-5678-9012-3456"
 
-        val payment = Payment.createCardPayment(
+        val payment = Payment(
             orderId = orderId,
             amount = amount,
+            paymentMethod = PaymentMethod.CARD,
             transactionKey = transactionKey,
             cardType = cardType,
-            cardNo = cardNo
+            cardNumber = CardNumber.from(cardNo)
         )
 
         assertAll(
@@ -47,11 +48,12 @@ class PaymentTest {
         val cardType = "SAMSUNG"
         val cardNo = "1234-5678-9012-3456"
 
-        val payment = Payment.createPendingPayment(
+        val payment = Payment(
             orderId = orderId,
             amount = amount,
+            paymentMethod = PaymentMethod.CARD,
             cardType = cardType,
-            cardNo = cardNo
+            cardNumber = CardNumber.from(cardNo)
         )
 
         assertAll(
@@ -65,18 +67,21 @@ class PaymentTest {
         )
     }
 
-    @DisplayName("실패한 Payment를 생성할 수 있다")
+    @DisplayName("Payment를 생성하고 FAILED 상태로 변경할 수 있다")
     @Test
     fun createFailedPayment() {
         val orderId = 1L
         val amount = Money.of(10000)
         val reason = "PG 시스템 일시 불가"
 
-        val payment = Payment.createFailedPayment(
+        val payment = Payment(
             orderId = orderId,
             amount = amount,
-            reason = reason
+            paymentMethod = PaymentMethod.CARD,
+            cardType = "SAMSUNG",
+            cardNumber = CardNumber.from("1234-5678-9012-3456")
         )
+        payment.markAsFailed(reason)
 
         assertAll(
             { assertThat(payment.orderId).isEqualTo(orderId) },
@@ -89,12 +94,13 @@ class PaymentTest {
     @DisplayName("PENDING 상태의 Payment를 SUCCESS로 변경할 수 있다")
     @Test
     fun markPaymentAsSuccess() {
-        val payment = Payment.createCardPayment(
+        val payment = Payment(
             orderId = 1L,
             amount = Money.of(10000),
+            paymentMethod = PaymentMethod.CARD,
             transactionKey = "TR-001",
             cardType = "SAMSUNG",
-            cardNo = "1234-5678-9012-3456"
+            cardNumber = CardNumber.from("1234-5678-9012-3456")
         )
 
         payment.markAsSuccess()
@@ -105,12 +111,13 @@ class PaymentTest {
     @DisplayName("PENDING 상태의 Payment를 FAILED로 변경할 수 있다")
     @Test
     fun markPaymentAsFailed() {
-        val payment = Payment.createCardPayment(
+        val payment = Payment(
             orderId = 1L,
             amount = Money.of(10000),
+            paymentMethod = PaymentMethod.CARD,
             transactionKey = "TR-001",
             cardType = "SAMSUNG",
-            cardNo = "1234-5678-9012-3456"
+            cardNumber = CardNumber.from("1234-5678-9012-3456")
         )
         val failureReason = "재고 부족"
 
@@ -125,8 +132,23 @@ class PaymentTest {
     @DisplayName("PENDING이 아닌 상태에서 상태 변경 시 예외가 발생한다")
     @Test
     fun failToChangeStatusWhenNotPending() {
-        val failedPayment = Payment.createFailedPayment(1L, Money.of(10000), "실패")
-        val successPayment = Payment.createCardPayment(1L, Money.of(10000), "TR-001", "SAMSUNG", "1234-5678-9012-3456")
+        val failedPayment = Payment(
+            orderId = 1L,
+            amount = Money.of(10000),
+            paymentMethod = PaymentMethod.CARD,
+            cardType = "SAMSUNG",
+            cardNumber = CardNumber.from("1234-5678-9012-3456")
+        )
+        failedPayment.markAsFailed("실패")
+
+        val successPayment = Payment(
+            orderId = 1L,
+            amount = Money.of(10000),
+            paymentMethod = PaymentMethod.CARD,
+            transactionKey = "TR-001",
+            cardType = "SAMSUNG",
+            cardNumber = CardNumber.from("1234-5678-9012-3456")
+        )
         successPayment.markAsSuccess()
 
         assertAll(

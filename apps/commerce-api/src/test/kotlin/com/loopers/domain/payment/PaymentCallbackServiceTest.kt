@@ -38,12 +38,13 @@ class PaymentCallbackServiceTest {
         // given
         val transactionKey = "TR-20251205-001"
         val orderId = 1L
-        val payment = Payment.createCardPayment(
+        val payment = Payment(
             orderId = orderId,
             amount = Money.of(10000),
+            paymentMethod = PaymentMethod.CARD,
             transactionKey = transactionKey,
             cardType = "SAMSUNG",
-            cardNo = "1234-5678-9012-3456"
+            cardNumber = CardNumber.from("1234-5678-9012-3456")
         )
         val callback = PaymentCallbackDto(
             transactionKey = transactionKey,
@@ -72,12 +73,13 @@ class PaymentCallbackServiceTest {
         // given
         val transactionKey = "TR-20251205-001"
         val orderId = 1L
-        val payment = Payment.createCardPayment(
+        val payment = Payment(
             orderId = orderId,
             amount = Money.of(10000),
+            paymentMethod = PaymentMethod.CARD,
             transactionKey = transactionKey,
             cardType = "SAMSUNG",
-            cardNo = "1234-5678-9012-3456"
+            cardNumber = CardNumber.from("1234-5678-9012-3456")
         )
         val callback = PaymentCallbackDto(
             transactionKey = transactionKey,
@@ -108,12 +110,13 @@ class PaymentCallbackServiceTest {
         // given
         val transactionKey = "TR-20251205-001"
         val orderId = 1L
-        val payment = Payment.createCardPayment(
+        val payment = Payment(
             orderId = orderId,
             amount = Money.of(10000),
+            paymentMethod = PaymentMethod.CARD,
             transactionKey = transactionKey,
             cardType = "SAMSUNG",
-            cardNo = "1234-5678-9012-3456"
+            cardNumber = CardNumber.from("1234-5678-9012-3456")
         )
         payment.markAsSuccess() // 이미 처리됨
 

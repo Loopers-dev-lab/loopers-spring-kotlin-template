@@ -7,13 +7,15 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
 class PaymentService(
     private val paymentRepository: PaymentRepository,
-    private val pgStrategies: List<PgStrategy>
+    private val pgStrategies: List<PgStrategy>,
+    @Value("\${payment.callback.url}") private val callbackUrl: String
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -38,19 +40,20 @@ class PaymentService(
             cardType = PgDto.CardTypeDto.from(cardType),
             cardNo = cardNo,
             amount = paymentAmount,
-            callbackUrl = "http://localhost:8080/api/v1/payments/callback"
+            callbackUrl = callbackUrl
         )
 
         val pgResponse = pgStrategy.requestPayment(userId, pgRequest)
 
         logger.info("PG 응답 수신: transactionKey=${pgResponse.transactionKey}, status=${pgResponse.status}")
 
-        val payment = Payment.createCardPayment(
+        val payment = Payment(
             orderId = order.id,
             amount = com.loopers.domain.shared.Money(paymentAmount),
+            paymentMethod = PaymentMethod.CARD,
             transactionKey = pgResponse.transactionKey,
             cardType = cardType,
-            cardNo = cardNo
+            cardNumber = CardNumber.from(cardNo)
         )
 
         return paymentRepository.save(payment)
@@ -68,11 +71,12 @@ class PaymentService(
 
         logger.warn("결제 폴백 실행 - PENDING 상태로 저장: orderId=${order.id}, amount=$paymentAmount, reason=${ex.message}")
 
-        val payment = Payment.createPendingPayment(
+        val payment = Payment(
             orderId = order.id,
             amount = com.loopers.domain.shared.Money(paymentAmount),
+            paymentMethod = PaymentMethod.CARD,
             cardType = cardType,
-            cardNo = cardNo
+            cardNumber = CardNumber.from(cardNo)
         )
 
         return paymentRepository.save(payment)

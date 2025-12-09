@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
+import org.springframework.context.ApplicationEventPublisher
 
 class OrderServiceTest {
 
@@ -24,6 +25,7 @@ class OrderServiceTest {
     private lateinit var orderRepository: OrderRepository
     private lateinit var productRepository: ProductRepository
     private lateinit var memberRepository: MemberRepository
+    private lateinit var eventPublisher: ApplicationEventPublisher
     private lateinit var couponService: CouponService
     private lateinit var externalOrderService: ExternalOrderService
 
@@ -32,12 +34,14 @@ class OrderServiceTest {
         orderRepository = mockk()
         productRepository = mockk()
         memberRepository = mockk()
+        eventPublisher = mockk(relaxed = true)
         couponService = mockk()
         externalOrderService = mockk()
         orderService = OrderService(
             orderRepository,
             productRepository,
             memberRepository,
+            eventPublisher,
             couponService,
             externalOrderService
         )
