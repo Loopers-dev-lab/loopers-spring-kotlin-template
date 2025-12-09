@@ -1,0 +1,31 @@
+### ================================================
+### 모니터링 & 상태 확인
+### ================================================
+
+@baseUrl = http://localhost:8080
+
+### ================================================
+### 1. Health Check
+### ================================================
+GET {{baseUrl}}/actuator/health
+Content-Type: application/json
+
+### ================================================
+### 2. Circuit Breaker 상태 조회
+### (management.endpoints.web.exposure.include에 circuitbreakers 추가 필요)
+### ================================================
+GET {{baseUrl}}/actuator/circuitbreakers
+Content-Type: application/json
+
+### ================================================
+### 3. Circuit Breaker 이벤트 조회
+### ================================================
+GET {{baseUrl}}/actuator/circuitbreakerevents
+Content-Type: application/json
+
+### ================================================
+### 4. Prometheus 메트릭
+### ================================================
+GET {{baseUrl}}/actuator/prometheus
+Content-Type: application/json
+

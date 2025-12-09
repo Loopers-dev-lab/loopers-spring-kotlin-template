@@ -1,0 +1,50 @@
+### ================================================
+### Commerce API 테스트
+### ================================================
+
+@baseUrl = http://localhost:8080
+@contentType = application/json
+@testUserId = testuser01
+
+### ================================================
+### 상품 조회 API
+### ================================================
+
+### 브랜드 필터 + 좋아요 순 정렬
+GET {{baseUrl}}/api/v1/products?brandId=1&sort=LIKES_DESC&page=0&size=20
+Accept: {{contentType}}
+
+### 전체 상품 + 좋아요 순 정렬
+GET {{baseUrl}}/api/v1/products?sort=LIKES_DESC&page=0&size=20
+Accept: {{contentType}}
+
+### 브랜드 필터 + 최신순 정렬
+GET {{baseUrl}}/api/v1/products?brandId=1&sort=LATEST&page=0&size=20
+Accept: {{contentType}}
+
+### 전체 상품 + 가격 낮은순 정렬
+GET {{baseUrl}}/api/v1/products?sort=PRICE_ASC&page=0&size=20
+Accept: {{contentType}}
+
+### 상품 상세 조회
+GET {{baseUrl}}/api/v1/products/1
+Accept: {{contentType}}
+
+### ================================================
+### 좋아요 API
+### ================================================
+
+### 좋아요 등록
+POST {{baseUrl}}/api/v1/likes/products/1
+X-USER-ID: {{testUserId}}
+Accept: {{contentType}}
+
+### 좋아요 취소
+DELETE {{baseUrl}}/api/v1/likes/products/1
+X-USER-ID: {{testUserId}}
+Accept: {{contentType}}
+
+### 내 좋아요 목록 조회
+GET {{baseUrl}}/api/v1/likes?page=0&size=20
+X-USER-ID: {{testUserId}}
+Accept: {{contentType}}

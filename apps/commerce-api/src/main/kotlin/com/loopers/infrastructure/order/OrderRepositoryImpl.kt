@@ -2,11 +2,13 @@ package com.loopers.infrastructure.order
 
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.order.OrderStatus
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
+import java.time.ZonedDateTime
 
 @Component
 class OrderRepositoryImpl(
@@ -32,5 +34,10 @@ class OrderRepositoryImpl(
         return orderJpaRepository.findByMemberId(memberId, pageable)
     }
 
-
+    override fun findByStatusAndCreatedAtBefore(
+        status: OrderStatus,
+        time: ZonedDateTime
+    ): List<Order> {
+        return orderJpaRepository.findByStatusAndCreatedAtBefore(status, time)
+    }
 }

@@ -60,12 +60,6 @@ class Order(
         this.finalAmount = this.totalAmount.minus(this.discountAmount)
     }
 
-    fun addItem(items: OrderItem) {
-        mutableItems.add(items)
-        items.assignOrder(this)
-        this.totalAmount = calculateTotalAmount()
-    }
-
     fun calculateTotalAmount() : Money {
         return mutableItems
             .map { it.subtotal }
@@ -100,10 +94,6 @@ class Order(
             )
         }
         status = OrderStatus.CANCELLED
-    }
-
-    fun processPayment(member: Member) {
-        member.pay(finalAmount)
     }
 
     companion object {

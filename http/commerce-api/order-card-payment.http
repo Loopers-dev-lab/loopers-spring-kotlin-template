@@ -1,0 +1,149 @@
+### ================================================
+### 주문 생성 API (카드 결제)
+### ================================================
+
+@baseUrl = http://localhost:8080
+@userId = testuser01
+
+### ================================================
+### 1. 정상 결제 - 카드 전액 결제
+### ================================================
+POST {{baseUrl}}/api/v1/orders
+X-USER-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 1
+    }
+  ],
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### ================================================
+### 2. 포인트 사용 + 카드 결제
+### ================================================
+POST {{baseUrl}}/api/v1/orders
+X-USER-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 1
+    }
+  ],
+  "usePoint": 3000,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### ================================================
+### 3. 포인트 전액 결제
+### ================================================
+POST {{baseUrl}}/api/v1/orders
+X-USER-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 1
+    }
+  ],
+  "usePoint": 10000
+}
+
+### ================================================
+### 4. 쿠폰 사용 + 카드 결제
+### ================================================
+POST {{baseUrl}}/api/v1/orders
+X-USER-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2
+    }
+  ],
+  "couponId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### ================================================
+### 5. 쿠폰 + 포인트 + 카드 결제 (복합)
+### ================================================
+POST {{baseUrl}}/api/v1/orders
+X-USER-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2
+    }
+  ],
+  "usePoint": 5000,
+  "couponId": 1,
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### ================================================
+### 6. 주문 상세 조회
+### ================================================
+GET {{baseUrl}}/api/v1/orders/1
+
+### ================================================
+### 7. 주문 목록 조회
+### ================================================
+GET {{baseUrl}}/api/v1/orders?page=0&size=20
+X-USER-ID: {{userId}}
+
+### ================================================
+### Circuit Breaker 테스트 - 연속 요청
+### (PG Simulator 중지 후 실행)
+### ================================================
+POST {{baseUrl}}/api/v1/orders
+X-USER-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 1
+    }
+  ],
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+
+### ================================================
+### 타임아웃 테스트
+### (PG Simulator에서 Thread.sleep(5000L) 설정 후 실행)
+### ================================================
+POST {{baseUrl}}/api/v1/orders
+X-USER-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 1
+    }
+  ],
+  "cardType": "SAMSUNG",
+  "cardNo": "1234-5678-9012-3456"
+}
+

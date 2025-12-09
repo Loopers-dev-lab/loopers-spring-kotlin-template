@@ -2,10 +2,12 @@ package com.loopers.domain.order
 
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import java.time.ZonedDateTime
 
 interface OrderRepository {
     fun save(order: Order): Order
     fun findById(id: Long): Order?
     fun findByIdOrThrow(id: Long): Order
     fun findByMemberId(memberId: String, pageable: Pageable): Page<Order>
+    fun findByStatusAndCreatedAtBefore(status: OrderStatus, time: ZonedDateTime): List<Order>
 }
