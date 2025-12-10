@@ -15,5 +15,8 @@ data class CardInfo(
 
     companion object {
         private val CARD_NO_PATTERN = Regex("^\\d{4}-\\d{4}-\\d{4}-\\d{4}$")
+
+        /** 0원 결제 시 사용되는 더미 카드 정보 (실제로 사용되지 않음) */
+        val EMPTY = CardInfo(CardType.SAMSUNG, "0000-0000-0000-0000")
     }
 }

@@ -2,7 +2,6 @@ package com.loopers.domain.payment
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import com.loopers.support.values.Money
 import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -69,18 +68,10 @@ class PaymentService(
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
         val transaction = pgClient.findTransaction(externalPaymentKey)
-
-        // 멱등함 - 이미 처리됐으면 내부에서 무시
-        payment.confirmPayment(listOf(transaction), currentTime = currentTime)
-
+        val result = payment.confirmPayment(listOf(transaction), currentTime)
         paymentRepository.save(payment)
 
-        return when (payment.status) {
-            PaymentStatus.PAID -> ConfirmResult.Paid(payment)
-            PaymentStatus.FAILED -> ConfirmResult.Failed(payment)
-            PaymentStatus.IN_PROGRESS -> ConfirmResult.StillInProgress(payment)
-            else -> throw CoreException(ErrorType.INTERNAL_ERROR, "예상치 못한 결제 상태: ${payment.status}")
-        }
+        return result
     }
 
     /**
@@ -104,25 +95,18 @@ class PaymentService(
             listOf(pgClient.findTransaction(key))
         } ?: pgClient.findTransactionsByPaymentId(payment.id)
 
-        // 멱등함 - 이미 처리됐으면 내부에서 무시
-        payment.confirmPayment(transactions, currentTime = currentTime)
-
+        val result = payment.confirmPayment(transactions, currentTime)
         paymentRepository.save(payment)
 
-        return when (payment.status) {
-            PaymentStatus.PAID -> ConfirmResult.Paid(payment)
-            PaymentStatus.FAILED -> ConfirmResult.Failed(payment)
-            PaymentStatus.IN_PROGRESS -> ConfirmResult.StillInProgress(payment)
-            else -> throw CoreException(ErrorType.INTERNAL_ERROR, "예상치 못한 결제 상태: ${payment.status}")
-        }
+        return result
     }
 
     /**
      * PG 결제를 요청하고 결제 상태를 업데이트합니다.
      * 이 메서드는 트랜잭션 없이 실행되며, PG 호출 후 상태 업데이트만 트랜잭션으로 처리합니다.
      *
-     * 0원 결제(포인트+쿠폰으로 전액 결제)의 경우 cardInfo가 null이어도 됩니다.
-     * 실제 PG 결제가 필요한 경우 cardInfo가 필수입니다.
+     * 0원 결제는 PgClientResultDecorator에서 NotRequired를 반환합니다.
+     * 0원 결제가 아닌 경우 cardInfo가 필수입니다.
      *
      * @param paymentId 결제 ID
      * @param cardInfo 카드 정보 (0원 결제가 아닌 경우 필수)
@@ -136,28 +120,20 @@ class PaymentService(
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
-        // 0원 결제는 PG 호출이 필요하지 않음 - PgPaymentRequest 생성 전에 체크
-        val pgResult = if (payment.paidAmount == Money.ZERO_KRW) {
-            PgPaymentCreateResult.NotRequired
-        } else {
-            val requiredCardInfo = cardInfo
-                ?: throw CoreException(ErrorType.BAD_REQUEST, "카드 정보가 필요합니다")
-            pgClient.requestPayment(
-                PgPaymentRequest(
-                    paymentId = payment.id,
-                    amount = payment.paidAmount,
-                    cardInfo = requiredCardInfo,
-                ),
-            )
-        }
+        val resolvedCardInfo = cardInfo
+            ?: CardInfo.EMPTY
 
-        payment.initiate(pgResult, currentTime)
-        val saved = paymentRepository.save(payment)
+        val pgResult = pgClient.requestPayment(
+            PgPaymentRequest(
+                paymentId = payment.id,
+                amount = payment.paidAmount,
+                cardInfo = resolvedCardInfo,
+            ),
+        )
 
-        return when (saved.status) {
-            PaymentStatus.PAID, PaymentStatus.IN_PROGRESS -> PgPaymentResult.Success(saved)
-            PaymentStatus.FAILED -> PgPaymentResult.Failed(saved, saved.failureMessage ?: "알 수 없는 오류")
-            else -> throw CoreException(ErrorType.INTERNAL_ERROR, "예상치 못한 결제 상태: ${saved.status}")
-        }
+        val result = payment.initiate(pgResult, currentTime)
+        paymentRepository.save(payment)
+
+        return result
     }
 }
