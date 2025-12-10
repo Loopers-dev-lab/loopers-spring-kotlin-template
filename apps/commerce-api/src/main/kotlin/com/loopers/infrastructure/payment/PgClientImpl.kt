@@ -4,14 +4,13 @@ import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
-import com.loopers.support.values.Money
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import com.loopers.domain.payment.PgPaymentRequest as DomainPgPaymentRequest
 
-@Component
+@Component("pgClientImpl")
 class PgClientImpl(
     private val pgPaymentFeignClient: PgPaymentFeignClient,
     private val pgQueryFeignClient: PgQueryFeignClient,
@@ -20,14 +19,9 @@ class PgClientImpl(
     private val callbackBaseUrl: String,
 ) : PgClient {
 
-    @CircuitBreaker(name = "pg-payment", fallbackMethod = "requestPaymentFallback")
+    @CircuitBreaker(name = "pg-payment")
     @Retry(name = "pg-payment")
     override fun requestPayment(request: DomainPgPaymentRequest): PgPaymentCreateResult {
-        // 0원 결제는 PG 호출이 필요하지 않음
-        if (request.amount == Money.ZERO_KRW) {
-            return PgPaymentCreateResult.NotRequired
-        }
-
         val infraRequest = request.toInfraRequest(callbackBaseUrl)
 
         return try {
@@ -37,15 +31,6 @@ class PgClientImpl(
         } catch (e: Exception) {
             throw exceptionClassifier.classify(e)
         }
-    }
-
-    @Suppress("unused")
-    private fun requestPaymentFallback(
-        request: DomainPgPaymentRequest,
-        e: Exception,
-    ): PgPaymentCreateResult = when (e) {
-        is PgResponseUncertainException -> PgPaymentCreateResult.Uncertain
-        else -> PgPaymentCreateResult.NotReached
     }
 
     @CircuitBreaker(name = "pg-query")
