@@ -83,20 +83,20 @@ class PaymentService(
         val payment = paymentRepository.findByOrderId(orderId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
+        val wasAlreadyProcessed = payment.status == PaymentStatus.PAID || payment.status == PaymentStatus.FAILED
+
         val transaction = pgClient.findTransaction(externalPaymentKey)
 
-        val result = payment.confirmPayment(listOf(transaction), currentTime = currentTime)
+        // 멱등함 - 이미 처리됐으면 내부에서 무시
+        payment.confirmPayment(listOf(transaction), currentTime = currentTime)
 
         paymentRepository.save(payment)
 
-        return when (result) {
-            is Payment.ConfirmResult.AlreadyProcessed -> {
-                CallbackResult.AlreadyProcessed(payment)
-            }
-
-            is Payment.ConfirmResult.Confirmed -> {
-                CallbackResult.Confirmed(payment)
-            }
+        // 이전에 이미 처리된 경우 AlreadyProcessed, 새로 처리된 경우 Confirmed
+        return if (wasAlreadyProcessed) {
+            CallbackResult.AlreadyProcessed(payment)
+        } else {
+            CallbackResult.Confirmed(payment)
         }
     }
 
@@ -117,21 +117,22 @@ class PaymentService(
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
+        val wasAlreadyProcessed = payment.status == PaymentStatus.PAID || payment.status == PaymentStatus.FAILED
+
         val transactions = payment.externalPaymentKey?.let { key ->
             listOf(pgClient.findTransaction(key))
         } ?: pgClient.findTransactionsByPaymentId(payment.id)
 
-        val result = payment.confirmPayment(transactions, currentTime = currentTime)
+        // 멱등함 - 이미 처리됐으면 내부에서 무시
+        payment.confirmPayment(transactions, currentTime = currentTime)
 
-        return when (result) {
-            is Payment.ConfirmResult.AlreadyProcessed -> {
-                CallbackResult.AlreadyProcessed(payment)
-            }
+        paymentRepository.save(payment)
 
-            is Payment.ConfirmResult.Confirmed -> {
-                paymentRepository.save(payment)
-                CallbackResult.Confirmed(payment)
-            }
+        // 이전에 이미 처리된 경우 AlreadyProcessed, 새로 처리된 경우 Confirmed
+        return if (wasAlreadyProcessed) {
+            CallbackResult.AlreadyProcessed(payment)
+        } else {
+            CallbackResult.Confirmed(payment)
         }
     }
 

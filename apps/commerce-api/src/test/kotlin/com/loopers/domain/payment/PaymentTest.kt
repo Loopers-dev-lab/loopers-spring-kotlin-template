@@ -552,12 +552,11 @@ class PaymentTest {
             val payment = createInProgressPayment()
 
             // when
-            val result = payment.confirmPayment(emptyList(), currentTime = Instant.now())
+            payment.confirmPayment(emptyList(), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
-            assertThat(result).isInstanceOf(Payment.ConfirmResult.Confirmed::class.java)
         }
 
         @DisplayName("매칭되는 트랜잭션이 없으면 FAILED로 전이된다")
@@ -571,7 +570,7 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(unmatchedTransaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(unmatchedTransaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
@@ -588,7 +587,7 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
@@ -636,6 +635,46 @@ class PaymentTest {
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+        }
+
+        @DisplayName("PAID 상태에서 confirmPayment 호출 시 PAID 상태 유지된다 (멱등성)")
+        @Test
+        fun `stays PAID when confirmPayment called on PAID payment`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
+            val successTransaction = createTransaction(
+                transactionKey = "tx_12345",
+                status = PgTransactionStatus.SUCCESS,
+            )
+            payment.confirmPayment(listOf(successTransaction), currentTime = Instant.now())
+            assertThat(payment.status).isEqualTo(PaymentStatus.PAID) // 사전 조건 확인
+
+            // when - PAID 상태에서 다시 호출
+            payment.confirmPayment(listOf(successTransaction), currentTime = Instant.now())
+
+            // then - 예외 없이 PAID 상태 유지
+            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
+        }
+
+        @DisplayName("FAILED 상태에서 confirmPayment 호출 시 FAILED 상태 유지된다 (멱등성)")
+        @Test
+        fun `stays FAILED when confirmPayment called on FAILED payment`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
+            val failedTransaction = createTransaction(
+                transactionKey = "tx_12345",
+                status = PgTransactionStatus.FAILED,
+                failureReason = "잔액 부족",
+            )
+            payment.confirmPayment(listOf(failedTransaction), currentTime = Instant.now())
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED) // 사전 조건 확인
+
+            // when - FAILED 상태에서 다시 호출
+            payment.confirmPayment(listOf(failedTransaction), currentTime = Instant.now())
+
+            // then - 예외 없이 FAILED 상태 유지
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(payment.failureMessage).isEqualTo("잔액 부족")
         }
     }
 

@@ -5,12 +5,12 @@ import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
-import org.springframework.data.domain.Slice
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
 import com.loopers.infrastructure.payment.PgRequestNotReachedException
 import com.loopers.support.values.Money
+import org.springframework.data.domain.Slice
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
@@ -60,14 +60,8 @@ class PaymentFacade(
             externalPaymentKey = criteria.externalPaymentKey,
         )
 
-        when (result) {
-            is PaymentService.CallbackResult.Confirmed -> {
-                handleConfirmedPayment(result.payment)
-            }
-
-            else -> {
-                return
-            }
+        if (result is PaymentService.CallbackResult.Confirmed) {
+            handleConfirmedPayment(result.payment)
         }
     }
 
@@ -102,14 +96,8 @@ class PaymentFacade(
     fun processInProgressPayment(paymentId: Long) {
         val result = paymentService.processInProgressPayment(paymentId)
 
-        when (result) {
-            is PaymentService.CallbackResult.Confirmed -> {
-                handleConfirmedPayment(result.payment)
-            }
-
-            else -> {
-                return
-            }
+        if (result is PaymentService.CallbackResult.Confirmed) {
+            handleConfirmedPayment(result.payment)
         }
     }
 

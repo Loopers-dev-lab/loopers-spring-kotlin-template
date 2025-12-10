@@ -126,24 +126,9 @@ class Payment(
     }
 
     /**
-     * 결제 확정 결과
-     */
-    sealed class ConfirmResult {
-        /**
-         * 이미 처리된 결제 (멱등성)
-         */
-        data class AlreadyProcessed(val status: PaymentStatus) : ConfirmResult()
-
-        /**
-         * 새로 확정된 결제
-         */
-        data class Confirmed(val status: PaymentStatus) : ConfirmResult()
-    }
-
-    /**
      * PG 트랜잭션 결과로 결제 상태를 확정합니다.
      *
-     * 멱등성: 이미 PAID/FAILED 상태면 AlreadyProcessed 반환
+     * 멱등성: 이미 PAID/FAILED 상태면 아무 일도 하지 않음
      *
      * 매칭 우선순위:
      * 1. externalPaymentKey가 있으면 해당 키와 일치하는 transaction
@@ -151,13 +136,12 @@ class Payment(
      *
      * @param transactions PG에서 조회한 트랜잭션 목록
      * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return ConfirmResult - AlreadyProcessed 또는 Confirmed
      * @throws CoreException PENDING 상태인 경우 (아직 결제 시작 안됨)
      */
-    fun confirmPayment(transactions: List<PgTransaction>, currentTime: Instant): ConfirmResult {
-        // 멱등성: 이미 처리된 결제
+    fun confirmPayment(transactions: List<PgTransaction>, currentTime: Instant) {
+        // 멱등성: 이미 최종 상태면 무시
         if (status == PaymentStatus.PAID || status == PaymentStatus.FAILED) {
-            return ConfirmResult.AlreadyProcessed(status)
+            return
         }
 
         // PENDING 상태면 예외 (아직 결제 시작 안됨)
@@ -189,8 +173,6 @@ class Payment(
                 failureMessage = "결제 시간 초과"
             }
         }
-
-        return ConfirmResult.Confirmed(status)
     }
 
     private fun findMatchingTransaction(transactions: List<PgTransaction>): PgTransaction? {
