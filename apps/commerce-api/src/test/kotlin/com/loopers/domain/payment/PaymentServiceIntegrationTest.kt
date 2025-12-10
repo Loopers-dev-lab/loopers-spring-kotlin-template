@@ -212,9 +212,9 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     @Nested
     inner class ProcessCallback {
 
-        @DisplayName("SUCCESS 트랜잭션 콜백을 받으면 PAID로 전이된다")
+        @DisplayName("SUCCESS 트랜잭션 콜백을 받으면 Paid 결과를 반환한다")
         @Test
-        fun `transitions to PAID when SUCCESS callback received`() {
+        fun `returns Paid when SUCCESS callback received`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = "pg_tx_success")
             val successTransaction = createTransaction(
@@ -230,14 +230,14 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
-            val confirmed = result as PaymentService.CallbackResult.Confirmed
-            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
+            val paid = result as ConfirmResult.Paid
+            assertThat(paid.payment.status).isEqualTo(PaymentStatus.PAID)
         }
 
-        @DisplayName("FAILED 트랜잭션 콜백을 받으면 FAILED로 전이된다")
+        @DisplayName("FAILED 트랜잭션 콜백을 받으면 Failed 결과를 반환한다")
         @Test
-        fun `transitions to FAILED when FAILED callback received`() {
+        fun `returns Failed when FAILED callback received`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = "pg_tx_failed")
             val failureReason = "카드 한도 초과"
@@ -255,15 +255,15 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
-            val confirmed = result as PaymentService.CallbackResult.Confirmed
-            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.FAILED)
-            assertThat(confirmed.payment.failureMessage).isEqualTo(failureReason)
+            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
+            val failed = result as ConfirmResult.Failed
+            assertThat(failed.payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(failed.payment.failureMessage).isEqualTo(failureReason)
         }
 
-        @DisplayName("이미 처리된 결제에 콜백이 오면 AlreadyProcessed를 반환한다")
+        @DisplayName("이미 처리된 결제에 콜백이 오면 Paid 결과를 반환한다 (멱등성)")
         @Test
-        fun `returns AlreadyProcessed when payment already processed`() {
+        fun `returns Paid when payment already paid - idempotent`() {
             // given
             val payment = createPaidPayment()
             val transaction = createTransaction(
@@ -279,7 +279,32 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PaymentService.CallbackResult.AlreadyProcessed::class.java)
+            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
+            val paid = result as ConfirmResult.Paid
+            assertThat(paid.payment.status).isEqualTo(PaymentStatus.PAID)
+        }
+
+        @DisplayName("PENDING 트랜잭션이면 StillInProgress 결과를 반환한다")
+        @Test
+        fun `returns StillInProgress when transaction is PENDING`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "pg_tx_pending")
+            val pendingTransaction = createTransaction(
+                transactionKey = "pg_tx_pending",
+                status = PgTransactionStatus.PENDING,
+            )
+            every { pgClient.findTransaction("pg_tx_pending") } returns pendingTransaction
+
+            // when
+            val result = paymentService.processCallback(
+                orderId = payment.orderId,
+                externalPaymentKey = "pg_tx_pending",
+            )
+
+            // then
+            assertThat(result).isInstanceOf(ConfirmResult.StillInProgress::class.java)
+            val stillInProgress = result as ConfirmResult.StillInProgress
+            assertThat(stillInProgress.payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
         }
 
         @DisplayName("존재하지 않는 주문 ID로 콜백이 오면 예외가 발생한다")
@@ -319,9 +344,9 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
-            val confirmed = result as PaymentService.CallbackResult.Confirmed
-            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
+            val paid = result as ConfirmResult.Paid
+            assertThat(paid.payment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @DisplayName("매칭되는 FAILED 트랜잭션이 있으면 FAILED로 전이된다")
@@ -343,10 +368,10 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
-            val confirmed = result as PaymentService.CallbackResult.Confirmed
-            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.FAILED)
-            assertThat(confirmed.payment.failureMessage).isEqualTo(failureReason)
+            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
+            val failed = result as ConfirmResult.Failed
+            assertThat(failed.payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(failed.payment.failureMessage).isEqualTo(failureReason)
         }
 
         @DisplayName("매칭되는 트랜잭션이 없으면 FAILED로 전이된다")
@@ -370,10 +395,32 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PaymentService.CallbackResult.Confirmed::class.java)
-            val confirmed = result as PaymentService.CallbackResult.Confirmed
-            assertThat(confirmed.payment.status).isEqualTo(PaymentStatus.FAILED)
-            assertThat(confirmed.payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
+            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
+            val failed = result as ConfirmResult.Failed
+            assertThat(failed.payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(failed.payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
+        }
+
+        @DisplayName("PENDING 트랜잭션이면 StillInProgress 결과를 반환한다")
+        @Test
+        fun `returns StillInProgress when transaction is still PENDING`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "pg_tx_pending")
+            val pendingTransaction = createTransaction(
+                transactionKey = "pg_tx_pending",
+                status = PgTransactionStatus.PENDING,
+            )
+            every { pgClient.findTransaction("pg_tx_pending") } returns pendingTransaction
+
+            // when
+            val result = paymentService.processInProgressPayment(
+                paymentId = payment.id,
+            )
+
+            // then
+            assertThat(result).isInstanceOf(ConfirmResult.StillInProgress::class.java)
+            val stillInProgress = result as ConfirmResult.StillInProgress
+            assertThat(stillInProgress.payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
         }
 
         @DisplayName("존재하지 않는 결제 ID면 예외가 발생한다")

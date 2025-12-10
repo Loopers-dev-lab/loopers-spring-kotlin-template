@@ -50,28 +50,13 @@ class PaymentService(
     }
 
     /**
-     * PG 콜백 결과
-     */
-    sealed class CallbackResult {
-        /**
-         * 이미 처리된 결제 (멱등성)
-         */
-        data class AlreadyProcessed(val payment: Payment) : CallbackResult()
-
-        /**
-         * 새로 확정된 결제
-         */
-        data class Confirmed(val payment: Payment) : CallbackResult()
-    }
-
-    /**
      * PG 콜백을 처리합니다.
      * orderId로 결제를 조회하고, externalPaymentKey로 PG 트랜잭션을 조회하여 결제를 확정합니다.
      *
      * @param orderId 주문 ID
      * @param externalPaymentKey PG 외부 결제 키
      * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return CallbackResult - 결제 확정 결과
+     * @return ConfirmResult - 결제 확정 결과
      * @throws CoreException 결제를 찾을 수 없는 경우
      */
     @Transactional
@@ -79,11 +64,9 @@ class PaymentService(
         orderId: Long,
         externalPaymentKey: String,
         currentTime: Instant = Instant.now(),
-    ): CallbackResult {
+    ): ConfirmResult {
         val payment = paymentRepository.findByOrderId(orderId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
-
-        val wasAlreadyProcessed = payment.status == PaymentStatus.PAID || payment.status == PaymentStatus.FAILED
 
         val transaction = pgClient.findTransaction(externalPaymentKey)
 
@@ -92,11 +75,11 @@ class PaymentService(
 
         paymentRepository.save(payment)
 
-        // 이전에 이미 처리된 경우 AlreadyProcessed, 새로 처리된 경우 Confirmed
-        return if (wasAlreadyProcessed) {
-            CallbackResult.AlreadyProcessed(payment)
-        } else {
-            CallbackResult.Confirmed(payment)
+        return when (payment.status) {
+            PaymentStatus.PAID -> ConfirmResult.Paid(payment)
+            PaymentStatus.FAILED -> ConfirmResult.Failed(payment)
+            PaymentStatus.IN_PROGRESS -> ConfirmResult.StillInProgress(payment)
+            else -> throw CoreException(ErrorType.INTERNAL_ERROR, "예상치 못한 결제 상태: ${payment.status}")
         }
     }
 
@@ -106,18 +89,16 @@ class PaymentService(
      *
      * @param paymentId 결제 ID
      * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return CallbackResult - 결제 확정 결과
+     * @return ConfirmResult - 결제 확정 결과
      * @throws CoreException 결제를 찾을 수 없는 경우
      */
     @Transactional
     fun processInProgressPayment(
         paymentId: Long,
         currentTime: Instant = Instant.now(),
-    ): CallbackResult {
+    ): ConfirmResult {
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
-
-        val wasAlreadyProcessed = payment.status == PaymentStatus.PAID || payment.status == PaymentStatus.FAILED
 
         val transactions = payment.externalPaymentKey?.let { key ->
             listOf(pgClient.findTransaction(key))
@@ -128,11 +109,11 @@ class PaymentService(
 
         paymentRepository.save(payment)
 
-        // 이전에 이미 처리된 경우 AlreadyProcessed, 새로 처리된 경우 Confirmed
-        return if (wasAlreadyProcessed) {
-            CallbackResult.AlreadyProcessed(payment)
-        } else {
-            CallbackResult.Confirmed(payment)
+        return when (payment.status) {
+            PaymentStatus.PAID -> ConfirmResult.Paid(payment)
+            PaymentStatus.FAILED -> ConfirmResult.Failed(payment)
+            PaymentStatus.IN_PROGRESS -> ConfirmResult.StillInProgress(payment)
+            else -> throw CoreException(ErrorType.INTERNAL_ERROR, "예상치 못한 결제 상태: ${payment.status}")
         }
     }
 

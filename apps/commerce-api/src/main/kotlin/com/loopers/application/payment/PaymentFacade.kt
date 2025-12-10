@@ -2,9 +2,9 @@ package com.loopers.application.payment
 
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderService
+import com.loopers.domain.payment.ConfirmResult
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
@@ -55,34 +55,25 @@ class PaymentFacade(
      * @param criteria 콜백 처리 파라미터 (orderId, externalPaymentKey)
      */
     fun processCallback(criteria: PaymentCriteria.ProcessCallback) {
-        val result = paymentService.processCallback(
-            orderId = criteria.orderId,
-            externalPaymentKey = criteria.externalPaymentKey,
-        )
-
-        if (result is PaymentService.CallbackResult.Confirmed) {
-            handleConfirmedPayment(result.payment)
-        }
-    }
-
-    /**
-     * 확정된 결제에 대한 후속 처리를 수행합니다.
-     */
-    private fun handleConfirmedPayment(payment: Payment) {
-        when (payment.status) {
-            PaymentStatus.PAID -> {
+        when (
+            val result = paymentService.processCallback(
+                orderId = criteria.orderId,
+                externalPaymentKey = criteria.externalPaymentKey,
+            )
+        ) {
+            is ConfirmResult.Paid -> {
                 retryTemplate.execute<Unit, Exception> {
-                    orderService.completePayment(payment.orderId)
+                    orderService.completePayment(result.payment.orderId)
                 }
             }
-
-            PaymentStatus.FAILED -> {
+            is ConfirmResult.Failed -> {
                 retryTemplate.execute<Unit, Exception> {
-                    recoverResources(payment)
+                    recoverResources(result.payment)
                 }
             }
-
-            else -> {}
+            is ConfirmResult.StillInProgress -> {
+                // 아직 미확정, 스케줄러가 나중에 처리
+            }
         }
     }
 
@@ -94,10 +85,20 @@ class PaymentFacade(
      * @throws PgRequestNotReachedException PG 연결 실패 시
      */
     fun processInProgressPayment(paymentId: Long) {
-        val result = paymentService.processInProgressPayment(paymentId)
-
-        if (result is PaymentService.CallbackResult.Confirmed) {
-            handleConfirmedPayment(result.payment)
+        when (val result = paymentService.processInProgressPayment(paymentId)) {
+            is ConfirmResult.Paid -> {
+                retryTemplate.execute<Unit, Exception> {
+                    orderService.completePayment(result.payment.orderId)
+                }
+            }
+            is ConfirmResult.Failed -> {
+                retryTemplate.execute<Unit, Exception> {
+                    recoverResources(result.payment)
+                }
+            }
+            is ConfirmResult.StillInProgress -> {
+                // 아직 미확정, 다음 스케줄링에서 재시도
+            }
         }
     }
 
