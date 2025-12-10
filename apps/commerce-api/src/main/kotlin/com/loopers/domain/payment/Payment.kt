@@ -118,6 +118,10 @@ class Payment(
             is PgPaymentCreateResult.NotReached -> {
                 status = PaymentStatus.FAILED
             }
+
+            is PgPaymentCreateResult.NotRequired -> {
+                status = PaymentStatus.PAID
+            }
         }
     }
 
