@@ -379,7 +379,7 @@ class PaymentTest {
     @Nested
     inner class Initiate {
 
-        @DisplayName("PENDING 상태에서 Accepted로 initiate() 호출 시 IN_PROGRESS로 전이되고 transactionKey가 저장된다")
+        @DisplayName("PENDING 상태에서 Accepted 결과로 시작하면 IN_PROGRESS로 전이되고 Success를 반환한다")
         @Test
         fun `transitions to IN_PROGRESS with transactionKey when initiate with Accepted`() {
             // given
@@ -388,15 +388,17 @@ class PaymentTest {
             val attemptedAt = Instant.now()
 
             // when
-            payment.initiate(PgPaymentCreateResult.Accepted(transactionKey), attemptedAt)
+            val result = payment.initiate(PgPaymentCreateResult.Accepted(transactionKey), attemptedAt)
 
             // then
+            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
+            assertThat((result as PgPaymentResult.Success).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
             assertThat(payment.externalPaymentKey).isEqualTo(transactionKey)
             assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
         }
 
-        @DisplayName("PENDING 상태에서 Uncertain으로 initiate() 호출 시 IN_PROGRESS로 전이되고 transactionKey는 null이다")
+        @DisplayName("PENDING 상태에서 Uncertain 결과로 시작하면 IN_PROGRESS로 전이되고 Success를 반환한다")
         @Test
         fun `transitions to IN_PROGRESS without transactionKey when initiate with Uncertain`() {
             // given
@@ -404,15 +406,17 @@ class PaymentTest {
             val attemptedAt = Instant.now()
 
             // when
-            payment.initiate(PgPaymentCreateResult.Uncertain, attemptedAt)
+            val result = payment.initiate(PgPaymentCreateResult.Uncertain, attemptedAt)
 
             // then
+            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
+            assertThat((result as PgPaymentResult.Success).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
             assertThat(payment.externalPaymentKey).isNull()
             assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
         }
 
-        @DisplayName("PENDING 상태에서 NotRequired로 initiate() 호출 시 PAID로 전이된다")
+        @DisplayName("PENDING 상태에서 NotRequired 결과로 시작하면 PAID로 전이되고 Success를 반환한다")
         @Test
         fun `transitions to PAID when initiate with NotRequired`() {
             // given
@@ -420,15 +424,36 @@ class PaymentTest {
             val attemptedAt = Instant.now()
 
             // when
-            payment.initiate(PgPaymentCreateResult.NotRequired, attemptedAt)
+            val result = payment.initiate(PgPaymentCreateResult.NotRequired, attemptedAt)
 
             // then
+            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
+            assertThat((result as PgPaymentResult.Success).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
             assertThat(payment.externalPaymentKey).isNull()
             assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
         }
 
-        @DisplayName("PENDING이 아닌 상태에서 initiate() 호출 시 예외가 발생한다")
+        @DisplayName("PENDING 상태에서 NotReached 결과로 시작하면 FAILED로 전이되고 Failed를 반환한다")
+        @Test
+        fun `transitions to FAILED with reason when initiate with NotReached`() {
+            // given
+            val payment = createPendingPayment()
+            val attemptedAt = Instant.now()
+
+            // when
+            val result = payment.initiate(PgPaymentCreateResult.NotReached, attemptedAt)
+
+            // then
+            assertThat(result).isInstanceOf(PgPaymentResult.Failed::class.java)
+            assertThat((result as PgPaymentResult.Failed).payment).isEqualTo(payment)
+            assertThat(result.reason).isEqualTo("PG 서비스에 연결할 수 없습니다")
+            assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(payment.failureMessage).isEqualTo("PG 서비스에 연결할 수 없습니다")
+            assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
+        }
+
+        @DisplayName("PENDING이 아닌 상태에서 시작하면 예외가 발생한다")
         @Test
         fun `throws exception when initiate is called from non-PENDING state`() {
             // given

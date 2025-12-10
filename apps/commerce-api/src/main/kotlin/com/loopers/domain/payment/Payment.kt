@@ -91,15 +91,17 @@ class Payment(
     /**
      * 결제를 개시합니다. PENDING → IN_PROGRESS 또는 FAILED 상태 전이
      * PG 결제 요청 결과에 따라 상태가 결정됩니다.
-     * - Accepted: IN_PROGRESS, transactionKey 저장
-     * - Uncertain: IN_PROGRESS, transactionKey null 유지
-     * - NotReached: FAILED (PG 서비스 불능)
+     * - Accepted: IN_PROGRESS, transactionKey 저장 -> Success
+     * - Uncertain: IN_PROGRESS, transactionKey null 유지 -> Success
+     * - NotReached: FAILED (PG 서비스 불능) -> Failed
+     * - NotRequired: PAID (0원 결제) -> Success
      *
      * @param result PG 결제 요청 결과
      * @param attemptedAt 결제 시도 시각
+     * @return PgPaymentResult 결제 개시 결과 (Success 또는 Failed)
      * @throws CoreException PENDING 상태가 아닌 경우
      */
-    fun initiate(result: PgPaymentCreateResult, attemptedAt: Instant) {
+    fun initiate(result: PgPaymentCreateResult, attemptedAt: Instant): PgPaymentResult {
         if (status != PaymentStatus.PENDING) {
             throw CoreException(ErrorType.BAD_REQUEST, "결제 대기 상태에서만 결제를 개시할 수 있습니다")
         }
@@ -117,11 +119,17 @@ class Payment(
 
             is PgPaymentCreateResult.NotReached -> {
                 status = PaymentStatus.FAILED
+                failureMessage = "PG 서비스에 연결할 수 없습니다"
             }
 
             is PgPaymentCreateResult.NotRequired -> {
                 status = PaymentStatus.PAID
             }
+        }
+
+        return when (status) {
+            PaymentStatus.FAILED -> PgPaymentResult.Failed(this, failureMessage ?: "알 수 없는 오류")
+            else -> PgPaymentResult.Success(this)
         }
     }
 
