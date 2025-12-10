@@ -35,10 +35,27 @@ class PgPaymentRequestTest {
             assertThat(request.cardInfo).isEqualTo(cardInfo)
         }
 
+        @Test
+        @DisplayName("금액이 0원이면 생성에 성공한다 (0원 결제용)")
+        fun `succeeds with zero amount for zero payment`() {
+            // given
+            val paymentId = 1L
+            val amount = Money.ZERO_KRW
+            val cardInfo = CardInfo(CardType.KB, "1234-5678-9012-3456")
+
+            // when
+            val request = PgPaymentRequest(paymentId, amount, cardInfo)
+
+            // then
+            assertThat(request.paymentId).isEqualTo(paymentId)
+            assertThat(request.amount).isEqualTo(amount)
+            assertThat(request.cardInfo).isEqualTo(cardInfo)
+        }
+
         @ParameterizedTest(name = "금액이 {0}원이면 예외가 발생한다")
-        @ValueSource(longs = [0, -1, -100, -10000])
-        @DisplayName("금액이 0 이하이면 예외가 발생한다")
-        fun `throws exception when amount is zero or negative`(amountValue: Long) {
+        @ValueSource(longs = [-1, -100, -10000])
+        @DisplayName("금액이 음수이면 예외가 발생한다")
+        fun `throws exception when amount is negative`(amountValue: Long) {
             // given
             val paymentId = 1L
             val amount = Money.krw(amountValue)
@@ -51,7 +68,7 @@ class PgPaymentRequestTest {
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.customMessage).isEqualTo("PG 결제 요청 금액은 0보다 커야 합니다")
+            assertThat(exception.customMessage).isEqualTo("PG 결제 요청 금액은 0 이상이어야 합니다")
         }
     }
 }

@@ -10,8 +10,8 @@ data class PgPaymentRequest(
     val cardInfo: CardInfo,
 ) {
     init {
-        if (amount <= Money.ZERO_KRW) {
-            throw CoreException(ErrorType.BAD_REQUEST, "PG 결제 요청 금액은 0보다 커야 합니다")
+        if (amount < Money.ZERO_KRW) {
+            throw CoreException(ErrorType.BAD_REQUEST, "PG 결제 요청 금액은 0 이상이어야 합니다")
         }
     }
 }
