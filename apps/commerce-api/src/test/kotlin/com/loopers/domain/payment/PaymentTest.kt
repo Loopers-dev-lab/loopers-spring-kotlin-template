@@ -41,9 +41,9 @@ class PaymentTest {
             assertThat(payment.usedPoint).isEqualTo(totalAmount)
         }
 
-        @DisplayName("포인트로 전액 결제하면 PAID 상태로 생성된다")
+        @DisplayName("포인트로 전액 결제해도 PENDING 상태로 생성된다")
         @Test
-        fun `have paid status when point covers total amount`() {
+        fun `have pending status when point covers total amount`() {
             // given
             val totalAmount = Money.krw(10000)
 
@@ -58,7 +58,7 @@ class PaymentTest {
             )
 
             // then
-            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
         }
 
         @DisplayName("포인트로 전액 결제하지 않으면 PENDING 상태로 생성된다")
@@ -153,7 +153,8 @@ class PaymentTest {
             assertThat(payment.couponDiscount).isEqualTo(couponDiscount)
             assertThat(payment.usedPoint).isEqualTo(usedPoint)
             assertThat(payment.issuedCouponId).isEqualTo(issuedCouponId)
-            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW)
+            assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
         }
 
         @DisplayName("쿠폰 없이 결제가 생성되면 쿠폰 할인이 0원이다")
@@ -178,9 +179,9 @@ class PaymentTest {
             assertThat(payment.usedPoint).isEqualTo(totalAmount)
         }
 
-        @DisplayName("쿠폰 할인이 주문 금액과 같으면 포인트는 0원이어야 한다")
+        @DisplayName("쿠폰 할인이 주문 금액과 같아도 PENDING 상태로 생성된다")
         @Test
-        fun `used point should be zero when coupon discount equals order amount`() {
+        fun `have pending status when coupon discount equals order amount`() {
             // given
             val totalAmount = Money.krw(10000)
 
@@ -201,7 +202,8 @@ class PaymentTest {
             assertThat(payment.usedPoint).isEqualTo(Money.ZERO_KRW)
             assertThat(payment.couponDiscount).isEqualTo(couponDiscount)
             assertThat(payment.totalAmount).isEqualTo(Money.krw(10000))
-            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW)
+            assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
         }
 
         @DisplayName("포인트와 카드 혼합 결제가 생성된다")
@@ -406,6 +408,22 @@ class PaymentTest {
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+            assertThat(payment.externalPaymentKey).isNull()
+            assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
+        }
+
+        @DisplayName("PENDING 상태에서 NotRequired로 initiate() 호출 시 PAID로 전이된다")
+        @Test
+        fun `transitions to PAID when initiate with NotRequired`() {
+            // given
+            val payment = createPendingPayment()
+            val attemptedAt = Instant.now()
+
+            // when
+            payment.initiate(PgPaymentCreateResult.NotRequired, attemptedAt)
+
+            // then
+            assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
             assertThat(payment.externalPaymentKey).isNull()
             assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
         }

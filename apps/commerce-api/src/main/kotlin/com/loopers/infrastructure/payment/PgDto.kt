@@ -17,9 +17,7 @@ data class PgMeta(
     val result: String,
     val errorCode: String?,
     val message: String?,
-) {
-    fun isSuccess(): Boolean = result == "SUCCESS"
-}
+)
 
 data class PgPaymentResponse(
     val transactionKey: String,

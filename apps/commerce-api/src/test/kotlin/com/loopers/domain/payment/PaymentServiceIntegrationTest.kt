@@ -111,16 +111,18 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             every { pgClient.requestPayment(any()) } returns PgPaymentCreateResult.Accepted(transactionKey)
 
             // when
-            val updatedPayment = paymentService.requestPgPayment(
+            val result = paymentService.requestPgPayment(
                 paymentId = payment.id,
                 cardInfo = cardInfo,
             )
 
             // then
+            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
+            val successResult = result as PgPaymentResult.Success
             assertAll(
-                { assertThat(updatedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS) },
-                { assertThat(updatedPayment.externalPaymentKey).isEqualTo(transactionKey) },
-                { assertThat(updatedPayment.attemptedAt).isNotNull() },
+                { assertThat(successResult.payment.status).isEqualTo(PaymentStatus.IN_PROGRESS) },
+                { assertThat(successResult.payment.externalPaymentKey).isEqualTo(transactionKey) },
+                { assertThat(successResult.payment.attemptedAt).isNotNull() },
             )
         }
 
@@ -134,16 +136,18 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             every { pgClient.requestPayment(any()) } returns PgPaymentCreateResult.Uncertain
 
             // when
-            val updatedPayment = paymentService.requestPgPayment(
+            val result = paymentService.requestPgPayment(
                 paymentId = payment.id,
                 cardInfo = cardInfo,
             )
 
             // then
+            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
+            val successResult = result as PgPaymentResult.Success
             assertAll(
-                { assertThat(updatedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS) },
-                { assertThat(updatedPayment.externalPaymentKey).isNull() },
-                { assertThat(updatedPayment.attemptedAt).isNotNull() },
+                { assertThat(successResult.payment.status).isEqualTo(PaymentStatus.IN_PROGRESS) },
+                { assertThat(successResult.payment.externalPaymentKey).isNull() },
+                { assertThat(successResult.payment.attemptedAt).isNotNull() },
             )
         }
 

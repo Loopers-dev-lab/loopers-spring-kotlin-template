@@ -10,7 +10,7 @@ import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PaymentStatus
+import com.loopers.domain.payment.PgPaymentResult
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
@@ -46,48 +46,38 @@ class OrderFacade(
         val payment = allocationResult.payment
         updateProductCache(allocationResult.productViews)
 
-        // 2. 포인트+쿠폰 전액 결제 완료된 경우
-        if (payment.status == PaymentStatus.PAID) {
-            return OrderInfo.PlaceOrder(
-                orderId = allocationResult.orderId,
-                paymentId = payment.id,
-                paymentStatus = PaymentStatus.PAID,
-            )
+        // 2. PG 결제 요청 (0원 결제도 동일한 플로우)
+        // 카드 정보는 0원 결제가 아닌 경우에만 필요
+        val cardInfo = criteria.cardType?.let { cardType ->
+            criteria.cardNo?.let { cardNo ->
+                CardInfo(
+                    cardType = CardType.valueOf(cardType),
+                    cardNo = cardNo,
+                )
+            }
         }
+        val result = paymentService.requestPgPayment(payment.id, cardInfo)
 
-        // 3. PG 결제 요청
-        val cardInfo = CardInfo(
-            cardType = CardType.valueOf(
-                criteria.cardType
-                    ?: throw CoreException(ErrorType.BAD_REQUEST, "카드 타입이 필요합니다."),
-            ),
-            cardNo = criteria.cardNo
-                ?: throw CoreException(ErrorType.BAD_REQUEST, "카드 번호가 필요합니다."),
-        )
-        val updatedPayment = paymentService.requestPgPayment(payment.id, cardInfo)
-
-        // 4. 상태에 따른 후속 처리
-        return when (updatedPayment.status) {
-            PaymentStatus.IN_PROGRESS -> {
+        // 3. 결과에 따른 후속 처리
+        return when (result) {
+            is PgPaymentResult.Success -> {
                 OrderInfo.PlaceOrder(
                     orderId = allocationResult.orderId,
                     paymentId = payment.id,
-                    paymentStatus = PaymentStatus.IN_PROGRESS,
+                    paymentStatus = result.payment.status,
                 )
             }
 
-            PaymentStatus.FAILED -> {
+            is PgPaymentResult.Failed -> {
                 // 보상 트랜잭션 (with retry)
                 retryTemplate.execute<Unit, Exception> {
-                    recoverResources(updatedPayment)
+                    recoverResources(result.payment)
                 }
                 throw CoreException(
                     ErrorType.INTERNAL_ERROR,
                     "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
                 )
             }
-
-            else -> throw CoreException(ErrorType.INTERNAL_ERROR)
         }
     }
 

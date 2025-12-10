@@ -4,6 +4,7 @@ import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
+import com.loopers.support.values.Money
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.retry.annotation.Retry
 import org.springframework.beans.factory.annotation.Value
@@ -22,6 +23,11 @@ class PgClientImpl(
     @CircuitBreaker(name = "pg-payment", fallbackMethod = "requestPaymentFallback")
     @Retry(name = "pg-payment")
     override fun requestPayment(request: DomainPgPaymentRequest): PgPaymentCreateResult {
+        // 0원 결제는 PG 호출이 필요하지 않음
+        if (request.amount == Money.ZERO_KRW) {
+            return PgPaymentCreateResult.NotRequired
+        }
+
         val infraRequest = request.toInfraRequest(callbackBaseUrl)
 
         return try {

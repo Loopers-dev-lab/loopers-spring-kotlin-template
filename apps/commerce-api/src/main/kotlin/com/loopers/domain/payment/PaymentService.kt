@@ -2,6 +2,7 @@ package com.loopers.domain.payment
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.values.Money
 import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -86,13 +87,14 @@ class PaymentService(
 
         val result = payment.confirmPayment(listOf(transaction), currentTime = currentTime)
 
+        paymentRepository.save(payment)
+
         return when (result) {
             is Payment.ConfirmResult.AlreadyProcessed -> {
                 CallbackResult.AlreadyProcessed(payment)
             }
 
             is Payment.ConfirmResult.Confirmed -> {
-                paymentRepository.save(payment)
                 CallbackResult.Confirmed(payment)
             }
         }
@@ -137,27 +139,43 @@ class PaymentService(
      * PG 결제를 요청하고 결제 상태를 업데이트합니다.
      * 이 메서드는 트랜잭션 없이 실행되며, PG 호출 후 상태 업데이트만 트랜잭션으로 처리합니다.
      *
+     * 0원 결제(포인트+쿠폰으로 전액 결제)의 경우 cardInfo가 null이어도 됩니다.
+     * 실제 PG 결제가 필요한 경우 cardInfo가 필수입니다.
+     *
      * @param paymentId 결제 ID
-     * @param cardInfo 카드 정보
-     * @return 상태가 업데이트된 Payment
+     * @param cardInfo 카드 정보 (0원 결제가 아닌 경우 필수)
+     * @return PgPaymentResult - 결제 결과
      */
     fun requestPgPayment(
         paymentId: Long,
-        cardInfo: CardInfo,
+        cardInfo: CardInfo?,
         currentTime: Instant = Instant.now(),
-    ): Payment {
+    ): PgPaymentResult {
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
-        val pgResult = pgClient.requestPayment(
-            PgPaymentRequest(
-                paymentId = payment.id,
-                amount = payment.paidAmount,
-                cardInfo = cardInfo,
-            ),
-        )
+        // 0원 결제는 PG 호출이 필요하지 않음 - PgPaymentRequest 생성 전에 체크
+        val pgResult = if (payment.paidAmount == Money.ZERO_KRW) {
+            PgPaymentCreateResult.NotRequired
+        } else {
+            val requiredCardInfo = cardInfo
+                ?: throw CoreException(ErrorType.BAD_REQUEST, "카드 정보가 필요합니다")
+            pgClient.requestPayment(
+                PgPaymentRequest(
+                    paymentId = payment.id,
+                    amount = payment.paidAmount,
+                    cardInfo = requiredCardInfo,
+                ),
+            )
+        }
 
         payment.initiate(pgResult, currentTime)
-        return paymentRepository.save(payment)
+        val saved = paymentRepository.save(payment)
+
+        return when (saved.status) {
+            PaymentStatus.PAID, PaymentStatus.IN_PROGRESS -> PgPaymentResult.Success(saved)
+            PaymentStatus.FAILED -> PgPaymentResult.Failed(saved, saved.failureMessage ?: "알 수 없는 오류")
+            else -> throw CoreException(ErrorType.INTERNAL_ERROR, "예상치 못한 결제 상태: ${saved.status}")
+        }
     }
 }

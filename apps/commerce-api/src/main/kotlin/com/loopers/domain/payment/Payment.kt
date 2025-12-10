@@ -212,8 +212,7 @@ class Payment(
         /**
          * 결제를 생성합니다.
          * paidAmount = totalAmount - usedPoint - couponDiscount 로 자동 계산
-         * - paidAmount가 0이면 (포인트+쿠폰으로 전액 결제) → PAID
-         * - paidAmount가 0보다 크면 (PG 결제 필요) → PENDING
+         * 모든 결제는 PENDING 상태로 생성됩니다. (0원 결제 포함)
          */
         fun create(
             userId: Long,
@@ -236,15 +235,13 @@ class Payment(
                 throw CoreException(ErrorType.BAD_REQUEST, "포인트와 쿠폰 할인의 합이 주문 금액을 초과합니다")
             }
 
-            val status = if (paidAmount == Money.ZERO_KRW) PaymentStatus.PAID else PaymentStatus.PENDING
-
             return Payment(
                 orderId = orderId,
                 userId = userId,
                 totalAmount = totalAmount,
                 usedPoint = usedPoint,
                 paidAmount = paidAmount,
-                status = status,
+                status = PaymentStatus.PENDING,
                 issuedCouponId = issuedCouponId,
                 couponDiscount = couponDiscount,
             )
