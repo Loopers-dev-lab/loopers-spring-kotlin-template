@@ -211,11 +211,24 @@ class OrderTest {
             assertThat(order.status).isEqualTo(OrderStatus.PAID)
         }
 
-        @DisplayName("PLACED가 아닌 상태에서 paid() 호출 시 예외가 발생한다")
+        @DisplayName("이미 PAID 상태에서 예외가 발생하지 않는다")
         @Test
-        fun `throws exception when status is not PLACED`() {
+        fun `order does nothing when pay on PAID`() {
             // given
             val order = createOrder(status = OrderStatus.PAID)
+
+            // when
+            order.pay()
+
+            // then
+            assertThat(order.status).isEqualTo(OrderStatus.PAID)
+        }
+
+        @DisplayName("CANCELLED 상태에서 예외가 발생한다")
+        @Test
+        fun `throws exception when status is CANCELLED`() {
+            // given
+            val order = createOrder(status = OrderStatus.CANCELLED)
 
             // when
             val exception = assertThrows<CoreException> {
@@ -299,21 +312,16 @@ class OrderTest {
             assertThat(exception.message).isEqualTo("주문 대기 상태에서만 취소할 수 있습니다")
         }
 
-        @DisplayName("CANCELLED 상태에서 cancel() 호출 시 예외가 발생한다")
+        @DisplayName("이미 CANCELLED 상태인 주문에 cancel() 호출해도 예외가 발생하지 않는다")
         @Test
-        fun `throws exception when cancel is called from CANCELLED status`() {
+        fun `cancel() on CANCELLED order does nothing`() {
             // given
-            val order = createOrder(status = OrderStatus.PLACED)
+            val order = createOrder(status = OrderStatus.CANCELLED)
+
+            // when & then - should NOT throw
             order.cancel()
 
-            // when
-            val exception = assertThrows<CoreException> {
-                order.cancel()
-            }
-
-            // then
-            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
-            assertThat(exception.message).isEqualTo("주문 대기 상태에서만 취소할 수 있습니다")
+            assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
         }
     }
 

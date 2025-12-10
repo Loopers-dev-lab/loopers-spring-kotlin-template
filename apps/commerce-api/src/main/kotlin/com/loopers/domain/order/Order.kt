@@ -84,6 +84,9 @@ class Order(
     }
 
     fun pay() {
+        if (status == OrderStatus.PAID) {
+            return
+        }
         if (status != OrderStatus.PLACED) {
             throw CoreException(ErrorType.BAD_REQUEST, "주문이 완료되지 않았습니다.")
         }
@@ -102,6 +105,9 @@ class Order(
      * @throws CoreException PLACED 상태가 아닌 경우
      */
     fun cancel() {
+        if (status == OrderStatus.CANCELLED) {
+            return
+        }
         if (status != OrderStatus.PLACED) {
             throw CoreException(ErrorType.BAD_REQUEST, "주문 대기 상태에서만 취소할 수 있습니다")
         }
