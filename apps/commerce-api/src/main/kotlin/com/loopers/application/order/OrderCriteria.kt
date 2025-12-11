@@ -1,5 +1,6 @@
 package com.loopers.application.order
 
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.product.ProductCommand
 import com.loopers.support.values.Money
 
@@ -9,7 +10,7 @@ class OrderCriteria {
         val usePoint: Money,
         val items: List<PlaceOrderItem>,
         val issuedCouponId: Long?,
-        val cardType: String? = null,
+        val cardType: CardType? = null,
         val cardNo: String? = null,
     ) {
         fun to(): ProductCommand.DecreaseStocks {

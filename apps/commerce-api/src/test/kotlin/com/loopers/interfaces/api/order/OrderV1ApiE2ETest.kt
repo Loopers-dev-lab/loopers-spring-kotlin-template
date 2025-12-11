@@ -5,6 +5,7 @@ import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.reset
 import com.github.tomakehurst.wiremock.client.WireMock.stubFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -78,7 +79,7 @@ class OrderV1ApiE2ETest @Autowired constructor(
             val request = OrderV1Request.PlaceOrder(
                 items = listOf(OrderV1Request.PlaceOrderItem(productId = product.id, quantity = 2)),
                 usePoint = 30000,
-                cardType = "HYUNDAI",
+                cardType = CardType.HYUNDAI,
                 cardNo = "1234-5678-9012-3456",
             )
 
@@ -101,7 +102,7 @@ class OrderV1ApiE2ETest @Autowired constructor(
             val request = OrderV1Request.PlaceOrder(
                 items = listOf(OrderV1Request.PlaceOrderItem(productId = product.id, quantity = 1)),
                 usePoint = 10000,
-                cardType = "HYUNDAI",
+                cardType = CardType.HYUNDAI,
                 cardNo = "1234-5678-9012-3456",
             )
 
@@ -123,7 +124,7 @@ class OrderV1ApiE2ETest @Autowired constructor(
             val request = OrderV1Request.PlaceOrder(
                 items = listOf(OrderV1Request.PlaceOrderItem(productId = product.id, quantity = 10)),
                 usePoint = 100000,
-                cardType = "HYUNDAI",
+                cardType = CardType.HYUNDAI,
                 cardNo = "1234-5678-9012-3456",
             )
 
@@ -144,7 +145,7 @@ class OrderV1ApiE2ETest @Autowired constructor(
             val request = OrderV1Request.PlaceOrder(
                 items = listOf(OrderV1Request.PlaceOrderItem(productId = 999L, quantity = 1)),
                 usePoint = 10000,
-                cardType = "HYUNDAI",
+                cardType = CardType.HYUNDAI,
                 cardNo = "1234-5678-9012-3456",
             )
 
@@ -163,7 +164,7 @@ class OrderV1ApiE2ETest @Autowired constructor(
             val request = OrderV1Request.PlaceOrder(
                 items = listOf(OrderV1Request.PlaceOrderItem(productId = product.id, quantity = 1)),
                 usePoint = 10000,
-                cardType = "HYUNDAI",
+                cardType = CardType.HYUNDAI,
                 cardNo = "1234-5678-9012-3456",
             )
 

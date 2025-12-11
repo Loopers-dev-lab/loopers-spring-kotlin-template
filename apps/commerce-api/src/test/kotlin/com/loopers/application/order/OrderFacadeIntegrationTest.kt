@@ -14,6 +14,7 @@ import com.loopers.domain.coupon.IssuedCouponRepository
 import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointAccount
@@ -458,7 +459,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         usePoint: Money = Money.krw(10000),
         items: List<OrderCriteria.PlaceOrderItem>,
         issuedCouponId: Long? = null,
-        cardType: String? = "HYUNDAI",
+        cardType: CardType? = CardType.HYUNDAI,
         cardNo: String? = "1234-5678-9012-3456",
     ) = OrderCriteria.PlaceOrder(
         userId = userId,

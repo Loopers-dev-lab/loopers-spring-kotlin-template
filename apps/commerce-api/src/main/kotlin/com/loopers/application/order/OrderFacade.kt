@@ -6,7 +6,6 @@ import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.CardInfo
-import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentService
@@ -50,7 +49,7 @@ class OrderFacade(
         val cardInfo = criteria.cardType?.let { cardType ->
             criteria.cardNo?.let { cardNo ->
                 CardInfo(
-                    cardType = CardType.valueOf(cardType),
+                    cardType = cardType,
                     cardNo = cardNo,
                 )
             }
