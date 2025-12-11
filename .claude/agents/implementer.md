@@ -254,8 +254,8 @@ If tests you didn't write are now failing, your changes broke existing behavior.
     - Your original milestone instruction
     - Failed test names and error messages
     - Your analysis of why the conflict occurred
-4. Use the regenerated tests to guide your design revision
-5. Repeat from 5.1
+4. Receive regenerated test skeletons with `fail("Not implemented")`
+5. Return to Step 4 (Red-Green-Refactor)
 
 After 3 failed attempts on the same regression, return failure to worker with:
 

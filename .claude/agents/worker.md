@@ -216,31 +216,37 @@ Args:
 ### On Validator Failure
 
 1. Identify which validator failed and why
-2. Create fix instruction for implementer:
+2. Determine fix type based on validator:
 
-```markdown
-## Fix Required
+| Validator             | Fix Type    | Implementer Entry Point      |
+|-----------------------|-------------|------------------------------|
+| code-style-validator  | Code fix    | Step 4 (Red-Green-Refactor)  |
+| code-reviewer         | Code fix    | Step 4 (Red-Green-Refactor)  |
+| architecture-reviewer | Code fix    | Step 4 (Red-Green-Refactor)  |
+| spec-validator        | TDD restart | Step 3 (test-case-generator) |
+| test-reviewer         | TDD restart | Step 3 (test-case-generator) |
 
-### Failed Validation
+3. Send fix instruction to implementer:
 
-[Validator name]: [Failure summary]
+For **Code fix** (Step 4):
 
-### Issues to Fix
+```
+Fix the following issues and re-validate.
+Start from Step 4 (implement fix directly, skip test-case-generator).
 
-[List specific issues from validator output]
-
-### Files to Modify
-
-[List affected files]
-
-### Expected Fix
-
-[Clear description of what needs to change]
+[Issues to fix]
+[Files to modify]
 ```
 
-3. Send fix instruction to implementer
-4. Increment retry counter
-5. Return to Step 4
+For **TDD restart** (Step 3):
+
+```
+Fix the following issues.
+Start from Step 3 (invoke test-case-generator first, then implement).
+
+[Issues to fix]
+[Spec sections to re-read]
+```
 
 ### Retry Limits
 
