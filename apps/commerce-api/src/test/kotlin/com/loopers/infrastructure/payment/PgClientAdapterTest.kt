@@ -2,7 +2,6 @@ package com.loopers.infrastructure.payment
 
 import com.loopers.domain.payment.CardInfo
 import com.loopers.domain.payment.CardType
-import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgPaymentRequest
 import com.loopers.domain.payment.PgTransaction
@@ -17,43 +16,48 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 
-class PgClientResultDecoratorTest {
+class PgClientAdapterTest {
 
-    private val delegate: PgClient = mockk()
-    private val decorator = PgClientResultDecorator(delegate)
+    private val pgGateway: PgGateway = mockk()
+    private val callbackBaseUrl = "https://callback.example.com"
+    private val adapter = PgClientAdapter(pgGateway, callbackBaseUrl)
 
     @DisplayName("requestPayment 테스트")
     @Nested
     inner class RequestPayment {
 
-        @DisplayName("0원 결제 요청 시 delegate 호출 없이 NotRequired를 반환한다")
+        @DisplayName("0원 결제 요청 시 pgGateway 호출 없이 NotRequired를 반환한다")
         @Test
-        fun `returns NotRequired without calling delegate when amount is zero`() {
+        fun `returns NotRequired without calling pgGateway when amount is zero`() {
             // given
             val request = createPaymentRequest(amount = Money.ZERO_KRW)
 
             // when
-            val result = decorator.requestPayment(request)
+            val result = adapter.requestPayment(request)
 
             // then
             assertThat(result).isEqualTo(PgPaymentCreateResult.NotRequired)
-            verify(exactly = 0) { delegate.requestPayment(any()) }
+            verify(exactly = 0) { pgGateway.requestPayment(any()) }
         }
 
-        @DisplayName("delegate 호출 성공 시 Accepted를 반환한다")
+        @DisplayName("pgGateway 호출 성공 시 Accepted를 반환한다")
         @Test
-        fun `returns Accepted when delegate call succeeds`() {
+        fun `returns Accepted when pgGateway call succeeds`() {
             // given
             val request = createPaymentRequest(amount = Money.krw(10000))
             val transactionKey = "tx_12345"
-            every { delegate.requestPayment(request) } returns PgPaymentCreateResult.Accepted(transactionKey)
+            every { pgGateway.requestPayment(any()) } returns PgPaymentResponse(
+                transactionKey = transactionKey,
+                status = "SUCCESS",
+                reason = null,
+            )
 
             // when
-            val result = decorator.requestPayment(request)
+            val result = adapter.requestPayment(request)
 
             // then
             assertThat(result).isEqualTo(PgPaymentCreateResult.Accepted(transactionKey))
-            verify(exactly = 1) { delegate.requestPayment(request) }
+            verify(exactly = 1) { pgGateway.requestPayment(any()) }
         }
 
         @DisplayName("PgResponseUncertainException 발생 시 Uncertain을 반환한다")
@@ -61,10 +65,10 @@ class PgClientResultDecoratorTest {
         fun `returns Uncertain when PgResponseUncertainException is thrown`() {
             // given
             val request = createPaymentRequest(amount = Money.krw(10000))
-            every { delegate.requestPayment(request) } throws PgResponseUncertainException("응답 불확실")
+            every { pgGateway.requestPayment(any()) } throws PgResponseUncertainException("응답 불확실")
 
             // when
-            val result = decorator.requestPayment(request)
+            val result = adapter.requestPayment(request)
 
             // then
             assertThat(result).isEqualTo(PgPaymentCreateResult.Uncertain)
@@ -75,10 +79,10 @@ class PgClientResultDecoratorTest {
         fun `returns NotReached when PgRequestNotReachedException is thrown`() {
             // given
             val request = createPaymentRequest(amount = Money.krw(10000))
-            every { delegate.requestPayment(request) } throws PgRequestNotReachedException("연결 실패")
+            every { pgGateway.requestPayment(any()) } throws PgRequestNotReachedException("연결 실패")
 
             // when
-            val result = decorator.requestPayment(request)
+            val result = adapter.requestPayment(request)
 
             // then
             assertThat(result).isEqualTo(PgPaymentCreateResult.NotReached)
@@ -89,10 +93,10 @@ class PgClientResultDecoratorTest {
         fun `returns NotReached when CallNotPermittedException is thrown`() {
             // given
             val request = createPaymentRequest(amount = Money.krw(10000))
-            every { delegate.requestPayment(request) } throws mockk<CallNotPermittedException>()
+            every { pgGateway.requestPayment(any()) } throws mockk<CallNotPermittedException>()
 
             // when
-            val result = decorator.requestPayment(request)
+            val result = adapter.requestPayment(request)
 
             // then
             assertThat(result).isEqualTo(PgPaymentCreateResult.NotReached)
@@ -103,25 +107,33 @@ class PgClientResultDecoratorTest {
     @Nested
     inner class FindTransaction {
 
-        @DisplayName("delegate로 위임하여 트랜잭션을 조회한다")
+        @DisplayName("pgGateway를 통해 트랜잭션을 조회한다")
         @Test
-        fun `delegates to delegate to find transaction`() {
+        fun `finds transaction via pgGateway`() {
             // given
             val transactionKey = "tx_12345"
+            every { pgGateway.findTransaction(transactionKey) } returns PgPaymentDetailResponse(
+                transactionKey = transactionKey,
+                orderId = "000001",
+                cardType = "SAMSUNG",
+                cardNo = "1234-5678-9012-3456",
+                amount = 10000L,
+                status = "SUCCESS",
+                reason = null,
+            )
+
+            // when
+            val result = adapter.findTransaction(transactionKey)
+
+            // then
             val expectedTransaction = PgTransaction(
                 transactionKey = transactionKey,
                 paymentId = 1L,
                 status = PgTransactionStatus.SUCCESS,
                 failureReason = null,
             )
-            every { delegate.findTransaction(transactionKey) } returns expectedTransaction
-
-            // when
-            val result = decorator.findTransaction(transactionKey)
-
-            // then
             assertThat(result).isEqualTo(expectedTransaction)
-            verify(exactly = 1) { delegate.findTransaction(transactionKey) }
+            verify(exactly = 1) { pgGateway.findTransaction(transactionKey) }
         }
     }
 
@@ -129,11 +141,23 @@ class PgClientResultDecoratorTest {
     @Nested
     inner class FindTransactionsByPaymentId {
 
-        @DisplayName("delegate로 위임하여 트랜잭션 목록을 조회한다")
+        @DisplayName("pgGateway를 통해 트랜잭션 목록을 조회한다")
         @Test
-        fun `delegates to delegate to find transactions by payment id`() {
+        fun `finds transactions by payment id via pgGateway`() {
             // given
             val paymentId = 1L
+            every { pgGateway.findTransactionsByOrderId("000001") } returns PgPaymentListResponse(
+                orderId = "000001",
+                transactions = listOf(
+                    PgTransactionSummary(transactionKey = "tx_12345", status = "SUCCESS", reason = null),
+                    PgTransactionSummary(transactionKey = "tx_67890", status = "FAILED", reason = "잔액 부족"),
+                ),
+            )
+
+            // when
+            val result = adapter.findTransactionsByPaymentId(paymentId)
+
+            // then
             val expectedTransactions = listOf(
                 PgTransaction(
                     transactionKey = "tx_12345",
@@ -148,14 +172,8 @@ class PgClientResultDecoratorTest {
                     failureReason = "잔액 부족",
                 ),
             )
-            every { delegate.findTransactionsByPaymentId(paymentId) } returns expectedTransactions
-
-            // when
-            val result = decorator.findTransactionsByPaymentId(paymentId)
-
-            // then
             assertThat(result).isEqualTo(expectedTransactions)
-            verify(exactly = 1) { delegate.findTransactionsByPaymentId(paymentId) }
+            verify(exactly = 1) { pgGateway.findTransactionsByOrderId("000001") }
         }
     }
 
