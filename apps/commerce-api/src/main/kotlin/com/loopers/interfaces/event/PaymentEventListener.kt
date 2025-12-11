@@ -2,13 +2,13 @@ package com.loopers.interfaces.event
 
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.integration.DataPlatformPublisher
-import com.loopers.domain.order.OrderEvent
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PgService
 import com.loopers.domain.payment.dto.PgCommand
 import com.loopers.domain.product.ProductService
+import com.loopers.domain.user.UserActivityEvent
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.scheduling.annotation.Async
@@ -39,8 +39,8 @@ class PaymentEventListener(
     private val orderService: OrderService,
     private val productService: ProductService,
     private val couponService: CouponService,
-    private val transactionTemplate: TransactionTemplate,
     private val dataPlatformPublisher: DataPlatformPublisher,
+    private val transactionTemplate: TransactionTemplate,
     private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
     private val log = LoggerFactory.getLogger(PaymentEventListener::class.java)
@@ -105,18 +105,34 @@ class PaymentEventListener(
         val orderDetails = orderService.getOrderDetail(event.orderId)
         productService.deductAllStock(orderDetails)
         log.info("재고 차감 완료: orderId=${event.orderId}, items=${orderDetails.size}개")
+    }
 
-        // 3. 주문 완료 이벤트 발행
-        // → OrderEventListener.handleOrderCompleted에서 데이터 플랫폼 전송 및 사용자 활동 로깅
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun handleAsyncPaymentSucceeded(event: PaymentEvent.PaymentSucceeded) {
+        log.info("결제 성공 - 데이터 플랫폼 결제 완료 정보 전송 시작: orderId=${event.orderId}, userId=${event.userId}")
+
+        // 데이터 플랫폼으로 결제 완료 정보 전송
+        try {
+            dataPlatformPublisher.send(event)
+            log.info("데이터 플랫폼 전송 완료: orderId=${event.orderId}")
+        } catch (e: Exception) {
+            log.error("데이터 플랫폼 전송 실패 (재시도 필요): orderId=${event.orderId}", e)
+            // TODO: 실패 시 재시도 큐에 추가 또는 Dead Letter Queue로 전송
+        }
+
+        // 사용자 활동 로깅 이벤트 발행
         applicationEventPublisher.publishEvent(
-            OrderEvent.OrderCompleted(
-                orderId = event.orderId,
+            UserActivityEvent.UserActivity(
                 userId = event.userId,
-                totalAmount = event.totalAmount,
-                items = orderDetails,
+                activityType = UserActivityEvent.ActivityType.ORDER_COMPLETED,
+                targetId = event.orderId,
+                metadata = mapOf(
+                    "totalAmount" to event.totalAmount,
+                ),
             ),
         )
-        log.debug("주문 완료 이벤트 발행 완료: orderId=${event.orderId}")
+        log.debug("사용자 활동 로깅 이벤트 발행 완료: orderId=${event.orderId}")
     }
 
     /**
@@ -144,16 +160,31 @@ class PaymentEventListener(
         } else {
             log.debug("쿠폰 미사용 주문 - 롤백 스킵: orderId=${event.orderId}")
         }
+    }
 
-        // 3. 주문 실패 이벤트 발행
-        // → OrderEventListener.handleOrderFailed에서 데이터 플랫폼 전송 및 사용자 활동 로깅
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun handleAsyncPaymentFailed(event: PaymentEvent.PaymentFailed) {
+        log.info("결제 실패 - 데이터 플랫폼 결제 실패 정보 전송 시작: orderId=${event.orderId}, userId=${event.userId}, reason=${event.reason}")
+
+        // 데이터 플랫폼으로 결제 완료 정보 전송
+        try {
+            dataPlatformPublisher.send(event)
+            log.info("데이터 플랫폼 전송 완료: orderId=${event.orderId}")
+        } catch (e: Exception) {
+            log.error("데이터 플랫폼 전송 실패 (재시도 필요): orderId=${event.orderId}", e)
+            // TODO: 실패 시 재시도 큐에 추가 또는 Dead Letter Queue로 전송
+        }
+
+        // 사용자 활동 로깅 이벤트 발행
         applicationEventPublisher.publishEvent(
-            OrderEvent.OrderFailed(
-                orderId = event.orderId,
+            UserActivityEvent.UserActivity(
                 userId = event.userId,
-                reason = event.reason,
+                activityType = UserActivityEvent.ActivityType.ORDER_FAILED,
+                targetId = event.orderId,
+                metadata = mapOf("reason" to (event.reason ?: "unknown")),
             ),
         )
-        log.debug("주문 실패 이벤트 발행 완료: orderId=${event.orderId}")
+        log.debug("사용자 활동 로깅 이벤트 발행 완료: orderId=${event.orderId}")
     }
 }

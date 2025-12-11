@@ -73,15 +73,6 @@ class OrderEventListener(
     fun handleOrderCreatedForUserActivity(event: OrderEvent.OrderCreated) {
         log.info("주문 생성 후처리 시작: orderId=${event.orderId}")
 
-        // 데이터 플랫폼으로 주문 정보 전송 (비동기 외부 I/O)
-        try {
-            dataPlatformPublisher.send(event)
-            log.info("데이터 플랫폼 전송 완료: orderId=${event.orderId}")
-        } catch (e: Exception) {
-            log.error("데이터 플랫폼 전송 실패 (재시도 필요): orderId=${event.orderId}", e)
-            // TODO: 실패 시 재시도 큐에 추가 또는 Dead Letter Queue로 전송
-        }
-
         // 사용자 활동 로깅 이벤트 발행
         applicationEventPublisher.publishEvent(
             UserActivityEvent.UserActivity(
@@ -125,7 +116,6 @@ class OrderEventListener(
                 targetId = event.orderId,
                 metadata = mapOf(
                     "totalAmount" to event.totalAmount,
-                    "itemCount" to event.items.size,
                 ),
             ),
         )
