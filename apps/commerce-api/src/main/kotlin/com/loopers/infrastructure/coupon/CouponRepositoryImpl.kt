@@ -14,5 +14,8 @@ class CouponRepositoryImpl(private val couponJpaRepository: CouponJpaRepository)
     ): CouponModel = couponJpaRepository.findNotUsedByCouponIdWithPessimisticLock(couponId, userId)
         ?: throw CoreException(ErrorType.NOT_FOUND, "사용 가능한 쿠폰이 존재하지 않습니다.")
 
+    override fun findByCouponIdAndUserId(couponId: Long, userId: Long): CouponModel? =
+        couponJpaRepository.findByIdAndRefUserIdAndIsUsed(couponId, userId, false)
+
     override fun save(couponModel: CouponModel): CouponModel = couponJpaRepository.save(couponModel)
 }
