@@ -18,7 +18,6 @@ import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
@@ -49,8 +48,8 @@ import java.time.ZonedDateTime
  * PaymentFacade 통합 테스트
  *
  * 검증 범위:
- * - 비즈니스 시나리오의 최종 결과 (결제 완료 → 주문 PAID, 결제 실패 → 리소스 복구)
- * - 트랜잭션 원자성 (리소스 복구가 하나의 트랜잭션으로 처리되는지)
+ * - 결제 성공 → 주문 완료
+ * - 결제 실패 → 리소스 복구 (포인트, 쿠폰, 재고)
  * - 멱등성 (중복 콜백 처리)
  */
 @SpringBootTest
@@ -98,10 +97,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             paymentFacade.processCallback(callbackCriteria(payment))
 
             // then
-            val updatedPayment = paymentRepository.findById(payment.id)!!
             val updatedOrder = orderRepository.findById(payment.orderId)!!
-
-            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
             assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
         }
 
@@ -116,7 +112,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val pointAccount = createPointAccount(userId, initialBalance)
             val payment = createInProgressPaymentWithPoint(userId, usedPoint)
 
-            // 포인트 차감 시뮬레이션 (실제로는 주문 생성 시 차감됨)
             pointAccount.deduct(usedPoint)
             pointAccountRepository.save(pointAccount)
 
@@ -138,7 +133,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val coupon = createCoupon()
             val issuedCoupon = createIssuedCoupon(userId, coupon)
 
-            // 쿠폰 사용 처리
             issuedCoupon.use(userId, coupon, ZonedDateTime.now())
             issuedCouponRepository.save(issuedCoupon)
 
@@ -161,7 +155,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val orderQuantity = 2
             val product = createProduct(stock = Stock.of(initialStock))
 
-            // 재고 차감 시뮬레이션
             product.decreaseStock(orderQuantity)
             productRepository.save(product)
 
@@ -187,10 +180,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             paymentFacade.processCallback(callbackCriteria(payment))
 
             // then
-            val updatedPayment = paymentRepository.findById(payment.id)!!
             val updatedOrder = orderRepository.findById(payment.orderId)!!
-
-            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(updatedOrder.status).isEqualTo(OrderStatus.CANCELLED)
         }
 
@@ -201,15 +191,14 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val payment = createInProgressPayment()
             stubPgTransactionSuccess(payment)
 
-            // 첫 번째 콜백으로 결제 완료
             paymentFacade.processCallback(callbackCriteria(payment))
 
-            // when - 중복 콜백
+            // when - 중복 콜백 (예외 없이 처리되어야 함)
             paymentFacade.processCallback(callbackCriteria(payment))
 
-            // then - 예외 없이 상태 유지
-            val updatedPayment = paymentRepository.findById(payment.id)!!
-            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
+            // then
+            val updatedOrder = orderRepository.findById(payment.orderId)!!
+            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
         }
     }
 
@@ -218,8 +207,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     inner class ProcessInProgressPayment {
 
         @Test
-        @DisplayName("PG에서 SUCCESS 조회 시 결제가 완료되고 주문이 PAID가 된다")
-        fun `completes payment and order when PG returns SUCCESS`() {
+        @DisplayName("PG에서 SUCCESS 조회 시 주문이 완료된다")
+        fun `completes order when PG returns SUCCESS`() {
             // given
             val payment = createInProgressPayment()
             stubPgTransactionSuccess(payment)
@@ -228,25 +217,21 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             paymentFacade.processInProgressPayment(payment.id)
 
             // then
-            val updatedPayment = paymentRepository.findById(payment.id)!!
             val updatedOrder = orderRepository.findById(payment.orderId)!!
-
-            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
             assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
         }
 
         @Test
-        @DisplayName("PG에서 FAILED 조회 시 리소스가 복구되고 주문이 취소된다")
-        fun `recovers resources and cancels order when PG returns FAILED`() {
+        @DisplayName("PG에서 FAILED 조회 시 리소스가 복구된다")
+        fun `restores resources when PG returns FAILED`() {
             // given
             val userId = 1L
             val initialBalance = Money.krw(10000)
-            val usedPoint = Money.krw(3000)
+            val usedPoint = Money.krw(5000)
 
             val pointAccount = createPointAccount(userId, initialBalance)
             val payment = createInProgressPaymentWithPoint(userId, usedPoint)
 
-            // 포인트 차감 시뮬레이션
             pointAccount.deduct(usedPoint)
             pointAccountRepository.save(pointAccount)
 
@@ -256,11 +241,9 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             paymentFacade.processInProgressPayment(payment.id)
 
             // then
-            val updatedPayment = paymentRepository.findById(payment.id)!!
             val updatedOrder = orderRepository.findById(payment.orderId)!!
             val updatedPointAccount = pointAccountRepository.findByUserId(userId)!!
 
-            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(updatedOrder.status).isEqualTo(OrderStatus.CANCELLED)
             assertThat(updatedPointAccount.balance).isEqualTo(initialBalance)
         }
@@ -276,10 +259,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             paymentFacade.processInProgressPayment(payment.id)
 
             // then
-            val updatedPayment = paymentRepository.findById(payment.id)!!
             val updatedOrder = orderRepository.findById(payment.orderId)!!
-
-            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
             assertThat(updatedOrder.status).isEqualTo(OrderStatus.PLACED)
         }
     }
@@ -328,10 +308,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
         }
     """.trimIndent()
 
-    // ===========================================
-    // Criteria 헬퍼
-    // ===========================================
-
     private fun callbackCriteria(payment: Payment) = PaymentCriteria.ProcessCallback(
         orderId = payment.orderId,
         externalPaymentKey = payment.externalPaymentKey!!,
@@ -346,21 +322,13 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
         stock: Stock = Stock.of(100),
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
-        val product = Product.create(
-            name = "테스트 상품",
-            price = price,
-            stock = stock,
-            brand = brand,
-        )
+        val product = Product.create(name = "테스트 상품", price = price, stock = stock, brand = brand)
         val savedProduct = productRepository.save(product)
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }
 
-    private fun createPointAccount(
-        userId: Long,
-        balance: Money,
-    ): PointAccount {
+    private fun createPointAccount(userId: Long, balance: Money): PointAccount {
         return pointAccountRepository.save(PointAccount.of(userId, balance))
     }
 

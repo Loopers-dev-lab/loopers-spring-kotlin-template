@@ -19,6 +19,14 @@ class OrderV1Request {
             description = "사용할 발급된 쿠폰 ID (선택)",
         )
         val issuedCouponId: Long? = null,
+        @field:Schema(
+            description = "카드 종류 (예: HYUNDAI, SAMSUNG 등)",
+        )
+        val cardType: String? = null,
+        @field:Schema(
+            description = "카드 번호 (예: 1234-5678-9012-3456)",
+        )
+        val cardNo: String? = null,
     ) {
         fun toCriteria(userId: Long): OrderCriteria.PlaceOrder {
             return OrderCriteria.PlaceOrder(
@@ -26,6 +34,8 @@ class OrderV1Request {
                 items = items.map { it.toCriteria() },
                 usePoint = usePoint?.let { Money.krw(it) } ?: Money.ZERO_KRW,
                 issuedCouponId = issuedCouponId,
+                cardType = cardType,
+                cardNo = cardNo,
             )
         }
     }
