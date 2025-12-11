@@ -46,8 +46,7 @@ class OrderFacade(
         val payment = allocationResult.payment
         updateProductCache(allocationResult.productViews)
 
-        // 2. PG 결제 요청 (0원 결제도 동일한 플로우)
-        // 카드 정보는 0원 결제가 아닌 경우에만 필요
+        // 2. PG 결제 요청
         val cardInfo = criteria.cardType?.let { cardType ->
             criteria.cardNo?.let { cardNo ->
                 CardInfo(
@@ -59,26 +58,21 @@ class OrderFacade(
         val result = paymentService.requestPgPayment(payment.id, cardInfo)
 
         // 3. 결과에 따른 후속 처리
-        return when (result) {
-            is PgPaymentResult.Success -> {
-                OrderInfo.PlaceOrder(
-                    orderId = allocationResult.orderId,
-                    paymentId = payment.id,
-                    paymentStatus = result.payment.status,
-                )
+        if (result is PgPaymentResult.Failed) {
+            retryTemplate.execute<Unit, Exception> {
+                recoverResources(result.payment)
             }
-
-            is PgPaymentResult.Failed -> {
-                // 보상 트랜잭션 (with retry)
-                retryTemplate.execute<Unit, Exception> {
-                    recoverResources(result.payment)
-                }
-                throw CoreException(
-                    ErrorType.INTERNAL_ERROR,
-                    "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
-                )
-            }
+            throw CoreException(
+                ErrorType.INTERNAL_ERROR,
+                "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
+            )
         }
+
+        return OrderInfo.PlaceOrder(
+            orderId = allocationResult.orderId,
+            paymentId = payment.id,
+            paymentStatus = payment.status,
+        )
     }
 
     /**
