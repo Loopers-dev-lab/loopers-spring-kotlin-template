@@ -1,5 +1,7 @@
 package com.loopers.interfaces.api.order
 
+import com.loopers.domain.payment.PgClient
+import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -13,8 +15,10 @@ import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
+import com.ninjasquad.springmockk.MockkBean
+import io.mockk.every
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -41,10 +45,17 @@ class OrderV1ApiE2ETest @Autowired constructor(
     private val redisCleanUp: RedisCleanUp,
 ) {
 
-    @AfterEach
-    fun tearDown() {
+    @MockkBean
+    private lateinit var pgClient: PgClient
+
+    @BeforeEach
+    fun setup() {
         databaseCleanUp.truncateAllTables()
         redisCleanUp.truncateAll()
+
+        every {
+            pgClient.requestPayment(any())
+        } returns PgPaymentCreateResult.Accepted("tx_test_key")
     }
 
     @DisplayName("POST /api/v1/orders")
