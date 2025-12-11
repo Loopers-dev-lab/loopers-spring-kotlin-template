@@ -173,5 +173,14 @@ or weekly design docs in `docs/`.
 
 ## Tool Usage
 
-- **Serena**: Use for file navigation, symbol search, and code modifications
-- **Context7**: Use for library documentation lookup when implementing with external libraries
+### Serena MCP
+
+Prefer Serena for semantic code operations:
+
+- Understanding codebase structure (`get_symbols_overview`)
+- Finding symbols and their relationships (`find_symbol`, `find_referencing_symbols`)
+- Navigating complex code paths
+
+### Context7
+
+Use for external library documentation lookup before implementing integrations.

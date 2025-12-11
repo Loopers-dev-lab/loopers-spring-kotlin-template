@@ -325,6 +325,50 @@ class CouponServiceIntegrationTest @Autowired constructor(
         }
     }
 
+    @DisplayName("쿠폰 사용 취소 통합테스트")
+    @Nested
+    inner class CancelCouponUse {
+
+        @DisplayName("사용된 쿠폰의 사용을 취소할 수 있다")
+        @Test
+        fun `cancel coupon use successfully`() {
+            // given
+            val userId = 1L
+            val coupon = createCoupon()
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            // 쿠폰 사용
+            val couponEntity = couponRepository.findById(coupon.id)!!
+            issuedCoupon.use(userId, couponEntity, FIXED_TIME)
+            issuedCouponRepository.save(issuedCoupon)
+
+            // when
+            couponService.cancelCouponUse(issuedCoupon.id)
+
+            // then
+            val updatedIssuedCoupon = issuedCouponRepository.findById(issuedCoupon.id)
+            assertAll(
+                { assertThat(updatedIssuedCoupon?.status).isEqualTo(UsageStatus.AVAILABLE) },
+                { assertThat(updatedIssuedCoupon?.usedAt).isNull() },
+            )
+        }
+
+        @DisplayName("존재하지 않는 쿠폰의 사용을 취소하려고 하면 예외가 발생한다")
+        @Test
+        fun `throw exception when canceling non-existent coupon`() {
+            // given
+            val nonExistentIssuedCouponId = 999L
+
+            // when
+            val exception = assertThrows<CoreException> {
+                couponService.cancelCouponUse(nonExistentIssuedCouponId)
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+        }
+    }
+
     private fun createCoupon(
         name: String = "테스트 쿠폰",
         discountType: DiscountType = DiscountType.FIXED_AMOUNT,

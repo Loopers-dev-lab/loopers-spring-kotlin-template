@@ -2,12 +2,12 @@ server:
   shutdown: graceful
   tomcat:
     threads:
-      max: 200 # 최대 워커 스레드 수 (default : 200)
-      min-spare: 10 # 최소 유지 스레드 수 (default : 10)
-    connection-timeout: 1m # 연결 타임아웃 (ms) (default : 60000ms = 1m)
-    max-connections: 8192 # 최대 동시 연결 수 (default : 8192)
-    accept-count: 100 # 대기 큐 크기 (default : 100)
-    keep-alive-timeout: 60s # 60s
+      max: 200
+      min-spare: 10
+    connection-timeout: 1m
+    max-connections: 8192
+    accept-count: 100
+    keep-alive-timeout: 60s
   max-http-request-header-size: 8KB
 
 spring:
@@ -15,6 +15,10 @@ spring:
     web-application-type: servlet
   application:
     name: commerce-api
+  task:
+    scheduling:
+      pool:
+        size: 1  # 동일 @Scheduled 메서드의 동시 실행 방지
   profiles:
     active: local
   config:
@@ -23,11 +27,74 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+  cloud:
+    openfeign:
+      client:
+        config:
+          pg-payment:
+            connect-timeout: 1000
+            read-timeout: 1000
+          pg-query:
+            connect-timeout: 1000
+            read-timeout: 500
 
 springdoc:
   use-fqn: true
   swagger-ui:
     path: /swagger-ui.html
+
+pg:
+  base-url: http://localhost:8081
+  callback-base-url: http://localhost:8080
+  merchant-id: loopers-commerce
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      pg-base:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 30
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 700ms
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - com.loopers.infrastructure.payment.PgRequestNotReachedException
+          - com.loopers.infrastructure.payment.PgResponseUncertainException
+    instances:
+      pg-payment:
+        base-config: pg-base
+      pg-query:
+        base-config: pg-base
+        sliding-window-size: 5
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 20
+        slow-call-duration-threshold: 400ms
+    circuit-breaker-aspect-order: 1
+
+  retry:
+    configs:
+      pg-base:
+        max-attempts: 4
+        wait-duration: 100ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        exponential-max-wait-duration: 1s
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.1
+        retry-exceptions:
+          - com.loopers.infrastructure.payment.PgRequestNotReachedException
+        ignore-exceptions:
+          - com.loopers.infrastructure.payment.PgResponseUncertainException
+    instances:
+      pg-payment:
+        base-config: pg-base
+      pg-query:
+        base-config: pg-base
+        max-attempts: 2
+    retry-aspect-order: 2
 
 ---
 spring:

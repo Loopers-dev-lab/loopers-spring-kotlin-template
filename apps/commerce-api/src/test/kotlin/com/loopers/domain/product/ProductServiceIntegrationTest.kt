@@ -246,6 +246,57 @@ class ProductServiceIntegrationTest @Autowired constructor(
         }
     }
 
+    @DisplayName("재고 증가 통합테스트")
+    @Nested
+    inner class IncreaseStocks {
+
+        @DisplayName("재고를 복구할 수 있다")
+        @Test
+        fun `increase stock successfully`() {
+            // given
+            val brand = brandRepository.save(Brand.of("브랜드"))
+            val product = createProduct(brandId = brand.id, stock = Stock.of(50))
+
+            val command = ProductCommand.IncreaseStocks(
+                units = listOf(
+                    ProductCommand.IncreaseStockUnit(productId = product.id, amount = 30),
+                ),
+            )
+
+            // when
+            productService.increaseStocks(command)
+
+            // then
+            val updatedProduct = productRepository.findById(product.id)
+            assertThat(updatedProduct?.stock).isEqualTo(Stock.of(80))
+        }
+
+        @DisplayName("여러 상품의 재고를 한 번에 복구할 수 있다")
+        @Test
+        fun `increase stocks for multiple products`() {
+            // given
+            val brand = brandRepository.save(Brand.of("브랜드"))
+            val product1 = createProduct(brandId = brand.id, name = "상품1", stock = Stock.of(10))
+            val product2 = createProduct(brandId = brand.id, name = "상품2", stock = Stock.of(20))
+
+            val command = ProductCommand.IncreaseStocks(
+                units = listOf(
+                    ProductCommand.IncreaseStockUnit(productId = product1.id, amount = 5),
+                    ProductCommand.IncreaseStockUnit(productId = product2.id, amount = 15),
+                ),
+            )
+
+            // when
+            productService.increaseStocks(command)
+
+            // then
+            assertAll(
+                { assertThat(productRepository.findById(product1.id)?.stock).isEqualTo(Stock.of(15)) },
+                { assertThat(productRepository.findById(product2.id)?.stock).isEqualTo(Stock.of(35)) },
+            )
+        }
+    }
+
     @DisplayName("여러 상품 상세 조회 통합테스트")
     @Nested
     inner class FindAllProductViewByIds {

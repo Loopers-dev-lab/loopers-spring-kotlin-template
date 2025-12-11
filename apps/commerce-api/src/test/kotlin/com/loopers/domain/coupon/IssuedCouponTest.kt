@@ -120,6 +120,48 @@ class IssuedCouponTest {
         }
     }
 
+    @DisplayName("쿠폰 사용 취소")
+    @Nested
+    inner class CancelUseTest {
+
+        @DisplayName("사용된 쿠폰을 취소하면 AVAILABLE 상태로 변경되고 usedAt이 null이 된다")
+        @Test
+        fun `cancel used coupon successfully`() {
+            // given
+            val userId = 1L
+            val coupon = createCoupon()
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+            issuedCoupon.use(userId, coupon, FIXED_TIME)
+
+            // when
+            issuedCoupon.cancelUse()
+
+            // then
+            assertAll(
+                { assertThat(issuedCoupon.status).isEqualTo(UsageStatus.AVAILABLE) },
+                { assertThat(issuedCoupon.usedAt).isNull() },
+            )
+        }
+
+        @DisplayName("사용되지 않은 쿠폰을 취소하면 예외가 발생한다")
+        @Test
+        fun `throw exception when canceling unused coupon`() {
+            // given
+            val userId = 1L
+            val coupon = createCoupon()
+            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
+
+            // when
+            val exception = assertThrows<CoreException> {
+                issuedCoupon.cancelUse()
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("사용되지 않은 쿠폰입니다")
+        }
+    }
+
     private fun createIssuedCoupon(
         userId: Long = 1L,
         coupon: Coupon = createCoupon(),

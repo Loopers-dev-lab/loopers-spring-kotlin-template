@@ -170,4 +170,29 @@ class ProductService(
     fun decreaseProductLikeCount(productId: Long) {
         productStatisticRepository.decreaseLikeCountBy(productId)
     }
+
+    /**
+     * 재고를 복구합니다. 결제 실패 시 감소했던 재고를 되돌립니다.
+     *
+     * @param command 복구할 재고 정보 (productId, amount)
+     */
+    @Transactional
+    fun increaseStocks(command: ProductCommand.IncreaseStocks) {
+        val increaseStockMap = command.units.associateBy { it.productId }
+
+        val increaseProductIds = increaseStockMap.keys.toList()
+        val lockedProducts = productRepository.findAllByIdsWithLock(increaseProductIds)
+
+        lockedProducts.forEach { product ->
+            val increasedStock = increaseStockMap[product.id]
+                ?: throw CoreException(
+                    errorType = ErrorType.BAD_REQUEST,
+                    customMessage = "[productId = ${product.id}] 상품의 재고를 증가할 수 없습니다.",
+                )
+
+            product.increaseStock(increasedStock.amount)
+        }
+
+        productRepository.saveAll(lockedProducts)
+    }
 }

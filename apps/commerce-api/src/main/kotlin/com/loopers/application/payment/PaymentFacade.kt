@@ -1,0 +1,127 @@
+package com.loopers.application.payment
+
+import com.loopers.domain.coupon.CouponService
+import com.loopers.domain.order.OrderService
+import com.loopers.domain.payment.ConfirmResult
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.point.PointService
+import com.loopers.domain.product.ProductCommand
+import com.loopers.domain.product.ProductService
+import com.loopers.infrastructure.payment.PgRequestNotReachedException
+import com.loopers.support.values.Money
+import org.springframework.data.domain.Slice
+import org.springframework.orm.ObjectOptimisticLockingFailureException
+import org.springframework.retry.support.RetryTemplate
+import org.springframework.stereotype.Component
+import org.springframework.transaction.support.TransactionTemplate
+
+/**
+ * 결제 관련 비즈니스 로직을 오케스트레이션하는 Facade
+ *
+ * - IN_PROGRESS 결제 조회
+ * - PG 콜백 처리 후 후속 처리
+ * - 보상 트랜잭션 관리
+ */
+@Component
+class PaymentFacade(
+    private val paymentService: PaymentService,
+    private val orderService: OrderService,
+    private val pointService: PointService,
+    private val couponService: CouponService,
+    private val productService: ProductService,
+    private val transactionTemplate: TransactionTemplate,
+    private val retryTemplate: RetryTemplate = RetryTemplate.builder()
+        .maxAttempts(2)
+        .uniformRandomBackoff(100, 500)
+        .retryOn(ObjectOptimisticLockingFailureException::class.java)
+        .build(),
+) {
+    /**
+     * 결제 목록을 조회합니다.
+     * pagination과 동적 조건(status)을 지원합니다.
+     *
+     * @param criteria 조회 조건 (page, size, sort, statuses)
+     * @return Slice<Payment> 결제 목록
+     */
+    fun findPayments(criteria: PaymentCriteria.FindPayments): Slice<Payment> {
+        return paymentService.findPayments(criteria.toCommand())
+    }
+
+    /**
+     * PG 콜백을 처리합니다.
+     * PaymentService에 처리를 위임하고, 결과에 따라 후속 처리를 수행합니다.
+     *
+     * @param criteria 콜백 처리 파라미터 (orderId, externalPaymentKey)
+     */
+    fun processCallback(criteria: PaymentCriteria.ProcessCallback) {
+        when (
+            val result = paymentService.processCallback(
+                orderId = criteria.orderId,
+                externalPaymentKey = criteria.externalPaymentKey,
+            )
+        ) {
+            is ConfirmResult.Paid -> {
+                retryTemplate.execute<Unit, Exception> {
+                    orderService.completePayment(result.payment.orderId)
+                }
+            }
+            is ConfirmResult.Failed -> {
+                retryTemplate.execute<Unit, Exception> {
+                    recoverResources(result.payment)
+                }
+            }
+            is ConfirmResult.StillInProgress -> {
+                // 아직 미확정, 스케줄러가 나중에 처리
+            }
+        }
+    }
+
+    /**
+     * IN_PROGRESS 상태의 결제를 처리합니다.
+     * 스케줄러에서 호출됩니다.
+     *
+     * @param paymentId 처리할 결제 ID
+     * @throws PgRequestNotReachedException PG 연결 실패 시
+     */
+    fun processInProgressPayment(paymentId: Long) {
+        when (val result = paymentService.processInProgressPayment(paymentId)) {
+            is ConfirmResult.Paid -> {
+                retryTemplate.execute<Unit, Exception> {
+                    orderService.completePayment(result.payment.orderId)
+                }
+            }
+            is ConfirmResult.Failed -> {
+                retryTemplate.execute<Unit, Exception> {
+                    recoverResources(result.payment)
+                }
+            }
+            is ConfirmResult.StillInProgress -> {
+                // 아직 미확정, 다음 스케줄링에서 재시도
+            }
+        }
+    }
+
+    /**
+     * 결제 실패 시 리소스를 복구합니다.
+     * - 포인트 복구
+     * - 쿠폰 사용 취소
+     * - 재고 복구
+     */
+    private fun recoverResources(payment: Payment) {
+        transactionTemplate.execute { _ ->
+            if (payment.usedPoint > Money.ZERO_KRW) {
+                pointService.restore(payment.userId, payment.usedPoint)
+            }
+            payment.issuedCouponId?.let { couponId ->
+                couponService.cancelCouponUse(couponId)
+            }
+            val order = orderService.findById(payment.orderId)
+            val increaseUnits = order.orderItems.map {
+                ProductCommand.IncreaseStockUnit(productId = it.productId, amount = it.quantity)
+            }
+            productService.increaseStocks(ProductCommand.IncreaseStocks(units = increaseUnits))
+            orderService.cancelOrder(payment.orderId)
+        }
+    }
+}

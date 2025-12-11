@@ -5,17 +5,19 @@ import com.loopers.cache.CacheTemplate
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
 import com.loopers.domain.order.OrderService
+import com.loopers.domain.payment.CardInfo
+import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentCommand
+import com.loopers.domain.payment.PaymentService
+import com.loopers.domain.payment.PgPaymentResult
 import com.loopers.domain.point.PointService
+import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
+import com.loopers.domain.product.ProductView
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
-import jakarta.annotation.PostConstruct
-import org.slf4j.LoggerFactory
 import org.springframework.orm.ObjectOptimisticLockingFailureException
-import org.springframework.retry.RetryCallback
-import org.springframework.retry.RetryContext
-import org.springframework.retry.RetryListener
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
@@ -26,99 +28,159 @@ class OrderFacade(
     val orderService: OrderService,
     val pointService: PointService,
     val couponService: CouponService,
+    val paymentService: PaymentService,
     private val transactionTemplate: TransactionTemplate,
     private val cacheTemplate: CacheTemplate,
+    private val retryTemplate: RetryTemplate = RetryTemplate.builder()
+        .maxAttempts(2)
+        .uniformRandomBackoff(100, 500)
+        .retryOn(ObjectOptimisticLockingFailureException::class.java)
+        .build(),
 ) {
-    private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
-    private lateinit var retryTemplate: RetryTemplate
+    fun placeOrder(criteria: OrderCriteria.PlaceOrder): OrderInfo.PlaceOrder {
+        // 1. 리소스 할당 (with retry)
+        val allocationResult = retryTemplate.execute<ResourceAllocationResult, Exception> {
+            allocateResources(criteria)
+        }
+        val payment = allocationResult.payment
+        updateProductCache(allocationResult.productViews)
 
-    @PostConstruct
-    fun init() {
-        this.retryTemplate = RetryTemplate.builder()
-            .maxAttempts(2)
-            .uniformRandomBackoff(100, 500)
-            .retryOn(ObjectOptimisticLockingFailureException::class.java)
-            .withListener(
-                object : RetryListener {
-                    override fun <T : Any?, E : Throwable?> onError(
-                        context: RetryContext,
-                        callback: RetryCallback<T, E>,
-                        throwable: Throwable,
-                    ) {
-                        if (throwable is ObjectOptimisticLockingFailureException) {
-                            logger.warn(
-                                "낙관적 락 충돌 발생 - 재시도 횟수: {}",
-                                context.retryCount,
-                            )
-                        }
-                    }
-                },
+        // 2. PG 결제 요청
+        val cardInfo = criteria.cardType?.let { cardType ->
+            criteria.cardNo?.let { cardNo ->
+                CardInfo(
+                    cardType = cardType,
+                    cardNo = cardNo,
+                )
+            }
+        }
+        val result = paymentService.requestPgPayment(PaymentCommand.RequestPgPayment(payment.id, cardInfo))
+
+        // 3. 결과에 따른 후속 처리
+        if (result is PgPaymentResult.Failed) {
+            retryTemplate.execute<Unit, Exception> {
+                recoverResources(result.payment)
+            }
+            throw CoreException(
+                ErrorType.INTERNAL_ERROR,
+                "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
             )
-            .build()
+        }
+
+        return OrderInfo.PlaceOrder(
+            orderId = allocationResult.orderId,
+            paymentId = payment.id,
+            paymentStatus = payment.status,
+        )
     }
 
-    fun placeOrder(criteria: OrderCriteria.PlaceOrder): OrderInfo.PlaceOrder {
-        return retryTemplate.execute<OrderInfo.PlaceOrder, Exception> {
-            // 매 재시도마다 새로운 트랜잭션 시작
-            val (orderInfo, productViews) = transactionTemplate.execute { _ ->
-                // 1. 재고 차감
-                val productIds = criteria.items.map { it.productId }
-                productService.decreaseStocks(criteria.to())
+    /**
+     * TX1: 리소스 할당
+     * - 재고 차감
+     * - 쿠폰 사용
+     * - 포인트 차감
+     * - PENDING 결제 생성
+     * - 주문 생성
+     */
+    private fun allocateResources(criteria: OrderCriteria.PlaceOrder): ResourceAllocationResult {
+        return transactionTemplate.execute { _ ->
+            // 1. 재고 차감
+            val productIds = criteria.items.map { it.productId }
+            productService.decreaseStocks(criteria.to())
 
-                // 2. 재고가 변경된 상품의 최신 정보 조회
-                val productViews = productService.findAllProductViewByIds(productIds)
+            // 2. 재고가 변경된 상품의 최신 정보 조회
+            val productViews = productService.findAllProductViewByIds(productIds)
 
-                // 3. 주문 생성을 위한 상품 맵 생성
-                val productMap = productViews.map { it.product }.associateBy { it.id }
+            // 3. 주문 생성을 위한 상품 맵 생성
+            val productMap = productViews.map { it.product }.associateBy { it.id }
 
-                val placeOrderItems = criteria.items.map { item ->
-                    val product = productMap[item.productId]
-                        ?: throw CoreException(ErrorType.INTERNAL_ERROR, "상품을 찾을 수 없습니다.")
+            val placeOrderItems = criteria.items.map { item ->
+                val product = productMap[item.productId]
+                    ?: throw CoreException(ErrorType.INTERNAL_ERROR, "상품을 찾을 수 없습니다.")
 
-                    OrderCommand.PlaceOrderItem(
-                        productId = item.productId,
-                        quantity = item.quantity,
-                        currentPrice = product.price,
-                        productName = product.name,
-                    )
-                }
-
-                val placeCommand = OrderCommand.PlaceOrder(
-                    userId = criteria.userId,
-                    items = placeOrderItems,
+                OrderCommand.PlaceOrderItem(
+                    productId = item.productId,
+                    quantity = item.quantity,
+                    currentPrice = product.price,
+                    productName = product.name,
                 )
+            }
 
-                val order = orderService.place(placeCommand)
+            val placeCommand = OrderCommand.PlaceOrder(
+                userId = criteria.userId,
+                items = placeOrderItems,
+            )
 
-                // 4. 주문 금액에서 쿠폰 할인 적용 (있는 경우)
-                val orderAmount = order.totalAmount
-                val couponDiscount = criteria.issuedCouponId?.let { issuedCouponId ->
-                    couponService.useCoupon(criteria.userId, issuedCouponId, orderAmount)
-                } ?: Money.ZERO_KRW
+            val order = orderService.place(placeCommand)
 
-                // 5. 포인트 차감 (0원 초과인 경우에만)
-                if (criteria.usePoint > Money.ZERO_KRW) {
-                    pointService.deduct(criteria.userId, criteria.usePoint)
-                }
+            // 4. 주문 금액에서 쿠폰 할인 적용 (있는 경우)
+            val orderAmount = order.totalAmount
+            val couponDiscount = criteria.issuedCouponId?.let { issuedCouponId ->
+                couponService.useCoupon(criteria.userId, issuedCouponId, orderAmount)
+            } ?: Money.ZERO_KRW
 
-                // 6. 결제 처리
-                val payCommand = OrderCommand.Pay(
-                    orderId = order.id,
+            // 5. 포인트 차감 (0원 초과인 경우에만)
+            if (criteria.usePoint > Money.ZERO_KRW) {
+                pointService.deduct(criteria.userId, criteria.usePoint)
+            }
+
+            // 6. PENDING 결제 생성 (paidAmount = totalAmount - usePoint - couponDiscount 자동 계산)
+            val payment = paymentService.create(
+                PaymentCommand.Create(
                     userId = criteria.userId,
-                    usePoint = criteria.usePoint,
+                    orderId = order.id,
+                    totalAmount = order.totalAmount,
+                    usedPoint = criteria.usePoint,
                     issuedCouponId = criteria.issuedCouponId,
                     couponDiscount = couponDiscount,
-                )
+                ),
+            )
 
-                orderService.pay(payCommand)
+            // 결제는 PENDING 상태로 유지, PG 결과 수신 후 initiate()로 IN_PROGRESS 전이
+            ResourceAllocationResult(
+                orderId = order.id,
+                payment = payment,
+                productViews = productViews,
+            )
+        }!!
+    }
 
-                OrderInfo.PlaceOrder(order.id) to productViews
-            }!!
-            val productCacheKeys = productViews
-                .associateBy { ProductCacheKeys.ProductDetail(productId = it.product.id) }
-            cacheTemplate.putAll(productCacheKeys)
+    /**
+     * 상품 캐시 업데이트
+     */
+    private fun updateProductCache(productViews: List<ProductView>) {
+        val productCacheKeys = productViews
+            .associateBy { ProductCacheKeys.ProductDetail(productId = it.product.id) }
+        cacheTemplate.putAll(productCacheKeys)
+    }
 
-            orderInfo
+    /**
+     * 리소스 복구 (포인트, 쿠폰, 재고)
+     */
+    private fun recoverResources(payment: Payment) {
+        transactionTemplate.execute { _ ->
+            if (payment.usedPoint > Money.ZERO_KRW) {
+                pointService.restore(payment.userId, payment.usedPoint)
+            }
+            payment.issuedCouponId?.let { couponId ->
+                couponService.cancelCouponUse(couponId)
+            }
+            val order = orderService.findById(payment.orderId)
+            val increaseUnits = order.orderItems.map {
+                ProductCommand.IncreaseStockUnit(productId = it.productId, amount = it.quantity)
+            }
+            productService.increaseStocks(ProductCommand.IncreaseStocks(units = increaseUnits))
+
+            orderService.cancelOrder(payment.orderId)
         }
     }
+
+    /**
+     * 리소스 할당 결과
+     */
+    private data class ResourceAllocationResult(
+        val orderId: Long,
+        val payment: Payment,
+        val productViews: List<ProductView>,
+    )
 }
