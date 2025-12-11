@@ -1,6 +1,4 @@
-package com.loopers.application.order.event
-
-import com.loopers.domain.order.OrderDetail
+package com.loopers.domain.order
 
 object OrderEvent {
     /**

@@ -1,12 +1,12 @@
 package com.loopers.interfaces.event
 
-import com.loopers.application.order.event.OrderEvent
-import com.loopers.application.payment.event.PaymentEvent
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.integration.DataPlatformPublisher
 import com.loopers.domain.order.OrderDetail
+import com.loopers.domain.order.OrderEvent
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.CardType
+import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PgService
 import com.loopers.domain.product.ProductService

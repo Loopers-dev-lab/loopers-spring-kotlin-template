@@ -1,8 +1,8 @@
 package com.loopers.interfaces.event
 
-import com.loopers.application.like.event.ProductLikeEvent
 import com.loopers.application.product.ProductCache
 import com.loopers.domain.like.ProductLikeCount
+import com.loopers.domain.like.ProductLikeEvent
 import com.loopers.domain.like.ProductLikeRepository
 import io.mockk.every
 import io.mockk.justRun

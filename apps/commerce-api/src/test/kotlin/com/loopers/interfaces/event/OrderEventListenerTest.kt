@@ -1,9 +1,9 @@
 package com.loopers.interfaces.event
 
-import com.loopers.application.order.event.OrderEvent
-import com.loopers.application.user.event.UserActivityEvent
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.integration.DataPlatformPublisher
+import com.loopers.domain.order.OrderEvent
+import com.loopers.domain.user.UserActivityEvent
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import io.mockk.every

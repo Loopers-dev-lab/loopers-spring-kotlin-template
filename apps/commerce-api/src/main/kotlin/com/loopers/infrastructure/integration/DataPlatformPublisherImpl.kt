@@ -1,8 +1,8 @@
 package com.loopers.infrastructure.integration
 
-import com.loopers.application.order.event.OrderEvent
-import com.loopers.application.payment.event.PaymentEvent
 import com.loopers.domain.integration.DataPlatformPublisher
+import com.loopers.domain.order.OrderEvent
+import com.loopers.domain.payment.PaymentEvent
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 

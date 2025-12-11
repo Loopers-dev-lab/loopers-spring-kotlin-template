@@ -1,4 +1,4 @@
-package com.loopers.application.like.event
+package com.loopers.domain.like
 
 object ProductLikeEvent {
     /**

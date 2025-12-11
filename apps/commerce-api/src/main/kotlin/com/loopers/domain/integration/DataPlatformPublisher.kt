@@ -1,7 +1,7 @@
 package com.loopers.domain.integration
 
-import com.loopers.application.order.event.OrderEvent
-import com.loopers.application.payment.event.PaymentEvent
+import com.loopers.domain.order.OrderEvent
+import com.loopers.domain.payment.PaymentEvent
 
 interface DataPlatformPublisher {
     fun send(event: OrderEvent.OrderCreated)

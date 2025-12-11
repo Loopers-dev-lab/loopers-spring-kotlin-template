@@ -1,7 +1,7 @@
 package com.loopers.interfaces.event
 
-import com.loopers.application.user.event.UserActivityEvent
 import com.loopers.domain.integration.UserActivityPublisher
+import com.loopers.domain.user.UserActivityEvent
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async

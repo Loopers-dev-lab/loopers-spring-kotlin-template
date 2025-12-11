@@ -1,9 +1,9 @@
 package com.loopers.application.like
 
-import com.loopers.application.like.event.ProductLikeEvent
-import com.loopers.application.user.event.UserActivityEvent
+import com.loopers.domain.like.ProductLikeEvent
 import com.loopers.domain.like.ProductLikeService
 import com.loopers.domain.product.ProductService
+import com.loopers.domain.user.UserActivityEvent
 import com.loopers.domain.user.UserService
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType

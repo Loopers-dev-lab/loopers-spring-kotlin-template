@@ -1,8 +1,8 @@
 package com.loopers.application.payment
 
-import com.loopers.application.payment.event.PaymentEvent
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.Payment
+import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgService

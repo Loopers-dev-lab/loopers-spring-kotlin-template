@@ -1,15 +1,15 @@
 package com.loopers.application.order
 
-import com.loopers.application.order.event.OrderEvent
-import com.loopers.application.payment.event.PaymentEvent
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderCommand
+import com.loopers.domain.order.OrderEvent
 import com.loopers.domain.order.OrderResult
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.CardType
+import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentMethod
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.point.PointService

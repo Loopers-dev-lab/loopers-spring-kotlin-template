@@ -1,6 +1,4 @@
-package com.loopers.application.payment.event
-
-import com.loopers.domain.payment.CardType
+package com.loopers.domain.payment
 
 object PaymentEvent {
     /**
