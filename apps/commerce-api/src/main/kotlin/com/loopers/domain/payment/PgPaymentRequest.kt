@@ -7,7 +7,7 @@ import com.loopers.support.values.Money
 data class PgPaymentRequest(
     val paymentId: Long,
     val amount: Money,
-    val cardInfo: CardInfo,
+    val cardInfo: CardInfo? = null,
 ) {
     init {
         if (amount < Money.ZERO_KRW) {

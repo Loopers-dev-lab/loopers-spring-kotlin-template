@@ -4,6 +4,8 @@ import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import org.springframework.beans.factory.annotation.Value
@@ -20,6 +22,10 @@ class PgClientAdapter(
     override fun requestPayment(request: DomainPgPaymentRequest): PgPaymentCreateResult {
         if (request.amount == Money.ZERO_KRW) {
             return PgPaymentCreateResult.NotRequired
+        }
+
+        if (request.cardInfo == null) {
+            throw CoreException(ErrorType.BAD_REQUEST, "카드 정보가 존재하지 않습니다.")
         }
 
         return try {
@@ -45,7 +51,7 @@ class PgClientAdapter(
 
     private fun DomainPgPaymentRequest.toInfraRequest() = PgPaymentRequest(
         orderId = paymentId.toOrderId(),
-        cardType = cardInfo.cardType.name,
+        cardType = cardInfo!!.cardType.name,
         cardNo = cardInfo.cardNo,
         amount = amount.amount.toLong(),
         callbackUrl = callbackBaseUrl,

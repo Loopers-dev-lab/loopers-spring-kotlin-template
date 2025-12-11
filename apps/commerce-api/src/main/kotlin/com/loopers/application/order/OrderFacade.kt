@@ -55,7 +55,7 @@ class OrderFacade(
                 )
             }
         }
-        val result = paymentService.requestPgPayment(payment.id, cardInfo)
+        val result = paymentService.requestPgPayment(PaymentCommand.RequestPgPayment(payment.id, cardInfo))
 
         // 3. 결과에 따른 후속 처리
         if (result is PgPaymentResult.Failed) {

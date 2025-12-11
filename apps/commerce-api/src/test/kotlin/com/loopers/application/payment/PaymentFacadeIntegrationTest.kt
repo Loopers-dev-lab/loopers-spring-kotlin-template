@@ -1,25 +1,25 @@
 package com.loopers.application.payment
 
-import com.loopers.application.order.OrderCriteria
-import com.loopers.application.order.OrderFacade
+import com.github.tomakehurst.wiremock.client.WireMock.aResponse
+import com.github.tomakehurst.wiremock.client.WireMock.get
+import com.github.tomakehurst.wiremock.client.WireMock.reset
+import com.github.tomakehurst.wiremock.client.WireMock.stubFor
+import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.loopers.domain.coupon.Coupon
 import com.loopers.domain.coupon.CouponRepository
 import com.loopers.domain.coupon.DiscountAmount
 import com.loopers.domain.coupon.DiscountType
-import com.loopers.domain.coupon.IssuedCoupon
 import com.loopers.domain.coupon.IssuedCouponRepository
 import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.Payment
-import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentCommand
+import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
-import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentCreateResult
-import com.loopers.domain.payment.PgTransaction
-import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -32,29 +32,32 @@ import com.loopers.domain.product.Stock
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
-import com.ninjasquad.springmockk.MockkBean
-import io.mockk.every
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertAll
-import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock
+import org.springframework.test.context.TestPropertySource
 import java.time.Instant
+import java.time.ZonedDateTime
 
 /**
  * PaymentFacade 통합 테스트
- * - 오케스트레이션: 포인트/쿠폰 결합 결제 흐름
- * - 외부 API 연동: PG 예외 처리
+ *
+ * 검증 범위:
+ * - 비즈니스 시나리오의 최종 결과 (결제 완료 → 주문 PAID, 결제 실패 → 리소스 복구)
+ * - 트랜잭션 원자성 (리소스 복구가 하나의 트랜잭션으로 처리되는지)
+ * - 멱등성 (중복 콜백 처리)
  */
 @SpringBootTest
+@AutoConfigureWireMock(port = 0)
+@TestPropertySource(properties = ["pg.base-url=http://localhost:\${wiremock.server.port}"])
 @DisplayName("PaymentFacade 통합 테스트")
 class PaymentFacadeIntegrationTest @Autowired constructor(
-    private val orderFacade: OrderFacade,
     private val paymentFacade: PaymentFacade,
     private val paymentService: PaymentService,
     private val paymentRepository: PaymentRepository,
@@ -65,133 +68,277 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     private val pointAccountRepository: PointAccountRepository,
     private val couponRepository: CouponRepository,
     private val issuedCouponRepository: IssuedCouponRepository,
+    private val circuitBreakerRegistry: CircuitBreakerRegistry,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
 ) {
-    @MockkBean
-    private lateinit var pgClient: PgClient
-
-    @BeforeEach
-    fun setup() {
-        every {
-            pgClient.requestPayment(match { it.amount == Money.ZERO_KRW })
-        } returns PgPaymentCreateResult.NotRequired
-    }
 
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
         redisCleanUp.truncateAll()
-    }
-
-    @Nested
-    @DisplayName("placeOrder")
-    inner class PlaceOrder {
-
-        @Test
-        @DisplayName("포인트로만 결제하면 paidAmount가 0이고 즉시 PAID 상태가 된다")
-        fun `point only payment results in zero paidAmount and immediate PAID status`() {
-            // given
-            val userId = 1L
-            val product = createProduct(price = Money.krw(10000))
-            createPointAccount(userId = userId, balance = Money.krw(100000))
-
-            val criteria = OrderCriteria.PlaceOrder(
-                userId = userId,
-                usePoint = Money.krw(10000),
-                items = listOf(
-                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
-                ),
-                issuedCouponId = null,
-                cardType = null,
-                cardNo = null,
-            )
-
-            // when
-            val result = orderFacade.placeOrder(criteria)
-
-            // then
-            val payment = paymentRepository.findById(result.paymentId)!!
-
-            assertAll(
-                { assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW) },
-                { assertThat(payment.usedPoint).isEqualTo(Money.krw(10000)) },
-                { assertThat(payment.status).isEqualTo(PaymentStatus.PAID) },
-            )
-        }
-
-        @Test
-        @DisplayName("쿠폰 할인 후 포인트로만 결제할 수 있다")
-        fun `point only payment with coupon discount`() {
-            // given
-            val userId = 1L
-            val product = createProduct(price = Money.krw(15000))
-            createPointAccount(userId = userId, balance = Money.krw(100000))
-            val coupon = createCoupon(discountType = DiscountType.FIXED_AMOUNT, discountValue = 5000)
-            val issuedCoupon = createIssuedCoupon(userId = userId, coupon = coupon)
-
-            // 15000 - 5000(쿠폰) = 10000원을 포인트로 결제
-            val criteria = OrderCriteria.PlaceOrder(
-                userId = userId,
-                usePoint = Money.krw(10000),
-                items = listOf(
-                    OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1),
-                ),
-                issuedCouponId = issuedCoupon.id,
-                cardType = null,
-                cardNo = null,
-            )
-
-            // when
-            val result = orderFacade.placeOrder(criteria)
-
-            // then
-            val payment = paymentRepository.findById(result.paymentId)!!
-
-            assertAll(
-                { assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW) },
-                { assertThat(payment.usedPoint).isEqualTo(Money.krw(10000)) },
-                { assertThat(payment.couponDiscount).isEqualTo(Money.krw(5000)) },
-                { assertThat(payment.status).isEqualTo(PaymentStatus.PAID) },
-            )
-
-            // 쿠폰이 사용됨
-            val usedCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
-            assertThat(usedCoupon.status).isEqualTo(UsageStatus.USED)
+        reset()
+        for (circuitBreaker in circuitBreakerRegistry.allCircuitBreakers) {
+            circuitBreaker.reset()
         }
     }
 
     @Nested
-    @DisplayName("handleCallback - 결제 콜백 처리")
-    inner class HandleCallback {
+    @DisplayName("processCallback")
+    inner class ProcessCallback {
 
         @Test
-        @DisplayName("잘못된 externalPaymentKey로 조회 시 PG에서 예외가 발생한다")
-        fun `callback with invalid externalPaymentKey throws exception from PG`() {
+        @DisplayName("결제 성공 시 주문이 PAID 상태가 된다")
+        fun `completes order when payment succeeds`() {
             // given
             val payment = createInProgressPayment()
-            val wrongKey = "wrong_key"
-            val criteria = PaymentCriteria.ProcessCallback(
-                orderId = payment.orderId,
-                externalPaymentKey = wrongKey,
-            )
+            stubPgTransactionSuccess(payment)
 
-            // PG에서 wrong_key로 조회 시 예외 발생
-            every { pgClient.findTransaction(wrongKey) } throws RuntimeException("Transaction not found")
+            // when
+            paymentFacade.processCallback(callbackCriteria(payment))
 
-            // when & then
-            assertThrows<RuntimeException> {
-                paymentFacade.processCallback(criteria)
-            }
+            // then
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            val updatedOrder = orderRepository.findById(payment.orderId)!!
 
-            // 결제 상태 변경 없음
-            val unchangedPayment = paymentRepository.findById(payment.id)!!
-            assertThat(unchangedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+        }
+
+        @Test
+        @DisplayName("결제 실패 시 사용한 포인트가 복구된다")
+        fun `restores used point when payment fails`() {
+            // given
+            val userId = 1L
+            val initialBalance = Money.krw(10000)
+            val usedPoint = Money.krw(5000)
+
+            val pointAccount = createPointAccount(userId, initialBalance)
+            val payment = createInProgressPaymentWithPoint(userId, usedPoint)
+
+            // 포인트 차감 시뮬레이션 (실제로는 주문 생성 시 차감됨)
+            pointAccount.deduct(usedPoint)
+            pointAccountRepository.save(pointAccount)
+
+            stubPgTransactionFailed(payment, "카드 한도 초과")
+
+            // when
+            paymentFacade.processCallback(callbackCriteria(payment))
+
+            // then
+            val updatedPointAccount = pointAccountRepository.findByUserId(userId)!!
+            assertThat(updatedPointAccount.balance).isEqualTo(initialBalance)
+        }
+
+        @Test
+        @DisplayName("결제 실패 시 사용한 쿠폰이 복구된다")
+        fun `restores used coupon when payment fails`() {
+            // given
+            val userId = 1L
+            val coupon = createCoupon()
+            val issuedCoupon = createIssuedCoupon(userId, coupon)
+
+            // 쿠폰 사용 처리
+            issuedCoupon.use(userId, coupon, ZonedDateTime.now())
+            issuedCouponRepository.save(issuedCoupon)
+
+            val payment = createInProgressPaymentWithCoupon(userId, issuedCoupon.id, Money.krw(5000))
+            stubPgTransactionFailed(payment, "잔액 부족")
+
+            // when
+            paymentFacade.processCallback(callbackCriteria(payment))
+
+            // then
+            val updatedCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
+            assertThat(updatedCoupon.status).isEqualTo(UsageStatus.AVAILABLE)
+        }
+
+        @Test
+        @DisplayName("결제 실패 시 차감된 재고가 복구된다")
+        fun `restores decreased stock when payment fails`() {
+            // given
+            val initialStock = 10
+            val orderQuantity = 2
+            val product = createProduct(stock = Stock.of(initialStock))
+
+            // 재고 차감 시뮬레이션
+            product.decreaseStock(orderQuantity)
+            productRepository.save(product)
+
+            val payment = createInProgressPaymentWithProduct(product, orderQuantity)
+            stubPgTransactionFailed(payment, "카드 오류")
+
+            // when
+            paymentFacade.processCallback(callbackCriteria(payment))
+
+            // then
+            val updatedProduct = productRepository.findById(product.id)!!
+            assertThat(updatedProduct.stock.amount).isEqualTo(initialStock)
+        }
+
+        @Test
+        @DisplayName("결제 실패 시 주문이 취소 상태가 된다")
+        fun `cancels order when payment fails`() {
+            // given
+            val payment = createInProgressPayment()
+            stubPgTransactionFailed(payment, "결제 거절")
+
+            // when
+            paymentFacade.processCallback(callbackCriteria(payment))
+
+            // then
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            val updatedOrder = orderRepository.findById(payment.orderId)!!
+
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(updatedOrder.status).isEqualTo(OrderStatus.CANCELLED)
+        }
+
+        @Test
+        @DisplayName("이미 PAID 상태인 결제에 콜백이 와도 정상 처리된다")
+        fun `handles duplicate callback for already paid payment`() {
+            // given
+            val payment = createInProgressPayment()
+            stubPgTransactionSuccess(payment)
+
+            // 첫 번째 콜백으로 결제 완료
+            paymentFacade.processCallback(callbackCriteria(payment))
+
+            // when - 중복 콜백
+            paymentFacade.processCallback(callbackCriteria(payment))
+
+            // then - 예외 없이 상태 유지
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
+        }
+    }
+
+    @Nested
+    @DisplayName("processInProgressPayment")
+    inner class ProcessInProgressPayment {
+
+        @Test
+        @DisplayName("PG에서 SUCCESS 조회 시 결제가 완료되고 주문이 PAID가 된다")
+        fun `completes payment and order when PG returns SUCCESS`() {
+            // given
+            val payment = createInProgressPayment()
+            stubPgTransactionSuccess(payment)
+
+            // when
+            paymentFacade.processInProgressPayment(payment.id)
+
+            // then
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            val updatedOrder = orderRepository.findById(payment.orderId)!!
+
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+        }
+
+        @Test
+        @DisplayName("PG에서 FAILED 조회 시 리소스가 복구되고 주문이 취소된다")
+        fun `recovers resources and cancels order when PG returns FAILED`() {
+            // given
+            val userId = 1L
+            val initialBalance = Money.krw(10000)
+            val usedPoint = Money.krw(3000)
+
+            val pointAccount = createPointAccount(userId, initialBalance)
+            val payment = createInProgressPaymentWithPoint(userId, usedPoint)
+
+            // 포인트 차감 시뮬레이션
+            pointAccount.deduct(usedPoint)
+            pointAccountRepository.save(pointAccount)
+
+            stubPgTransactionFailed(payment, "결제 실패")
+
+            // when
+            paymentFacade.processInProgressPayment(payment.id)
+
+            // then
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            val updatedOrder = orderRepository.findById(payment.orderId)!!
+            val updatedPointAccount = pointAccountRepository.findByUserId(userId)!!
+
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
+            assertThat(updatedOrder.status).isEqualTo(OrderStatus.CANCELLED)
+            assertThat(updatedPointAccount.balance).isEqualTo(initialBalance)
+        }
+
+        @Test
+        @DisplayName("PG에서 IN_PROGRESS 조회 시 상태가 유지된다")
+        fun `keeps status when PG returns IN_PROGRESS`() {
+            // given
+            val payment = createInProgressPayment()
+            stubPgTransactionInProgress(payment)
+
+            // when
+            paymentFacade.processInProgressPayment(payment.id)
+
+            // then
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            val updatedOrder = orderRepository.findById(payment.orderId)!!
+
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PLACED)
         }
     }
 
     // ===========================================
-    // 헬퍼 메서드
+    // WireMock 스텁 헬퍼
+    // ===========================================
+
+    private fun stubPgTransactionSuccess(payment: Payment) {
+        stubPgTransaction(payment, "SUCCESS", null)
+    }
+
+    private fun stubPgTransactionFailed(payment: Payment, reason: String) {
+        stubPgTransaction(payment, "FAILED", reason)
+    }
+
+    private fun stubPgTransactionInProgress(payment: Payment) {
+        stubPgTransaction(payment, "PENDING", null)
+    }
+
+    private fun stubPgTransaction(payment: Payment, status: String, reason: String?) {
+        val transactionKey = payment.externalPaymentKey!!
+        stubFor(
+            get(urlEqualTo("/api/v1/payments/$transactionKey"))
+                .willReturn(
+                    aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(pgTransactionResponse(payment, status, reason)),
+                ),
+        )
+    }
+
+    private fun pgTransactionResponse(payment: Payment, status: String, reason: String?) = """
+        {
+            "meta": {"result": "SUCCESS", "errorCode": null, "message": null},
+            "data": {
+                "transactionKey": "${payment.externalPaymentKey}",
+                "orderId": "${payment.id.toString().padStart(6, '0')}",
+                "cardType": "HYUNDAI",
+                "cardNo": "1234-5678-9012-3456",
+                "amount": ${payment.paidAmount.amount.toLong()},
+                "status": "$status",
+                "reason": ${reason?.let { "\"$it\"" } ?: "null"}
+            }
+        }
+    """.trimIndent()
+
+    // ===========================================
+    // Criteria 헬퍼
+    // ===========================================
+
+    private fun callbackCriteria(payment: Payment) = PaymentCriteria.ProcessCallback(
+        orderId = payment.orderId,
+        externalPaymentKey = payment.externalPaymentKey!!,
+    )
+
+    // ===========================================
+    // 도메인 픽스처 헬퍼
     // ===========================================
 
     private fun createProduct(
@@ -211,78 +358,111 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     }
 
     private fun createPointAccount(
-        userId: Long = 1L,
-        balance: Money = Money.ZERO_KRW,
+        userId: Long,
+        balance: Money,
     ): PointAccount {
-        val account = PointAccount.of(userId, balance)
-        return pointAccountRepository.save(account)
+        return pointAccountRepository.save(PointAccount.of(userId, balance))
     }
 
     private fun createCoupon(
-        name: String = "테스트 쿠폰",
         discountType: DiscountType = DiscountType.FIXED_AMOUNT,
         discountValue: Long = 5000,
     ): Coupon {
-        val discountAmount = DiscountAmount(
-            type = discountType,
-            value = discountValue,
+        val discountAmount = DiscountAmount(type = discountType, value = discountValue)
+        return couponRepository.save(Coupon.of(name = "테스트 쿠폰", discountAmount = discountAmount))
+    }
+
+    private fun createIssuedCoupon(userId: Long, coupon: Coupon) =
+        issuedCouponRepository.save(coupon.issue(userId))
+
+    private fun createInProgressPayment(userId: Long = 1L): Payment {
+        val product = createProduct()
+        createPointAccount(userId, Money.krw(100000))
+
+        val order = createOrder(userId, product, quantity = 1)
+        return createPayment(
+            userId = userId,
+            order = order,
+            usedPoint = Money.ZERO_KRW,
+            issuedCouponId = null,
+            couponDiscount = Money.ZERO_KRW,
         )
-        val coupon = Coupon.of(name = name, discountAmount = discountAmount)
-        return couponRepository.save(coupon)
     }
 
-    private fun createIssuedCoupon(
+    private fun createInProgressPaymentWithPoint(userId: Long, usedPoint: Money): Payment {
+        val product = createProduct()
+
+        val order = createOrder(userId, product, quantity = 1)
+        return createPayment(
+            userId = userId,
+            order = order,
+            usedPoint = usedPoint,
+            issuedCouponId = null,
+            couponDiscount = Money.ZERO_KRW,
+        )
+    }
+
+    private fun createInProgressPaymentWithCoupon(
         userId: Long,
-        coupon: Coupon,
-    ): IssuedCoupon {
-        val issuedCoupon = coupon.issue(userId)
-        return issuedCouponRepository.save(issuedCoupon)
+        issuedCouponId: Long,
+        couponDiscount: Money,
+    ): Payment {
+        val product = createProduct()
+        createPointAccount(userId, Money.krw(100000))
+
+        val order = createOrder(userId, product, quantity = 1)
+        return createPayment(
+            userId = userId,
+            order = order,
+            usedPoint = Money.ZERO_KRW,
+            issuedCouponId = issuedCouponId,
+            couponDiscount = couponDiscount,
+        )
     }
 
-    private fun createInProgressPayment(
-        userId: Long = 1L,
-    ): Payment {
-        val product = createProduct(price = Money.krw(10000), stock = Stock.of(100))
-        createPointAccount(userId = userId, balance = Money.krw(100000))
+    private fun createInProgressPaymentWithProduct(product: Product, quantity: Int): Payment {
+        val userId = 1L
+        createPointAccount(userId, Money.krw(100000))
 
-        // Order 생성
+        val order = createOrder(userId, product, quantity)
+        return createPayment(
+            userId = userId,
+            order = order,
+            usedPoint = Money.ZERO_KRW,
+            issuedCouponId = null,
+            couponDiscount = Money.ZERO_KRW,
+        )
+    }
+
+    private fun createOrder(userId: Long, product: Product, quantity: Int): Order {
         val order = Order.place(userId)
         order.addOrderItem(
             productId = product.id,
-            quantity = 1,
-            productName = "테스트 상품",
-            unitPrice = Money.krw(10000),
+            quantity = quantity,
+            productName = product.name,
+            unitPrice = product.price,
         )
-        val savedOrder = orderRepository.save(order)
+        return orderRepository.save(order)
+    }
 
-        // Payment 생성 (PENDING)
+    private fun createPayment(
+        userId: Long,
+        order: Order,
+        usedPoint: Money,
+        issuedCouponId: Long?,
+        couponDiscount: Money,
+    ): Payment {
         val payment = paymentService.create(
             PaymentCommand.Create(
                 userId = userId,
-                orderId = savedOrder.id,
-                totalAmount = savedOrder.totalAmount,
-                usedPoint = Money.krw(5000),
-                issuedCouponId = null,
-                couponDiscount = Money.ZERO_KRW,
+                orderId = order.id,
+                totalAmount = order.totalAmount,
+                usedPoint = usedPoint,
+                issuedCouponId = issuedCouponId,
+                couponDiscount = couponDiscount,
             ),
         )
-
-        // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
         payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
         return paymentRepository.save(payment)
-    }
-
-    private fun createTransaction(
-        transactionKey: String,
-        paymentId: Long,
-        status: PgTransactionStatus,
-        failureReason: String? = null,
-    ): PgTransaction {
-        return PgTransaction(
-            transactionKey = transactionKey,
-            paymentId = paymentId,
-            status = status,
-            failureReason = failureReason,
-        )
     }
 }

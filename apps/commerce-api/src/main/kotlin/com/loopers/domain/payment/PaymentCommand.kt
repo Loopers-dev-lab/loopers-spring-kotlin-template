@@ -27,4 +27,9 @@ class PaymentCommand {
             )
         }
     }
+
+    data class RequestPgPayment(
+        val paymentId: Long,
+        val cardInfo: CardInfo? = null,
+    )
 }

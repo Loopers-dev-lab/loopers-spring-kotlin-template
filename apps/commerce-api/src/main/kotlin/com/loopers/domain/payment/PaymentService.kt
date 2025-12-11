@@ -113,21 +113,17 @@ class PaymentService(
      * @return PgPaymentResult - 결제 결과
      */
     fun requestPgPayment(
-        paymentId: Long,
-        cardInfo: CardInfo?,
+        command: PaymentCommand.RequestPgPayment,
         currentTime: Instant = Instant.now(),
     ): PgPaymentResult {
-        val payment = paymentRepository.findById(paymentId)
+        val payment = paymentRepository.findById(command.paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
-
-        val resolvedCardInfo = cardInfo
-            ?: CardInfo.EMPTY
 
         val pgResult = pgClient.requestPayment(
             PgPaymentRequest(
                 paymentId = payment.id,
                 amount = payment.paidAmount,
-                cardInfo = resolvedCardInfo,
+                cardInfo = command.cardInfo,
             ),
         )
 

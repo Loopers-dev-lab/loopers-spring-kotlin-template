@@ -12,6 +12,10 @@ class OrderRdbRepository(
         return orderJpaRepository.findByIdWithOrderItems(id)
     }
 
+    override fun findAll(): List<Order> {
+        return orderJpaRepository.findAll()
+    }
+
     override fun save(order: Order): Order {
         return orderJpaRepository.save(order)
     }
