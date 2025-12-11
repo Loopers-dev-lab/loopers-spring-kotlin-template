@@ -36,6 +36,7 @@ import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -69,6 +70,13 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
 ) {
     @MockkBean
     private lateinit var pgClient: PgClient
+
+    @BeforeEach
+    fun setup() {
+        every {
+            pgClient.requestPayment(match { it.amount == Money.ZERO_KRW })
+        } returns PgPaymentCreateResult.NotRequired
+    }
 
     @AfterEach
     fun tearDown() {
@@ -106,7 +114,6 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val payment = paymentRepository.findById(result.paymentId)!!
 
             assertAll(
-                { assertThat(result.paymentStatus).isEqualTo(PaymentStatus.PAID) },
                 { assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW) },
                 { assertThat(payment.usedPoint).isEqualTo(Money.krw(10000)) },
                 { assertThat(payment.status).isEqualTo(PaymentStatus.PAID) },
@@ -142,10 +149,10 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             val payment = paymentRepository.findById(result.paymentId)!!
 
             assertAll(
-                { assertThat(result.paymentStatus).isEqualTo(PaymentStatus.PAID) },
                 { assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW) },
                 { assertThat(payment.usedPoint).isEqualTo(Money.krw(10000)) },
                 { assertThat(payment.couponDiscount).isEqualTo(Money.krw(5000)) },
+                { assertThat(payment.status).isEqualTo(PaymentStatus.PAID) },
             )
 
             // 쿠폰이 사용됨
