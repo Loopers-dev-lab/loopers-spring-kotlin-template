@@ -47,9 +47,9 @@ class LikeServiceTest(
                 refBrandId = 12,
             )
             productRepository.save(testProduct)
-            val isNewLike = likeService.like(testUser.id, testProduct.id)
+            val result = likeService.like(testUser.id, testProduct.id)
 
-            assertThat(isNewLike).isTrue()
+            assertThat(result.changed).isTrue
         }
     }
 }
