@@ -171,17 +171,13 @@ class CouponServiceTest : IntegrationTest() {
                 discountType = DiscountType.FIXED,
                 discountValue = 5000L,
             )
-            val couponIssue1 = createCouponIssue(user1.id, coupon.id)
-            val couponIssue2 = createCouponIssue(user2.id, coupon.id)
+            createCouponIssue(user1.id, coupon.id)
+            createCouponIssue(user2.id, coupon.id)
             val totalAmount = 10000L
 
             // when
             val discountAmount1 = couponService.calculateCouponDiscount(user1.id, coupon.id, totalAmount)
             val discountAmount2 = couponService.calculateCouponDiscount(user2.id, coupon.id, totalAmount)
-
-            // then
-            couponIssueJpaRepository.findById(couponIssue1.id!!).orElseThrow()
-            couponIssueJpaRepository.findById(couponIssue2.id!!).orElseThrow()
 
             assertSoftly { softly ->
                 softly.assertThat(discountAmount1).isEqualTo(5000L)

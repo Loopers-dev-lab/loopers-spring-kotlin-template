@@ -133,7 +133,7 @@ class OrderFacade(
                 // 10. 재고 감소
                 productService.deductAllStock(orderResult.orderDetails)
 
-                // 12. 주문 생성 이벤트 발행 (쿠폰 사용 후속 처리)
+                // 11. 주문 생성 이벤트 발행 (쿠폰 사용 후속 처리)
                 applicationEventPublisher.publishEvent(
                     OrderEvent.OrderCreated(
                         orderId = orderResult.order.id,
@@ -142,7 +142,7 @@ class OrderFacade(
                     ),
                 )
 
-                // 11. 주문 완료 이벤트 발행 (데이터 플랫폼 전송, 사용자 활동 로깅)
+                // 12. 주문 완료 이벤트 발행 (데이터 플랫폼 전송, 사용자 활동 로깅)
                 applicationEventPublisher.publishEvent(
                     OrderEvent.OrderCompleted(
                         orderId = orderResult.order.id,
