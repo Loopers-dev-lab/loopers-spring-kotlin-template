@@ -13,7 +13,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDateTime
+import java.time.Instant
 
 @Component
 class LikeService(
@@ -41,7 +41,7 @@ class LikeService(
         // 이벤트 발행 (집계는 이벤트 핸들러에서)
         publishProductLikedEvent(savedLike, member, productId)
 
-        return likeRepository.save(like)
+        return savedLike
     }
 
     private fun publishProductLikedEvent(
@@ -55,7 +55,7 @@ class LikeService(
                 likeId = savedLike.id,
                 memberId = member.id,
                 productId = productId,
-                likedAt = LocalDateTime.now().toString(),
+                likedAt = Instant.now(),
             ),
         )
 
@@ -66,8 +66,8 @@ class LikeService(
                 actionType = ActionType.LIKE,
                 targetEntityType = EntityType.PRODUCT,
                 targetEntityId = productId,
-                metadata = mapOf("likeId" to savedLike.id),
-                occurredAt = LocalDateTime.now().toString()
+                metadata = mapOf("likeId" to savedLike.id.toString()),
+                occurredAt = Instant.now()
             )
         )
     }
@@ -88,7 +88,7 @@ class LikeService(
             ProductUnlikedEvent(
                 productId = productId,
                 memberId = member.id,
-                unlikedAt = LocalDateTime.now().toString()
+                unlikedAt = Instant.now()
             )
         )
     }

@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDateTime
+import java.time.Instant
 
 @Component
 class PaymentCallbackService(
@@ -31,35 +31,44 @@ class PaymentCallbackService(
             return
         }
 
+        if (callback.isSuccess()) {
+            handleSuccess(payment, callback)
+        } else {
+            handleFailure(payment, callback)
+        }
+    }
+
+    private fun handleSuccess(payment: Payment, callback: PaymentCallbackDto) {
+        payment.markAsSuccess()
+
+        // order는 성공 케이스에서만 필요
         val order = orderRepository.findByIdOrThrow(payment.orderId)
 
-        if (callback.isSuccess()) {
-            payment.markAsSuccess()
-
-            // 이벤트 발행 (주문 완료 처리는 이벤트 핸들러에서)
-            eventPublisher.publishEvent(
-                PaymentCompletedEvent(
-                    paymentId = payment.id!!,
-                    orderId = payment.orderId,
-                    memberId = order.memberId,
-                    amount = payment.amount.amount,
-                    completedAt = LocalDateTime.now().toString()
-                )
+        // 이벤트 발행 (주문 완료 처리는 이벤트 핸들러에서)
+        eventPublisher.publishEvent(
+            PaymentCompletedEvent(
+                paymentId = requireNotNull(payment.id) { "Payment ID는 null일 수 없습니다" },
+                orderId = payment.orderId,
+                memberId = order.memberId,
+                amount = payment.amount.amount,
+                completedAt = Instant.now()
             )
-            logger.info("결제 완료 이벤트 발행: orderId=${payment.orderId}, paymentId=${payment.id}")
-        } else {
-            payment.markAsFailed(callback.reason ?: "결제 실패")
+        )
+        logger.info("결제 완료 이벤트 발행: orderId=${payment.orderId}, paymentId=${payment.id}")
+    }
 
-            // 이벤트 발행
-            eventPublisher.publishEvent(
-                PaymentFailedEvent(
-                    paymentId = payment.id!!,
-                    orderId = payment.orderId,
-                    reason = callback.reason ?: "결제 실패",
-                    failedAt = LocalDateTime.now().toString()
-                )
+    private fun handleFailure(payment: Payment, callback: PaymentCallbackDto) {
+        payment.markAsFailed(callback.reason ?: "결제 실패")
+
+        // 이벤트 발행
+        eventPublisher.publishEvent(
+            PaymentFailedEvent(
+                paymentId = requireNotNull(payment.id) { "Payment ID는 null일 수 없습니다" },
+                orderId = payment.orderId,
+                reason = callback.reason ?: "결제 실패",
+                failedAt = Instant.now()
             )
-            logger.warn("결제 실패 이벤트 발행: orderId=${payment.orderId}, reason=${callback.reason}")
-        }
+        )
+        logger.warn("결제 실패 이벤트 발행: orderId=${payment.orderId}, reason=${callback.reason}")
     }
 }
