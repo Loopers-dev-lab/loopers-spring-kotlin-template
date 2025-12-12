@@ -1,13 +1,15 @@
 package com.loopers.domain.order
 
 import com.loopers.domain.coupon.CouponService
-import com.loopers.domain.member.Member
 import com.loopers.domain.member.MemberRepository
+import com.loopers.domain.order.event.OrderCreatedEvent
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.shared.Money
 import com.loopers.infrastructure.order.ExternalOrderService
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -18,6 +20,7 @@ class OrderService(
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
     private val memberRepository: MemberRepository,
+    private val eventPublisher: ApplicationEventPublisher,
     private val couponService: CouponService,
     private val externalOrderService: ExternalOrderService,
 ) {
@@ -32,11 +35,21 @@ class OrderService(
         couponId: Long? = null,
         usePoint: Long = 0L
     ): Order {
-        val productMap = loadProducts(orderItems)
+        // 주문 생성 시에는 Product를 읽기만 하므로 락 불필요 (재고 차감은 결제 완료 시)
+        val productMap = loadProductsWithoutLock(orderItems)
+        // Member는 포인트 차감이 발생하므로 비관적 락 필요
         val member = memberRepository.findByMemberIdWithLockOrThrow(memberId)
 
-        // 쿠폰 할인 적용
-        val order = createOrderWithCoupon(memberId, orderItems, couponId, productMap)
+        // 쿠폰 할인 계산 및 사용 처리
+        val discountAmount = couponService.applyAndUseCouponForOrder(
+            memberId = memberId,
+            couponId = couponId,
+            orderItems = orderItems,
+            productMap = productMap
+        )
+
+        // 주문 생성
+        val order = createOrder(memberId, orderItems, productMap, discountAmount)
 
         // 포인트 사용 검증 및 차감
         val finalPaymentAmount = order.finalAmount.amount - usePoint
@@ -51,7 +64,37 @@ class OrderService(
             member.usePoint(usePoint)
         }
 
-        return orderRepository.save(order)
+        val savedOrder = orderRepository.save(order)
+
+        if (couponId != null) {
+            publishOrderCreatedEvent(savedOrder, memberId, couponId)
+        }
+
+        return savedOrder
+    }
+
+    private fun createOrder(
+        memberId: String,
+        orderItems: List<OrderItemCommand>,
+        productMap: Map<Long, Product>,
+        discountAmount: Money,
+    ): Order = Order.create(
+        memberId = memberId,
+        orderItems = orderItems,
+        productMap = productMap,
+        discountAmount = discountAmount,
+    )
+
+    private fun publishOrderCreatedEvent(savedOrder: Order, memberId: String, couponId: Long) {
+        eventPublisher.publishEvent(
+            OrderCreatedEvent(
+                orderId = savedOrder.id,
+                memberId = memberId,
+                orderAmount = savedOrder.totalAmount.amount,
+                couponId = couponId,
+                createdAt = java.time.LocalDateTime.now().toString(),
+            ),
+        )
     }
 
     /**
@@ -72,31 +115,23 @@ class OrderService(
         externalOrderService.processOrder(order)
     }
 
-    private fun loadProducts(orderItems: List<OrderItemCommand>): Map<Long, Product> {
+    /**
+     * 주문 생성 시 상품 조회 (락 없음 - 가격 조회용)
+     */
+    private fun loadProductsWithoutLock(orderItems: List<OrderItemCommand>): Map<Long, Product> {
+        return productRepository.findAllByIdIn(orderItems.map { it.productId })
+            .associateBy { it.id }
+    }
+
+    /**
+     * 재고 차감 시 상품 조회 (락 필요)
+     */
+    private fun loadProductsWithLock(orderItems: List<OrderItemCommand>): Map<Long, Product> {
         return productRepository.findAllByIdInWithLock(orderItems.map { it.productId })
             .associateBy { it.id }
     }
 
-    private fun createOrderWithCoupon(
-        memberId: String,
-        orderItems: List<OrderItemCommand>,
-        couponId: Long?,
-        productMap: Map<Long, Product>
-    ): Order {
-        val discountAmount = couponService.applyAndUseCouponForOrder(
-            memberId = memberId,
-            couponId = couponId,
-            orderItems = orderItems,
-            productMap = productMap
-        )
 
-        return Order.create(
-            memberId = memberId,
-            orderItems = orderItems,
-            productMap = productMap,
-            discountAmount = discountAmount
-        )
-    }
 
     private fun decreaseProductStocks(order: Order, productMap: Map<Long, Product>) {
         order.items.forEach { item ->

@@ -1,17 +1,26 @@
 package com.loopers.domain.like
 
+import com.loopers.domain.like.event.ProductLikedEvent
+import com.loopers.domain.like.event.ProductUnlikedEvent
+import com.loopers.domain.member.Member
 import com.loopers.domain.member.MemberRepository
 import com.loopers.domain.product.ProductRepository
+import com.loopers.support.event.ActionType
+import com.loopers.support.event.EntityType
+import com.loopers.support.event.UserActionEvent
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 
 @Component
 class LikeService(
     private val likeRepository: LikeRepository,
     private val memberRepository: MemberRepository,
     private val productRepository: ProductRepository,
+    private val eventPublisher: ApplicationEventPublisher
 ) {
 
     @Transactional
@@ -24,13 +33,43 @@ class LikeService(
             return existingLike
         }
 
-        // 비관적 락 적용 - likesCount 동시성 제어
-        val product = productRepository.findByIdWithLockOrThrow(productId)
-
+        // 좋아요 저장 (집계는 제거)
+        val product = productRepository.findByIdOrThrow(productId) // 락 제거
         val like = Like.of(member, product)
-        product.increaseLikesCount()
+        val savedLike = likeRepository.save(like)
+
+        // 이벤트 발행 (집계는 이벤트 핸들러에서)
+        publishProductLikedEvent(savedLike, member, productId)
 
         return likeRepository.save(like)
+    }
+
+    private fun publishProductLikedEvent(
+        savedLike: Like,
+        member: Member,
+        productId: Long,
+    ) {
+        // 좋아요 집계를 위한 이벤트
+        eventPublisher.publishEvent(
+            ProductLikedEvent(
+                likeId = savedLike.id,
+                memberId = member.id,
+                productId = productId,
+                likedAt = LocalDateTime.now().toString(),
+            ),
+        )
+
+        // 사용자 행동 로깅을 위한 이벤트
+        eventPublisher.publishEvent(
+            UserActionEvent(
+                userId = member.memberId.value,
+                actionType = ActionType.LIKE,
+                targetEntityType = EntityType.PRODUCT,
+                targetEntityId = productId,
+                metadata = mapOf("likeId" to savedLike.id),
+                occurredAt = LocalDateTime.now().toString()
+            )
+        )
     }
 
     @Transactional
@@ -41,11 +80,17 @@ class LikeService(
         val like = likeRepository.findByMemberIdAndProductId(member.id, productId)
             ?: return
 
-        // 비관적 락 적용 - likesCount 동시성 제어
-        val product = productRepository.findByIdWithLockOrThrow(productId)
-        product.decreaseLikesCount()
-
+        // 좋아요 삭제
         likeRepository.deleteByMemberIdAndProductId(member.id, productId)
+
+        // 이벤트 발행 (집계는 이벤트 핸들러에서)
+        eventPublisher.publishEvent(
+            ProductUnlikedEvent(
+                productId = productId,
+                memberId = member.id,
+                unlikedAt = LocalDateTime.now().toString()
+            )
+        )
     }
 
     @Transactional(readOnly = true)
