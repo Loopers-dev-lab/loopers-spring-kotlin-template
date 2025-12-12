@@ -30,6 +30,7 @@ class PaymentService(
             usedPoint = command.usedPoint,
             issuedCouponId = command.issuedCouponId,
             couponDiscount = command.couponDiscount,
+            cardInfo = command.cardInfo,
         )
 
         return paymentRepository.save(payment)

@@ -32,6 +32,7 @@ class Payment(
     status: PaymentStatus,
     issuedCouponId: Long? = null,
     couponDiscount: Money = Money.ZERO_KRW,
+    cardInfo: CardInfo? = null,
     externalPaymentKey: String? = null,
     failureMessage: String? = null,
     attemptedAt: Instant? = null,
@@ -64,6 +65,10 @@ class Payment(
     @Embedded
     @AttributeOverride(name = "amount", column = Column(name = "coupon_discount", nullable = false))
     var couponDiscount: Money = couponDiscount
+        private set
+
+    @Embedded
+    var cardInfo: CardInfo? = cardInfo
         private set
 
     @Column(name = "status", nullable = false)
@@ -212,6 +217,8 @@ class Payment(
          * 결제를 생성합니다.
          * paidAmount = totalAmount - usedPoint - couponDiscount 로 자동 계산
          * 모든 결제는 PENDING 상태로 생성됩니다. (0원 결제 포함)
+         *
+         * @param cardInfo 카드 정보 (paidAmount > 0인 경우 필수, 0원 결제인 경우 null 가능)
          */
         fun create(
             userId: Long,
@@ -220,6 +227,7 @@ class Payment(
             usedPoint: Money,
             issuedCouponId: Long?,
             couponDiscount: Money,
+            cardInfo: CardInfo? = null,
         ): Payment {
             if (usedPoint < Money.ZERO_KRW) {
                 throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트는 0 이상이어야 합니다")
@@ -234,6 +242,10 @@ class Payment(
                 throw CoreException(ErrorType.BAD_REQUEST, "포인트와 쿠폰 할인의 합이 주문 금액을 초과합니다")
             }
 
+            if (paidAmount > Money.ZERO_KRW && cardInfo == null) {
+                throw CoreException(ErrorType.BAD_REQUEST, "카드 결제 시 카드 정보는 필수입니다")
+            }
+
             return Payment(
                 orderId = orderId,
                 userId = userId,
@@ -243,6 +255,7 @@ class Payment(
                 status = PaymentStatus.PENDING,
                 issuedCouponId = issuedCouponId,
                 couponDiscount = couponDiscount,
+                cardInfo = cardInfo,
             )
         }
 
@@ -254,6 +267,7 @@ class Payment(
             status: PaymentStatus,
             issuedCouponId: Long? = null,
             couponDiscount: Money = Money.ZERO_KRW,
+            cardInfo: CardInfo? = null,
             paidAmount: Money = Money.ZERO_KRW,
             externalPaymentKey: String? = null,
             failureMessage: String? = null,
@@ -268,6 +282,7 @@ class Payment(
                 status = status,
                 issuedCouponId = issuedCouponId,
                 couponDiscount = couponDiscount,
+                cardInfo = cardInfo,
                 externalPaymentKey = externalPaymentKey,
                 failureMessage = failureMessage,
                 attemptedAt = attemptedAt,

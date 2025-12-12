@@ -69,6 +69,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         fun `creates payment with PENDING status`() {
             // given
             val order = createOrder()
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
 
             // when
             val payment = paymentService.create(
@@ -79,11 +80,13 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                     usedPoint = Money.krw(5000),
                     issuedCouponId = null,
                     couponDiscount = Money.ZERO_KRW,
+                    cardInfo = cardInfo,
                 ),
             )
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+            assertThat(payment.cardInfo).isEqualTo(cardInfo)
         }
 
         @Test
@@ -91,6 +94,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         fun `creates payment with coupon`() {
             // given
             val order = createOrder(totalAmount = Money.krw(15000))
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
 
             // when
             val payment = paymentService.create(
@@ -101,11 +105,13 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                     usedPoint = Money.krw(5000),
                     issuedCouponId = 1L,
                     couponDiscount = Money.krw(3000),
+                    cardInfo = cardInfo,
                 ),
             )
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+            assertThat(payment.cardInfo).isEqualTo(cardInfo)
         }
     }
 
@@ -564,6 +570,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                 usedPoint = Money.krw(5000),
                 issuedCouponId = null,
                 couponDiscount = Money.ZERO_KRW,
+                cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
             ),
         )
     }

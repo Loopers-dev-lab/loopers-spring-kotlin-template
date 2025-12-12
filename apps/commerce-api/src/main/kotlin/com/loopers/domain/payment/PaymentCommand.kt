@@ -10,6 +10,7 @@ class PaymentCommand {
         val usedPoint: Money,
         val issuedCouponId: Long?,
         val couponDiscount: Money,
+        val cardInfo: CardInfo? = null,
     )
 
     data class FindPayments(

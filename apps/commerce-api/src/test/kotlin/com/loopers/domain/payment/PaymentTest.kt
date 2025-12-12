@@ -66,6 +66,7 @@ class PaymentTest {
         fun `have pending status when point does not cover total amount`() {
             // given
             val totalAmount = Money.krw(10000)
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
 
             // when
             val payment = Payment.create(
@@ -75,11 +76,13 @@ class PaymentTest {
                 usedPoint = Money.ZERO_KRW,
                 issuedCouponId = null,
                 couponDiscount = Money.ZERO_KRW,
+                cardInfo = cardInfo,
             )
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
             assertThat(payment.paidAmount).isEqualTo(totalAmount)
+            assertThat(payment.cardInfo).isEqualTo(cardInfo)
         }
 
         @DisplayName("사용 포인트가 음수이면 예외가 발생한다")
@@ -212,6 +215,7 @@ class PaymentTest {
             // given
             val totalAmount = Money.krw(10000)
             val usedPoint = Money.krw(3000)
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
 
             // when
             val payment = Payment.create(
@@ -221,12 +225,14 @@ class PaymentTest {
                 usedPoint = usedPoint,
                 issuedCouponId = null,
                 couponDiscount = Money.ZERO_KRW,
+                cardInfo = cardInfo,
             )
 
             // then - paidAmount = 10000 - 3000 = 7000 자동 계산
             assertThat(payment.usedPoint).isEqualTo(usedPoint)
             assertThat(payment.paidAmount).isEqualTo(Money.krw(7000))
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+            assertThat(payment.cardInfo).isEqualTo(cardInfo)
         }
 
         @DisplayName("카드 전액 결제가 생성된다")
@@ -234,6 +240,7 @@ class PaymentTest {
         fun `create card only payment`() {
             // given
             val totalAmount = Money.krw(10000)
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
 
             // when
             val payment = Payment.create(
@@ -243,12 +250,14 @@ class PaymentTest {
                 usedPoint = Money.ZERO_KRW,
                 issuedCouponId = null,
                 couponDiscount = Money.ZERO_KRW,
+                cardInfo = cardInfo,
             )
 
             // then - paidAmount = 10000 자동 계산
             assertThat(payment.usedPoint).isEqualTo(Money.ZERO_KRW)
             assertThat(payment.paidAmount).isEqualTo(Money.krw(10000))
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+            assertThat(payment.cardInfo).isEqualTo(cardInfo)
         }
 
         @DisplayName("쿠폰 + 포인트 + 카드 혼합 결제가 생성된다")
@@ -258,6 +267,7 @@ class PaymentTest {
             val totalAmount = Money.krw(10000)
             val couponDiscount = Money.krw(3000)
             val usedPoint = Money.krw(2000)
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
 
             // when
             val payment = Payment.create(
@@ -267,6 +277,7 @@ class PaymentTest {
                 usedPoint = usedPoint,
                 issuedCouponId = 100L,
                 couponDiscount = couponDiscount,
+                cardInfo = cardInfo,
             )
 
             // then - paidAmount = 10000 - 3000 - 2000 = 5000 자동 계산
@@ -275,6 +286,53 @@ class PaymentTest {
             assertThat(payment.usedPoint).isEqualTo(usedPoint)
             assertThat(payment.paidAmount).isEqualTo(Money.krw(5000))
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+            assertThat(payment.cardInfo).isEqualTo(cardInfo)
+        }
+
+        @DisplayName("paidAmount가 0보다 크면 cardInfo가 필수이다")
+        @Test
+        fun `throws exception when paidAmount greater than zero without cardInfo`() {
+            // given
+            val totalAmount = Money.krw(10000)
+
+            // when
+            val exception = assertThrows<CoreException> {
+                Payment.create(
+                    userId = 1L,
+                    orderId = 1L,
+                    totalAmount = totalAmount,
+                    usedPoint = Money.ZERO_KRW,
+                    issuedCouponId = null,
+                    couponDiscount = Money.ZERO_KRW,
+                    cardInfo = null,
+                )
+            }
+
+            // then
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("카드 결제 시 카드 정보는 필수입니다")
+        }
+
+        @DisplayName("0원 결제 시 cardInfo가 없어도 생성된다")
+        @Test
+        fun `creates payment without cardInfo when paidAmount is zero`() {
+            // given
+            val totalAmount = Money.krw(10000)
+
+            // when
+            val payment = Payment.create(
+                userId = 1L,
+                orderId = 1L,
+                totalAmount = totalAmount,
+                usedPoint = totalAmount,
+                issuedCouponId = null,
+                couponDiscount = Money.ZERO_KRW,
+                cardInfo = null,
+            )
+
+            // then
+            assertThat(payment.paidAmount).isEqualTo(Money.ZERO_KRW)
+            assertThat(payment.cardInfo).isNull()
         }
     }
 
@@ -729,6 +787,7 @@ class PaymentTest {
         userId: Long = 1L,
         orderId: Long = 1L,
         totalAmount: Money = Money.krw(10000),
+        cardInfo: CardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
     ): Payment {
         return Payment.create(
             userId = userId,
@@ -737,6 +796,7 @@ class PaymentTest {
             usedPoint = Money.ZERO_KRW,
             issuedCouponId = null,
             couponDiscount = Money.ZERO_KRW,
+            cardInfo = cardInfo,
         )
     }
 
@@ -746,6 +806,7 @@ class PaymentTest {
         totalAmount: Money = Money.krw(10000),
         externalPaymentKey: String? = "tx_12345",
         attemptedAt: Instant = Instant.now(),
+        cardInfo: CardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
     ): Payment {
         val payment = Payment.create(
             userId = userId,
@@ -754,6 +815,7 @@ class PaymentTest {
             usedPoint = Money.ZERO_KRW,
             issuedCouponId = null,
             couponDiscount = Money.ZERO_KRW,
+            cardInfo = cardInfo,
         )
         val result = if (externalPaymentKey != null) {
             PgPaymentCreateResult.Accepted(externalPaymentKey)

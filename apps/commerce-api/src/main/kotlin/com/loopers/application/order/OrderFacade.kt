@@ -38,14 +38,7 @@ class OrderFacade(
         .build(),
 ) {
     fun placeOrder(criteria: OrderCriteria.PlaceOrder): OrderInfo.PlaceOrder {
-        // 1. 리소스 할당 (with retry)
-        val allocationResult = retryTemplate.execute<ResourceAllocationResult, Exception> {
-            allocateResources(criteria)
-        }
-        val payment = allocationResult.payment
-        updateProductCache(allocationResult.productViews)
-
-        // 2. PG 결제 요청
+        // 카드 정보 생성 (allocateResources에서 사용하므로 먼저 생성)
         val cardInfo = criteria.cardType?.let { cardType ->
             criteria.cardNo?.let { cardNo ->
                 CardInfo(
@@ -54,6 +47,15 @@ class OrderFacade(
                 )
             }
         }
+
+        // 1. 리소스 할당 (with retry)
+        val allocationResult = retryTemplate.execute<ResourceAllocationResult, Exception> {
+            allocateResources(criteria, cardInfo)
+        }
+        val payment = allocationResult.payment
+        updateProductCache(allocationResult.productViews)
+
+        // 2. PG 결제 요청
         val result = paymentService.requestPgPayment(PaymentCommand.RequestPgPayment(payment.id, cardInfo))
 
         // 3. 결과에 따른 후속 처리
@@ -82,7 +84,7 @@ class OrderFacade(
      * - PENDING 결제 생성
      * - 주문 생성
      */
-    private fun allocateResources(criteria: OrderCriteria.PlaceOrder): ResourceAllocationResult {
+    private fun allocateResources(criteria: OrderCriteria.PlaceOrder, cardInfo: CardInfo?): ResourceAllocationResult {
         return transactionTemplate.execute { _ ->
             // 1. 재고 차감
             val productIds = criteria.items.map { it.productId }
@@ -133,6 +135,7 @@ class OrderFacade(
                     usedPoint = criteria.usePoint,
                     issuedCouponId = criteria.issuedCouponId,
                     couponDiscount = couponDiscount,
+                    cardInfo = cardInfo,
                 ),
             )
 
