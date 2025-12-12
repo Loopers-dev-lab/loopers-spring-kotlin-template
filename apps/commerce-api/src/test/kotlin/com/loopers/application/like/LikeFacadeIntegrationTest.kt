@@ -54,8 +54,16 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         assertThat(result.memberId).isEqualTo(member.memberId.value)
         assertThat(result.product.id).isEqualTo(product.id)
 
+        // 비동기 이벤트 처리 대기 (최대 3초)
+        var retryCount = 0
+        var updatedProduct = productJpaRepository.findById(product.id!!).get()
+        while (updatedProduct.likesCount != 1 && retryCount < 30) {
+            Thread.sleep(100)
+            updatedProduct = productJpaRepository.findById(product.id!!).get()
+            retryCount++
+        }
+
         // 좋아요 수 증가 확인
-        val updatedProduct = productJpaRepository.findById(product.id!!).get()
         assertThat(updatedProduct.likesCount).isEqualTo(1)
     }
 
@@ -81,8 +89,16 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         val likes = likeJpaRepository.findAll()
         assertThat(likes).hasSize(1)
 
+        // 비동기 이벤트 처리 대기 (최대 3초)
+        var retryCount = 0
+        var updatedProduct = productJpaRepository.findById(product.id!!).get()
+        while (updatedProduct.likesCount != 1 && retryCount < 30) {
+            Thread.sleep(100)
+            updatedProduct = productJpaRepository.findById(product.id!!).get()
+            retryCount++
+        }
+
         // 좋아요 수가 중복 증가하지 않았는지 확인
-        val updatedProduct = productJpaRepository.findById(product.id!!).get()
         assertThat(updatedProduct.likesCount).isEqualTo(1)
     }
 
@@ -100,6 +116,15 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         // 좋아요 추가
         likeFacade.addLike(member.memberId.value, product.id!!)
 
+        // 비동기 이벤트 처리 대기 (좋아요 추가)
+        var retryCount = 0
+        var updatedProduct = productJpaRepository.findById(product.id!!).get()
+        while (updatedProduct.likesCount != 1 && retryCount < 30) {
+            Thread.sleep(100)
+            updatedProduct = productJpaRepository.findById(product.id!!).get()
+            retryCount++
+        }
+
         // 좋아요 취소
         likeFacade.cancelLike(member.memberId.value, product.id!!)
 
@@ -107,8 +132,16 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         val likes = likeJpaRepository.findAll()
         assertThat(likes).isEmpty()
 
+        // 비동기 이벤트 처리 대기 (좋아요 취소)
+        retryCount = 0
+        updatedProduct = productJpaRepository.findById(product.id!!).get()
+        while (updatedProduct.likesCount != 0 && retryCount < 30) {
+            Thread.sleep(100)
+            updatedProduct = productJpaRepository.findById(product.id!!).get()
+            retryCount++
+        }
+
         // 좋아요 수 감소 확인
-        val updatedProduct = productJpaRepository.findById(product.id!!).get()
         assertThat(updatedProduct.likesCount).isEqualTo(0)
     }
 

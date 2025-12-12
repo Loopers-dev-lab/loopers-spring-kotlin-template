@@ -64,7 +64,8 @@ class OrderServiceTest {
         }
         val orderItems = listOf(OrderItemCommand(productId, 1))
 
-        every { productRepository.findAllByIdInWithLock(listOf(productId)) } returns listOf(product)
+        // 주문 생성 시에는 락 없이 조회 (가격 확인용)
+        every { productRepository.findAllByIdIn(listOf(productId)) } returns listOf(product)
         every { memberRepository.findByMemberIdWithLockOrThrow(memberId) } returns member
         every { couponService.applyAndUseCouponForOrder(any(), any(), any(), any()) } returns Money.of(1000L)
         every { orderRepository.save(any()) } answers { firstArg() }
@@ -105,7 +106,8 @@ class OrderServiceTest {
         }
         val orderItems = listOf(OrderItemCommand(productId, 1))
 
-        every { productRepository.findAllByIdInWithLock(listOf(productId)) } returns listOf(product)
+        // 주문 생성 시에는 락 없이 조회 (가격 확인용)
+        every { productRepository.findAllByIdIn(listOf(productId)) } returns listOf(product)
         every { memberRepository.findByMemberIdWithLockOrThrow(memberId) } returns member
         every { couponService.applyAndUseCouponForOrder(any(), any(), any(), any()) } returns Money.zero()
 
