@@ -2,6 +2,7 @@ package com.loopers.domain.payment
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -11,6 +12,7 @@ import java.time.Instant
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val pgClient: PgClient,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     /**
      * 결제를 생성합니다.
@@ -33,7 +35,13 @@ class PaymentService(
             cardInfo = command.cardInfo,
         )
 
-        return paymentRepository.save(payment)
+        val savedPayment = paymentRepository.save(payment)
+
+        eventPublisher.publishEvent(
+            PaymentCreatedEventV1(paymentId = savedPayment.id),
+        )
+
+        return savedPayment
     }
 
     /**
@@ -72,6 +80,29 @@ class PaymentService(
         val result = payment.confirmPayment(listOf(transaction), currentTime)
         paymentRepository.save(payment)
 
+        when (result) {
+            is ConfirmResult.Paid -> {
+                eventPublisher.publishEvent(
+                    PaymentPaidEventV1(
+                        paymentId = payment.id,
+                        orderId = payment.orderId,
+                    ),
+                )
+            }
+            is ConfirmResult.Failed -> {
+                eventPublisher.publishEvent(
+                    PaymentFailedEventV1(
+                        paymentId = payment.id,
+                        orderId = payment.orderId,
+                        userId = payment.userId,
+                        usedPoint = payment.usedPoint,
+                        issuedCouponId = payment.issuedCouponId,
+                    ),
+                )
+            }
+            is ConfirmResult.StillInProgress -> { /* No event, still waiting */ }
+        }
+
         return result
     }
 
@@ -109,8 +140,8 @@ class PaymentService(
      * 0원 결제는 PgClientResultDecorator에서 NotRequired를 반환합니다.
      * 0원 결제가 아닌 경우 cardInfo가 필수입니다.
      *
-     * @param paymentId 결제 ID
-     * @param cardInfo 카드 정보 (0원 결제가 아닌 경우 필수)
+     * @param command 결제 요청 커맨드
+     * @param currentTime 현재 시각
      * @return PgPaymentResult - 결제 결과
      */
     fun requestPgPayment(
@@ -131,6 +162,64 @@ class PaymentService(
         val result = payment.initiate(pgResult, currentTime)
         paymentRepository.save(payment)
 
+        publishPgPaymentResultEvent(result, payment)
+
         return result
+    }
+
+    /**
+     * PG 결제를 요청하고 결제 상태를 업데이트합니다.
+     * 이 메서드는 비동기 이벤트 리스너에서 사용됩니다. (cardInfo는 Payment에 저장되어 있음)
+     *
+     * @param paymentId 결제 ID
+     * @param currentTime 현재 시각
+     * @return PgPaymentResult - 결제 결과
+     */
+    fun requestPgPayment(
+        paymentId: Long,
+        currentTime: Instant = Instant.now(),
+    ): PgPaymentResult {
+        val payment = paymentRepository.findById(paymentId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
+
+        val pgResult = pgClient.requestPayment(
+            PgPaymentRequest(
+                paymentId = payment.id,
+                amount = payment.paidAmount,
+                cardInfo = payment.cardInfo,
+            ),
+        )
+
+        val result = payment.initiate(pgResult, currentTime)
+        paymentRepository.save(payment)
+
+        publishPgPaymentResultEvent(result, payment)
+
+        return result
+    }
+
+    private fun publishPgPaymentResultEvent(result: PgPaymentResult, payment: Payment) {
+        when (result) {
+            is PgPaymentResult.NotRequired -> {
+                eventPublisher.publishEvent(
+                    PaymentPaidEventV1(
+                        paymentId = payment.id,
+                        orderId = payment.orderId,
+                    ),
+                )
+            }
+            is PgPaymentResult.Failed -> {
+                eventPublisher.publishEvent(
+                    PaymentFailedEventV1(
+                        paymentId = payment.id,
+                        orderId = payment.orderId,
+                        userId = payment.userId,
+                        usedPoint = payment.usedPoint,
+                        issuedCouponId = payment.issuedCouponId,
+                    ),
+                )
+            }
+            is PgPaymentResult.InProgress -> { /* No event, wait for callback */ }
+        }
     }
 }

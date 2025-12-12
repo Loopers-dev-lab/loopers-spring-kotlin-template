@@ -14,6 +14,8 @@ import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.payment.CardInfo
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentRepository
@@ -428,6 +430,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
                 usedPoint = usedPoint,
                 issuedCouponId = issuedCouponId,
                 couponDiscount = couponDiscount,
+                cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
             ),
         )
         payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())

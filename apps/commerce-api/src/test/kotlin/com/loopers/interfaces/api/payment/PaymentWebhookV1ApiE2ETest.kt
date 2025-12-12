@@ -7,6 +7,8 @@ import com.github.tomakehurst.wiremock.client.WireMock.stubFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.payment.CardInfo
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentRepository
@@ -274,6 +276,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
                 usedPoint = Money.krw(5000),
                 issuedCouponId = null,
                 couponDiscount = Money.ZERO_KRW,
+                cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
             ),
         )
 

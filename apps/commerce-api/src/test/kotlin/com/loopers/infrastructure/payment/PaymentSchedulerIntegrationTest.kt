@@ -2,6 +2,8 @@ package com.loopers.infrastructure.payment
 
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.payment.CardInfo
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentStatus
@@ -144,6 +146,7 @@ class PaymentSchedulerIntegrationTest @Autowired constructor(
             usedPoint = Money.krw(5000),
             issuedCouponId = null,
             couponDiscount = Money.ZERO_KRW,
+            cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
         )
         payment.initiate(PgPaymentCreateResult.Accepted(externalPaymentKey), Instant.now())
         return paymentRepository.save(payment)
