@@ -1,6 +1,5 @@
 package com.loopers.application.order
 
-import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.event.PaymentCompletedEvent
 import com.loopers.domain.payment.event.PaymentFailedEvent
@@ -40,7 +39,16 @@ class OrderEventHandler(
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handlePaymentFailed(event: PaymentFailedEvent) {
         coroutineScope.launch {
-            logger.info("결제 실패 처리: orderId=${event.orderId}")
+            try {
+                logger.info("결제 실패 처리 시작: orderId=${event.orderId}, reason=${event.reason}")
+
+                // 주문 상태를 실패로 변경
+                orderService.failOrder(event.orderId)
+
+                logger.info("주문 실패 처리 완료: orderId=${event.orderId}")
+            } catch (e: Exception) {
+                logger.error("주문 실패 처리 실패: orderId=${event.orderId}", e)
+            }
         }
     }
 }

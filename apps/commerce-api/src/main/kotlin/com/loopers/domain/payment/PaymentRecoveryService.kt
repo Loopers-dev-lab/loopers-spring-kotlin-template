@@ -1,7 +1,6 @@
 package com.loopers.domain.payment
 
 import com.loopers.domain.order.OrderRepository
-import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.strategy.PgStrategy
 import org.slf4j.LoggerFactory
@@ -13,7 +12,7 @@ import java.time.ZonedDateTime
 class PaymentRecoveryService(
     private val orderRepository: OrderRepository,
     private val paymentRepository: PaymentRepository,
-    private val orderService: OrderService,
+    private val transactionService: PaymentRecoveryTransactionService,
     private val pgStrategies: List<PgStrategy>
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -32,40 +31,43 @@ class PaymentRecoveryService(
         log.info("복구 대상 주문 발견: ${staleOrders.size}건")
 
         staleOrders.forEach { order ->
-            val payment = paymentRepository.findByOrderId(order.id!!)
-                .firstOrNull { it.status == PaymentStatus.PENDING }
-
-            if (payment == null) {
-                log.warn("PENDING Payment not found for orderId=${order.id}")
-                return@forEach
-            }
-
-            if (payment.transactionKey == null) {
-                log.warn("TransactionKey is null for orderId=${order.id}, paymentId=${payment.id} - Cannot recover (Fallback case)")
-                return@forEach
-            }
-
-            val pgStrategy = pgStrategies.firstOrNull { it.supports(payment.paymentMethod) }
-            if (pgStrategy == null) {
-                log.warn("No PG strategy found for paymentMethod=${payment.paymentMethod}")
-                return@forEach
-            }
-
             try {
-                val pgStatus = pgStrategy.getPaymentStatus(order.memberId, payment.transactionKey!!)
-                log.info("PG 상태 조회: orderId=${order.id}, status=${pgStatus.status}")
-
-                if (pgStatus.status == "SUCCESS") {
-                    // Order 도메인이 재고 차감 포함한 완료 처리를 담당
-                    orderService.completeOrderWithPayment(order.id!!)
-                    payment.markAsSuccess()
-                    log.info("결제 복구 완료: orderId=${order.id}, transactionKey=${payment.transactionKey}")
-                } else {
-                    log.info("PG에서 여전히 대기 중: orderId=${order.id}, status=${pgStatus.status}")
-                }
+                processStaleOrder(order)
             } catch (e: Exception) {
-                log.error("결제 복구 실패: orderId=${order.id}", e)
+                log.error("주문 복구 실패: orderId=${order.id}", e)
             }
+        }
+    }
+
+    private fun processStaleOrder(order: com.loopers.domain.order.Order) {
+        val payment = paymentRepository.findByOrderId(order.id!!)
+            .firstOrNull { it.status == PaymentStatus.PENDING }
+
+        if (payment == null) {
+            log.warn("PENDING Payment not found for orderId=${order.id}")
+            return
+        }
+
+        if (payment.transactionKey == null) {
+            log.warn("TransactionKey is null for orderId=${order.id}, paymentId=${payment.id}")
+            return
+        }
+
+        val pgStrategy = pgStrategies.firstOrNull { it.supports(payment.paymentMethod) }
+        if (pgStrategy == null) {
+            log.warn("No PG strategy found for paymentMethod=${payment.paymentMethod}")
+            return
+        }
+
+        // PG 조회 (트랜잭션 외부에서 실행)
+        val pgStatus = pgStrategy.getPaymentStatus(order.memberId, payment.transactionKey!!)
+        log.info("PG 상태 조회: orderId=${order.id}, status=${pgStatus.status}")
+
+        // 3. PG 상태에 따라 별도 서비스의 트랜잭션 메서드 호출 (프록시를 거침)
+        when (pgStatus.status) {
+            "SUCCESS" -> transactionService.handlePaymentSuccess(order.id!!, payment)
+            "FAILED", "CANCELED" -> transactionService.handlePaymentFailure(order.id!!, payment, pgStatus.reason)
+            else -> log.info("PG에서 여전히 대기 중: orderId=${order.id}, status=${pgStatus.status}")
         }
     }
 }
