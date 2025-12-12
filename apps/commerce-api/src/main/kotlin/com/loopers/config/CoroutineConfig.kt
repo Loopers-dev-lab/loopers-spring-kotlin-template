@@ -1,10 +1,12 @@
 package com.loopers.config
 
+import jakarta.annotation.PreDestroy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -13,6 +15,7 @@ import org.springframework.context.annotation.Configuration
 class CoroutineConfig {
 
     private val logger = LoggerFactory.getLogger(javaClass)
+    private lateinit var scope: CoroutineScope
 
     /**
      * 이벤트 처리용 코루틴 디스패처
@@ -35,8 +38,17 @@ class CoroutineConfig {
         eventDispatcher: CoroutineDispatcher,
         eventExceptionHandler: CoroutineExceptionHandler,
     ) : CoroutineScope {
-        return CoroutineScope(
+        scope = CoroutineScope(
             eventDispatcher + SupervisorJob() + eventExceptionHandler
         )
+        return scope
+    }
+
+    @PreDestroy
+    fun cleanup() {
+        logger.info("이벤트 코루틴 스코프 종료 중...")
+        if (::scope.isInitialized) {
+            scope.cancel()
+        }
     }
 }
