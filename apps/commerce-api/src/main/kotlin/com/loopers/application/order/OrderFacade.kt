@@ -1,6 +1,5 @@
 package com.loopers.application.order
 
-import com.loopers.application.product.ProductCacheKeys
 import com.loopers.cache.CacheTemplate
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
@@ -10,7 +9,6 @@ import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
-import com.loopers.domain.product.ProductView
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -64,10 +62,10 @@ class OrderFacade(
 
         // 2. 상품 조회
         val productIds = criteria.items.map { it.productId }
-        val productViews = productService.findAllProductViewByIds(productIds)
-        val productMap = productViews.map { it.product }.associateBy { it.id }
+        val products = productService.findAllByIds(productIds)
+        val productMap = products.associateBy { it.id }
 
-        // 3. 주문 생성 (OrderCreatedEventV1 발행 -> BEFORE_COMMIT에서 재고 차감)
+        // 3. 주문 생성
         val placeOrderItems = criteria.items.map { item ->
             val product = productMap[item.productId]
                 ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다.")
@@ -111,23 +109,11 @@ class OrderFacade(
             ),
         )
 
-        // 7. 상품 캐시 업데이트
-        updateProductCache(productViews)
-
-        // 8. 즉시 응답 (PENDING 상태, PG 결제는 비동기로 진행)
+        // 7. 즉시 응답 (PENDING 상태, PG 결제는 비동기로 진행)
         return OrderInfo.PlaceOrder(
             orderId = order.id,
             paymentId = payment.id,
             paymentStatus = payment.status,
         )
-    }
-
-    /**
-     * 상품 캐시 업데이트
-     */
-    private fun updateProductCache(productViews: List<ProductView>) {
-        val productCacheKeys = productViews
-            .associateBy { ProductCacheKeys.ProductDetail(productId = it.product.id) }
-        cacheTemplate.putAll(productCacheKeys)
     }
 }
