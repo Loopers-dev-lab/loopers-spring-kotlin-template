@@ -18,10 +18,12 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.springframework.context.ApplicationEventPublisher
 
 class LikeFacadeTest {
     private lateinit var productLikeRepository: ProductLikeRepository
     private lateinit var productStatisticRepository: ProductStatisticRepository
+    private lateinit var eventPublisher: ApplicationEventPublisher
 
     private lateinit var likeService: ProductLikeService
     private lateinit var productService: ProductService
@@ -32,8 +34,9 @@ class LikeFacadeTest {
     fun setUp() {
         productLikeRepository = mockk()
         productStatisticRepository = mockk()
+        eventPublisher = mockk(relaxed = true)
 
-        likeService = ProductLikeService(productLikeRepository)
+        likeService = ProductLikeService(productLikeRepository, eventPublisher)
         productService = mockk()
 
         // Facade 생성

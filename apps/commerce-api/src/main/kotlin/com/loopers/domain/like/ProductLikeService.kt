@@ -1,11 +1,13 @@
 package com.loopers.domain.like
 
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
 class ProductLikeService(
     private val productLikeRepository: ProductLikeRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     /**
      * 상품에 좋아요 추가
@@ -19,7 +21,15 @@ class ProductLikeService(
         val result = productLikeRepository.save(ProductLike.of(productId, userId))
         return when (result) {
             ProductLikeRepository.SaveResult.AlreadyExists -> ProductResult.AddLike(false)
-            ProductLikeRepository.SaveResult.Created -> ProductResult.AddLike(true)
+            ProductLikeRepository.SaveResult.Created -> {
+                eventPublisher.publishEvent(
+                    LikeCreatedEventV1(
+                        userId = userId,
+                        productId = productId,
+                    ),
+                )
+                ProductResult.AddLike(true)
+            }
         }
     }
 
@@ -35,7 +45,15 @@ class ProductLikeService(
         val result = productLikeRepository.deleteByUserIdAndProductId(userId, productId)
         return when (result) {
             ProductLikeRepository.DeleteResult.NotExist -> ProductResult.RemoveLike(false)
-            ProductLikeRepository.DeleteResult.Deleted -> ProductResult.RemoveLike(true)
+            ProductLikeRepository.DeleteResult.Deleted -> {
+                eventPublisher.publishEvent(
+                    LikeCanceledEventV1(
+                        userId = userId,
+                        productId = productId,
+                    ),
+                )
+                ProductResult.RemoveLike(true)
+            }
         }
     }
 }
