@@ -26,6 +26,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -52,9 +53,8 @@ import java.util.concurrent.TimeUnit
  * 검증 범위:
  * - 주문 생성 오케스트레이션 성공
  * - 단일 트랜잭션 내 리소스 할당 (주문, 쿠폰, 포인트, 결제)
- * - 재고 차감은 OrderCreatedEventV1 리스너(BEFORE_COMMIT)에서 처리
- * - PG 결제 요청은 PaymentCreatedEventV1 리스너(ASYNC)에서 처리
- * - PG 실패 시 PaymentFailedEventV1 체인으로 리소스 복구 (비동기)
+ * - PG 결제 요청 비동기 처리
+ * - PG 실패 시 리소스 복구 (비동기)
  * - 리소스 할당 실패 시 트랜잭션 롤백
  */
 @SpringBootTest
@@ -66,6 +66,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
     private val orderRepository: OrderRepository,
     private val paymentRepository: PaymentRepository,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
@@ -139,30 +140,6 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             // then
             assertThat(orderInfo.orderId).isGreaterThan(0)
             assertThat(orderInfo.paymentStatus).isEqualTo(PaymentStatus.PENDING)
-        }
-
-        @Test
-        @DisplayName("재고 차감이 OrderCreatedEventV1 리스너를 통해 동기적으로 처리된다")
-        fun `stock is decreased via OrderCreatedEventV1 listener in same transaction`() {
-            // given
-            val userId = 1L
-            val initialStock = 100
-            val orderQuantity = 5
-            val product = createProduct(price = Money.krw(20000), stock = Stock.of(initialStock))
-            createPointAccount(userId, Money.krw(100000))
-
-            val criteria = placeOrderCriteria(
-                userId = userId,
-                usePoint = Money.krw(50000),
-                items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = orderQuantity)),
-            )
-
-            // when
-            orderFacade.placeOrder(criteria)
-
-            // then - 재고가 트랜잭션 내에서 동기적으로 차감됨
-            val updatedProduct = productRepository.findById(product.id)!!
-            assertThat(updatedProduct.stock.amount).isEqualTo(initialStock - orderQuantity)
         }
 
         @Test
@@ -249,7 +226,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             val userId = 1L
             val initialStock = 100
             val orderQuantity = 5
-            val product = createProduct(price = Money.krw(20000), stock = Stock.of(initialStock))
+            val product = createProduct(price = Money.krw(20000), stockQuantity = initialStock)
             createPointAccount(userId, Money.krw(100000))
             stubPgPaymentFailure()
 
@@ -263,13 +240,13 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             val orderInfo = orderFacade.placeOrder(criteria)
 
             // then - 주문 생성 직후 재고는 차감된 상태
-            val productAfterOrder = productRepository.findById(product.id)!!
-            assertThat(productAfterOrder.stock.amount).isEqualTo(initialStock - orderQuantity)
+            val stockAfterOrder = stockRepository.findByProductId(product.id)!!
+            assertThat(stockAfterOrder.quantity).isEqualTo(initialStock - orderQuantity)
 
             // then - 비동기로 PG 실패 후 재고 복구됨
             await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val restoredProduct = productRepository.findById(product.id)!!
-                assertThat(restoredProduct.stock.amount).isEqualTo(initialStock)
+                val restoredStock = stockRepository.findByProductId(product.id)!!
+                assertThat(restoredStock.quantity).isEqualTo(initialStock)
             }
         }
 
@@ -373,8 +350,8 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             // given
             val userId = 1L
             val initialStock = 100
-            val normalStock = createProduct(stock = Stock.of(initialStock))
-            val insufficientStock = createProduct(stock = Stock.of(5))
+            val normalStock = createProduct(stockQuantity = initialStock)
+            val insufficientStock = createProduct(stockQuantity = 5)
             val initialBalance = Money.krw(100000)
             createPointAccount(userId, initialBalance)
 
@@ -391,10 +368,10 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             assertThrows<CoreException> { orderFacade.placeOrder(criteria) }
 
             // then
-            val unchangedProduct = productRepository.findById(normalStock.id)!!
+            val unchangedStock = stockRepository.findByProductId(normalStock.id)!!
             val unchangedPoint = pointAccountRepository.findByUserId(userId)!!
 
-            assertThat(unchangedProduct.stock.amount).isEqualTo(initialStock)
+            assertThat(unchangedStock.quantity).isEqualTo(initialStock)
             assertThat(unchangedPoint.balance).isEqualTo(initialBalance)
         }
 
@@ -532,11 +509,12 @@ class OrderFacadeIntegrationTest @Autowired constructor(
 
     private fun createProduct(
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
-        val product = Product.create(name = "테스트 상품", price = price, stock = stock, brand = brand)
+        val product = Product.create(name = "테스트 상품", price = price, brand = brand)
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }
