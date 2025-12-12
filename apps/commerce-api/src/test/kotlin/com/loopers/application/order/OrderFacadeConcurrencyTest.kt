@@ -16,6 +16,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
@@ -33,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class OrderFacadeConcurrencyTest @Autowired constructor(
     private val orderFacade: OrderFacade,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
@@ -155,7 +157,7 @@ class OrderFacadeConcurrencyTest @Autowired constructor(
     fun `concurrent orders for same product should deduct stock correctly`() {
         // given
         val initialStock = 10
-        val product = createProduct(stock = Stock.of(initialStock))
+        val product = createProduct(stockQuantity = initialStock)
 
         val threadCount = 10
         val executorService = Executors.newFixedThreadPool(threadCount)
@@ -186,6 +188,7 @@ class OrderFacadeConcurrencyTest @Autowired constructor(
                     orderFacade.placeOrder(criteria)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
+                    e.printStackTrace()
                 } finally {
                     latch.countDown()
                 }
@@ -198,22 +201,22 @@ class OrderFacadeConcurrencyTest @Autowired constructor(
         // then
         assertThat(successCount.get()).isEqualTo(initialStock)
 
-        val updatedProduct = productRepository.findById(product.id)!!
-        assertThat(updatedProduct.stock.amount).isEqualTo(0)
+        val updatedStock = stockRepository.findByProductId(product.id)!!
+        assertThat(updatedStock.quantity).isEqualTo(0)
     }
 
     private fun createProduct(
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
         val product = Product.create(
             name = "테스트 상품",
             price = price,
-            stock = stock,
             brand = brand,
         )
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }

@@ -1,5 +1,13 @@
 package com.loopers.domain.order
 
+import com.loopers.domain.product.Brand
+import com.loopers.domain.product.BrandRepository
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.ProductStatistic
+import com.loopers.domain.product.ProductStatisticRepository
+import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
@@ -26,6 +34,10 @@ import org.springframework.test.context.event.RecordApplicationEvents
 class OrderServiceIntegrationTest @Autowired constructor(
     private val orderService: OrderService,
     private val orderRepository: OrderRepository,
+    private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
+    private val brandRepository: BrandRepository,
+    private val productStatisticRepository: ProductStatisticRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
     @Autowired
@@ -44,7 +56,8 @@ class OrderServiceIntegrationTest @Autowired constructor(
         @DisplayName("주문을 생성하면 PLACED 상태로 저장된다")
         fun `creates order with PLACED status`() {
             // given
-            val command = placeOrderCommand(userId = 1L)
+            val product = createProduct()
+            val command = placeOrderCommand(userId = 1L, productId = product.id)
 
             // when
             val savedOrder = orderService.place(command)
@@ -59,12 +72,15 @@ class OrderServiceIntegrationTest @Autowired constructor(
         @DisplayName("여러 상품을 포함한 주문을 생성할 수 있다")
         fun `creates order with multiple items`() {
             // given
+            val product1 = createProduct()
+            val product2 = createProduct()
+            val product3 = createProduct()
             val command = OrderCommand.PlaceOrder(
                 userId = 1L,
                 items = listOf(
-                    placeOrderItem(productId = 1L),
-                    placeOrderItem(productId = 2L),
-                    placeOrderItem(productId = 3L),
+                    placeOrderItem(productId = product1.id),
+                    placeOrderItem(productId = product2.id),
+                    placeOrderItem(productId = product3.id),
                 ),
             )
 
@@ -81,11 +97,13 @@ class OrderServiceIntegrationTest @Autowired constructor(
         @DisplayName("주문 생성 시 OrderCreatedEventV1을 발행한다")
         fun `publishes OrderCreatedEventV1 when order is placed`() {
             // given
+            val product1 = createProduct()
+            val product2 = createProduct()
             val command = OrderCommand.PlaceOrder(
                 userId = 1L,
                 items = listOf(
-                    placeOrderItem(productId = 100L, quantity = 2),
-                    placeOrderItem(productId = 200L, quantity = 3),
+                    placeOrderItem(productId = product1.id, quantity = 2),
+                    placeOrderItem(productId = product2.id, quantity = 3),
                 ),
             )
 
@@ -99,9 +117,9 @@ class OrderServiceIntegrationTest @Autowired constructor(
             val event = events[0]
             assertThat(event.orderId).isEqualTo(savedOrder.id)
             assertThat(event.orderItems).hasSize(2)
-            assertThat(event.orderItems[0].productId).isEqualTo(100L)
+            assertThat(event.orderItems[0].productId).isEqualTo(product1.id)
             assertThat(event.orderItems[0].quantity).isEqualTo(2)
-            assertThat(event.orderItems[1].productId).isEqualTo(200L)
+            assertThat(event.orderItems[1].productId).isEqualTo(product2.id)
             assertThat(event.orderItems[1].quantity).isEqualTo(3)
         }
     }
@@ -114,11 +132,13 @@ class OrderServiceIntegrationTest @Autowired constructor(
         @DisplayName("주문 취소 시 OrderCanceledEventV1을 발행한다")
         fun `publishes OrderCanceledEventV1 when order is canceled`() {
             // given
+            val product1 = createProduct()
+            val product2 = createProduct()
             val command = OrderCommand.PlaceOrder(
                 userId = 1L,
                 items = listOf(
-                    placeOrderItem(productId = 100L, quantity = 2),
-                    placeOrderItem(productId = 200L, quantity = 3),
+                    placeOrderItem(productId = product1.id, quantity = 2),
+                    placeOrderItem(productId = product2.id, quantity = 3),
                 ),
             )
             val savedOrder = orderService.place(command)
@@ -136,16 +156,16 @@ class OrderServiceIntegrationTest @Autowired constructor(
             val event = events[0]
             assertThat(event.orderId).isEqualTo(canceledOrder.id)
             assertThat(event.orderItems).hasSize(2)
-            assertThat(event.orderItems[0].productId).isEqualTo(100L)
+            assertThat(event.orderItems[0].productId).isEqualTo(product1.id)
             assertThat(event.orderItems[0].quantity).isEqualTo(2)
-            assertThat(event.orderItems[1].productId).isEqualTo(200L)
+            assertThat(event.orderItems[1].productId).isEqualTo(product2.id)
             assertThat(event.orderItems[1].quantity).isEqualTo(3)
         }
     }
 
-    private fun placeOrderCommand(userId: Long = 1L) = OrderCommand.PlaceOrder(
+    private fun placeOrderCommand(userId: Long = 1L, productId: Long) = OrderCommand.PlaceOrder(
         userId = userId,
-        items = listOf(placeOrderItem()),
+        items = listOf(placeOrderItem(productId = productId)),
     )
 
     private fun placeOrderItem(
@@ -158,4 +178,16 @@ class OrderServiceIntegrationTest @Autowired constructor(
         quantity = quantity,
         currentPrice = currentPrice,
     )
+
+    private fun createProduct(
+        price: Money = Money.krw(10000),
+        stockQuantity: Int = 100,
+    ): Product {
+        val brand = brandRepository.save(Brand.create("테스트 브랜드"))
+        val product = Product.create(name = "테스트 상품", price = price, brand = brand)
+        val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
+        productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
+        return savedProduct
+    }
 }

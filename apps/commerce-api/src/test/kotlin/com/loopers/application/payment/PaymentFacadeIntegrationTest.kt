@@ -30,6 +30,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
@@ -66,6 +67,7 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
@@ -159,10 +161,11 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // given
             val initialStock = 10
             val orderQuantity = 2
-            val product = createProduct(stock = Stock.of(initialStock))
+            val product = createProduct(stockQuantity = initialStock)
 
-            product.decreaseStock(orderQuantity)
-            productRepository.save(product)
+            val stock = stockRepository.findByProductId(product.id)!!
+            stock.decrease(orderQuantity)
+            stockRepository.save(stock)
 
             val payment = createInProgressPaymentWithProduct(product, orderQuantity)
             stubPgTransactionFailed(payment, "카드 오류")
@@ -171,8 +174,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             paymentFacade.processCallback(callbackCriteria(payment))
 
             // then
-            val updatedProduct = productRepository.findById(product.id)!!
-            assertThat(updatedProduct.stock.amount).isEqualTo(initialStock)
+            val updatedStock = stockRepository.findByProductId(product.id)!!
+            assertThat(updatedStock.quantity).isEqualTo(initialStock)
         }
 
         @Test
@@ -333,11 +336,12 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
 
     private fun createProduct(
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
-        val product = Product.create(name = "테스트 상품", price = price, stock = stock, brand = brand)
+        val product = Product.create(name = "테스트 상품", price = price, brand = brand)
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }

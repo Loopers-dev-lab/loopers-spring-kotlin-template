@@ -12,6 +12,14 @@ import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
+import com.loopers.domain.product.Brand
+import com.loopers.domain.product.BrandRepository
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.ProductStatistic
+import com.loopers.domain.product.ProductStatisticRepository
+import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -51,6 +59,10 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val pointAccountRepository: PointAccountRepository,
+    private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
+    private val brandRepository: BrandRepository,
+    private val productStatisticRepository: ProductStatisticRepository,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
@@ -692,9 +704,23 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     // 도메인 픽스처 헬퍼
     // ===========================================
 
+    private fun createProduct(
+        price: Money = Money.krw(10000),
+        stockQuantity: Int = 100,
+    ): Product {
+        val brand = brandRepository.save(Brand.create("테스트 브랜드"))
+        val product = Product.create(name = "테스트 상품", price = price, brand = brand)
+        val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
+        productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
+        return savedProduct
+    }
+
     private fun createOrder(totalAmount: Money = Money.krw(10000)): Order {
+        // PaymentFailedEventV1 처리 시 재고 복구를 위해 Product/Stock 생성
+        val product = createProduct(price = totalAmount)
         val order = Order.place(1L)
-        order.addOrderItem(productId = 1L, quantity = 1, productName = "테스트 상품", unitPrice = totalAmount)
+        order.addOrderItem(productId = product.id, quantity = 1, productName = "테스트 상품", unitPrice = totalAmount)
         return orderRepository.save(order)
     }
 

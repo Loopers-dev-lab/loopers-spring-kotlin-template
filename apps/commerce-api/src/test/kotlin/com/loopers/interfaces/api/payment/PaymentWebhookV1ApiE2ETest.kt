@@ -23,6 +23,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
@@ -57,6 +58,7 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
@@ -286,16 +288,16 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
 
     private fun createProduct(
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
         val product = Product.create(
             name = "테스트 상품",
             price = price,
-            stock = stock,
             brand = brand,
         )
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }

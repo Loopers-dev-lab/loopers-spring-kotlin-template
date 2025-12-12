@@ -12,6 +12,41 @@ import kotlin.test.Test
 
 class StockTest {
 
+    @DisplayName("재고 생성 테스트")
+    @Nested
+    inner class Create {
+        @DisplayName("productId와 quantity로 재고를 생성할 수 있다.")
+        @Test
+        fun `create stock with productId and quantity`() {
+            // given
+            val productId = 1L
+            val quantity = 10
+
+            // when
+            val stock = Stock.create(productId, quantity)
+
+            // then
+            assertThat(stock.productId).isEqualTo(productId)
+            assertThat(stock.quantity).isEqualTo(quantity)
+        }
+
+        @DisplayName("음수 quantity로 생성하면 예외가 발생한다.")
+        @Test
+        fun `throws exception when quantity is negative`() {
+            // given
+            val productId = 1L
+            val quantity = -1
+
+            // when & then
+            val exception = assertThrows<CoreException> {
+                Stock.create(productId, quantity)
+            }
+
+            assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+            assertThat(exception.message).isEqualTo("재고는 0 이상이어야 합니다.")
+        }
+    }
+
     @DisplayName("재고 추가 테스트")
     @Nested
     inner class Increase {
@@ -20,13 +55,14 @@ class StockTest {
         @ValueSource(ints = [1, 3, 10])
         fun `increase stock when valid amount is provided`(amount: Int) {
             // given
-            val stock = createStock()
+            val initialQuantity = 10
+            val stock = createStock(quantity = initialQuantity)
 
             // when
-            val increasedStock = stock.increase(amount)
+            stock.increase(amount)
 
             // then
-            assertThat(increasedStock.amount).isEqualTo(stock.amount + amount)
+            assertThat(stock.quantity).isEqualTo(initialQuantity + amount)
         }
 
         @DisplayName("0 이하로 재고를 증가시키면 예외가 발생한다.")
@@ -56,16 +92,14 @@ class StockTest {
         @ValueSource(ints = [1, 3, 10])
         fun `decrease stock when valid amount is provided`(decreaseAmount: Int) {
             // given
-            val existAmount = 10
-            val stock = createStock(
-                amount = existAmount,
-            )
+            val existQuantity = 10
+            val stock = createStock(quantity = existQuantity)
 
             // when
-            val decreasedStock = stock.decrease(decreaseAmount)
+            stock.decrease(decreaseAmount)
 
             // then
-            assertThat(decreasedStock.amount).isEqualTo(stock.amount - decreaseAmount)
+            assertThat(stock.quantity).isEqualTo(existQuantity - decreaseAmount)
         }
 
         @DisplayName("0 이하로 재고를 감소시키면 예외가 발생한다.")
@@ -89,10 +123,8 @@ class StockTest {
         @Test
         fun `throws exception when decrease amount is greater than exist amount`() {
             // given
-            val existAmount = 10
-            val stock = createStock(
-                amount = existAmount,
-            )
+            val existQuantity = 10
+            val stock = createStock(quantity = existQuantity)
 
             // when
             val decreaseAmount = 20
@@ -106,9 +138,10 @@ class StockTest {
         }
     }
 
-    fun createStock(
-        amount: Int = 10,
+    private fun createStock(
+        productId: Long = 1L,
+        quantity: Int = 10,
     ): Stock {
-        return Stock.of(amount)
+        return Stock.create(productId, quantity)
     }
 }

@@ -9,6 +9,7 @@ import com.loopers.domain.product.ProductSortType
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
@@ -24,6 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest
 class ProductFacadeIntegrationTest @Autowired constructor(
     private val productFacade: ProductFacade,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val brandRepository: BrandRepository,
     private val cacheTemplate: CacheTemplate,
@@ -57,15 +59,16 @@ class ProductFacadeIntegrationTest @Autowired constructor(
         @DisplayName("상품을 두 번 조회하면 두 번째는 캐시에서 조회된다")
         fun `use cache when product is fetched twice`() {
             // given
-            val originalProduct = createProduct(price = Money.krw(10000))
+            val originalProduct = createProduct(price = Money.krw(10000), stockQuantity = 100)
 
             // given - 첫 번째 조회 (캐시 저장)
             val firstResult = productFacade.findProductById(originalProduct.id)
             val cachedStock = firstResult.stock
 
             // given - 원본 데이터 수정
-            originalProduct.decreaseStock(1)
-            productRepository.save(originalProduct)
+            val stock = stockRepository.findByProductId(originalProduct.id)!!
+            stock.decrease(1)
+            stockRepository.save(stock)
 
             // when
             val cachedResult = productFacade.findProductById(originalProduct.id)
@@ -237,9 +240,9 @@ class ProductFacadeIntegrationTest @Autowired constructor(
         @DisplayName("목록 캐시 히트 시 detail 캐시를 먼저 조회하고 없는 것만 DB에서 가져온다")
         fun `use detail cache and fetch missing from db when list cache hits`() {
             // given - 상품 3개 생성
-            val product1 = createProduct(name = "상품1", price = Money.krw(1000))
-            val product2 = createProduct(name = "상품2", price = Money.krw(2000))
-            val product3 = createProduct(name = "상품3", price = Money.krw(3000))
+            val product1 = createProduct(name = "상품1", price = Money.krw(1000), stockQuantity = 100)
+            val product2 = createProduct(name = "상품2", price = Money.krw(2000), stockQuantity = 100)
+            val product3 = createProduct(name = "상품3", price = Money.krw(3000), stockQuantity = 100)
 
             val criteria = ProductCriteria.FindProducts(
                 page = 0,
@@ -257,9 +260,10 @@ class ProductFacadeIntegrationTest @Autowired constructor(
             cacheTemplate.evict(product2CacheKey)
 
             // given - product2의 재고 변경
-            val originalStock = product2.stock
-            product2.decreaseStock(10)
-            productRepository.save(product2)
+            val originalStock = stockRepository.findByProductId(product2.id)!!
+            val originalQuantity = originalStock.quantity
+            originalStock.decrease(10)
+            stockRepository.save(originalStock)
 
             // when - 두 번째 조회 (목록 캐시 히트, detail 캐시 부분 히트)
             val secondResult = productFacade.findProducts(criteria)
@@ -273,7 +277,7 @@ class ProductFacadeIntegrationTest @Autowired constructor(
             assertThat(resultProduct1!!.price).isEqualTo(Money.krw(1000)) // 캐시된 값
 
             assertThat(resultProduct2).isNotNull()
-            assertThat(resultProduct2!!.stock.amount).isEqualTo(originalStock.amount - 10) // DB에서 가져온 값 (재고 감소 확인)
+            assertThat(resultProduct2!!.stock).isEqualTo(originalQuantity - 10) // DB에서 가져온 값 (재고 감소 확인)
 
             assertThat(resultProduct3).isNotNull()
             assertThat(resultProduct3!!.price).isEqualTo(Money.krw(3000)) // 캐시된 값
@@ -284,7 +288,7 @@ class ProductFacadeIntegrationTest @Autowired constructor(
                 object : com.fasterxml.jackson.core.type.TypeReference<com.loopers.domain.product.ProductView>() {},
             )
             assertThat(product2CachedAgain).isNotNull()
-            assertThat(product2CachedAgain!!.product.stock.amount).isEqualTo(originalStock.amount - 10)
+            assertThat(product2CachedAgain!!.stock.quantity).isEqualTo(originalQuantity - 10)
         }
 
         @Test
@@ -323,7 +327,7 @@ class ProductFacadeIntegrationTest @Autowired constructor(
     private fun createProduct(
         name: String = "테스트 상품",
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
         brandId: Long? = null,
     ): Product {
         val brand = if (brandId != null) {
@@ -335,10 +339,10 @@ class ProductFacadeIntegrationTest @Autowired constructor(
         val product = Product.create(
             name = name,
             price = price,
-            stock = stock,
             brand = brand,
         )
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }

@@ -22,6 +22,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
@@ -55,6 +56,7 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
@@ -138,16 +140,16 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
 
     private fun createProduct(
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
         val product = Product.create(
             name = "테스트 상품",
             price = price,
-            stock = stock,
             brand = brand,
         )
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }
@@ -163,7 +165,7 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
     private fun createInProgressPayment(
         userId: Long = 1L,
     ): Payment {
-        val product = createProduct(price = Money.krw(10000), stock = Stock.of(100))
+        val product = createProduct(price = Money.krw(10000), stockQuantity = 100)
         createPointAccount(userId = userId, balance = Money.krw(100000))
 
         val order = Order.place(userId)
