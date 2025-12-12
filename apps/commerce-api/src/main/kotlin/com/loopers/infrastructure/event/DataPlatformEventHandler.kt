@@ -4,9 +4,7 @@ import com.loopers.domain.order.event.OrderCreatedEvent
 import com.loopers.domain.payment.event.PaymentCompletedEvent
 import com.loopers.infrastructure.dataplatform.DataPlatformClient
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
@@ -26,13 +24,11 @@ class DataPlatformEventHandler(
         coroutineScope.launch {
             try {
                 logger.info("주문 데이터 플랫폼 전송 시작: orderId=${event.orderId}")
-                withContext(Dispatchers.IO) {
-                    dataPlatformClient.sendOrderData(
-                        orderId = event.orderId,
-                        memberId = event.memberId,
-                        amount = event.orderAmount
-                    )
-                }
+                dataPlatformClient.sendOrderData(
+                    orderId = event.orderId,
+                    memberId = event.memberId,
+                    amount = event.orderAmount
+                )
                 logger.info("주문 데이터 플랫폼 전송 완료: orderId=${event.orderId}")
             } catch (e: Exception) {
                 logger.error("주문 데이터 플랫폼 전송 실패: orderId=${event.orderId}, error=${e.message}", e)
@@ -46,14 +42,12 @@ class DataPlatformEventHandler(
         coroutineScope.launch {
             try {
                 logger.info("결제 데이터 플랫폼 전송 시작: paymentId=${event.paymentId}")
-                withContext(Dispatchers.IO) {
-                    dataPlatformClient.sendPaymentData(
-                        paymentId = event.paymentId,
-                        orderId = event.orderId,
-                        memberId = event.memberId,
-                        amount = event.amount
-                    )
-                }
+                dataPlatformClient.sendPaymentData(
+                    paymentId = event.paymentId,
+                    orderId = event.orderId,
+                    memberId = event.memberId,
+                    amount = event.amount
+                )
                 logger.info("결제 데이터 플랫폼 전송 완료: paymentId=${event.paymentId}")
             } catch (e: Exception) {
                 logger.error("결제 데이터 플랫폼 전송 실패: paymentId=${event.paymentId}, error=${e.message}", e)

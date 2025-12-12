@@ -2,9 +2,7 @@ package com.loopers.domain.like.event
 
 import com.loopers.domain.product.ProductRepository
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
@@ -15,7 +13,6 @@ import org.springframework.transaction.event.TransactionalEventListener
 
 @Component
 class ProductLikeEventHandler(
-    private val productRepository: ProductRepository,
     @Qualifier("eventCoroutineScope")
     private val coroutineScope: CoroutineScope,
     private val productLikeEventProcessor: ProductLikeEventProcessor
@@ -26,9 +23,7 @@ class ProductLikeEventHandler(
     fun handleProductLiked(event: ProductLikedEvent) {
         coroutineScope.launch {
             try {
-                withContext(Dispatchers.IO) {
-                    productLikeEventProcessor.processProductLiked(event.productId)
-                }
+                productLikeEventProcessor.processProductLiked(event.productId)
             } catch (e: Exception) {
                 logger.error("좋아요 집계 실패: productId=${event.productId}", e)
             }
@@ -39,9 +34,7 @@ class ProductLikeEventHandler(
     fun handleProductUnliked(event: ProductUnlikedEvent) {
         coroutineScope.launch {
             try {
-                withContext(Dispatchers.IO) {
-                    productLikeEventProcessor.processProductUnliked(event.productId)
-                }
+                productLikeEventProcessor.processProductUnliked(event.productId)
             } catch (e: Exception) {
                 logger.error("좋아요 취소 집계 실패: productId=${event.productId}", e)
             }
