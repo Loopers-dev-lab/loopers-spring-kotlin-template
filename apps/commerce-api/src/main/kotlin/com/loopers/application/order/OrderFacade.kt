@@ -6,22 +6,31 @@ import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.CardInfo
-import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PgPaymentResult
 import com.loopers.domain.point.PointService
-import com.loopers.domain.product.ProductCommand
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductView
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
-import org.springframework.orm.ObjectOptimisticLockingFailureException
-import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
-import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.transaction.annotation.Transactional
 
+/**
+ * 주문 오케스트레이션 Facade
+ *
+ * placeOrder() 플로우:
+ * 1. 상품 조회 및 주문 생성 (OrderCreatedEventV1 발행 -> BEFORE_COMMIT에서 재고 차감)
+ * 2. 쿠폰 사용 (있는 경우)
+ * 3. 포인트 차감 (있는 경우)
+ * 4. 결제 생성 (PaymentCreatedEventV1 발행 -> ASYNC로 PG 결제 요청)
+ * 5. 즉시 응답 (PENDING 상태)
+ *
+ * PG 결제 실패 시 PaymentFailedEventV1 체인으로 자동 복구:
+ * - 포인트 복원, 쿠폰 복원
+ * - 주문 취소 (OrderCanceledEventV1 발행 -> BEFORE_COMMIT에서 재고 복원)
+ */
 @Component
 class OrderFacade(
     val productService: ProductService,
@@ -29,16 +38,21 @@ class OrderFacade(
     val pointService: PointService,
     val couponService: CouponService,
     val paymentService: PaymentService,
-    private val transactionTemplate: TransactionTemplate,
     private val cacheTemplate: CacheTemplate,
-    private val retryTemplate: RetryTemplate = RetryTemplate.builder()
-        .maxAttempts(2)
-        .uniformRandomBackoff(100, 500)
-        .retryOn(ObjectOptimisticLockingFailureException::class.java)
-        .build(),
 ) {
+    /**
+     * 주문을 생성합니다.
+     *
+     * 트랜잭션 내에서 주문, 쿠폰, 포인트, 결제를 처리하고 즉시 응답합니다.
+     * 재고 차감은 OrderCreatedEventV1 리스너(BEFORE_COMMIT)에서 처리됩니다.
+     * PG 결제 요청은 PaymentCreatedEventV1 리스너(ASYNC)에서 처리됩니다.
+     *
+     * @param criteria 주문 생성 조건
+     * @return 주문 정보 (PENDING 상태의 결제 포함)
+     */
+    @Transactional
     fun placeOrder(criteria: OrderCriteria.PlaceOrder): OrderInfo.PlaceOrder {
-        // 카드 정보 생성 (allocateResources에서 사용하므로 먼저 생성)
+        // 1. 카드 정보 생성
         val cardInfo = criteria.cardType?.let { cardType ->
             criteria.cardNo?.let { cardNo ->
                 CardInfo(
@@ -48,104 +62,64 @@ class OrderFacade(
             }
         }
 
-        // 1. 리소스 할당 (with retry)
-        val allocationResult = retryTemplate.execute<ResourceAllocationResult, Exception> {
-            allocateResources(criteria, cardInfo)
-        }
-        val payment = allocationResult.payment
-        updateProductCache(allocationResult.productViews)
+        // 2. 상품 조회
+        val productIds = criteria.items.map { it.productId }
+        val productViews = productService.findAllProductViewByIds(productIds)
+        val productMap = productViews.map { it.product }.associateBy { it.id }
 
-        // 2. PG 결제 요청
-        val result = paymentService.requestPgPayment(PaymentCommand.RequestPgPayment(payment.id, cardInfo))
+        // 3. 주문 생성 (OrderCreatedEventV1 발행 -> BEFORE_COMMIT에서 재고 차감)
+        val placeOrderItems = criteria.items.map { item ->
+            val product = productMap[item.productId]
+                ?: throw CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다.")
 
-        // 3. 결과에 따른 후속 처리
-        if (result is PgPaymentResult.Failed) {
-            retryTemplate.execute<Unit, Exception> {
-                recoverResources(result.payment)
-            }
-            throw CoreException(
-                ErrorType.INTERNAL_ERROR,
-                "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
+            OrderCommand.PlaceOrderItem(
+                productId = item.productId,
+                quantity = item.quantity,
+                currentPrice = product.price,
+                productName = product.name,
             )
         }
 
+        val placeCommand = OrderCommand.PlaceOrder(
+            userId = criteria.userId,
+            items = placeOrderItems,
+        )
+
+        val order = orderService.place(placeCommand)
+
+        // 4. 쿠폰 사용 (있는 경우)
+        val orderAmount = order.totalAmount
+        val couponDiscount = criteria.issuedCouponId?.let { issuedCouponId ->
+            couponService.useCoupon(criteria.userId, issuedCouponId, orderAmount)
+        } ?: Money.ZERO_KRW
+
+        // 5. 포인트 차감 (0원 초과인 경우에만)
+        if (criteria.usePoint > Money.ZERO_KRW) {
+            pointService.deduct(criteria.userId, criteria.usePoint)
+        }
+
+        // 6. 결제 생성 (PaymentCreatedEventV1 발행 -> ASYNC로 PG 결제 요청)
+        val payment = paymentService.create(
+            PaymentCommand.Create(
+                userId = criteria.userId,
+                orderId = order.id,
+                totalAmount = order.totalAmount,
+                usedPoint = criteria.usePoint,
+                issuedCouponId = criteria.issuedCouponId,
+                couponDiscount = couponDiscount,
+                cardInfo = cardInfo,
+            ),
+        )
+
+        // 7. 상품 캐시 업데이트
+        updateProductCache(productViews)
+
+        // 8. 즉시 응답 (PENDING 상태, PG 결제는 비동기로 진행)
         return OrderInfo.PlaceOrder(
-            orderId = allocationResult.orderId,
+            orderId = order.id,
             paymentId = payment.id,
             paymentStatus = payment.status,
         )
-    }
-
-    /**
-     * TX1: 리소스 할당
-     * - 재고 차감
-     * - 쿠폰 사용
-     * - 포인트 차감
-     * - PENDING 결제 생성
-     * - 주문 생성
-     */
-    private fun allocateResources(criteria: OrderCriteria.PlaceOrder, cardInfo: CardInfo?): ResourceAllocationResult {
-        return transactionTemplate.execute { _ ->
-            // 1. 재고 차감
-            val productIds = criteria.items.map { it.productId }
-            productService.decreaseStocks(criteria.to())
-
-            // 2. 재고가 변경된 상품의 최신 정보 조회
-            val productViews = productService.findAllProductViewByIds(productIds)
-
-            // 3. 주문 생성을 위한 상품 맵 생성
-            val productMap = productViews.map { it.product }.associateBy { it.id }
-
-            val placeOrderItems = criteria.items.map { item ->
-                val product = productMap[item.productId]
-                    ?: throw CoreException(ErrorType.INTERNAL_ERROR, "상품을 찾을 수 없습니다.")
-
-                OrderCommand.PlaceOrderItem(
-                    productId = item.productId,
-                    quantity = item.quantity,
-                    currentPrice = product.price,
-                    productName = product.name,
-                )
-            }
-
-            val placeCommand = OrderCommand.PlaceOrder(
-                userId = criteria.userId,
-                items = placeOrderItems,
-            )
-
-            val order = orderService.place(placeCommand)
-
-            // 4. 주문 금액에서 쿠폰 할인 적용 (있는 경우)
-            val orderAmount = order.totalAmount
-            val couponDiscount = criteria.issuedCouponId?.let { issuedCouponId ->
-                couponService.useCoupon(criteria.userId, issuedCouponId, orderAmount)
-            } ?: Money.ZERO_KRW
-
-            // 5. 포인트 차감 (0원 초과인 경우에만)
-            if (criteria.usePoint > Money.ZERO_KRW) {
-                pointService.deduct(criteria.userId, criteria.usePoint)
-            }
-
-            // 6. PENDING 결제 생성 (paidAmount = totalAmount - usePoint - couponDiscount 자동 계산)
-            val payment = paymentService.create(
-                PaymentCommand.Create(
-                    userId = criteria.userId,
-                    orderId = order.id,
-                    totalAmount = order.totalAmount,
-                    usedPoint = criteria.usePoint,
-                    issuedCouponId = criteria.issuedCouponId,
-                    couponDiscount = couponDiscount,
-                    cardInfo = cardInfo,
-                ),
-            )
-
-            // 결제는 PENDING 상태로 유지, PG 결과 수신 후 initiate()로 IN_PROGRESS 전이
-            ResourceAllocationResult(
-                orderId = order.id,
-                payment = payment,
-                productViews = productViews,
-            )
-        }!!
     }
 
     /**
@@ -156,34 +130,4 @@ class OrderFacade(
             .associateBy { ProductCacheKeys.ProductDetail(productId = it.product.id) }
         cacheTemplate.putAll(productCacheKeys)
     }
-
-    /**
-     * 리소스 복구 (포인트, 쿠폰, 재고)
-     */
-    private fun recoverResources(payment: Payment) {
-        transactionTemplate.execute { _ ->
-            if (payment.usedPoint > Money.ZERO_KRW) {
-                pointService.restore(payment.userId, payment.usedPoint)
-            }
-            payment.issuedCouponId?.let { couponId ->
-                couponService.cancelCouponUse(couponId)
-            }
-            val order = orderService.findById(payment.orderId)
-            val increaseUnits = order.orderItems.map {
-                ProductCommand.IncreaseStockUnit(productId = it.productId, amount = it.quantity)
-            }
-            productService.increaseStocks(ProductCommand.IncreaseStocks(units = increaseUnits))
-
-            orderService.cancelOrder(payment.orderId)
-        }
-    }
-
-    /**
-     * 리소스 할당 결과
-     */
-    private data class ResourceAllocationResult(
-        val orderId: Long,
-        val payment: Payment,
-        val productViews: List<ProductView>,
-    )
 }

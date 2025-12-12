@@ -42,9 +42,11 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock
+import org.awaitility.Awaitility.await
 import org.springframework.test.context.TestPropertySource
 import java.time.Instant
 import java.time.ZonedDateTime
+import java.util.concurrent.TimeUnit
 
 /**
  * PaymentFacade 통합 테스트
@@ -98,9 +100,11 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // when
             paymentFacade.processCallback(callbackCriteria(payment))
 
-            // then
-            val updatedOrder = orderRepository.findById(payment.orderId)!!
-            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+            // then - 주문 완료는 @Async 핸들러에서 처리되므로 비동기 완료 대기
+            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
+                val updatedOrder = orderRepository.findById(payment.orderId)!!
+                assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+            }
         }
 
         @Test
@@ -195,6 +199,12 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
 
             paymentFacade.processCallback(callbackCriteria(payment))
 
+            // 첫 번째 콜백의 비동기 주문 완료 대기
+            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
+                val order = orderRepository.findById(payment.orderId)!!
+                assertThat(order.status).isEqualTo(OrderStatus.PAID)
+            }
+
             // when - 중복 콜백 (예외 없이 처리되어야 함)
             paymentFacade.processCallback(callbackCriteria(payment))
 
@@ -218,9 +228,11 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // when
             paymentFacade.processInProgressPayment(payment.id)
 
-            // then
-            val updatedOrder = orderRepository.findById(payment.orderId)!!
-            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+            // then - 주문 완료는 @Async 핸들러에서 처리되므로 비동기 완료 대기
+            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
+                val updatedOrder = orderRepository.findById(payment.orderId)!!
+                assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+            }
         }
 
         @Test

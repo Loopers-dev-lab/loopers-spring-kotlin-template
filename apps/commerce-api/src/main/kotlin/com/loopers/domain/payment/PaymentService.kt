@@ -89,6 +89,7 @@ class PaymentService(
                     ),
                 )
             }
+
             is ConfirmResult.Failed -> {
                 eventPublisher.publishEvent(
                     PaymentFailedEventV1(
@@ -100,7 +101,10 @@ class PaymentService(
                     ),
                 )
             }
-            is ConfirmResult.StillInProgress -> { /* No event, still waiting */ }
+
+            is ConfirmResult.StillInProgress -> {
+                /* No event, still waiting */
+            }
         }
 
         return result
@@ -129,6 +133,33 @@ class PaymentService(
 
         val result = payment.confirmPayment(transactions, currentTime)
         paymentRepository.save(payment)
+
+        when (result) {
+            is ConfirmResult.Paid -> {
+                eventPublisher.publishEvent(
+                    PaymentPaidEventV1(
+                        paymentId = payment.id,
+                        orderId = payment.orderId,
+                    ),
+                )
+            }
+
+            is ConfirmResult.Failed -> {
+                eventPublisher.publishEvent(
+                    PaymentFailedEventV1(
+                        paymentId = payment.id,
+                        orderId = payment.orderId,
+                        userId = payment.userId,
+                        usedPoint = payment.usedPoint,
+                        issuedCouponId = payment.issuedCouponId,
+                    ),
+                )
+            }
+
+            is ConfirmResult.StillInProgress -> {
+                /* No event, still waiting */
+            }
+        }
 
         return result
     }
@@ -175,6 +206,7 @@ class PaymentService(
      * @param currentTime 현재 시각
      * @return PgPaymentResult - 결제 결과
      */
+    @Transactional
     fun requestPgPayment(
         paymentId: Long,
         currentTime: Instant = Instant.now(),
@@ -208,6 +240,7 @@ class PaymentService(
                     ),
                 )
             }
+
             is PgPaymentResult.Failed -> {
                 eventPublisher.publishEvent(
                     PaymentFailedEventV1(
@@ -219,7 +252,10 @@ class PaymentService(
                     ),
                 )
             }
-            is PgPaymentResult.InProgress -> { /* No event, wait for callback */ }
+
+            is PgPaymentResult.InProgress -> {
+                /* No event, wait for callback */
+            }
         }
     }
 }
