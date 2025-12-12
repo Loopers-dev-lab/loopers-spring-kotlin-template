@@ -17,6 +17,6 @@ class OrderRdbRepository(
     }
 
     override fun save(order: Order): Order {
-        return orderJpaRepository.save(order)
+        return orderJpaRepository.saveAndFlush(order)
     }
 }

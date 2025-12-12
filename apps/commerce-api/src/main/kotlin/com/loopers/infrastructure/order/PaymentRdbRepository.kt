@@ -74,6 +74,6 @@ class PaymentRdbRepository(
     }
 
     override fun save(payment: Payment): Payment {
-        return paymentJpaRepository.save(payment)
+        return paymentJpaRepository.saveAndFlush(payment)
     }
 }
