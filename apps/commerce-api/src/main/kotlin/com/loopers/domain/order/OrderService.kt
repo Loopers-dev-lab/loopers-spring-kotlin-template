@@ -3,6 +3,7 @@ package com.loopers.domain.order
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional
 class OrderService(
     private val orderRepository: OrderRepository,
     private val paymentRepository: PaymentRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional
     fun place(command: OrderCommand.PlaceOrder): Order {
@@ -21,7 +23,21 @@ class OrderService(
                 newOrder.addOrderItem(it.productId, it.quantity, it.productName, it.currentPrice)
             }
 
-        return orderRepository.save(newOrder)
+        val savedOrder = orderRepository.save(newOrder)
+
+        eventPublisher.publishEvent(
+            OrderCreatedEventV1(
+                orderId = savedOrder.id,
+                orderItems = savedOrder.orderItems.map {
+                    OrderCreatedEventV1.OrderItemSnapshot(
+                        productId = it.productId,
+                        quantity = it.quantity,
+                    )
+                },
+            ),
+        )
+
+        return savedOrder
     }
 
     /**
@@ -41,7 +57,21 @@ class OrderService(
 
         order.cancel()
 
-        return orderRepository.save(order)
+        val savedOrder = orderRepository.save(order)
+
+        eventPublisher.publishEvent(
+            OrderCanceledEventV1(
+                orderId = savedOrder.id,
+                orderItems = savedOrder.orderItems.map {
+                    OrderCreatedEventV1.OrderItemSnapshot(
+                        productId = it.productId,
+                        quantity = it.quantity,
+                    )
+                },
+            ),
+        )
+
+        return savedOrder
     }
 
     /**
