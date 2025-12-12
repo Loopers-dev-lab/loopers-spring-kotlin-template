@@ -3,6 +3,7 @@ package com.loopers.interfaces.event.order
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.payment.PaymentFailedEventV1
 import com.loopers.domain.payment.PaymentPaidEventV1
+import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
@@ -18,7 +19,7 @@ class OrderEventListener(
         orderService.completePayment(event.orderId)
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    @EventListener()
     fun onPaymentFailed(event: PaymentFailedEventV1) {
         orderService.cancelOrder(event.orderId)
     }

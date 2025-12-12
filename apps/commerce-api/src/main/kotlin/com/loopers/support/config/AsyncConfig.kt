@@ -14,8 +14,10 @@ class AsyncConfig {
         val executor = ThreadPoolTaskExecutor()
         executor.corePoolSize = 2
         executor.maxPoolSize = 10
-        executor.queueCapacity = 100
+        executor.queueCapacity = 1000
         executor.setThreadNamePrefix("event-async-")
+        executor.setWaitForTasksToCompleteOnShutdown(true)
+        executor.setAwaitTerminationSeconds(10)
         executor.initialize()
         return executor
     }
