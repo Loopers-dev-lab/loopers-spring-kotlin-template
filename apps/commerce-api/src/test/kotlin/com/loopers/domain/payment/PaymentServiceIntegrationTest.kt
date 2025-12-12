@@ -10,6 +10,8 @@ import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.point.PointAccount
+import com.loopers.domain.point.PointAccountRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -48,6 +50,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     private val paymentService: PaymentService,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
+    private val pointAccountRepository: PointAccountRepository,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
@@ -697,6 +700,10 @@ class PaymentServiceIntegrationTest @Autowired constructor(
 
     private fun createPendingPayment(): Payment {
         val order = createOrder()
+        // PaymentEventListener가 PaymentFailedEventV1을 처리할 때 포인트 복구가 가능하도록 포인트 계좌 생성
+        if (pointAccountRepository.findByUserId(1L) == null) {
+            pointAccountRepository.save(PointAccount.of(userId = 1L, balance = Money.krw(10000)))
+        }
         return paymentRepository.save(
             Payment.create(
                 userId = 1L,
