@@ -12,7 +12,7 @@ data class PaymentFailedEventV1(
     val usedPoint: Money,
     val issuedCouponId: Long?,
     override val eventId: String = UUID.randomUUID().toString(),
-    override val eventType: String = "PaymentFailedEventV1",
+    override val eventType: String = "PaymentFailedEvent",
     override val aggregateId: String = paymentId.toString(),
     override val aggregateType: String = "Payment",
     override val occurredAt: Instant = Instant.now(),

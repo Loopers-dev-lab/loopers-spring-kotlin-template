@@ -8,7 +8,7 @@ data class LikeCanceledEventV1(
     val userId: Long,
     val productId: Long,
     override val eventId: String = UUID.randomUUID().toString(),
-    override val eventType: String = "LikeCanceledEventV1",
+    override val eventType: String = "LikeCanceledEvent",
     override val aggregateId: String = productId.toString(),
     override val aggregateType: String = "ProductLike",
     override val occurredAt: Instant = Instant.now(),

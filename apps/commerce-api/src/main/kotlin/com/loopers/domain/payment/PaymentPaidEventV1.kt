@@ -8,7 +8,7 @@ data class PaymentPaidEventV1(
     val paymentId: Long,
     val orderId: Long,
     override val eventId: String = UUID.randomUUID().toString(),
-    override val eventType: String = "PaymentPaidEventV1",
+    override val eventType: String = "PaymentPaidEvent",
     override val aggregateId: String = paymentId.toString(),
     override val aggregateType: String = "Payment",
     override val occurredAt: Instant = Instant.now(),
