@@ -169,8 +169,8 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
-            assertThat((result as PgPaymentResult.Success).payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+            assertThat(result).isInstanceOf(PgPaymentResult.InProgress::class.java)
+            assertThat((result as PgPaymentResult.InProgress).payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
         }
 
         @Test
@@ -250,7 +250,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
+            assertThat(result).isInstanceOf(PgPaymentResult.NotRequired::class.java)
         }
     }
 

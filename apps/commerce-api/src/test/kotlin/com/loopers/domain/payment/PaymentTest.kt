@@ -379,7 +379,7 @@ class PaymentTest {
     @Nested
     inner class Initiate {
 
-        @DisplayName("PENDING 상태에서 Accepted 결과로 시작하면 IN_PROGRESS로 전이되고 Success를 반환한다")
+        @DisplayName("PENDING 상태에서 Accepted 결과로 시작하면 IN_PROGRESS로 전이되고 InProgress를 반환한다")
         @Test
         fun `transitions to IN_PROGRESS with transactionKey when initiate with Accepted`() {
             // given
@@ -391,14 +391,14 @@ class PaymentTest {
             val result = payment.initiate(PgPaymentCreateResult.Accepted(transactionKey), attemptedAt)
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
-            assertThat((result as PgPaymentResult.Success).payment).isEqualTo(payment)
+            assertThat(result).isInstanceOf(PgPaymentResult.InProgress::class.java)
+            assertThat((result as PgPaymentResult.InProgress).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
             assertThat(payment.externalPaymentKey).isEqualTo(transactionKey)
             assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
         }
 
-        @DisplayName("PENDING 상태에서 Uncertain 결과로 시작하면 IN_PROGRESS로 전이되고 Success를 반환한다")
+        @DisplayName("PENDING 상태에서 Uncertain 결과로 시작하면 IN_PROGRESS로 전이되고 InProgress를 반환한다")
         @Test
         fun `transitions to IN_PROGRESS without transactionKey when initiate with Uncertain`() {
             // given
@@ -409,14 +409,14 @@ class PaymentTest {
             val result = payment.initiate(PgPaymentCreateResult.Uncertain, attemptedAt)
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
-            assertThat((result as PgPaymentResult.Success).payment).isEqualTo(payment)
+            assertThat(result).isInstanceOf(PgPaymentResult.InProgress::class.java)
+            assertThat((result as PgPaymentResult.InProgress).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
             assertThat(payment.externalPaymentKey).isNull()
             assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
         }
 
-        @DisplayName("PENDING 상태에서 NotRequired 결과로 시작하면 PAID로 전이되고 Success를 반환한다")
+        @DisplayName("PENDING 상태에서 NotRequired 결과로 시작하면 PAID로 전이되고 NotRequired를 반환한다")
         @Test
         fun `transitions to PAID when initiate with NotRequired`() {
             // given
@@ -427,8 +427,8 @@ class PaymentTest {
             val result = payment.initiate(PgPaymentCreateResult.NotRequired, attemptedAt)
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
-            assertThat((result as PgPaymentResult.Success).payment).isEqualTo(payment)
+            assertThat(result).isInstanceOf(PgPaymentResult.NotRequired::class.java)
+            assertThat((result as PgPaymentResult.NotRequired).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
             assertThat(payment.externalPaymentKey).isNull()
             assertThat(payment.attemptedAt).isEqualTo(attemptedAt)
