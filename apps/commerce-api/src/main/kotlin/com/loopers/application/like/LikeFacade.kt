@@ -13,18 +13,12 @@ class LikeFacade(
     @Transactional
     fun addLike(userId: Long, productId: Long) {
         productService.findProductById(productId)
-        val likeResult = likeService.addLike(userId, productId)
-        if (likeResult.isChanged) {
-            productService.increaseProductLikeCount(productId)
-        }
+        likeService.addLike(userId, productId)
     }
 
     @Transactional
     fun removeLike(userId: Long, productId: Long) {
         productService.findProductById(productId)
-        val likeResult = likeService.removeLike(userId, productId)
-        if (likeResult.isChanged) {
-            productService.decreaseProductLikeCount(productId)
-        }
+        likeService.removeLike(userId, productId)
     }
 }
