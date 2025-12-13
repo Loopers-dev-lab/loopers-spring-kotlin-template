@@ -39,7 +39,7 @@ class LikeService(
         } catch (e: DataIntegrityViolationException) {
             // 동시 요청으로 인한 중복 insert 시도 - 기존 데이터 반환
             likeRepository.findByMemberIdAndProductId(member.id, productId)
-                ?: throw CoreException(ErrorType.INTERNAL_ERROR, "동시 요청 처리 중 일시적 오류 발생")
+                ?: throw CoreException(ErrorType.INTERNAL_ERROR, "좋아요 데이터 조회 실패 - DB 상태 확인 필요")
         }
     }
 
@@ -76,8 +76,8 @@ class LikeService(
         val like = likeRepository.findByMemberIdAndProductId(member.id, productId)
             ?: return
 
-        // 좋아요 삭제
-        likeRepository.deleteByMemberIdAndProductId(member.id, productId)
+        // 좋아요 삭제 (이미 조회한 엔티티를 직접 삭제)
+        likeRepository.delete(like)
 
         // 이벤트 발행 (집계는 이벤트 핸들러에서)
         eventPublisher.publishEvent(
