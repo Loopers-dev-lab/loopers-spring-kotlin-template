@@ -10,10 +10,8 @@ import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.payment.CardInfo
 import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
-import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentRepository
-import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -54,7 +52,6 @@ import java.time.Instant
 @DisplayName("PaymentWebhookV1Api E2E 테스트")
 class PaymentWebhookV1ApiE2ETest @Autowired constructor(
     private val testRestTemplate: TestRestTemplate,
-    private val paymentService: PaymentService,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
@@ -270,19 +267,21 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
         )
         val savedOrder = orderRepository.save(order)
 
-        val payment = paymentService.create(
-            PaymentCommand.Create(
-                userId = userId,
-                orderId = savedOrder.id,
-                totalAmount = savedOrder.totalAmount,
-                usedPoint = Money.krw(5000),
-                issuedCouponId = null,
-                couponDiscount = Money.ZERO_KRW,
-                cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
-            ),
-        )
+        val totalAmount = savedOrder.totalAmount
+        val usedPoint = Money.krw(5000)
+        val paidAmount = totalAmount - usedPoint
 
-        payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
+        val payment = Payment.of(
+            orderId = savedOrder.id,
+            userId = userId,
+            totalAmount = totalAmount,
+            usedPoint = usedPoint,
+            paidAmount = paidAmount,
+            status = PaymentStatus.IN_PROGRESS,
+            cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
+            externalPaymentKey = "tx_test_1",
+            attemptedAt = Instant.now(),
+        )
         return paymentRepository.save(payment)
     }
 
