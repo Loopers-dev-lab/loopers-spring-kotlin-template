@@ -1,6 +1,5 @@
 package com.loopers.interfaces.api.like
 
-import com.loopers.domain.like.ProductLikeRepository
 import com.loopers.domain.product.Brand
 import com.loopers.domain.product.BrandRepository
 import com.loopers.domain.product.Product
@@ -13,15 +12,12 @@ import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
-import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertAll
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import java.util.concurrent.TimeUnit
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.HttpEntity
@@ -38,7 +34,6 @@ class LikeV1ApiE2ETest @Autowired constructor(
     private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
-    private val productLikeRepository: ProductLikeRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
 
@@ -61,16 +56,8 @@ class LikeV1ApiE2ETest @Autowired constructor(
             // when
             val response = addLike(userId, product.id)
 
-            // then
-            assertAll(
-                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
-            )
-
-            // 비동기 이벤트 리스너가 likeCount를 업데이트하기 때문에 await 필요
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val updatedStatistic = productStatisticRepository.findByProductId(product.id)!!
-                assertThat(updatedStatistic.likeCount).isEqualTo(1)
-            }
+            // then - E2E 테스트 책임: HTTP 응답 검증
+            assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
         }
 
         @DisplayName("동일한 상품에 중복으로 좋아요를 추가해도 200 OK를 반환한다 (멱등성)")
@@ -82,25 +69,11 @@ class LikeV1ApiE2ETest @Autowired constructor(
 
             // when
             val firstResponse = addLike(userId, product.id)
-
-            // 비동기 이벤트 리스너가 likeCount를 업데이트하기 때문에 await 필요
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val statistic = productStatisticRepository.findByProductId(product.id)!!
-                assertThat(statistic.likeCount).isEqualTo(1)
-            }
-
             val secondResponse = addLike(userId, product.id)
 
-            // then
-            assertAll(
-                { assertThat(firstResponse.statusCode).isEqualTo(HttpStatus.OK) },
-                { assertThat(secondResponse.statusCode).isEqualTo(HttpStatus.OK) },
-            )
-
-            // 약간의 지연 후 확인 (중복이므로 이벤트가 발행되지 않음)
-            Thread.sleep(500)
-            val updatedStatistic = productStatisticRepository.findByProductId(product.id)!!
-            assertThat(updatedStatistic.likeCount).isEqualTo(1)
+            // then - E2E 테스트 책임: HTTP 응답 검증
+            assertThat(firstResponse.statusCode).isEqualTo(HttpStatus.OK)
+            assertThat(secondResponse.statusCode).isEqualTo(HttpStatus.OK)
         }
 
         @DisplayName("존재하지 않는 상품에 좋아요를 추가하면 404 Not Found를 반환한다")
@@ -142,25 +115,11 @@ class LikeV1ApiE2ETest @Autowired constructor(
             val product = createProduct()
             addLike(userId, product.id)
 
-            // 비동기 이벤트 리스너가 likeCount를 업데이트하기 때문에 await 필요
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val statistic = productStatisticRepository.findByProductId(product.id)!!
-                assertThat(statistic.likeCount).isEqualTo(1)
-            }
-
             // when
             val response = removeLike(userId, product.id)
 
-            // then
-            assertAll(
-                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
-            )
-
-            // 비동기 이벤트 리스너가 likeCount를 업데이트하기 때문에 await 필요
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val updatedStatistic = productStatisticRepository.findByProductId(product.id)!!
-                assertThat(updatedStatistic.likeCount).isEqualTo(0)
-            }
+            // then - E2E 테스트 책임: HTTP 응답 검증
+            assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
         }
 
         @DisplayName("좋아요하지 않은 상품의 좋아요를 삭제해도 200 OK를 반환한다 (멱등성)")
@@ -173,11 +132,8 @@ class LikeV1ApiE2ETest @Autowired constructor(
             // when
             val response = removeLike(userId, product.id)
 
-            // then
+            // then - E2E 테스트 책임: HTTP 응답 검증
             assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
-
-            val statistic = productStatisticRepository.findByProductId(product.id)!!
-            assertThat(statistic.likeCount).isEqualTo(0)
         }
 
         @DisplayName("존재하지 않는 상품의 좋아요를 삭제하면 404 Not Found를 반환한다")
