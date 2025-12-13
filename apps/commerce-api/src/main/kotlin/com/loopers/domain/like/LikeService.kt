@@ -5,10 +5,10 @@ import com.loopers.domain.like.event.ProductUnlikedEvent
 import com.loopers.domain.member.Member
 import com.loopers.domain.member.MemberRepository
 import com.loopers.domain.product.ProductRepository
-import com.loopers.support.event.ActionType
-import com.loopers.support.event.EntityType
-import com.loopers.support.event.UserActionEvent
+import com.loopers.support.error.CoreException
+import com.loopers.support.error.ErrorType
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -33,15 +33,22 @@ class LikeService(
             return existingLike
         }
 
-        // 좋아요 저장 (집계는 제거)
-        val product = productRepository.findByIdOrThrow(productId) // 락 제거
-        val like = Like.of(member, product)
-        val savedLike = likeRepository.save(like)
+        try {
+            // 좋아요 저장
+            val product = productRepository.findByIdOrThrow(productId)
+            val like = Like.of(member, product)
+            val savedLike = likeRepository.save(like)
 
-        // 이벤트 발행 (집계는 이벤트 핸들러에서)
-        publishProductLikedEvent(savedLike, member, productId)
+            // 이벤트 발행 (집계는 이벤트 핸들러에서)
+            publishProductLikedEvent(savedLike, member, productId)
 
-        return savedLike
+            return savedLike
+        } catch (e: DataIntegrityViolationException) {
+            // 동시 요청으로 인한 중복 insert 시도 - 기존 데이터 반환
+            return likeRepository.findByMemberIdAndProductId(member.id, productId)
+                ?: throw CoreException(ErrorType.INTERNAL_ERROR, "좋아요 생성 중 오류 발생")
+        }
+
     }
 
     private fun publishProductLikedEvent(
@@ -57,18 +64,6 @@ class LikeService(
                 productId = productId,
                 likedAt = Instant.now(),
             ),
-        )
-
-        // 사용자 행동 로깅을 위한 이벤트
-        eventPublisher.publishEvent(
-            UserActionEvent(
-                userId = member.memberId.value,
-                actionType = ActionType.LIKE,
-                targetEntityType = EntityType.PRODUCT,
-                targetEntityId = productId,
-                metadata = mapOf("likeId" to savedLike.id.toString()),
-                occurredAt = Instant.now()
-            )
         )
     }
 

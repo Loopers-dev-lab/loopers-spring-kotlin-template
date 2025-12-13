@@ -14,7 +14,9 @@ class PaymentRecoveryTransactionService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Transactional(propagation= Propagation.REQUIRES_NEW)
-    fun handlePaymentSuccess(orderId: Long, payment: Payment) {
+    fun handlePaymentSuccess(orderId: Long, paymentId: Long) {
+        val payment = paymentRepository.findByIdOrThrow(paymentId)
+
         orderService.completeOrderWithPayment(orderId)
 
         payment.markAsSuccess()
@@ -24,13 +26,15 @@ class PaymentRecoveryTransactionService(
     }
 
     @Transactional(propagation= Propagation.REQUIRES_NEW)
-    fun handlePaymentFailure(orderId: Long, payment: Payment, reason: String?) {
+    fun handlePaymentFailure(orderId: Long, paymentId: Long, reason: String?) {
+        val payment = paymentRepository.findByIdOrThrow(paymentId)
+
         payment.markAsFailed(reason ?: "PG에서 결제 실패")
         paymentRepository.save(payment)
 
         orderService.failOrder(orderId)
 
-        logger.info("결제 실패 처리 완료: orderId=$orderId, reason={$reason ?: 'PG에서 결제 실패'}")
+        logger.info("결제 실패 처리 완료: orderId={}, reason={}", orderId, reason ?: "PG에서 결제 실패")
     }
 
 

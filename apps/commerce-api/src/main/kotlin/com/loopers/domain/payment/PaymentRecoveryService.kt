@@ -5,7 +5,6 @@ import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.strategy.PgStrategy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 import java.time.ZonedDateTime
 
 @Component
@@ -17,7 +16,6 @@ class PaymentRecoveryService(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @Transactional
     fun recoverPendingPayments() {
         val cutoffTime = ZonedDateTime.now().minusMinutes(10)
 
@@ -65,8 +63,8 @@ class PaymentRecoveryService(
 
         // 3. PG 상태에 따라 별도 서비스의 트랜잭션 메서드 호출 (프록시를 거침)
         when (pgStatus.status) {
-            "SUCCESS" -> transactionService.handlePaymentSuccess(order.id!!, payment)
-            "FAILED", "CANCELED" -> transactionService.handlePaymentFailure(order.id!!, payment, pgStatus.reason)
+            "SUCCESS" -> transactionService.handlePaymentSuccess(order.id!!, payment.id!!)
+            "FAILED", "CANCELED" -> transactionService.handlePaymentFailure(order.id!!, payment.id!!, pgStatus.reason)
             else -> log.info("PG에서 여전히 대기 중: orderId=${order.id}, status=${pgStatus.status}")
         }
     }
