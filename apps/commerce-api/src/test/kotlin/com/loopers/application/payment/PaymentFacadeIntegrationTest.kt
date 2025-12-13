@@ -17,10 +17,8 @@ import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.CardInfo
 import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
-import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentRepository
-import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -63,7 +61,6 @@ import java.util.concurrent.TimeUnit
 @DisplayName("PaymentFacade 통합 테스트")
 class PaymentFacadeIntegrationTest @Autowired constructor(
     private val paymentFacade: PaymentFacade,
-    private val paymentService: PaymentService,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
@@ -438,18 +435,22 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
         issuedCouponId: Long?,
         couponDiscount: Money,
     ): Payment {
-        val payment = paymentService.create(
-            PaymentCommand.Create(
-                userId = userId,
-                orderId = order.id,
-                totalAmount = order.totalAmount,
-                usedPoint = usedPoint,
-                issuedCouponId = issuedCouponId,
-                couponDiscount = couponDiscount,
-                cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
-            ),
+        val totalAmount = order.totalAmount
+        val paidAmount = totalAmount - usedPoint - couponDiscount
+
+        val payment = Payment.of(
+            orderId = order.id,
+            userId = userId,
+            totalAmount = totalAmount,
+            usedPoint = usedPoint,
+            paidAmount = paidAmount,
+            status = PaymentStatus.IN_PROGRESS,
+            issuedCouponId = issuedCouponId,
+            couponDiscount = couponDiscount,
+            cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
+            externalPaymentKey = "tx_test_1",
+            attemptedAt = Instant.now(),
         )
-        payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
         return paymentRepository.save(payment)
     }
 }
