@@ -12,6 +12,7 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
@@ -33,22 +34,22 @@ class LikeService(
             return existingLike
         }
 
-        try {
-            // 좋아요 저장
-            val product = productRepository.findByIdOrThrow(productId)
-            val like = Like.of(member, product)
-            val savedLike = likeRepository.save(like)
-
-            // 이벤트 발행 (집계는 이벤트 핸들러에서)
-            publishProductLikedEvent(savedLike, member, productId)
-
-            return savedLike
+        return try {
+            createLikeInNewTx(member, productId)
         } catch (e: DataIntegrityViolationException) {
             // 동시 요청으로 인한 중복 insert 시도 - 기존 데이터 반환
-            return likeRepository.findByMemberIdAndProductId(member.id, productId)
+            likeRepository.findByMemberIdAndProductId(member.id, productId)
                 ?: throw CoreException(ErrorType.INTERNAL_ERROR, "동시 요청 처리 중 일시적 오류 발생")
         }
+    }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    private fun createLikeInNewTx(member: Member, productId: Long): Like {
+        val product = productRepository.findByIdOrThrow(productId)
+        val like = Like.of(member, product)
+        val savedLike = likeRepository.save(like)
+        publishProductLikedEvent(savedLike, member, productId)
+        return savedLike
     }
 
     private fun publishProductLikedEvent(
