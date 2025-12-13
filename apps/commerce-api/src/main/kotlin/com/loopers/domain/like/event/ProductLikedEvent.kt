@@ -4,7 +4,7 @@ import java.time.Instant
 
 data class ProductLikedEvent(
     val likeId: Long,
-    val memberId: Long,
+    val memberId: String,
     val productId: Long,
     val likedAt: Instant
 )

@@ -46,7 +46,7 @@ class LikeService(
         } catch (e: DataIntegrityViolationException) {
             // 동시 요청으로 인한 중복 insert 시도 - 기존 데이터 반환
             return likeRepository.findByMemberIdAndProductId(member.id, productId)
-                ?: throw CoreException(ErrorType.INTERNAL_ERROR, "좋아요 생성 중 오류 발생")
+                ?: throw CoreException(ErrorType.INTERNAL_ERROR, "동시 요청 처리 중 일시적 오류 발생")
         }
 
     }
@@ -60,7 +60,7 @@ class LikeService(
         eventPublisher.publishEvent(
             ProductLikedEvent(
                 likeId = savedLike.id,
-                memberId = member.id,
+                memberId = member.memberId.value,
                 productId = productId,
                 likedAt = Instant.now(),
             ),
@@ -82,7 +82,7 @@ class LikeService(
         eventPublisher.publishEvent(
             ProductUnlikedEvent(
                 productId = productId,
-                memberId = member.id,
+                memberId = member.memberId.value,
                 unlikedAt = Instant.now()
             )
         )

@@ -4,6 +4,6 @@ import java.time.Instant
 
 data class ProductUnlikedEvent(
     val productId: Long,
-    val memberId: Long,
+    val memberId: String,
     val unlikedAt: Instant
 )
