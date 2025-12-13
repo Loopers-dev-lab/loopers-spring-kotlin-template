@@ -32,7 +32,11 @@ class ProductV1Controller(
     ): ApiResponse<Page<ProductV1Dto.ProductResponse>> {
         val pageable = PageRequest.of(page, size)
 
-        // 목록 조회 이벤트 발행
+        val result = productFacade.getProducts(brandId, sort, pageable)
+            .map { ProductV1Dto.ProductResponse.from(it) }
+            .let { ApiResponse.success(it) }
+
+        // 목록 조회 성공 후 이벤트 발행
         eventPublisher.publishEvent(
             ProductBrowsedEvent(
                 memberId = memberId,
@@ -43,9 +47,7 @@ class ProductV1Controller(
             )
         )
 
-        return productFacade.getProducts(brandId, sort, pageable)
-            .map { ProductV1Dto.ProductResponse.from(it) }
-            .let { ApiResponse.success(it) }
+        return result
     }
 
     @GetMapping("/{productId}")
@@ -53,8 +55,11 @@ class ProductV1Controller(
         @RequestHeader(value = "X-USER-ID", required = false) memberId: String?,
         @PathVariable productId: Long,
     ): ApiResponse<ProductV1Dto.ProductResponse> {
+        val result = productFacade.getProduct(productId)
+            .let { ProductV1Dto.ProductResponse.from(it) }
+            .let { ApiResponse.success(it) }
 
-        // 상품 조회 이벤트 발행 (비회원도 발행)
+        // 상품 조회 성공 후 이벤트 발행 (도메인 이벤트는 비회원도 발행, UserActionEvent는 인증 사용자만)
         eventPublisher.publishEvent(
             ProductViewedEvent(
                 productId = productId,
@@ -63,9 +68,7 @@ class ProductV1Controller(
             )
         )
 
-        return productFacade.getProduct(productId)
-            .let { ProductV1Dto.ProductResponse.from(it) }
-            .let { ApiResponse.success(it) }
+        return result
     }
 
 
