@@ -76,7 +76,7 @@ class OrderServiceTest {
             OrderItemCommand(productId = 2L, quantity = 1),
         )
 
-        every { productRepository.findAllByIdIn(any()) } returns listOf(product1, product2)
+        every { productRepository.findAllByIdIn(listOf(1L, 2L)) } returns listOf(product1, product2)
         every { memberRepository.findByMemberIdWithLockOrThrow(memberId) } returns member
         every { couponService.applyAndUseCouponForOrder(any(), any(), any(), any()) } returns Money.of(5000)
         every { orderRepository.save(any()) } answers { firstArg() }
@@ -189,7 +189,7 @@ class OrderServiceTest {
         }
         val orderItems = listOf(OrderItemCommand(productId = 1L, quantity = 1))
 
-        every { productRepository.findAllByIdIn(any()) } returns listOf(product)
+        every { productRepository.findAllByIdIn(listOf(1L)) } returns listOf(product)
         every { memberRepository.findByMemberIdWithLockOrThrow(memberId) } returns member
         every { couponService.applyAndUseCouponForOrder(any(), any(), any(), any()) } returns Money.zero()
         every { orderRepository.save(any()) } answers { firstArg() }
@@ -209,7 +209,9 @@ class OrderServiceTest {
         verify(exactly = 1) { eventPublisher.publishEvent(any<OrderCreatedEvent>()) }
         assertThat(eventSlot.captured.orderId).isEqualTo(result.id)
         assertThat(eventSlot.captured.memberId).isEqualTo(memberId)
+        assertThat(eventSlot.captured.orderAmount).isEqualTo(result.totalAmount.amount)
         assertThat(eventSlot.captured.couponId).isNull()
+        assertThat(eventSlot.captured.createdAt).isNotNull()
     }
 
 }
