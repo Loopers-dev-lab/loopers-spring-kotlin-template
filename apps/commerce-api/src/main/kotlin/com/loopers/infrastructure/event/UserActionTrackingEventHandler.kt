@@ -93,9 +93,10 @@ class UserActionTrackingEventHandler(
                 targetEntityType = EntityType.ORDER,
                 targetEntityId = event.orderId,
                 metadata = mapOf(
-                    "orderAmount" to event.orderAmount.toString(),
-                    "couponId" to (event.couponId?.toString() ?: "")
-                ),
+                    "orderAmount" to event.orderAmount.toString()
+                ).let { base ->
+                    event.couponId?.let { base + ("couponId" to it.toString()) } ?: base
+                },
                 occurredAt = event.createdAt
             )
         )
