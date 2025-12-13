@@ -1,5 +1,6 @@
 package com.loopers.domain.like
 
+import com.loopers.application.like.LikeInfo
 import com.loopers.domain.like.event.ProductLikedEvent
 import com.loopers.domain.like.event.ProductUnlikedEvent
 import com.loopers.domain.member.MemberRepository
@@ -25,18 +26,19 @@ class LikeService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Transactional
-    fun addLike(memberId: String, productId: Long): Like {
+    fun addLike(memberId: String, productId: Long): LikeInfo {
         val member = memberRepository.findByMemberIdOrThrow(memberId)
 
         // 이미 좋아요가 있으면 기존 것 반환 (멱등성 보장)
         val existingLike = likeRepository.findByMemberIdAndProductId(member.id, productId)
         if (existingLike != null) {
-            return existingLike
+            val product = productRepository.findByIdOrThrow(productId)
+            return LikeInfo.from(existingLike, product, member.memberId.value)
         }
 
         return try {
             val product = productRepository.findByIdOrThrow(productId)
-            val like = Like.of(member, product)
+            val like = Like.of(member.id, productId)
             val savedLike = likeRepository.save(like)
 
             // 이벤트 발행
@@ -49,12 +51,14 @@ class LikeService(
                 ),
             )
 
-            savedLike
+            LikeInfo.from(savedLike, product, member.memberId.value)
         } catch (e: DataIntegrityViolationException) {
             // 동시 요청으로 인한 중복 insert 시도 - 기존 데이터 반환
             logger.debug("동시 좋아요 요청으로 인한 중복 insert 시도: memberId={}, productId={}", member.memberId.value, productId, e)
-            likeRepository.findByMemberIdAndProductId(member.id, productId)
-                ?: throw CoreException(ErrorType.INTERNAL_ERROR, "좋아요 데이터 조회 실패 - DB 상태 확인 필요")
+            val like = (likeRepository.findByMemberIdAndProductId(member.id, productId)
+                ?: throw CoreException(ErrorType.INTERNAL_ERROR, "좋아요 데이터 조회 실패 - DB 상태 확인 필요"))
+            val product = productRepository.findByIdOrThrow(productId)
+            LikeInfo.from(like, product, member.memberId.value)
         }
     }
 
@@ -80,8 +84,19 @@ class LikeService(
     }
 
     @Transactional(readOnly = true)
-    fun getMyLikes(memberId: String, pageable: Pageable): Page<Like> {
+    fun getMyLikes(memberId: String, pageable: Pageable): Page<LikeInfo> {
         val member = memberRepository.findByMemberIdOrThrow(memberId)
-        return likeRepository.findByMemberId(member.id, pageable)
+        val likes = likeRepository.findByMemberId(member.id, pageable)
+
+        val productIds = likes.content.map { it.productId }
+        val products = productRepository.findAllByIdIn(productIds)
+            .associateBy { it.id }
+
+
+        return likes.map { like ->
+            val product = products[like.productId]
+                ?: throw CoreException(ErrorType.PRODUCT_NOT_FOUND)
+            LikeInfo.from(like, product, member.memberId.value)
+        }
     }
 }

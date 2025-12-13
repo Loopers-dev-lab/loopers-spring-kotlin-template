@@ -1,13 +1,9 @@
 package com.loopers.domain.like
 
 import com.loopers.domain.BaseEntity
-import com.loopers.domain.member.Member
-import com.loopers.domain.product.Product
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.FetchType
 import jakarta.persistence.Index
-import jakarta.persistence.JoinColumn
-import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 
@@ -21,23 +17,21 @@ import jakarta.persistence.UniqueConstraint
     ],
 )
 class Like(
-    member: Member,
-    product: Product,
+    memberId: Long,
+    productId: Long,
 ) : BaseEntity() {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_id", nullable = false)
-    var member: Member = member
+    @Column(name = "member_id", nullable = false)
+    var memberId: Long = memberId
         protected set
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    var product: Product = product
+    @Column(name = "product_id", nullable = false)
+    var productId: Long = productId
         protected set
 
     companion object {
-        fun of(member: Member, product: Product): Like {
-            return Like(member, product)
+        fun of(memberId: Long, productId: Long): Like {
+            return Like(memberId, productId)
         }
     }
 }

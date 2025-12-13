@@ -2,6 +2,7 @@ package com.loopers.application.like
 
 import com.loopers.application.product.ProductInfo
 import com.loopers.domain.like.Like
+import com.loopers.domain.product.Product
 
 data class LikeInfo(
     val id: Long,
@@ -11,11 +12,11 @@ data class LikeInfo(
 ) {
 
     companion object {
-        fun from(like: Like): LikeInfo {
+        fun from(like: Like, product: Product, memberIdValue: String): LikeInfo {
             return LikeInfo(
                 id = like.id,
-                memberId = like.member.memberId.value,
-                product = ProductInfo.from(like.product),
+                memberId = memberIdValue,
+                product = ProductInfo.from(product),
                 createdAt = like.createdAt.toString()
             )
         }

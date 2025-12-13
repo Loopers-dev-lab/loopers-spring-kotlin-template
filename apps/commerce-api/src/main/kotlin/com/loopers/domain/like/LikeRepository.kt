@@ -9,4 +9,5 @@ interface LikeRepository {
     fun deleteByMemberIdAndProductId(memberId: Long, productId: Long)
     fun findByMemberId(memberId: Long, pageable: Pageable): Page<Like>
     fun existsByMemberIdAndProductId(memberId: Long, productId: Long): Boolean
+    fun delete(like: Like)
 }
