@@ -39,6 +39,7 @@ class PaymentRdbRepository(
             .selectFrom(qPayment)
             .where(
                 query.statuses.takeIf { it.isNotEmpty() }?.let { qPayment.status.`in`(it) },
+                query.createdBefore?.let { qPayment.createdAt.lt(it) },
             )
             .orderBy(*getOrderSpecifiers(query.sort, qPayment))
             .offset((query.page * query.size).toLong())

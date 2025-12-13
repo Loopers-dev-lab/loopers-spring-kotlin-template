@@ -4,6 +4,7 @@ import com.loopers.domain.like.LikeCanceledEventV1
 import com.loopers.domain.like.LikeCreatedEventV1
 import com.loopers.domain.order.OrderCanceledEventV1
 import com.loopers.domain.order.OrderCreatedEventV1
+import com.loopers.domain.order.OrderItemSnapshot
 import com.loopers.domain.product.Brand
 import com.loopers.domain.product.BrandRepository
 import com.loopers.domain.product.Product
@@ -66,7 +67,7 @@ class ProductEventListenerIntegrationTest @Autowired constructor(
             val event = OrderCreatedEventV1(
                 orderId = 1L,
                 orderItems = listOf(
-                    OrderCreatedEventV1.OrderItemSnapshot(
+                    OrderItemSnapshot(
                         productId = product.id,
                         quantity = orderQuantity,
                     ),
@@ -97,8 +98,8 @@ class ProductEventListenerIntegrationTest @Autowired constructor(
             val event = OrderCreatedEventV1(
                 orderId = 1L,
                 orderItems = listOf(
-                    OrderCreatedEventV1.OrderItemSnapshot(productId = product1.id, quantity = orderQuantity1),
-                    OrderCreatedEventV1.OrderItemSnapshot(productId = product2.id, quantity = orderQuantity2),
+                    OrderItemSnapshot(productId = product1.id, quantity = orderQuantity1),
+                    OrderItemSnapshot(productId = product2.id, quantity = orderQuantity2),
                 ),
             )
 
@@ -130,7 +131,7 @@ class ProductEventListenerIntegrationTest @Autowired constructor(
             val event = OrderCanceledEventV1(
                 orderId = 1L,
                 orderItems = listOf(
-                    OrderCreatedEventV1.OrderItemSnapshot(
+                    OrderItemSnapshot(
                         productId = product.id,
                         quantity = cancelQuantity,
                     ),
@@ -161,8 +162,8 @@ class ProductEventListenerIntegrationTest @Autowired constructor(
             val event = OrderCanceledEventV1(
                 orderId = 1L,
                 orderItems = listOf(
-                    OrderCreatedEventV1.OrderItemSnapshot(productId = product1.id, quantity = cancelQuantity1),
-                    OrderCreatedEventV1.OrderItemSnapshot(productId = product2.id, quantity = cancelQuantity2),
+                    OrderItemSnapshot(productId = product1.id, quantity = cancelQuantity1),
+                    OrderItemSnapshot(productId = product2.id, quantity = cancelQuantity2),
                 ),
             )
 
