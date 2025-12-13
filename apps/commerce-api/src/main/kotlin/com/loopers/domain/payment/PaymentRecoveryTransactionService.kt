@@ -36,6 +36,4 @@ class PaymentRecoveryTransactionService(
 
         logger.info("결제 실패 처리 완료: orderId={}, reason={}", orderId, reason ?: "PG에서 결제 실패")
     }
-
-
 }

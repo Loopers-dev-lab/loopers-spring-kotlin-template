@@ -24,7 +24,7 @@ class CircuitBreakerEventListener(
         circuitBreakerRegistry.eventPublisher
             .onEntryAdded { event ->
                 val addedCircuitBreaker = event.addedEntry
-                logger.info("새로운 Circuit Breaker 등록됨: ${addedCircuitBreaker.name}")
+                logger.info("새로운 Circuit Breaker 등록됨: {}", addedCircuitBreaker.name)
                 registerEventListeners(addedCircuitBreaker)
             }
 
@@ -35,14 +35,10 @@ class CircuitBreakerEventListener(
         circuitBreaker.eventPublisher
             .onStateTransition { event: CircuitBreakerOnStateTransitionEvent ->
                 logger.warn(
-                    """
-                    ========================================
-                    Circuit Breaker State Changed!
-                    Name: ${event.circuitBreakerName}
-                    From: ${event.stateTransition.fromState}
-                    To: ${event.stateTransition.toState}
-                    ========================================
-                    """.trimIndent()
+                    "Circuit Breaker State Changed! Name: {}, From: {}, To: {}",
+                    event.circuitBreakerName,
+                    event.stateTransition.fromState,
+                    event.stateTransition.toState
                 )
             }
             .onError { event ->
@@ -54,10 +50,10 @@ class CircuitBreakerEventListener(
                 )
             }
             .onSuccess { event ->
-                logger.debug("Circuit Breaker Success: ${circuitBreaker.name}")
+                logger.debug("Circuit Breaker Success: {}", circuitBreaker.name)
             }
             .onCallNotPermitted { event ->
-                logger.warn("Circuit Breaker Call Not Permitted: ${circuitBreaker.name} - Circuit is OPEN")
+                logger.warn("Circuit Breaker Call Not Permitted: {} - Circuit is OPEN", circuitBreaker.name)
             }
     }
 }
