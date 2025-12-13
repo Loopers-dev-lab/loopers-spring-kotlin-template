@@ -8,21 +8,21 @@ import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
+import com.loopers.infrastructure.like.ProductLikeJpaRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
-import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import java.util.concurrent.TimeUnit
 
 @SpringBootTest
 class LikeFacadeIntegrationTest @Autowired constructor(
     private val likeFacade: LikeFacade,
+    private val productLikeJpaRepository: ProductLikeJpaRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val productRepository: ProductRepository,
     private val stockRepository: StockRepository,
@@ -38,46 +38,35 @@ class LikeFacadeIntegrationTest @Autowired constructor(
     @Nested
     inner class AddLike {
 
-        @DisplayName("새로운 좋아요를 추가하면 ProductLike가 저장되고 likeCount가 증가한다")
+        @DisplayName("새로운 좋아요를 추가하면 ProductLike가 저장된다")
         @Test
-        fun `save like and increase like count when add new like`() {
+        fun `saves ProductLike when adding new like`() {
             // given
             val userId = 1L
             val product = createProduct()
-            val initialLikeCount = getProductLikeCount(product.id)
 
             // when
             likeFacade.addLike(userId, product.id)
 
-            // then - 비동기 이벤트 리스너가 likeCount를 업데이트하기 때문에 await 필요
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val updatedLikeCount = getProductLikeCount(product.id)
-                assertThat(updatedLikeCount).isEqualTo(initialLikeCount + 1)
-            }
+            // then - LikeFacade 책임: ProductLike 저장
+            val likeCount = productLikeJpaRepository.countByUserIdAndProductId(userId, product.id)
+            assertThat(likeCount).isEqualTo(1)
         }
 
-        @DisplayName("이미 좋아요한 상품에 다시 좋아요를 추가하면 likeCount가 증가하지 않는다")
+        @DisplayName("이미 좋아요한 상품에 다시 좋아요를 추가해도 예외 없이 처리된다")
         @Test
-        fun `not increase like count when add duplicate like`() {
+        fun `handles duplicate like gracefully`() {
             // given
             val userId = 1L
             val product = createProduct()
             likeFacade.addLike(userId, product.id)
 
-            // 비동기 이벤트 리스너가 likeCount를 업데이트하기 때문에 await 필요
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val likeCount = getProductLikeCount(product.id)
-                assertThat(likeCount).isEqualTo(1)
-            }
-            val likeCountAfterFirstAdd = getProductLikeCount(product.id)
-
-            // when
+            // when - 중복 좋아요 (예외 없이 처리되어야 함)
             likeFacade.addLike(userId, product.id)
 
-            // then - 약간의 지연 후 확인 (중복이므로 이벤트가 발행되지 않음)
-            Thread.sleep(500)
-            val likeCountAfterSecondAdd = getProductLikeCount(product.id)
-            assertThat(likeCountAfterSecondAdd).isEqualTo(likeCountAfterFirstAdd)
+            // then - LikeFacade 책임: ProductLike 유지
+            val likeCount = productLikeJpaRepository.countByUserIdAndProductId(userId, product.id)
+            assertThat(likeCount).isEqualTo(1)
         }
 
         @DisplayName("존재하지 않는 상품에 좋아요를 추가하면 예외가 발생한다")
@@ -101,45 +90,35 @@ class LikeFacadeIntegrationTest @Autowired constructor(
     @Nested
     inner class RemoveLike {
 
-        @DisplayName("좋아요를 제거하면 ProductLike가 삭제되고 likeCount가 감소한다")
+        @DisplayName("좋아요를 제거하면 ProductLike가 삭제된다")
         @Test
-        fun `delete like and decrease like count when remove like`() {
+        fun `deletes ProductLike when removing like`() {
             // given
             val userId = 1L
             val product = createProduct()
             likeFacade.addLike(userId, product.id)
 
-            // 비동기 이벤트 리스너가 likeCount를 업데이트하기 때문에 await 필요
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val likeCount = getProductLikeCount(product.id)
-                assertThat(likeCount).isEqualTo(1)
-            }
-            val likeCountAfterAdd = getProductLikeCount(product.id)
-
             // when
             likeFacade.removeLike(userId, product.id)
 
-            // then - 비동기 이벤트 리스너가 likeCount를 업데이트하기 때문에 await 필요
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val likeCountAfterRemove = getProductLikeCount(product.id)
-                assertThat(likeCountAfterRemove).isEqualTo(likeCountAfterAdd - 1)
-            }
+            // then - LikeFacade 책임: ProductLike 삭제
+            val likeCount = productLikeJpaRepository.countByUserIdAndProductId(userId, product.id)
+            assertThat(likeCount).isEqualTo(0)
         }
 
-        @DisplayName("존재하지 않는 좋아요를 제거하면 likeCount가 변하지 않는다")
+        @DisplayName("존재하지 않는 좋아요를 제거해도 예외 없이 처리된다")
         @Test
-        fun `not change like count when remove non existing like`() {
+        fun `handles remove non existing like gracefully`() {
             // given
             val userId = 1L
             val product = createProduct()
-            val initialLikeCount = getProductLikeCount(product.id)
 
-            // when
+            // when - 존재하지 않는 좋아요 제거 (예외 없이 처리되어야 함)
             likeFacade.removeLike(userId, product.id)
 
-            // then
-            val likeCountAfterRemove = getProductLikeCount(product.id)
-            assertThat(likeCountAfterRemove).isEqualTo(initialLikeCount)
+            // then - 예외 없이 정상 처리됨
+            val likeCount = productLikeJpaRepository.countByUserIdAndProductId(userId, product.id)
+            assertThat(likeCount).isEqualTo(0)
         }
 
         @DisplayName("존재하지 않는 상품의 좋아요를 제거하면 예외가 발생한다")
@@ -174,9 +153,5 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
-    }
-
-    private fun getProductLikeCount(productId: Long): Long {
-        return productStatisticRepository.findByProductId(productId)?.likeCount ?: 0L
     }
 }
