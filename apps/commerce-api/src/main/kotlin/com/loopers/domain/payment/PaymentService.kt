@@ -4,8 +4,12 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Slice
+import org.springframework.orm.ObjectOptimisticLockingFailureException
+import org.springframework.retry.annotation.Backoff
+import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.Instant
 
 @Component
@@ -13,6 +17,7 @@ class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val pgClient: PgClient,
     private val eventPublisher: ApplicationEventPublisher,
+    private val transactionTemplate: TransactionTemplate,
 ) {
     /**
      * 결제를 생성합니다.
@@ -202,11 +207,18 @@ class PaymentService(
      * PG 결제를 요청하고 결제 상태를 업데이트합니다.
      * 이 메서드는 비동기 이벤트 리스너에서 사용됩니다. (cardInfo는 Payment에 저장되어 있음)
      *
+     * PG 호출은 트랜잭션 외부에서 수행하여, PG 응답 대기 중 DB 커넥션을 점유하지 않습니다.
+     * save + event publish만 트랜잭션 내에서 수행합니다.
+     *
      * @param paymentId 결제 ID
      * @param currentTime 현재 시각
      * @return PgPaymentResult - 결제 결과
      */
-    @Transactional
+    @Retryable(
+        retryFor = [ObjectOptimisticLockingFailureException::class],
+        maxAttempts = 3,
+        backoff = Backoff(delay = 100),
+    )
     fun requestPgPayment(
         paymentId: Long,
         currentTime: Instant = Instant.now(),
@@ -223,9 +235,11 @@ class PaymentService(
         )
 
         val result = payment.initiate(pgResult, currentTime)
-        paymentRepository.save(payment)
 
-        publishPgPaymentResultEvent(result, payment)
+        transactionTemplate.execute {
+            paymentRepository.save(payment)
+            publishPgPaymentResultEvent(result, payment)
+        }
 
         return result
     }
