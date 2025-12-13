@@ -2,17 +2,16 @@ package com.loopers.domain.like
 
 import com.loopers.domain.like.event.ProductLikedEvent
 import com.loopers.domain.like.event.ProductUnlikedEvent
-import com.loopers.domain.member.Member
 import com.loopers.domain.member.MemberRepository
 import com.loopers.domain.product.ProductRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
@@ -23,6 +22,7 @@ class LikeService(
     private val productRepository: ProductRepository,
     private val eventPublisher: ApplicationEventPublisher
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     @Transactional
     fun addLike(memberId: String, productId: Long): Like {
@@ -35,37 +35,27 @@ class LikeService(
         }
 
         return try {
-            createLikeInNewTx(member, productId)
+            val product = productRepository.findByIdOrThrow(productId)
+            val like = Like.of(member, product)
+            val savedLike = likeRepository.save(like)
+
+            // 이벤트 발행
+            eventPublisher.publishEvent(
+                ProductLikedEvent(
+                    likeId = savedLike.id,
+                    memberId = member.memberId.value,
+                    productId = productId,
+                    likedAt = Instant.now(),
+                ),
+            )
+
+            savedLike
         } catch (e: DataIntegrityViolationException) {
             // 동시 요청으로 인한 중복 insert 시도 - 기존 데이터 반환
+            logger.debug("동시 좋아요 요청으로 인한 중복 insert 시도: memberId={}, productId={}", member.memberId.value, productId, e)
             likeRepository.findByMemberIdAndProductId(member.id, productId)
                 ?: throw CoreException(ErrorType.INTERNAL_ERROR, "좋아요 데이터 조회 실패 - DB 상태 확인 필요")
         }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    private fun createLikeInNewTx(member: Member, productId: Long): Like {
-        val product = productRepository.findByIdOrThrow(productId)
-        val like = Like.of(member, product)
-        val savedLike = likeRepository.save(like)
-        publishProductLikedEvent(savedLike, member, productId)
-        return savedLike
-    }
-
-    private fun publishProductLikedEvent(
-        savedLike: Like,
-        member: Member,
-        productId: Long,
-    ) {
-        // 좋아요 집계를 위한 이벤트
-        eventPublisher.publishEvent(
-            ProductLikedEvent(
-                likeId = savedLike.id,
-                memberId = member.memberId.value,
-                productId = productId,
-                likedAt = Instant.now(),
-            ),
-        )
     }
 
     @Transactional
