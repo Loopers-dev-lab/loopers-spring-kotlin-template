@@ -36,6 +36,12 @@ dependencies {
     // feign client
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.3.0")
 
+    // kafka
+    implementation("org.springframework.kafka:spring-kafka")
+    testImplementation("org.springframework.kafka:spring-kafka-test")
+    testImplementation("org.testcontainers:kafka")
+    testImplementation("org.awaitility:awaitility:4.2.0")
+
     // querydsl
     kapt("com.querydsl:querydsl-apt::jakarta")
 
