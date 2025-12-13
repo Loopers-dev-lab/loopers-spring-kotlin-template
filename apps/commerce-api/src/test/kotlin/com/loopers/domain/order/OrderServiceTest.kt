@@ -13,6 +13,7 @@ import com.loopers.support.error.ErrorType
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
+import io.mockk.match
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
@@ -76,7 +77,9 @@ class OrderServiceTest {
             OrderItemCommand(productId = 2L, quantity = 1),
         )
 
-        every { productRepository.findAllByIdIn(listOf(1L, 2L)) } returns listOf(product1, product2)
+        every {
+            productRepository.findAllByIdIn(match { it.size == 2 && it.containsAll(listOf(1L, 2L)) })
+        } returns listOf(product1, product2)
         every { memberRepository.findByMemberIdWithLockOrThrow(memberId) } returns member
         every { couponService.applyAndUseCouponForOrder(any(), any(), any(), any()) } returns Money.of(5000)
         every { orderRepository.save(any()) } answers { firstArg() }
@@ -98,12 +101,15 @@ class OrderServiceTest {
         verify(exactly = 1) { member.usePoint(3000L) }
 
         // 이벤트 발행 검증 추가
+        val now = java.time.Instant.now()
         verify(exactly = 1) { eventPublisher.publishEvent(any<OrderCreatedEvent>()) }
         assertThat(eventSlot.captured.orderId).isEqualTo(result.id)
         assertThat(eventSlot.captured.memberId).isEqualTo(memberId)
         assertThat(eventSlot.captured.orderAmount).isEqualTo(result.totalAmount.amount)
         assertThat(eventSlot.captured.couponId).isEqualTo(1L)
         assertThat(eventSlot.captured.createdAt).isNotNull()
+        assertThat(eventSlot.captured.createdAt)
+            .isBetween(now.minusSeconds(1), now.plusSeconds(1))
     }
 
     @DisplayName("포인트를 초과 사용하면 예외가 발생한다")
@@ -124,7 +130,9 @@ class OrderServiceTest {
         val orderItems = listOf(OrderItemCommand(productId, 1))
 
         // 주문 생성 시에는 락 없이 조회 (가격 확인용)
-        every { productRepository.findAllByIdIn(listOf(productId)) } returns listOf(product)
+        every {
+            productRepository.findAllByIdIn(match { it.size == 1 && it.contains(productId) })
+        } returns listOf(product)
         every { memberRepository.findByMemberIdWithLockOrThrow(memberId) } returns member
         every { couponService.applyAndUseCouponForOrder(any(), any(), any(), any()) } returns Money.zero()
 
@@ -140,6 +148,10 @@ class OrderServiceTest {
 
         assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
         assertThat(exception.message).contains("포인트를 너무 많이 사용했습니다")
+
+        // 예외 케이스에서 이벤트 미발행 및 포인트 미차감 검증
+        verify(exactly = 0) { eventPublisher.publishEvent(any<OrderCreatedEvent>()) }
+        verify(exactly = 0) { member.usePoint(any()) }
     }
 
     @DisplayName("결제 완료 후 재고가 차감되고 주문이 완료된다")
@@ -189,7 +201,9 @@ class OrderServiceTest {
         }
         val orderItems = listOf(OrderItemCommand(productId = 1L, quantity = 1))
 
-        every { productRepository.findAllByIdIn(listOf(1L)) } returns listOf(product)
+        every {
+            productRepository.findAllByIdIn(match { it.size == 1 && it.contains(1L) })
+        } returns listOf(product)
         every { memberRepository.findByMemberIdWithLockOrThrow(memberId) } returns member
         every { couponService.applyAndUseCouponForOrder(any(), any(), any(), any()) } returns Money.zero()
         every { orderRepository.save(any()) } answers { firstArg() }
@@ -206,12 +220,15 @@ class OrderServiceTest {
         )
 
         // then
+        val now = java.time.Instant.now()
         verify(exactly = 1) { eventPublisher.publishEvent(any<OrderCreatedEvent>()) }
         assertThat(eventSlot.captured.orderId).isEqualTo(result.id)
         assertThat(eventSlot.captured.memberId).isEqualTo(memberId)
         assertThat(eventSlot.captured.orderAmount).isEqualTo(result.totalAmount.amount)
         assertThat(eventSlot.captured.couponId).isNull()
         assertThat(eventSlot.captured.createdAt).isNotNull()
+        assertThat(eventSlot.captured.createdAt)
+            .isBetween(now.minusSeconds(1), now.plusSeconds(1))
     }
 
 }
