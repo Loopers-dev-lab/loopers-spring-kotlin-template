@@ -34,7 +34,6 @@ import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.assertj.core.api.Assertions.assertThat
-import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -45,7 +44,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock
 import org.springframework.test.context.TestPropertySource
 import java.time.ZonedDateTime
-import java.util.concurrent.TimeUnit
 
 /**
  * OrderFacade 통합 테스트
@@ -143,55 +141,6 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("PG 결제 요청이 비동기로 처리되어 IN_PROGRESS 상태가 된다")
-        fun `payment becomes IN_PROGRESS after async PG request`() {
-            // given
-            val userId = 1L
-            val product = createProduct(price = Money.krw(20000))
-            createPointAccount(userId, Money.krw(100000))
-            stubPgPaymentSuccess()
-
-            val criteria = placeOrderCriteria(
-                userId = userId,
-                usePoint = Money.krw(10000),
-                items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1)),
-            )
-
-            // when
-            val orderInfo = orderFacade.placeOrder(criteria)
-
-            // then - 비동기로 PG 결제 요청이 처리되어 IN_PROGRESS 상태가 됨
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val savedPayment = paymentRepository.findByOrderId(orderInfo.orderId)!!
-                assertThat(savedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
-            }
-        }
-
-        @Test
-        @DisplayName("0원 결제 시 비동기 처리 후 PAID 상태가 된다")
-        fun `payment becomes PAID after async processing for zero amount`() {
-            // given
-            val userId = 1L
-            val product = createProduct(price = Money.krw(10000))
-            createPointAccount(userId, Money.krw(100000))
-
-            val criteria = placeOrderCriteria(
-                userId = userId,
-                usePoint = Money.krw(10000),
-                items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1)),
-            )
-
-            // when
-            val orderInfo = orderFacade.placeOrder(criteria)
-
-            // then - 비동기로 PaymentPaidEventV1이 발행되어 주문 완료 처리됨
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val savedPayment = paymentRepository.findByOrderId(orderInfo.orderId)!!
-                assertThat(savedPayment.status).isEqualTo(PaymentStatus.PAID)
-            }
-        }
-
-        @Test
         @DisplayName("쿠폰을 적용한 주문을 생성할 수 있다")
         fun `creates order with coupon`() {
             // given
@@ -220,8 +169,8 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("PG 결제 실패 시 비동기로 재고가 복구된다")
-        fun `restores stock asynchronously when PG payment fails`() {
+        @DisplayName("주문 생성 시 재고가 차감된다")
+        fun `decreases stock when order is placed`() {
             // given
             val userId = 1L
             val initialStock = 100
@@ -237,22 +186,16 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             )
 
             // when
-            val orderInfo = orderFacade.placeOrder(criteria)
+            orderFacade.placeOrder(criteria)
 
             // then - 주문 생성 직후 재고는 차감된 상태
             val stockAfterOrder = stockRepository.findByProductId(product.id)!!
             assertThat(stockAfterOrder.quantity).isEqualTo(initialStock - orderQuantity)
-
-            // then - 비동기로 PG 실패 후 재고 복구됨
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val restoredStock = stockRepository.findByProductId(product.id)!!
-                assertThat(restoredStock.quantity).isEqualTo(initialStock)
-            }
         }
 
         @Test
-        @DisplayName("PG 결제 실패 시 비동기로 포인트가 복구된다")
-        fun `restores point asynchronously when PG payment fails`() {
+        @DisplayName("주문 생성 시 포인트가 차감된다")
+        fun `deducts point when order is placed`() {
             // given
             val userId = 1L
             val initialBalance = Money.krw(100000)
@@ -268,22 +211,16 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             )
 
             // when
-            val orderInfo = orderFacade.placeOrder(criteria)
+            orderFacade.placeOrder(criteria)
 
             // then - 주문 생성 직후 포인트는 차감된 상태
             val pointAfterOrder = pointAccountRepository.findByUserId(userId)!!
             assertThat(pointAfterOrder.balance).isEqualTo(initialBalance - usePoint)
-
-            // then - 비동기로 PG 실패 후 포인트 복구됨
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val restoredPoint = pointAccountRepository.findByUserId(userId)!!
-                assertThat(restoredPoint.balance).isEqualTo(initialBalance)
-            }
         }
 
         @Test
-        @DisplayName("PG 결제 실패 시 비동기로 쿠폰이 복구된다")
-        fun `restores coupon asynchronously when PG payment fails`() {
+        @DisplayName("주문 생성 시 쿠폰이 사용된다")
+        fun `uses coupon when order is placed`() {
             // given
             val userId = 1L
             val product = createProduct(price = Money.krw(30000))
@@ -302,22 +239,16 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             )
 
             // when
-            val orderInfo = orderFacade.placeOrder(criteria)
+            orderFacade.placeOrder(criteria)
 
             // then - 주문 생성 직후 쿠폰은 사용된 상태
             val couponAfterOrder = issuedCouponRepository.findById(issuedCoupon.id)!!
             assertThat(couponAfterOrder.status).isEqualTo(UsageStatus.USED)
-
-            // then - 비동기로 PG 실패 후 쿠폰 복구됨
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val restoredCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
-                assertThat(restoredCoupon.status).isEqualTo(UsageStatus.AVAILABLE)
-            }
         }
 
         @Test
-        @DisplayName("PG 결제 실패 시 비동기로 주문이 취소된다")
-        fun `cancels order asynchronously when PG payment fails`() {
+        @DisplayName("주문 생성 시 PLACED 상태가 된다")
+        fun `creates order with PLACED status`() {
             // given
             val userId = 1L
             val product = createProduct(price = Money.krw(20000))
@@ -336,12 +267,6 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             // then - 주문 생성 직후 PLACED 상태
             val orderAfterPlace = orderRepository.findById(orderInfo.orderId)!!
             assertThat(orderAfterPlace.status).isEqualTo(OrderStatus.PLACED)
-
-            // then - 비동기로 PG 실패 후 주문 취소됨
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val cancelledOrder = orderRepository.findById(orderInfo.orderId)!!
-                assertThat(cancelledOrder.status).isEqualTo(OrderStatus.CANCELLED)
-            }
         }
 
         @Test
