@@ -41,11 +41,9 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock
-import org.awaitility.Awaitility.await
 import org.springframework.test.context.TestPropertySource
 import java.time.Instant
 import java.time.ZonedDateTime
-import java.util.concurrent.TimeUnit
 
 /**
  * PaymentFacade 통합 테스트
@@ -90,8 +88,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     inner class ProcessCallback {
 
         @Test
-        @DisplayName("결제 성공 시 주문이 PAID 상태가 된다")
-        fun `completes order when payment succeeds`() {
+        @DisplayName("결제 성공 시 Payment가 PAID 상태가 된다")
+        fun `payment becomes PAID when PG returns SUCCESS`() {
             // given
             val payment = createInProgressPayment()
             stubPgTransactionSuccess(payment)
@@ -99,11 +97,9 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // when
             paymentFacade.processCallback(callbackCriteria(payment))
 
-            // then - 주문 완료는 @Async 핸들러에서 처리되므로 비동기 완료 대기
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val updatedOrder = orderRepository.findById(payment.orderId)!!
-                assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
-            }
+            // then - PaymentFacade 책임: Payment 상태 변경
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test
@@ -199,18 +195,16 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
 
             paymentFacade.processCallback(callbackCriteria(payment))
 
-            // 첫 번째 콜백의 비동기 주문 완료 대기
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val order = orderRepository.findById(payment.orderId)!!
-                assertThat(order.status).isEqualTo(OrderStatus.PAID)
-            }
+            // 첫 번째 콜백 처리 확인
+            val firstPayment = paymentRepository.findById(payment.id)!!
+            assertThat(firstPayment.status).isEqualTo(PaymentStatus.PAID)
 
             // when - 중복 콜백 (예외 없이 처리되어야 함)
             paymentFacade.processCallback(callbackCriteria(payment))
 
-            // then
-            val updatedOrder = orderRepository.findById(payment.orderId)!!
-            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+            // then - PaymentFacade 책임: Payment 상태 유지
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
     }
 
@@ -219,8 +213,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     inner class ProcessInProgressPayment {
 
         @Test
-        @DisplayName("PG에서 SUCCESS 조회 시 주문이 완료된다")
-        fun `completes order when PG returns SUCCESS`() {
+        @DisplayName("PG에서 SUCCESS 조회 시 Payment가 PAID 상태가 된다")
+        fun `payment becomes PAID when PG returns SUCCESS in processInProgressPayment`() {
             // given
             val payment = createInProgressPayment()
             stubPgTransactionSuccess(payment)
@@ -228,11 +222,9 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // when
             paymentFacade.processInProgressPayment(payment.id)
 
-            // then - 주문 완료는 @Async 핸들러에서 처리되므로 비동기 완료 대기
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                val updatedOrder = orderRepository.findById(payment.orderId)!!
-                assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
-            }
+            // then - PaymentFacade 책임: Payment 상태 변경
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test
