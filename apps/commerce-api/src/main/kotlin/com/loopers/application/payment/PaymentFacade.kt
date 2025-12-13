@@ -28,12 +28,18 @@ class PaymentFacade(
             paymentService.requestPgPayment(payment)
         } catch (e: Exception) {
             // 결제 실패를 별도 트랜잭션에 저장하여 롤백 시에도 실패 기록이 유지되도록 함
-            paymentService.savePaymentFailure(payment.id!!, e.message ?: "PG 결제 요청 실패")
+            paymentService.savePaymentFailure(
+                requireNotNull(payment.id) { "Payment id must not be null after creation" },
+                e.message ?: "PG 결제 요청 실패",
+            )
             throw e
         }
 
         // 3. 거래 키 업데이트
-        paymentService.updatePaymentWithTransaction(payment.id!!, transactionKey)
+        paymentService.updatePaymentWithTransaction(
+            requireNotNull(payment.id) { "Payment id must not be null after creation" },
+            transactionKey,
+        )
 
         return PaymentInfo.from(payment, transactionKey)
     }
@@ -74,7 +80,7 @@ data class PaymentInfo(
     companion object {
         fun from(payment: Payment, transactionKey: String): PaymentInfo {
             return PaymentInfo(
-                paymentId = payment.id!!,
+                paymentId = requireNotNull(payment.id) { "Payment id must not be null when creating PaymentInfo" },
                 transactionKey = transactionKey,
                 status = payment.status.name,
                 amount = payment.amount,
@@ -98,7 +104,7 @@ data class PaymentDetailInfo(
     companion object {
         fun from(payment: Payment): PaymentDetailInfo {
             return PaymentDetailInfo(
-                paymentId = payment.id!!,
+                paymentId = requireNotNull(payment.id) { "Payment id must not be null when creating PaymentDetailInfo" },
                 userId = payment.userId,
                 orderId = payment.orderId,
                 transactionKey = payment.transactionKey,

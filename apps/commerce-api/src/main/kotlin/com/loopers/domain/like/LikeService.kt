@@ -1,10 +1,11 @@
 package com.loopers.domain.like
 
-import com.loopers.domain.product.ProductCacheRepository
-import com.loopers.domain.product.ProductLikeCountService
+import com.loopers.domain.event.LikeAddedEvent
+import com.loopers.domain.event.LikeRemovedEvent
 import com.loopers.domain.product.ProductRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -12,14 +13,12 @@ import org.springframework.transaction.annotation.Transactional
 class LikeService(
     private val likeRepository: LikeRepository,
     private val productRepository: ProductRepository,
-    private val productLikeCountService: ProductLikeCountService,
-    private val productCacheRepository: ProductCacheRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     /**
      * 좋아요를 등록한다
      * UniqueConstraint를 활용하여 멱등성 보장
-     * 이미 존재하는 경우 별도 처리 없이 반환 (멱등성)
-     * Redis의 atomic 연산을 통해 동시성 문제 해결
+     * 집계 처리는 이벤트 핸들러에서 비동기로 처리
      */
     @Transactional
     fun addLike(userId: Long, productId: Long) {
@@ -37,11 +36,8 @@ class LikeService(
         val like = Like(userId = userId, productId = productId)
         likeRepository.save(like)
 
-        // Redis에서 좋아요 수 증가 (atomic 연산)
-        productLikeCountService.increment(productId)
-
-        // 캐시 무효화
-        evictProductCache(productId)
+        // 좋아요 추가 이벤트 발행 (집계 및 캐시 무효화는 이벤트 핸들러에서 처리)
+        eventPublisher.publishEvent(LikeAddedEvent(userId = userId, productId = productId))
     }
 
     @Transactional
@@ -54,23 +50,10 @@ class LikeService(
         // 삭제 시도 및 삭제된 행 수 확인
         val deletedCount = likeRepository.deleteByUserIdAndProductId(userId, productId)
 
-        // 실제로 삭제된 경우에만 Redis 감소 및 캐시 무효화
+        // 실제로 삭제된 경우에만 이벤트 발행
         if (deletedCount > 0) {
-            // Redis에서 좋아요 수 감소 (atomic 연산)
-            productLikeCountService.decrement(productId)
-
-            // 캐시 무효화
-            evictProductCache(productId)
+            // 좋아요 제거 이벤트 발행 (집계 및 캐시 무효화는 이벤트 핸들러에서 처리)
+            eventPublisher.publishEvent(LikeRemovedEvent(userId = userId, productId = productId))
         }
-    }
-
-    private fun evictProductCache(productId: Long) {
-        // 상품 상세 캐시 삭제
-        val detailCacheKey = productCacheRepository.buildProductDetailCacheKey(productId)
-        productCacheRepository.delete(detailCacheKey)
-
-        // 상품 목록 캐시 삭제
-        val listCachePattern = productCacheRepository.getProductListCachePattern()
-        productCacheRepository.deleteByPattern(listCachePattern)
     }
 }
