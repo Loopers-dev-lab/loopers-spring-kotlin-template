@@ -13,6 +13,7 @@ data class OrderCreatedEvent(
     val userId: Long,
     val amount: Long,
     val couponId: Long?,
+    val items: List<OrderItemInfo>,
     val createdAt: ZonedDateTime,
 ) {
     companion object {
@@ -22,8 +23,30 @@ data class OrderCreatedEvent(
                 userId = order.userId,
                 amount = order.totalAmount.amount.toLong(),
                 couponId = couponId,
+                items = order.items.map { OrderItemInfo.from(it) },
                 createdAt = order.createdAt,
             )
+        }
+    }
+
+    /**
+     * 주문 상품 정보
+     */
+    data class OrderItemInfo(
+        val productId: Long,
+        val productName: String,
+        val quantity: Int,
+        val priceAtOrder: Long,
+    ) {
+        companion object {
+            fun from(orderItem: com.loopers.domain.order.OrderItem): OrderItemInfo {
+                return OrderItemInfo(
+                    productId = orderItem.productId,
+                    productName = orderItem.productName,
+                    quantity = orderItem.quantity,
+                    priceAtOrder = orderItem.priceAtOrder.amount.toLong(),
+                )
+            }
         }
     }
 }

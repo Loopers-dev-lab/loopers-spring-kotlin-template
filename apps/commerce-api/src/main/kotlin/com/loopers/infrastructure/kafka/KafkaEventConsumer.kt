@@ -192,8 +192,22 @@ class KafkaEventConsumer(
             return
         }
 
-        // 주문 관련 집계 처리 (판매량 등)
-        // TODO: 주문 상품 정보를 통해 각 상품의 판매량 집계
+        // 주문 상품별 판매량 집계
+        event.items.forEach { item ->
+            val metrics = productMetricsRepository.findOrCreateByProductId(item.productId)
+            val totalAmount = item.priceAtOrder * item.quantity
+            metrics.incrementSales(
+                quantity = item.quantity.toLong(),
+                amount = totalAmount,
+            )
+            productMetricsRepository.save(metrics)
+
+            logger.debug(
+                "상품 판매량 집계 완료: productId=${item.productId}, " +
+                    "quantity=${item.quantity}, amount=$totalAmount, " +
+                    "totalSalesCount=${metrics.salesCount}, totalSalesAmount=${metrics.totalSalesAmount}",
+            )
+        }
 
         eventHandledRepository.save(
             EventHandled.create(
@@ -205,7 +219,10 @@ class KafkaEventConsumer(
         )
 
         acknowledgment.acknowledge()
-        logger.info("OrderCreatedEvent 처리 완료: orderId=${event.orderId}")
+        logger.info(
+            "OrderCreatedEvent 처리 완료: orderId=${event.orderId}, " +
+                "items=${event.items.size}개 상품 판매량 집계",
+        )
     }
 
     /**

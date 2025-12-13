@@ -49,6 +49,7 @@ class OrderEventHandlerTest {
                 userId = 100L,
                 amount = 10000L,
                 couponId = 200L,
+                items = emptyList(),
                 createdAt = ZonedDateTime.now(),
             )
 
@@ -70,6 +71,7 @@ class OrderEventHandlerTest {
                 userId = 100L,
                 amount = 10000L,
                 couponId = null,
+                items = emptyList(),
                 createdAt = ZonedDateTime.now(),
             )
 
@@ -89,6 +91,7 @@ class OrderEventHandlerTest {
                 userId = 100L,
                 amount = 10000L,
                 couponId = 200L,
+                items = emptyList(),
                 createdAt = ZonedDateTime.now(),
             )
 
@@ -109,6 +112,7 @@ class OrderEventHandlerTest {
                 userId = 100L,
                 amount = 10000L,
                 couponId = null,
+                items = emptyList(),
                 createdAt = ZonedDateTime.now(),
             )
 
