@@ -46,7 +46,7 @@ class CircuitBreakerEventListener(
                 )
             }
             .onError { event ->
-                logger.debug(
+                logger.warn(
                     "Circuit Breaker Error: {} - {}",
                     circuitBreaker.name,
                     event.throwable.message,

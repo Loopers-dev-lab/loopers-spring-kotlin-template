@@ -10,12 +10,16 @@ import com.loopers.domain.product.Quantity
 import com.loopers.domain.shared.Money
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import io.mockk.*
+import io.mockk.Runs
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 import org.springframework.context.ApplicationEventPublisher
 
@@ -97,7 +101,9 @@ class OrderServiceTest {
         verify(exactly = 1) { eventPublisher.publishEvent(any<OrderCreatedEvent>()) }
         assertThat(eventSlot.captured.orderId).isEqualTo(result.id)
         assertThat(eventSlot.captured.memberId).isEqualTo(memberId)
+        assertThat(eventSlot.captured.orderAmount).isEqualTo(result.totalAmount.amount)
         assertThat(eventSlot.captured.couponId).isEqualTo(1L)
+        assertThat(eventSlot.captured.createdAt).isNotNull()
     }
 
     @DisplayName("포인트를 초과 사용하면 예외가 발생한다")
@@ -165,6 +171,45 @@ class OrderServiceTest {
         // then
         verify(exactly = 1) { product.decreaseStock(Quantity.of(quantity)) }
         verify(exactly = 1) { order.complete() }
+    }
+
+    @DisplayName("쿠폰 없이 주문을 생성하고 이벤트를 발행한다")
+    @Test
+    fun createOrderWithoutCouponAndPublishEvent() {
+        // given
+        val memberId = "testuser01"
+        val product = mockk<Product>(relaxed = true) {
+            every { id } returns 1L
+            every { name } returns "상품1"
+            every { price } returns Money.of(10000L)
+            every { validateStock(any()) } just Runs
+        }
+        val member = mockk<Member>(relaxed = true) {
+            every { point.amount } returns 50000L
+        }
+        val orderItems = listOf(OrderItemCommand(productId = 1L, quantity = 1))
+
+        every { productRepository.findAllByIdIn(any()) } returns listOf(product)
+        every { memberRepository.findByMemberIdWithLockOrThrow(memberId) } returns member
+        every { couponService.applyAndUseCouponForOrder(any(), any(), any(), any()) } returns Money.zero()
+        every { orderRepository.save(any()) } answers { firstArg() }
+
+        val eventSlot = slot<OrderCreatedEvent>()
+        every { eventPublisher.publishEvent(capture(eventSlot)) } just Runs
+
+        // when
+        val result = orderService.createOrderWithCalculation(
+            memberId = memberId,
+            orderItems = orderItems,
+            couponId = null,
+            usePoint = 0L,
+        )
+
+        // then
+        verify(exactly = 1) { eventPublisher.publishEvent(any<OrderCreatedEvent>()) }
+        assertThat(eventSlot.captured.orderId).isEqualTo(result.id)
+        assertThat(eventSlot.captured.memberId).isEqualTo(memberId)
+        assertThat(eventSlot.captured.couponId).isNull()
     }
 
 }
