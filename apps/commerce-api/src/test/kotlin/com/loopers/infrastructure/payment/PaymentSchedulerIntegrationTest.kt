@@ -14,6 +14,7 @@ import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.ninjasquad.springmockk.MockkBean
+import io.mockk.clearMocks
 import io.mockk.every
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -44,6 +45,7 @@ class PaymentSchedulerIntegrationTest @Autowired constructor(
 
     @AfterEach
     fun tearDown() {
+        clearMocks(pgClient)
         databaseCleanUp.truncateAllTables()
     }
 
@@ -116,6 +118,38 @@ class PaymentSchedulerIntegrationTest @Autowired constructor(
         }
     }
 
+    @Nested
+    @DisplayName("recoverPendingPayments")
+    inner class RecoverPendingPayments {
+
+        @Test
+        @DisplayName("스케줄러가 정상적으로 실행된다")
+        fun `scheduler executes without error`() {
+            // given - PENDING 결제가 없어도 스케줄러는 정상 실행되어야 함
+
+            // when - 스케줄러 호출
+            paymentScheduler.recoverPendingPayments()
+
+            // then - 예외 없이 정상 실행됨 (검증은 PaymentJobIntegrationTest에서 수행)
+        }
+
+        @Test
+        @DisplayName("최근 생성된 PENDING 결제는 처리하지 않는다")
+        fun `skips recently created PENDING payments`() {
+            // given - 결제 생성 직후에 recoverPendingPayments 호출
+            // threshold는 now() - 30초이므로 방금 생성된 결제는 대상이 아님
+
+            val payment = createPendingPayment()
+
+            // 스케줄러 호출 - threshold가 현재 시간 - 30초이므로 방금 생성된 결제는 대상 아님
+            paymentScheduler.recoverPendingPayments()
+
+            // then - 결제 상태는 여전히 PENDING
+            val updated = paymentRepository.findById(payment.id)!!
+            assertThat(updated.status).isEqualTo(PaymentStatus.PENDING)
+        }
+    }
+
     // ===========================================
     // 헬퍼 메서드
     // ===========================================
@@ -149,6 +183,22 @@ class PaymentSchedulerIntegrationTest @Autowired constructor(
             cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
         )
         payment.initiate(PgPaymentCreateResult.Accepted(externalPaymentKey), Instant.now())
+        return paymentRepository.save(payment)
+    }
+
+    private fun createPendingPayment(
+        userId: Long = 1L,
+    ): Payment {
+        val order = createOrder()
+        val payment = Payment.create(
+            userId = userId,
+            orderId = order.id,
+            totalAmount = order.totalAmount,
+            usedPoint = Money.ZERO_KRW,
+            issuedCouponId = null,
+            couponDiscount = Money.ZERO_KRW,
+            cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
+        )
         return paymentRepository.save(payment)
     }
 
