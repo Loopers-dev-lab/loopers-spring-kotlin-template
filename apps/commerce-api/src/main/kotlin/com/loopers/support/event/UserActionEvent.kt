@@ -12,11 +12,11 @@ data class UserActionEvent(
 )
 
 enum class ActionType {
-    VIEW,
-    CLICK,
-    LIKE,
-    ORDER,
-    SEARCH
+    VIEW, // 상품 상세 조회
+    BROWSE, // 상품 목록 조회
+    LIKE, // 상품 좋아요
+    UNLIKE, // 상품 좋아요 취소
+    ORDER, // 주문
 }
 
 enum class EntityType {
