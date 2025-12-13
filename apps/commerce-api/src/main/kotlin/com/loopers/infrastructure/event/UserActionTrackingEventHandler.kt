@@ -22,7 +22,7 @@ class UserActionTrackingEventHandler(
     fun handleProductLiked(event: ProductLikedEvent) {
         eventPublisher.publishEvent(
             UserActionEvent(
-                userId = event.memberId.toString(),
+                userId = event.memberId,
                 actionType = ActionType.LIKE,
                 targetEntityType = EntityType.PRODUCT,
                 targetEntityId = event.productId,
@@ -36,7 +36,7 @@ class UserActionTrackingEventHandler(
     fun handleProductUnliked(event: ProductUnlikedEvent) {
         eventPublisher.publishEvent(
             UserActionEvent(
-                userId = event.memberId.toString(),
+                userId = event.memberId,
                 actionType = ActionType.UNLIKE,
                 targetEntityType = EntityType.PRODUCT,
                 targetEntityId = event.productId,
@@ -56,7 +56,7 @@ class UserActionTrackingEventHandler(
                 userId = event.memberId,
                 actionType = ActionType.BROWSE,
                 targetEntityType = EntityType.PRODUCT,
-                targetEntityId = 0L, // 목록 조회는 특정 상품 없음
+                targetEntityId = null, // 목록 조회는 특정 상품 없음
                 metadata = mapOf(
                     "brandId" to (event.brandId?.toString() ?: "all"),
                     "sortType" to event.sortType.name,

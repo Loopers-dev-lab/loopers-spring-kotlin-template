@@ -6,7 +6,7 @@ data class UserActionEvent(
     val userId: String,
     val actionType: ActionType,
     val targetEntityType: EntityType,
-    val targetEntityId: Long,
+    val targetEntityId: Long?, // BROWSE 액션은 null 허용
     val metadata: Map<String, String> = emptyMap(),
     val occurredAt: Instant
 )
