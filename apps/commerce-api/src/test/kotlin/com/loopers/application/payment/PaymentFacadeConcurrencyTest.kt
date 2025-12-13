@@ -6,11 +6,8 @@ import com.loopers.domain.payment.CardInfo
 import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
-import com.loopers.domain.payment.PaymentCommand
-import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgClient
-import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointAccount
@@ -52,7 +49,6 @@ import java.util.concurrent.atomic.AtomicInteger
 @DisplayName("결제 동시성 통합 테스트")
 class PaymentFacadeConcurrencyTest @Autowired constructor(
     private val paymentFacade: PaymentFacade,
-    private val paymentService: PaymentService,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
@@ -177,20 +173,21 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
         )
         val savedOrder = orderRepository.save(order)
 
-        val payment = paymentService.create(
-            PaymentCommand.Create(
-                userId = userId,
-                orderId = savedOrder.id,
-                totalAmount = savedOrder.totalAmount,
-                usedPoint = Money.krw(5000),
-                issuedCouponId = null,
-                couponDiscount = Money.ZERO_KRW,
-                cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
-            ),
-        )
+        val totalAmount = savedOrder.totalAmount
+        val usedPoint = Money.krw(5000)
+        val paidAmount = totalAmount - usedPoint
 
-        // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
-        payment.initiate(PgPaymentCreateResult.Accepted("tx_concurrent_test"), Instant.now())
+        val payment = Payment.of(
+            orderId = savedOrder.id,
+            userId = userId,
+            totalAmount = totalAmount,
+            usedPoint = usedPoint,
+            paidAmount = paidAmount,
+            status = PaymentStatus.IN_PROGRESS,
+            cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
+            externalPaymentKey = "tx_concurrent_test",
+            attemptedAt = Instant.now(),
+        )
         return paymentRepository.save(payment)
     }
 
