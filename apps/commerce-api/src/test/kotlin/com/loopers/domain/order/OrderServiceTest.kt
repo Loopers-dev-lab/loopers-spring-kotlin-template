@@ -13,7 +13,6 @@ import com.loopers.support.error.ErrorType
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
-import io.mockk.match
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
