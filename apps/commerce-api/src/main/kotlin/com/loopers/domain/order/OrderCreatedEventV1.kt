@@ -13,10 +13,4 @@ data class OrderCreatedEventV1(
     override val aggregateType: String = "Order",
     override val occurredAt: Instant = Instant.now(),
     override val version: Int = 1,
-) : DomainEvent {
-
-    data class OrderItemSnapshot(
-        val productId: Long,
-        val quantity: Int,
-    )
-}
+) : DomainEvent

@@ -6,7 +6,7 @@ import java.util.UUID
 
 data class OrderCanceledEventV1(
     val orderId: Long,
-    val orderItems: List<OrderCreatedEventV1.OrderItemSnapshot>,
+    val orderItems: List<OrderItemSnapshot>,
     override val eventId: String = UUID.randomUUID().toString(),
     override val eventType: String = "OrderCanceledEvent",
     override val aggregateId: String = orderId.toString(),

@@ -29,7 +29,7 @@ class OrderService(
             OrderCreatedEventV1(
                 orderId = savedOrder.id,
                 orderItems = savedOrder.orderItems.map {
-                    OrderCreatedEventV1.OrderItemSnapshot(
+                    OrderItemSnapshot(
                         productId = it.productId,
                         quantity = it.quantity,
                     )
@@ -63,7 +63,7 @@ class OrderService(
             OrderCanceledEventV1(
                 orderId = savedOrder.id,
                 orderItems = savedOrder.orderItems.map {
-                    OrderCreatedEventV1.OrderItemSnapshot(
+                    OrderItemSnapshot(
                         productId = it.productId,
                         quantity = it.quantity,
                     )
