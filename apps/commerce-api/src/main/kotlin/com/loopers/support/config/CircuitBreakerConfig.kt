@@ -12,8 +12,8 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class CircuitBreakerConfig {
 
-    @Bean
-    fun circuitBreakerRegistryEventConsumer(): RegistryEventConsumer<CircuitBreaker> {
+    @Bean(name = ["customCircuitBreakerRegistryEventConsumer"])
+    fun customCircuitBreakerRegistryEventConsumer(): RegistryEventConsumer<CircuitBreaker> {
         return CircuitBreakerRegistryEventConsumer()
     }
 }

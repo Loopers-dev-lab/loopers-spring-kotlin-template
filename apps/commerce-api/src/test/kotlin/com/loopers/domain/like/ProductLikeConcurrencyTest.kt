@@ -89,11 +89,9 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
 
             // then
             val likes = productLikeRepository.findAllByProductId(product.id)
-            val count = productLikeCountRepository.findByProductId(product.id)
 
             assertSoftly { soft ->
                 soft.assertThat(likes.size).isEqualTo(1)
-                soft.assertThat(count.likeCount).isEqualTo(1)
                 soft.assertThat(success.get() + fail.get()).isEqualTo(threadCount)
             }
         }
@@ -147,11 +145,9 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
 
             // then
             val likes = productLikeRepository.findAllByProductId(product.id)
-            val count = productLikeCountRepository.findByProductId(product.id)
 
             assertSoftly { soft ->
                 soft.assertThat(likes.size).isEqualTo(threadCount)
-                soft.assertThat(count.likeCount.toInt()).isEqualTo(threadCount)
                 soft.assertThat(success.get()).isEqualTo(threadCount)
                 soft.assertThat(fail.get()).isEqualTo(0)
             }
@@ -213,11 +209,9 @@ class ProductLikeConcurrencyTest : IntegrationTest() {
 
             // then
             val remainingLikes = productLikeRepository.findAllByProductId(product.id)
-            val remainingCount = productLikeCountRepository.findByProductId(product.id)
 
             assertSoftly { soft ->
                 soft.assertThat(remainingLikes.size).isEqualTo(20)
-                soft.assertThat(remainingCount.likeCount).isEqualTo(20)
                 soft.assertThat(success.get()).isEqualTo(30)
                 soft.assertThat(fail.get()).isEqualTo(0)
             }

@@ -41,7 +41,7 @@ class PaymentApplicationService(
             ),
         )
 
-        paymentEventPublisher.publish(PaymentEvent.PaymentCreated.from(payment = payment))
+        paymentEventPublisher.publish(PaymentEvent.PaymentRequest.from(payment = payment))
 
         return TransactionInfo.from(payment)
     }

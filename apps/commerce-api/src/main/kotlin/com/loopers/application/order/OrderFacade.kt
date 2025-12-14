@@ -3,26 +3,46 @@ package com.loopers.application.order
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
+import com.loopers.domain.order.OrderEvent
 import com.loopers.domain.order.OrderResult
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentMethod
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PgService
 import com.loopers.domain.payment.dto.PaymentCommand
-import com.loopers.domain.payment.dto.PgCommand
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.UserService
-import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
-import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * 주문 파사드
+ *
+ * 책임:
+ * - 주문 생성 비즈니스 로직 조율
+ * - 결제 수단별 처리 흐름 분기 (포인트/카드)
+ * - 도메인 서비스 호출 및 이벤트 발행
+ *
+ * 결제 수단별 처리 흐름:
+ *
+ * 1. POINT 결제:
+ *    - 포인트 사용 → 주문 생성 → 재고 차감 → 이벤트 발행
+ *    - 모든 처리가 하나의 트랜잭션에서 완료
+ *    - OrderCreated 이벤트 → 쿠폰 사용 (BEFORE_COMMIT)
+ *    - OrderCompleted 이벤트 → 데이터 플랫폼 전송 (AFTER_COMMIT)
+ *
+ * 2. CARD 결제:
+ *    - 주문 생성 → 결제 생성 → 이벤트 발행
+ *    - 재고 차감은 PG 결제 성공 후 PaymentEventListener에서 처리
+ *    - PaymentRequest 이벤트 → PG API 요청 (AFTER_COMMIT)
+ *    - OrderCreated 이벤트 → 쿠폰 사용 (BEFORE_COMMIT), 로깅 (AFTER_COMMIT)
+ */
 @Component
 class OrderFacade(
     private val couponService: CouponService,
@@ -32,7 +52,7 @@ class OrderFacade(
     private val productService: ProductService,
     private val pointService: PointService,
     private val paymentService: PaymentService,
-    private val pgService: PgService,
+    private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
 
     private val log = LoggerFactory.getLogger(OrderFacade::class.java)
@@ -82,13 +102,8 @@ class OrderFacade(
         // 5. 총 주문 금액 계산
         val totalAmount = orderService.calculateTotalAmount(items, products)
 
-        // 6. 쿠폰 할인 금액 계산 (쿠폰 사용 중복 발생시 exception을 catch하여 예외를 던짐)
-        val discountAmount = try {
-            couponService.applyCoupon(user.id, couponId, totalAmount)
-        } catch (e: ObjectOptimisticLockingFailureException) {
-            log.debug("쿠폰 중복 사용 시도 무시: user=$user.id, couponId=$couponId")
-            throw CoreException(ErrorType.COUPON_ALREADY_USED, "이미 사용된 쿠폰입니다")
-        }
+        // 6. 쿠폰 적용시 할인 금액 계산 (쿠폰 사용 처리는 이벤트로 분리)
+        val discountAmount = couponService.calculateCouponDiscount(user.id, couponId, totalAmount)
 
         // 7. 최종 결제 금액 계산
         val finalAmount = totalAmount - discountAmount
@@ -117,6 +132,25 @@ class OrderFacade(
 
                 // 10. 재고 감소
                 productService.deductAllStock(orderResult.orderDetails)
+
+                // 11. 주문 생성 이벤트 발행 (쿠폰 사용 후속 처리)
+                applicationEventPublisher.publishEvent(
+                    OrderEvent.OrderCreated(
+                        orderId = orderResult.order.id,
+                        userId = user.id,
+                        couponId = couponId,
+                    ),
+                )
+
+                // 12. 주문 완료 이벤트 발행 (데이터 플랫폼 전송, 사용자 활동 로깅)
+                applicationEventPublisher.publishEvent(
+                    OrderEvent.OrderCompleted(
+                        orderId = orderResult.order.id,
+                        userId = user.id,
+                        totalAmount = finalAmount,
+                        items = orderResult.orderDetails,
+                    ),
+                )
                 return
             }
 
@@ -148,24 +182,28 @@ class OrderFacade(
                     ),
                 )
 
-                // 10. PG 결제 요청
-                val transactionKey = pgService.requestPayment(
-                    command = PgCommand.Request(
-                        userId = userId,
+                // 10. PG 결제 요청 이벤트 발행 (AFTER_COMMIT에서 처리)
+                applicationEventPublisher.publishEvent(
+                    PaymentEvent.PaymentRequest(
+                        paymentId = payment.id,
                         orderId = orderResult.order.id.toString(),
+                        userId = userId,
                         cardType = command.cardType,
                         cardNo = command.cardNo,
                         amount = finalAmount,
                     ),
                 )
 
-                // 11. transactionKey update
-                paymentService.updateTransactionKey(payment.id, transactionKey)
-
+                // 11. 주문 생성 이벤트 발행 (쿠폰 사용 후속 처리(before), 사용자 활동 로깅(after)
+                applicationEventPublisher.publishEvent(
+                    OrderEvent.OrderCreated(
+                        orderId = orderResult.order.id,
+                        userId = user.id,
+                        couponId = couponId,
+                    ),
+                )
                 return
             }
         }
-
-        // TODO. 주문 정보 외부 시스템 전송
     }
 }

@@ -28,17 +28,12 @@ class ProductLikeService(
         if (productLikeRepository.existsBy(product.id, user.id)) {
             return
         }
-        val result = productLikeRepository.increaseCount(product.id)
-        if (result == 0) {
-            productLikeRepository.saveCount(ProductLikeCount.create(product.id, 1L))
-        }
         productLikeRepository.save(ProductLike.create(product.id, user.id))
     }
 
     @Transactional
     fun unlike(product: Product, user: User) {
         productLikeRepository.findBy(product.id, user.id) ?: return
-        productLikeRepository.decreaseCount(product.id)
         return productLikeRepository.deleteBy(product.id, user.id)
     }
 }

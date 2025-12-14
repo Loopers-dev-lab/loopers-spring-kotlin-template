@@ -4,13 +4,14 @@ import com.loopers.domain.brand.BrandService
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderCommand
+import com.loopers.domain.order.OrderEvent
 import com.loopers.domain.order.OrderResult
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
 import com.loopers.domain.payment.CardType
+import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentMethod
 import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PgService
 import com.loopers.domain.point.PointService
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.Gender
@@ -28,6 +29,7 @@ import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
@@ -43,8 +45,8 @@ class OrderFacadeTest {
     private val productService: ProductService = mockk()
     private val pointService: PointService = mockk()
     private val paymentService: PaymentService = mockk()
-    private val pgService: PgService = mockk()
-    private val orderFacade = OrderFacade(couponService, orderService, userService, brandService, productService, pointService, paymentService, pgService)
+    private val applicationEventPublisher: ApplicationEventPublisher = mockk()
+    private val orderFacade = OrderFacade(couponService, orderService, userService, brandService, productService, pointService, paymentService, applicationEventPublisher)
 
     private val pageable: Pageable = PageRequest.of(0, 20)
 
@@ -182,10 +184,11 @@ class OrderFacadeTest {
             justRun { productService.validateStockAvailability(any()) }
             every { brandService.getAllBrand(any()) } returns listOf(brand)
             every { orderService.calculateTotalAmount(any(), any()) } returns totalAmount
-            every { couponService.applyCoupon(any(), any(), any()) } returns discountAmount
+            every { couponService.calculateCouponDiscount(any(), any(), any()) } returns discountAmount
             justRun { pointService.use(any(), any()) }
             justRun { productService.deductAllStock(any()) }
             every { orderService.createOrder(any()) } returns orderResult
+            justRun { applicationEventPublisher.publishEvent(any<OrderEvent.OrderCreated>()) }
 
             // when
             orderFacade.placeOrder(
@@ -204,7 +207,7 @@ class OrderFacadeTest {
             verify(exactly = 1) { productService.validateStockAvailability(any()) }
             verify(exactly = 1) { brandService.getAllBrand(any()) }
             verify(exactly = 1) { orderService.calculateTotalAmount(any(), any()) }
-            verify(exactly = 1) { couponService.applyCoupon(userIdLong, couponId, totalAmount) }
+            verify(exactly = 1) { couponService.calculateCouponDiscount(userIdLong, couponId, totalAmount) }
             verify(exactly = 1) { pointService.use(userIdLong, finalTotalAmount) }
             verify(exactly = 1) { productService.deductAllStock(any()) }
             verify(exactly = 1) { orderService.createOrder(any()) }
@@ -219,7 +222,6 @@ class OrderFacadeTest {
             val couponId = 100L
             val cardType = CardType.KB
             val cardNo = "1234-5678-9814-1451"
-            val transactionKey = "txn_123"
 
             val user = createUser(id = userIdLong)
             val brand = createBrand(id = 1L)
@@ -238,12 +240,12 @@ class OrderFacadeTest {
             justRun { productService.validateStockAvailability(any()) }
             every { brandService.getAllBrand(any()) } returns listOf(brand)
             every { orderService.calculateTotalAmount(any(), any()) } returns totalAmount
-            every { couponService.applyCoupon(any(), any(), any()) } returns discountAmount
+            every { couponService.calculateCouponDiscount(any(), any(), any()) } returns discountAmount
             every { orderService.createOrder(any()) } returns orderResult
             every { paymentService.create(any()) } returns payment
             every { payment.id } returns 1L
-            every { pgService.requestPayment(any()) } returns transactionKey
-            justRun { paymentService.updateTransactionKey(any(), any()) }
+            justRun { applicationEventPublisher.publishEvent(any<PaymentEvent.PaymentRequest>()) }
+            justRun { applicationEventPublisher.publishEvent(any<OrderEvent.OrderCreated>()) }
 
             // when
             orderFacade.placeOrder(
@@ -264,11 +266,12 @@ class OrderFacadeTest {
             verify(exactly = 1) { productService.validateStockAvailability(any()) }
             verify(exactly = 1) { brandService.getAllBrand(any()) }
             verify(exactly = 1) { orderService.calculateTotalAmount(any(), any()) }
-            verify(exactly = 1) { couponService.applyCoupon(userIdLong, couponId, totalAmount) }
+            verify(exactly = 1) { couponService.calculateCouponDiscount(userIdLong, couponId, totalAmount) }
             verify(exactly = 1) { orderService.createOrder(any()) }
             verify(exactly = 1) { paymentService.create(any()) }
-            verify(exactly = 1) { pgService.requestPayment(any()) }
-            verify(exactly = 1) { paymentService.updateTransactionKey(any(), any()) }
+            // PG 결제 요청은 이벤트로 처리됨
+            verify(exactly = 1) { applicationEventPublisher.publishEvent(ofType<PaymentEvent.PaymentRequest>()) }
+            verify(exactly = 1) { applicationEventPublisher.publishEvent(ofType<OrderEvent.OrderCreated>()) }
             // 카드 결제는 재고 차감이 콜백에서 발생하므로 여기서는 호출되지 않음
             verify(exactly = 0) { productService.deductAllStock(any()) }
         }
