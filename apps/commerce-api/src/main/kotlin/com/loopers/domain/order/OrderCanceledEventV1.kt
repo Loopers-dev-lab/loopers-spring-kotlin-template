@@ -15,6 +15,20 @@ data class OrderCanceledEventV1(
     override val version: Int = 1,
 ) : DomainEvent {
 
+    companion object {
+        fun from(order: Order): OrderCanceledEventV1 {
+            return OrderCanceledEventV1(
+                orderId = order.id,
+                orderItems = order.orderItems.map {
+                    OrderItemSnapshot(
+                        productId = it.productId,
+                        quantity = it.quantity,
+                    )
+                },
+            )
+        }
+    }
+
     data class OrderItemSnapshot(
         val productId: Long,
         val quantity: Int,
