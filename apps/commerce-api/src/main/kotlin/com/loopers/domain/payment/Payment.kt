@@ -155,7 +155,7 @@ class Payment(
     /**
      * PG 트랜잭션 결과로 결제 상태를 확정합니다.
      *
-     * 멱등성: 이미 PAID/FAILED 상태면 해당 결과를 그대로 반환
+     * 멱등성: 이미 PAID/FAILED 상태면 아무 동작 없이 종료
      *
      * 매칭 우선순위:
      * 1. externalPaymentKey가 있으면 해당 키와 일치하는 transaction
@@ -163,16 +163,12 @@ class Payment(
      *
      * @param transactions PG에서 조회한 트랜잭션 목록
      * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return ConfirmResult - Paid, Failed, 또는 StillInProgress
      * @throws CoreException PENDING 상태인 경우 (아직 결제 시작 안됨)
      */
-    fun confirmPayment(transactions: List<PgTransaction>, currentTime: Instant): ConfirmResult {
-        // 멱등성: 이미 최종 상태면 해당 결과 반환
-        if (status == PaymentStatus.PAID) {
-            return ConfirmResult.Paid(this)
-        }
-        if (status == PaymentStatus.FAILED) {
-            return ConfirmResult.Failed(this)
+    fun confirmPayment(transactions: List<PgTransaction>, currentTime: Instant) {
+        // 멱등성: 이미 최종 상태면 아무것도 하지 않음
+        if (status == PaymentStatus.PAID || status == PaymentStatus.FAILED) {
+            return
         }
 
         // PENDING 상태면 예외 (아직 결제 시작 안됨)
@@ -186,29 +182,27 @@ class Payment(
             matched?.status == PgTransactionStatus.SUCCESS -> {
                 status = PaymentStatus.PAID
                 externalPaymentKey = matched.transactionKey
+                getDomainEvents().add(PaymentPaidEventV1.from(this))
             }
 
             matched?.status == PgTransactionStatus.FAILED -> {
                 status = PaymentStatus.FAILED
                 externalPaymentKey = matched.transactionKey
                 failureMessage = matched.failureReason
+                getDomainEvents().add(PaymentFailedEventV1.from(this))
             }
 
             matched == null -> {
                 status = PaymentStatus.FAILED
                 failureMessage = "매칭되는 PG 트랜잭션이 없습니다"
+                getDomainEvents().add(PaymentFailedEventV1.from(this))
             }
 
             isTimedOut(currentTime) -> {
                 status = PaymentStatus.FAILED
                 failureMessage = "결제 시간 초과"
+                getDomainEvents().add(PaymentFailedEventV1.from(this))
             }
-        }
-
-        return when (status) {
-            PaymentStatus.PAID -> ConfirmResult.Paid(this)
-            PaymentStatus.FAILED -> ConfirmResult.Failed(this)
-            else -> ConfirmResult.StillInProgress(this)
         }
     }
 

@@ -564,9 +564,9 @@ class PaymentTest {
     @Nested
     inner class ConfirmPayment {
 
-        @DisplayName("externalPaymentKey로 SUCCESS 매칭 시 PAID로 전이하고 Paid를 반환한다")
+        @DisplayName("externalPaymentKey로 SUCCESS 매칭 시 PAID로 전이하고 PaymentPaidEventV1이 등록된다")
         @Test
-        fun `transitions to PAID and returns Paid when matched by externalPaymentKey with SUCCESS`() {
+        fun `transitions to PAID when matched by externalPaymentKey with SUCCESS`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
             val transaction = createTransaction(
@@ -575,18 +575,19 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
-            assertThat((result as ConfirmResult.Paid).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
             assertThat(payment.externalPaymentKey).isEqualTo("tx_12345")
+            val events = payment.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(PaymentPaidEventV1::class.java)
         }
 
-        @DisplayName("externalPaymentKey로 FAILED 매칭 시 FAILED로 전이하고 Failed를 반환한다")
+        @DisplayName("externalPaymentKey로 FAILED 매칭 시 FAILED로 전이하고 PaymentFailedEventV1이 등록된다")
         @Test
-        fun `transitions to FAILED and returns Failed when matched by externalPaymentKey with FAILED`() {
+        fun `transitions to FAILED when matched by externalPaymentKey with FAILED`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
             val transaction = createTransaction(
@@ -596,19 +597,20 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
-            assertThat((result as ConfirmResult.Failed).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(payment.externalPaymentKey).isEqualTo("tx_12345")
             assertThat(payment.failureMessage).isEqualTo("잔액 부족")
+            val events = payment.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(PaymentFailedEventV1::class.java)
         }
 
-        @DisplayName("paymentId로 SUCCESS 매칭 시 PAID로 전이하고 Paid를 반환한다")
+        @DisplayName("paymentId로 SUCCESS 매칭 시 PAID로 전이하고 PaymentPaidEventV1이 등록된다")
         @Test
-        fun `transitions to PAID and returns Paid when matched by paymentId with SUCCESS`() {
+        fun `transitions to PAID when matched by paymentId with SUCCESS`() {
             // given - Uncertain으로 initiate된 경우 externalPaymentKey가 null
             val payment = createInProgressPayment(externalPaymentKey = null)
             val transaction = createTransaction(
@@ -618,18 +620,19 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
-            assertThat((result as ConfirmResult.Paid).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
             assertThat(payment.externalPaymentKey).isEqualTo("tx_new_12345")
+            val events = payment.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(PaymentPaidEventV1::class.java)
         }
 
-        @DisplayName("paymentId로 FAILED 매칭 시 FAILED로 전이하고 Failed를 반환한다")
+        @DisplayName("paymentId로 FAILED 매칭 시 FAILED로 전이하고 PaymentFailedEventV1이 등록된다")
         @Test
-        fun `transitions to FAILED and returns Failed when matched by paymentId with FAILED`() {
+        fun `transitions to FAILED when matched by paymentId with FAILED`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = null)
             val transaction = createTransaction(
@@ -640,14 +643,15 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(transaction), currentTime = Instant.now())
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
-            assertThat((result as ConfirmResult.Failed).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(payment.externalPaymentKey).isEqualTo("tx_failed_12345")
             assertThat(payment.failureMessage).isEqualTo("카드 한도 초과")
+            val events = payment.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(PaymentFailedEventV1::class.java)
         }
 
         @DisplayName("IN_PROGRESS가 아닌 상태에서 호출 시 예외가 발생한다")
@@ -667,25 +671,26 @@ class PaymentTest {
             assertThat(exception.message).isEqualTo("결제 진행 중 상태에서만 확정할 수 있습니다")
         }
 
-        @DisplayName("빈 트랜잭션 목록이면 FAILED로 전이하고 Failed를 반환한다")
+        @DisplayName("빈 트랜잭션 목록이면 FAILED로 전이하고 PaymentFailedEventV1이 등록된다")
         @Test
-        fun `transitions to FAILED and returns Failed when transaction list is empty`() {
+        fun `transitions to FAILED when transaction list is empty`() {
             // given
             val payment = createInProgressPayment()
 
             // when
-            val result = payment.confirmPayment(emptyList(), currentTime = Instant.now())
+            payment.confirmPayment(emptyList(), currentTime = Instant.now())
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
-            assertThat((result as ConfirmResult.Failed).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
+            val events = payment.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(PaymentFailedEventV1::class.java)
         }
 
-        @DisplayName("매칭되는 트랜잭션이 없으면 FAILED로 전이하고 Failed를 반환한다")
+        @DisplayName("매칭되는 트랜잭션이 없으면 FAILED로 전이하고 PaymentFailedEventV1이 등록된다")
         @Test
-        fun `transitions to FAILED and returns Failed when no matching transaction exists`() {
+        fun `transitions to FAILED when no matching transaction exists`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
             val unmatchedTransaction = createTransaction(
@@ -694,18 +699,19 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(unmatchedTransaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(unmatchedTransaction), currentTime = Instant.now())
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
-            assertThat((result as ConfirmResult.Failed).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
+            val events = payment.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(PaymentFailedEventV1::class.java)
         }
 
-        @DisplayName("PENDING 트랜잭션만 있으면 FAILED로 전이하고 Failed를 반환한다 (externalPaymentKey 없는 경우)")
+        @DisplayName("PENDING 트랜잭션만 있으면 FAILED로 전이하고 PaymentFailedEventV1이 등록된다 (externalPaymentKey 없는 경우)")
         @Test
-        fun `transitions to FAILED and returns Failed when only PENDING transactions exist without key`() {
+        fun `transitions to FAILED when only PENDING transactions exist without key`() {
             // given - externalPaymentKey가 null이면 PENDING 트랜잭션은 매칭 대상 아님
             val payment = createInProgressPayment(externalPaymentKey = null)
             val pendingTransaction = createTransaction(
@@ -713,18 +719,19 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
-            assertThat((result as ConfirmResult.Failed).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(payment.failureMessage).isEqualTo("매칭되는 PG 트랜잭션이 없습니다")
+            val events = payment.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(PaymentFailedEventV1::class.java)
         }
 
-        @DisplayName("PENDING 트랜잭션 매칭 시 5분 경과하면 FAILED로 전이하고 Failed를 반환한다")
+        @DisplayName("PENDING 트랜잭션 매칭 시 5분 경과하면 FAILED로 전이하고 PaymentFailedEventV1이 등록된다")
         @Test
-        fun `transitions to FAILED and returns Failed when matched PENDING and 5 minutes elapsed`() {
+        fun `transitions to FAILED when matched PENDING and 5 minutes elapsed`() {
             // given - externalPaymentKey가 있으면 PENDING도 매칭됨
             val attemptedAt = Instant.now().minusSeconds(301) // 5분 1초 전
             val payment = createInProgressPayment(
@@ -737,18 +744,19 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
-            assertThat((result as ConfirmResult.Failed).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(payment.failureMessage).isEqualTo("결제 시간 초과")
+            val events = payment.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(PaymentFailedEventV1::class.java)
         }
 
-        @DisplayName("PENDING 트랜잭션 매칭 시 5분 미경과면 IN_PROGRESS 유지하고 StillInProgress를 반환한다")
+        @DisplayName("PENDING 트랜잭션 매칭 시 5분 미경과면 IN_PROGRESS 유지하고 이벤트 없음")
         @Test
-        fun `stays IN_PROGRESS and returns StillInProgress when matched PENDING and less than 5 minutes elapsed`() {
+        fun `stays IN_PROGRESS when matched PENDING and less than 5 minutes elapsed`() {
             // given - externalPaymentKey가 있으면 PENDING도 매칭됨
             val attemptedAt = Instant.now().minusSeconds(299) // 4분 59초 전
             val payment = createInProgressPayment(
@@ -761,17 +769,16 @@ class PaymentTest {
             )
 
             // when
-            val result = payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(pendingTransaction), currentTime = Instant.now())
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.StillInProgress::class.java)
-            assertThat((result as ConfirmResult.StillInProgress).payment).isEqualTo(payment)
             assertThat(payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+            assertThat(payment.pollEvents()).isEmpty()
         }
 
-        @DisplayName("PAID 상태에서 confirmPayment 호출 시 Paid를 반환한다 (멱등성)")
+        @DisplayName("PAID 상태에서 confirmPayment 호출 시 아무 동작 없음 (멱등성)")
         @Test
-        fun `returns Paid when confirmPayment called on PAID payment`() {
+        fun `does nothing when confirmPayment called on PAID payment`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
             val successTransaction = createTransaction(
@@ -780,19 +787,19 @@ class PaymentTest {
             )
             payment.confirmPayment(listOf(successTransaction), currentTime = Instant.now())
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID) // 사전 조건 확인
+            payment.pollEvents() // 첫 번째 호출의 이벤트 비움
 
             // when - PAID 상태에서 다시 호출
-            val result = payment.confirmPayment(listOf(successTransaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(successTransaction), currentTime = Instant.now())
 
-            // then - 예외 없이 Paid 반환
-            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
-            assertThat((result as ConfirmResult.Paid).payment).isEqualTo(payment)
+            // then - 예외 없고 이벤트도 없음
             assertThat(payment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(payment.pollEvents()).isEmpty()
         }
 
-        @DisplayName("FAILED 상태에서 confirmPayment 호출 시 Failed를 반환한다 (멱등성)")
+        @DisplayName("FAILED 상태에서 confirmPayment 호출 시 아무 동작 없음 (멱등성)")
         @Test
-        fun `returns Failed when confirmPayment called on FAILED payment`() {
+        fun `does nothing when confirmPayment called on FAILED payment`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = "tx_12345")
             val failedTransaction = createTransaction(
@@ -802,15 +809,15 @@ class PaymentTest {
             )
             payment.confirmPayment(listOf(failedTransaction), currentTime = Instant.now())
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED) // 사전 조건 확인
+            payment.pollEvents() // 첫 번째 호출의 이벤트 비움
 
             // when - FAILED 상태에서 다시 호출
-            val result = payment.confirmPayment(listOf(failedTransaction), currentTime = Instant.now())
+            payment.confirmPayment(listOf(failedTransaction), currentTime = Instant.now())
 
-            // then - 예외 없이 Failed 반환
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
-            assertThat((result as ConfirmResult.Failed).payment).isEqualTo(payment)
+            // then - 예외 없고 이벤트도 없음
             assertThat(payment.status).isEqualTo(PaymentStatus.FAILED)
             assertThat(payment.failureMessage).isEqualTo("잔액 부족")
+            assertThat(payment.pollEvents()).isEmpty()
         }
     }
 

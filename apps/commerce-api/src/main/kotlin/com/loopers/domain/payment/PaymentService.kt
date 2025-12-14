@@ -69,7 +69,6 @@ class PaymentService(
      * @param orderId 주문 ID
      * @param externalPaymentKey PG 외부 결제 키
      * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return ConfirmResult - 결제 확정 결과
      * @throws CoreException 결제를 찾을 수 없는 경우
      */
     @Transactional
@@ -77,42 +76,15 @@ class PaymentService(
         orderId: Long,
         externalPaymentKey: String,
         currentTime: Instant = Instant.now(),
-    ): ConfirmResult {
+    ) {
         val payment = paymentRepository.findByOrderId(orderId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
         val transaction = pgClient.findTransaction(externalPaymentKey)
-        val result = payment.confirmPayment(listOf(transaction), currentTime)
+        payment.confirmPayment(listOf(transaction), currentTime)
         paymentRepository.save(payment)
 
-        when (result) {
-            is ConfirmResult.Paid -> {
-                eventPublisher.publishEvent(
-                    PaymentPaidEventV1(
-                        paymentId = payment.id,
-                        orderId = payment.orderId,
-                    ),
-                )
-            }
-
-            is ConfirmResult.Failed -> {
-                eventPublisher.publishEvent(
-                    PaymentFailedEventV1(
-                        paymentId = payment.id,
-                        orderId = payment.orderId,
-                        userId = payment.userId,
-                        usedPoint = payment.usedPoint,
-                        issuedCouponId = payment.issuedCouponId,
-                    ),
-                )
-            }
-
-            is ConfirmResult.StillInProgress -> {
-                /* No event, still waiting */
-            }
-        }
-
-        return result
+        payment.pollEvents().forEach { eventPublisher.publishEvent(it) }
     }
 
     /**
@@ -121,14 +93,13 @@ class PaymentService(
      *
      * @param paymentId 결제 ID
      * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return ConfirmResult - 결제 확정 결과
      * @throws CoreException 결제를 찾을 수 없는 경우
      */
     @Transactional
     fun processInProgressPayment(
         paymentId: Long,
         currentTime: Instant = Instant.now(),
-    ): ConfirmResult {
+    ) {
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
@@ -136,37 +107,10 @@ class PaymentService(
             listOf(pgClient.findTransaction(key))
         } ?: pgClient.findTransactionsByPaymentId(payment.id)
 
-        val result = payment.confirmPayment(transactions, currentTime)
+        payment.confirmPayment(transactions, currentTime)
         paymentRepository.save(payment)
 
-        when (result) {
-            is ConfirmResult.Paid -> {
-                eventPublisher.publishEvent(
-                    PaymentPaidEventV1(
-                        paymentId = payment.id,
-                        orderId = payment.orderId,
-                    ),
-                )
-            }
-
-            is ConfirmResult.Failed -> {
-                eventPublisher.publishEvent(
-                    PaymentFailedEventV1(
-                        paymentId = payment.id,
-                        orderId = payment.orderId,
-                        userId = payment.userId,
-                        usedPoint = payment.usedPoint,
-                        issuedCouponId = payment.issuedCouponId,
-                    ),
-                )
-            }
-
-            is ConfirmResult.StillInProgress -> {
-                /* No event, still waiting */
-            }
-        }
-
-        return result
+        payment.pollEvents().forEach { eventPublisher.publishEvent(it) }
     }
 
     /**
