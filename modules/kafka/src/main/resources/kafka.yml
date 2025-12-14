@@ -3,26 +3,36 @@ spring:
     bootstrap-servers: ${BOOTSTRAP_SERVERS}
     client-id: ${spring.application.name}
     properties:
-        spring.json.add.type.headers: false # json serialize off
-        request.timeout.ms: 20000
-        retry.backoff.ms: 500
-        auto:
-          create.topics.enable: false
-          register.schemas: false
-          offset.reset: latest
-        use.latest.version: true
+      spring.json.add.type.headers: false # JSON 타입 헤더 비활성화
+      request.timeout.ms: 20000           # 요청 타임아웃 (20초)
+      retry.backoff.ms: 500               # 재시도 간격 (500ms)
+      auto:
+        create.topics.enable: false       # 토픽 자동 생성 비활성화
+        register.schemas: false           # 스키마 자동 등록 비활성화
+        offset.reset: latest              # 오프셋 없을 시 최신부터 소비
+      use.latest.version: true
+
+    # Producer 설정
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      retries: 3
+      acks: all       # 모든 ISR 복제본이 메시지를 받아야 ACK (데이터 유실 방지)
+      retries: 3      # 재시도 횟수
+      properties:
+        enable.idempotence: true                  # 중복 메시지 방지 (exactly-once semantics)
+        max.in.flight.requests.per.connection: 5  # idempotence 활성화 시 최대 5까지 허용
+
+    # Consumer 설정
     consumer:
       group-id: loopers-default-consumer
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-serializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
       properties:
-        enable-auto-commit: false
+        enable-auto-commit: false  # 자동 커밋 비활성화 (수동 ACK)
+
+    # Listener 설정
     listener:
-      ack-mode: manual
+      ack-mode: manual  # 수동 ACK 모드
 
 ---
 spring.config.activate.on-profile: local, test
