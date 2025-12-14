@@ -88,6 +88,25 @@ services:
       timeout: 5s
       retries: 10
 
+  kafka-init:
+    image: bitnamilegacy/kafka:3.5.1
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [ '/bin/bash', '-c' ]
+    command: |
+      "
+      # OutboxEvent 토픽들 생성
+      kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic product-like-events --partitions 3 --replication-factor 1
+      kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic product-view-events --partitions 3 --replication-factor 1
+      kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic product-sold-out-events --partitions 3 --replication-factor 1
+      kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic order-completed-events --partitions 3 --replication-factor 1
+      kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic order-canceled-events --partitions 3 --replication-factor 1
+
+      echo 'Kafka topics created successfully'
+      "
+
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
