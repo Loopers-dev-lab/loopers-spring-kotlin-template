@@ -21,6 +21,7 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
 
@@ -77,9 +78,22 @@ resilience4j:
         ignoreExceptions:
           - com.loopers.support.error.CoreException # 비즈니스 예외
           - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+      outbox-default:
+        maxAttempts: 2 # 최초 호출 + 재시도 1회
+        waitDuration: 500ms # 재시도 전 대기 시간
+        enableExponentialBackoff: true # 지수 백오프 사용
+        exponentialBackoffMultiplier: 2.0 # 500ms → 1s → 2s
+        retryExceptions:
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
+          - org.apache.kafka.common.errors.RetriableException
+        ignoreExceptions:
+          - com.loopers.support.error.CoreException
     instances:
       pgClient:
         baseConfig: default # PG 클라이언트 호출에 default 설정 적용
+      outboxPublisher:
+        baseConfig: outbox-default
 
 ---
 spring:
