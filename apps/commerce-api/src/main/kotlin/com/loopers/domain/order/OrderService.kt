@@ -59,17 +59,7 @@ class OrderService(
 
         val savedOrder = orderRepository.save(order)
 
-        eventPublisher.publishEvent(
-            OrderCanceledEventV1(
-                orderId = savedOrder.id,
-                orderItems = savedOrder.orderItems.map {
-                    OrderCanceledEventV1.OrderItemSnapshot(
-                        productId = it.productId,
-                        quantity = it.quantity,
-                    )
-                },
-            ),
-        )
+        order.pollEvents().forEach { eventPublisher.publishEvent(it) }
 
         return savedOrder
     }

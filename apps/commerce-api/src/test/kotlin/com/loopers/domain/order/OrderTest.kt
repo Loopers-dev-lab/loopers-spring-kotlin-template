@@ -296,6 +296,21 @@ class OrderTest {
             assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
         }
 
+        @DisplayName("cancel 성공 시 OrderCanceledEventV1이 등록된다")
+        @Test
+        fun `registers OrderCanceledEventV1 when cancel succeeds`() {
+            // given
+            val order = createOrder(status = OrderStatus.PLACED)
+
+            // when
+            order.cancel()
+
+            // then
+            val events = order.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(OrderCanceledEventV1::class.java)
+        }
+
         @DisplayName("PAID 상태에서 cancel() 호출 시 예외가 발생한다")
         @Test
         fun `throws exception when cancel is called from PAID status`() {
@@ -312,16 +327,20 @@ class OrderTest {
             assertThat(exception.message).isEqualTo("주문 대기 상태에서만 취소할 수 있습니다")
         }
 
-        @DisplayName("이미 CANCELLED 상태인 주문에 cancel() 호출해도 예외가 발생하지 않는다")
+        @DisplayName("이미 CANCELLED 상태인 주문에 cancel() 호출해도 예외가 발생하지 않는다 (멱등성)")
         @Test
-        fun `cancel() on CANCELLED order does nothing`() {
+        fun `cancel() on CANCELLED order does nothing (idempotency)`() {
             // given
             val order = createOrder(status = OrderStatus.CANCELLED)
 
-            // when & then - should NOT throw
+            // when
             order.cancel()
 
+            // then
             assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
+            // 이벤트가 등록되지 않아야 함
+            val events = order.pollEvents()
+            assertThat(events).isEmpty()
         }
     }
 
