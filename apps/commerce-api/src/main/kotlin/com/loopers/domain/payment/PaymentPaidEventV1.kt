@@ -13,4 +13,13 @@ data class PaymentPaidEventV1(
     override val aggregateType: String = "Payment",
     override val occurredAt: Instant = Instant.now(),
     override val version: Int = 1,
-) : DomainEvent
+) : DomainEvent {
+    companion object {
+        fun from(payment: Payment): PaymentPaidEventV1 {
+            return PaymentPaidEventV1(
+                paymentId = payment.id,
+                orderId = payment.orderId,
+            )
+        }
+    }
+}

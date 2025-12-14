@@ -17,4 +17,16 @@ data class PaymentFailedEventV1(
     override val aggregateType: String = "Payment",
     override val occurredAt: Instant = Instant.now(),
     override val version: Int = 1,
-) : DomainEvent
+) : DomainEvent {
+    companion object {
+        fun from(payment: Payment): PaymentFailedEventV1 {
+            return PaymentFailedEventV1(
+                paymentId = payment.id,
+                orderId = payment.orderId,
+                userId = payment.userId,
+                usedPoint = payment.usedPoint,
+                issuedCouponId = payment.issuedCouponId,
+            )
+        }
+    }
+}
