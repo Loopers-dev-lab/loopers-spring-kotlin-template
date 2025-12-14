@@ -3,6 +3,7 @@ package com.loopers.domain.order
 import com.loopers.domain.BaseEntity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.event.DomainEvent
 import com.loopers.support.values.Money
 import jakarta.persistence.AttributeOverride
 import jakarta.persistence.CascadeType
@@ -16,6 +17,7 @@ import jakarta.persistence.ForeignKey
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
+import jakarta.persistence.Transient
 
 @Entity
 @Table(name = "orders")
@@ -49,6 +51,15 @@ class Order(
     )
     var orderItems: MutableList<OrderItem> = orderItems
         private set
+
+    @Transient
+    private val domainEvents: MutableList<DomainEvent> = mutableListOf()
+
+    fun pollEvents(): List<DomainEvent> {
+        val events = domainEvents.toList()
+        domainEvents.clear()
+        return events
+    }
 
     init {
         if (totalAmount < Money.ZERO_KRW) {
