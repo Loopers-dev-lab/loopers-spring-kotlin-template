@@ -3,8 +3,10 @@ package com.loopers.domain.payment
 import com.loopers.domain.BaseEntity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.event.DomainEvent
 import com.loopers.support.values.Money
 import jakarta.persistence.AttributeOverride
+import jakarta.persistence.Transient
 import jakarta.persistence.Column
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
@@ -92,6 +94,15 @@ class Payment(
     @Column(name = "version", nullable = false)
     var version: Long = 0
         private set
+
+    @Transient
+    private val domainEvents: MutableList<DomainEvent> = mutableListOf()
+
+    fun pollEvents(): List<DomainEvent> {
+        val events = domainEvents.toList()
+        domainEvents.clear()
+        return events
+    }
 
     /**
      * 결제를 개시합니다. PENDING → IN_PROGRESS, PAID, 또는 FAILED 상태 전이

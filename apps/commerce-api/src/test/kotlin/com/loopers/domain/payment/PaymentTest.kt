@@ -433,6 +433,38 @@ class PaymentTest {
         }
     }
 
+    @DisplayName("pollEvents 테스트")
+    @Nested
+    inner class PollEvents {
+
+        @DisplayName("초기 상태에서 pollEvents는 빈 리스트를 반환한다")
+        @Test
+        fun `pollEvents returns empty list initially`() {
+            // given
+            val payment = createPendingPayment()
+
+            // when
+            val events = payment.pollEvents()
+
+            // then
+            assertThat(events).isEmpty()
+        }
+
+        @DisplayName("pollEvents 호출 후 두 번째 호출은 빈 리스트를 반환한다")
+        @Test
+        fun `pollEvents clears list after returning`() {
+            // given
+            val payment = createPendingPayment()
+            payment.pollEvents() // first call
+
+            // when
+            val secondEvents = payment.pollEvents()
+
+            // then
+            assertThat(secondEvents).isEmpty()
+        }
+    }
+
     @DisplayName("initiate 테스트")
     @Nested
     inner class Initiate {
