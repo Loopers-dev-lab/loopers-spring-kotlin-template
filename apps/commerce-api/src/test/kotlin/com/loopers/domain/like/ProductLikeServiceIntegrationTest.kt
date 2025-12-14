@@ -45,11 +45,9 @@ class ProductLikeServiceIntegrationTest @Autowired constructor(
             val productId = 100L
 
             // when
-            val result = productLikeService.addLike(userId, productId)
+            productLikeService.addLike(userId, productId)
 
             // then
-            assertThat(result.isChanged).isTrue()
-
             val events = applicationEvents.stream(LikeCreatedEventV1::class.java).toList()
             assertThat(events).hasSize(1)
 
@@ -70,12 +68,9 @@ class ProductLikeServiceIntegrationTest @Autowired constructor(
             val eventsBeforeSecondCall = applicationEvents.stream(LikeCreatedEventV1::class.java).count()
 
             // when
-            val result = productLikeService.addLike(userId, productId)
+            productLikeService.addLike(userId, productId)
 
-            // then
-            assertThat(result.isChanged).isFalse()
-
-            // Verify no additional events were published
+            // then - Verify no additional events were published
             val eventsAfterSecondCall = applicationEvents.stream(LikeCreatedEventV1::class.java).count()
             assertThat(eventsAfterSecondCall).isEqualTo(eventsBeforeSecondCall)
         }
@@ -94,11 +89,9 @@ class ProductLikeServiceIntegrationTest @Autowired constructor(
             productLikeService.addLike(userId, productId)
 
             // when
-            val result = productLikeService.removeLike(userId, productId)
+            productLikeService.removeLike(userId, productId)
 
             // then
-            assertThat(result.isChanged).isTrue()
-
             val events = applicationEvents.stream(LikeCanceledEventV1::class.java).toList()
             assertThat(events).hasSize(1)
 
@@ -115,11 +108,9 @@ class ProductLikeServiceIntegrationTest @Autowired constructor(
             val productId = 100L
 
             // when
-            val result = productLikeService.removeLike(userId, productId)
+            productLikeService.removeLike(userId, productId)
 
             // then
-            assertThat(result.isChanged).isFalse()
-
             val events = applicationEvents.stream(LikeCanceledEventV1::class.java).toList()
             assertThat(events).isEmpty()
         }

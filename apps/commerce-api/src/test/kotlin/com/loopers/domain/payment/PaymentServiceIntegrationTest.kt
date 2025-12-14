@@ -71,6 +71,8 @@ class PaymentServiceIntegrationTest @Autowired constructor(
 
     @BeforeEach
     fun setup() {
+        stubPgPaymentSuccess("tx_default")
+
         for (circuitBreaker in circuitBreakerRegistry.allCircuitBreakers) {
             circuitBreaker.reset()
         }

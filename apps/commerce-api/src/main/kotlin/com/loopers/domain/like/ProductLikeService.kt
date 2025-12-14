@@ -14,22 +14,17 @@ class ProductLikeService(
      *
      * @param userId 사용자 ID
      * @param productId 상품 ID
-     * @return changed=true: 새로 추가됨, changed=false: 이미 존재함
      */
     @Transactional
-    fun addLike(userId: Long, productId: Long): ProductResult.AddLike {
+    fun addLike(userId: Long, productId: Long) {
         val result = productLikeRepository.save(ProductLike.of(productId, userId))
-        return when (result) {
-            ProductLikeRepository.SaveResult.AlreadyExists -> ProductResult.AddLike(false)
-            ProductLikeRepository.SaveResult.Created -> {
-                eventPublisher.publishEvent(
-                    LikeCreatedEventV1(
-                        userId = userId,
-                        productId = productId,
-                    ),
-                )
-                ProductResult.AddLike(true)
-            }
+        if (result == ProductLikeRepository.SaveResult.Created) {
+            eventPublisher.publishEvent(
+                LikeCreatedEventV1(
+                    userId = userId,
+                    productId = productId,
+                ),
+            )
         }
     }
 
@@ -38,22 +33,17 @@ class ProductLikeService(
      *
      * @param userId 사용자 ID
      * @param productId 상품 ID
-     * @return changed=true: 삭제됨, changed=false: 이미 없음
      */
     @Transactional
-    fun removeLike(userId: Long, productId: Long): ProductResult.RemoveLike {
+    fun removeLike(userId: Long, productId: Long) {
         val result = productLikeRepository.deleteByUserIdAndProductId(userId, productId)
-        return when (result) {
-            ProductLikeRepository.DeleteResult.NotExist -> ProductResult.RemoveLike(false)
-            ProductLikeRepository.DeleteResult.Deleted -> {
-                eventPublisher.publishEvent(
-                    LikeCanceledEventV1(
-                        userId = userId,
-                        productId = productId,
-                    ),
-                )
-                ProductResult.RemoveLike(true)
-            }
+        if (result == ProductLikeRepository.DeleteResult.Deleted) {
+            eventPublisher.publishEvent(
+                LikeCanceledEventV1(
+                    userId = userId,
+                    productId = productId,
+                ),
+            )
         }
     }
 }
