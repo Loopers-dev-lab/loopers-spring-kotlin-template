@@ -2,7 +2,7 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
-    # Producer 설정
+    # Producer 설정 (commerce-api는 Producer 전용)
     producer:
       # At Least Once 보장을 위한 설정
       acks: all # 모든 ISR replica가 메시지를 받을 때까지 대기
@@ -18,38 +18,6 @@ spring:
       batch-size: 16384 # 16KB
       linger-ms: 10 # 10ms 대기 후 배치 전송
       compression-type: snappy # 압축 타입
-
-    # Consumer 설정
-    consumer:
-      # Consumer Group 설정
-      group-id: commerce-consumer-group
-      # 수동 커밋 (멱등성 보장)
-      enable-auto-commit: false # 수동 Ack
-      # Offset 리셋 정책
-      auto-offset-reset: earliest # 처음부터 읽기
-      # 역직렬화
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        # JSON 역직렬화 설정
-        spring.json.trusted.packages: "*"
-        # 세션 타임아웃
-        session.timeout.ms: 30000 # 30초
-        # 하트비트 간격
-        heartbeat.interval.ms: 10000 # 10초
-        # 최대 poll 간격 (이 시간 내에 poll을 호출해야 함)
-        max.poll.interval.ms: 300000 # 5분
-        # 한 번에 가져올 최대 레코드 수
-        max.poll.records: 10
-
-    # Listener 설정
-    listener:
-      # 수동 Ack 모드
-      ack-mode: manual
-      # 동시성 (파티션 수에 맞춰 조정)
-      concurrency: 3
-      # 에러 핸들링
-      type: batch # 배치 리스너 사용
 
 # Kafka Topic 설정
 kafka:
