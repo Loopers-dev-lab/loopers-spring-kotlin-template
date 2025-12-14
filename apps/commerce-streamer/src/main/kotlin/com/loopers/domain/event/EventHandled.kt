@@ -73,7 +73,7 @@ class EventHandled(
             aggregateType: String,
             aggregateId: Long,
             eventVersion: Long,
-            handledBy: String = "commerce-consumer",
+            handledBy: String = "commerce-streamer",
         ): EventHandled {
             return EventHandled(
                 eventType = eventType,

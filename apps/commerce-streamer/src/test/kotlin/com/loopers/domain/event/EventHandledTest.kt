@@ -23,6 +23,22 @@ class EventHandledTest {
         assertThat(eventHandled.aggregateType).isEqualTo("Product")
         assertThat(eventHandled.aggregateId).isEqualTo(100L)
         assertThat(eventHandled.eventVersion).isEqualTo(12345L)
+        assertThat(eventHandled.handledBy).isEqualTo("commerce-streamer")
+    }
+
+    @Test
+    fun `handledBy를 커스터마이징할 수 있다`() {
+        // when
+        val eventHandled = EventHandled.create(
+            eventType = "OrderCreatedEvent",
+            aggregateType = "Order",
+            aggregateId = 200L,
+            eventVersion = 67890L,
+            handledBy = "custom-consumer",
+        )
+
+        // then
+        assertThat(eventHandled.handledBy).isEqualTo("custom-consumer")
     }
 
     @Test

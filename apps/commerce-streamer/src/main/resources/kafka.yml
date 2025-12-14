@@ -1,0 +1,76 @@
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+    # Consumer 설정 (commerce-streamer는 Consumer만 사용)
+    consumer:
+      # Consumer Group 설정
+      group-id: commerce-streamer-consumer-group
+      # 수동 커밋 (멱등성 보장)
+      enable-auto-commit: false # 수동 Ack
+      # Offset 리셋 정책
+      auto-offset-reset: earliest # 처음부터 읽기
+      # 역직렬화
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        # JSON 역직렬화 설정
+        spring.json.trusted.packages: "*"
+        # 세션 타임아웃
+        session.timeout.ms: 30000 # 30초
+        # 하트비트 간격
+        heartbeat.interval.ms: 10000 # 10초
+        # 최대 poll 간격 (이 시간 내에 poll을 호출해야 함)
+        max.poll.interval.ms: 300000 # 5분
+        # 한 번에 가져올 최대 레코드 수
+        max.poll.records: 10
+
+    # Listener 설정
+    listener:
+      # 수동 Ack 모드
+      ack-mode: manual
+      # 동시성 (파티션 수에 맞춰 조정)
+      concurrency: 3
+      # 에러 핸들링
+      type: single # 단건 리스너 사용
+
+# Kafka Topic 설정
+kafka:
+  topics:
+    catalog-events: catalog-events
+    order-events: order-events
+    catalog-events-dlq: catalog-events-dlq
+    order-events-dlq: order-events-dlq
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  kafka:
+    # Docker Compose Kafka 사용 (docker/infra-compose.yml)
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+---
+spring:
+  config:
+    activate:
+      on-profile: qa
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prd

@@ -9,11 +9,12 @@ import org.springframework.kafka.config.TopicBuilder
 import org.springframework.kafka.core.KafkaTemplate
 
 /**
- * Kafka 설정
+ * Kafka 토픽 설정
+ * commerce-streamer는 Consumer만 사용 (Producer는 commerce-api에서 담당)
  */
 @Configuration
 @ConditionalOnBean(KafkaTemplate::class)
-class KafkaConfig {
+class KafkaTopicConfig {
 
     @Value("\${kafka.topics.catalog-events}")
     private lateinit var catalogEventsTopic: String
