@@ -44,6 +44,10 @@ class Stock(
         this.quantity -= quantity
     }
 
+    fun isSoldOut(): Boolean {
+        return this.quantity == 0L
+    }
+
     private fun isInsufficientStock(quantity: Long): Boolean {
         return this.quantity < quantity
     }

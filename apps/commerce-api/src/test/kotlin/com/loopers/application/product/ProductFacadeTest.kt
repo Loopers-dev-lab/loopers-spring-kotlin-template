@@ -4,6 +4,7 @@ import com.loopers.application.dto.PageResult
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.like.ProductLikeService
 import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductEvent
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductSort
 import com.loopers.domain.user.Gender
@@ -24,6 +25,7 @@ import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
@@ -38,7 +40,8 @@ class ProductFacadeTest {
     private val productLikeService: ProductLikeService = mockk()
     private val userService: UserService = mockk()
     private val productCache: ProductCache = mockk()
-    private val productFacade = ProductFacade(brandService, productService, productLikeService, userService, productCache)
+    private val applicationEventPublisher: ApplicationEventPublisher = mockk()
+    private val productFacade = ProductFacade(brandService, productService, productLikeService, userService, productCache, applicationEventPublisher)
 
     private val pageable: Pageable = PageRequest.of(0, 20)
 
@@ -202,11 +205,13 @@ class ProductFacadeTest {
             )
 
             every { productCache.getProductDetail(productId, userId) } returns cachedResult
+            justRun { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
 
             // when
             val result = productFacade.getProduct(productId, userId)
 
             // then
+            verify(exactly = 1) { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
             verify(exactly = 1) { productCache.getProductDetail(productId, userId) }
             verify(exactly = 0) { productService.getProduct(any()) }
 
@@ -236,6 +241,7 @@ class ProductFacadeTest {
             every { productLikeService.getCountBy(productId) } returns productLikeCount
             every { userService.getMyInfo(userId) } returns user
             every { productLikeService.getBy(productId, userIdLong) } returns productLike
+            justRun { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
             justRun { productCache.setProductDetail(productId, userId, any()) }
 
             // when
@@ -246,7 +252,8 @@ class ProductFacadeTest {
             verify(exactly = 1) { productService.getProduct(productId) }
             verify(exactly = 1) { brandService.getBrand(brandId) }
             verify(exactly = 1) { productLikeService.getCountBy(productId) }
-            verify(exactly = 1) { userService.getMyInfo(userId) }
+            verify(exactly = 1) { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
+            verify(exactly = 2) { userService.getMyInfo(userId) }
             verify(exactly = 1) { productLikeService.getBy(productId, userIdLong) }
 
             assertSoftly { softly ->
@@ -288,6 +295,7 @@ class ProductFacadeTest {
             every { productService.getProduct(productId) } returns product
             every { brandService.getBrand(brandId) } returns brand
             every { productLikeService.getCountBy(productId) } returns productLikeCount
+            justRun { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
             justRun { productCache.setProductDetail(productId, null, any()) }
 
             // when
@@ -322,6 +330,7 @@ class ProductFacadeTest {
             every { productLikeService.getCountBy(productId) } returns productLikeCount
             every { userService.getMyInfo(userId) } returns user
             every { productLikeService.getBy(productId, userIdLong) } returns null
+            justRun { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
             justRun { productCache.setProductDetail(productId, userId, any()) }
 
             // when
