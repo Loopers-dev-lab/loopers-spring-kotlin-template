@@ -178,12 +178,11 @@ class PaymentService(
      *
      * @param command 결제 요청 커맨드
      * @param currentTime 현재 시각
-     * @return PgPaymentResult - 결제 결과
      */
     fun requestPgPayment(
         command: PaymentCommand.RequestPgPayment,
         currentTime: Instant = Instant.now(),
-    ): PgPaymentResult {
+    ) {
         val payment = paymentRepository.findById(command.paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
@@ -195,12 +194,10 @@ class PaymentService(
             ),
         )
 
-        val result = payment.initiate(pgResult, currentTime)
+        payment.initiate(pgResult, currentTime)
         paymentRepository.save(payment)
 
-        publishPgPaymentResultEvent(result, payment)
-
-        return result
+        payment.pollEvents().forEach { eventPublisher.publishEvent(it) }
     }
 
     /**
@@ -212,7 +209,6 @@ class PaymentService(
      *
      * @param paymentId 결제 ID
      * @param currentTime 현재 시각
-     * @return PgPaymentResult - 결제 결과
      */
     @Retryable(
         retryFor = [ObjectOptimisticLockingFailureException::class],
@@ -222,7 +218,7 @@ class PaymentService(
     fun requestPgPayment(
         paymentId: Long,
         currentTime: Instant = Instant.now(),
-    ): PgPaymentResult {
+    ) {
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
@@ -234,42 +230,11 @@ class PaymentService(
             ),
         )
 
-        val result = payment.initiate(pgResult, currentTime)
+        payment.initiate(pgResult, currentTime)
 
         transactionTemplate.execute {
             paymentRepository.save(payment)
-            publishPgPaymentResultEvent(result, payment)
-        }
-
-        return result
-    }
-
-    private fun publishPgPaymentResultEvent(result: PgPaymentResult, payment: Payment) {
-        when (result) {
-            is PgPaymentResult.NotRequired -> {
-                eventPublisher.publishEvent(
-                    PaymentPaidEventV1(
-                        paymentId = payment.id,
-                        orderId = payment.orderId,
-                    ),
-                )
-            }
-
-            is PgPaymentResult.Failed -> {
-                eventPublisher.publishEvent(
-                    PaymentFailedEventV1(
-                        paymentId = payment.id,
-                        orderId = payment.orderId,
-                        userId = payment.userId,
-                        usedPoint = payment.usedPoint,
-                        issuedCouponId = payment.issuedCouponId,
-                    ),
-                )
-            }
-
-            is PgPaymentResult.InProgress -> {
-                /* No event, wait for callback */
-            }
+            payment.pollEvents().forEach { eventPublisher.publishEvent(it) }
         }
     }
 }

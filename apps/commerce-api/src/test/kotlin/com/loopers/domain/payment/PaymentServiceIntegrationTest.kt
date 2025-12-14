@@ -217,7 +217,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             stubPgPaymentSuccess("tx_test_123")
 
             // when
-            val result = paymentService.requestPgPayment(
+            paymentService.requestPgPayment(
                 PaymentCommand.RequestPgPayment(
                     paymentId = payment.id,
                     cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
@@ -225,19 +225,19 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.InProgress::class.java)
-            assertThat((result as PgPaymentResult.InProgress).payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
         }
 
         @Test
-        @DisplayName("PG 응답 data가 null이면 Failed를 반환한다")
+        @DisplayName("PG 응답 data가 null이면 FAILED로 전이된다")
         fun `returns Failed when PG response data is null`() {
             // given
             val payment = createPendingPayment()
             stubPgPaymentDataNull()
 
             // when
-            val result = paymentService.requestPgPayment(
+            paymentService.requestPgPayment(
                 PaymentCommand.RequestPgPayment(
                     paymentId = payment.id,
                     cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
@@ -245,18 +245,19 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Failed::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
 
         @Test
-        @DisplayName("PG 서버 에러 시 Failed를 반환한다")
+        @DisplayName("PG 서버 에러 시 FAILED로 전이된다")
         fun `returns Failed when PG server error`() {
             // given
             val payment = createPendingPayment()
             stubPgPaymentServerError()
 
             // when
-            val result = paymentService.requestPgPayment(
+            paymentService.requestPgPayment(
                 PaymentCommand.RequestPgPayment(
                     paymentId = payment.id,
                     cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
@@ -264,7 +265,8 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Failed::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
 
         @Test
@@ -285,7 +287,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("0원 결제 시 PG 호출 없이 즉시 완료된다")
+        @DisplayName("0원 결제 시 PG 호출 없이 즉시 PAID로 전이된다")
         fun `completes immediately for zero amount payment`() {
             // given
             val order = createOrder(totalAmount = Money.krw(10000))
@@ -301,12 +303,13 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = paymentService.requestPgPayment(
+            paymentService.requestPgPayment(
                 PaymentCommand.RequestPgPayment(paymentId = payment.id, cardInfo = null),
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.NotRequired::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test

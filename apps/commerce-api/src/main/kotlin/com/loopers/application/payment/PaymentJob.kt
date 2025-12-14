@@ -1,15 +1,12 @@
 package com.loopers.application.payment
 
 import com.loopers.domain.payment.Payment
-import com.loopers.domain.payment.PaymentFailedEventV1
 import com.loopers.domain.payment.PaymentPageQuery
-import com.loopers.domain.payment.PaymentPaidEventV1
 import com.loopers.domain.payment.PaymentRepository
 import com.loopers.domain.payment.PaymentSortType
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgClient
 import com.loopers.domain.payment.PgPaymentRequest
-import com.loopers.domain.payment.PgPaymentResult
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
@@ -70,36 +67,11 @@ class PaymentJob(
             ),
         )
 
-        val result = payment.initiate(pgResult, Instant.now())
+        payment.initiate(pgResult, Instant.now())
 
         transactionTemplate.execute {
             paymentRepository.save(payment)
-            publishPgPaymentResultEvent(result, payment)
-        }
-    }
-
-    private fun publishPgPaymentResultEvent(result: PgPaymentResult, payment: Payment) {
-        when (result) {
-            is PgPaymentResult.InProgress -> {}
-            is PgPaymentResult.NotRequired -> {
-                eventPublisher.publishEvent(
-                    PaymentPaidEventV1(
-                        paymentId = payment.id,
-                        orderId = payment.orderId,
-                    ),
-                )
-            }
-            is PgPaymentResult.Failed -> {
-                eventPublisher.publishEvent(
-                    PaymentFailedEventV1(
-                        paymentId = payment.id,
-                        orderId = payment.orderId,
-                        userId = payment.userId,
-                        usedPoint = payment.usedPoint,
-                        issuedCouponId = payment.issuedCouponId,
-                    ),
-                )
-            }
+            payment.pollEvents().forEach { eventPublisher.publishEvent(it) }
         }
     }
 }

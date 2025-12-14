@@ -53,11 +53,18 @@ class Order(
         private set
 
     @Transient
-    private val domainEvents: MutableList<DomainEvent> = mutableListOf()
+    private var domainEvents: MutableList<DomainEvent>? = null
+
+    private fun getDomainEvents(): MutableList<DomainEvent> {
+        if (domainEvents == null) {
+            domainEvents = mutableListOf()
+        }
+        return domainEvents!!
+    }
 
     fun pollEvents(): List<DomainEvent> {
-        val events = domainEvents.toList()
-        domainEvents.clear()
+        val events = getDomainEvents().toList()
+        getDomainEvents().clear()
         return events
     }
 

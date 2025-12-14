@@ -96,54 +96,58 @@ class Payment(
         private set
 
     @Transient
-    private val domainEvents: MutableList<DomainEvent> = mutableListOf()
+    private var domainEvents: MutableList<DomainEvent>? = null
+
+    private fun getDomainEvents(): MutableList<DomainEvent> {
+        if (domainEvents == null) {
+            domainEvents = mutableListOf()
+        }
+        return domainEvents!!
+    }
 
     fun pollEvents(): List<DomainEvent> {
-        val events = domainEvents.toList()
-        domainEvents.clear()
+        val events = getDomainEvents().toList()
+        getDomainEvents().clear()
         return events
     }
 
     /**
-     * 결제를 개시합니다. PENDING → IN_PROGRESS, PAID, 또는 FAILED 상태 전이
+     * 결제를 개시합니다. PENDING -> IN_PROGRESS, PAID, 또는 FAILED 상태 전이
      * PG 결제 요청 결과에 따라 상태가 결정됩니다.
-     * - Accepted: IN_PROGRESS, transactionKey 저장 -> InProgress
-     * - Uncertain: IN_PROGRESS, transactionKey null 유지 -> InProgress
-     * - NotReached: FAILED (PG 서비스 불능) -> Failed
-     * - NotRequired: PAID (0원 결제) -> NotRequired
+     * - Accepted: IN_PROGRESS, transactionKey 저장
+     * - Uncertain: IN_PROGRESS, transactionKey null 유지
+     * - NotReached: FAILED (PG 서비스 불능) -> PaymentFailedEventV1 등록
+     * - NotRequired: PAID (0원 결제) -> PaymentPaidEventV1 등록
      *
      * @param result PG 결제 요청 결과
      * @param attemptedAt 결제 시도 시각
-     * @return PgPaymentResult 결제 개시 결과 (InProgress, NotRequired, 또는 Failed)
      * @throws CoreException PENDING 상태가 아닌 경우
      */
-    fun initiate(result: PgPaymentCreateResult, attemptedAt: Instant): PgPaymentResult {
+    fun initiate(result: PgPaymentCreateResult, attemptedAt: Instant) {
         if (status != PaymentStatus.PENDING) {
             throw CoreException(ErrorType.BAD_REQUEST, "결제 대기 상태에서만 결제를 개시할 수 있습니다")
         }
         this.attemptedAt = attemptedAt
 
-        return when (result) {
+        when (result) {
             is PgPaymentCreateResult.Accepted -> {
                 status = PaymentStatus.IN_PROGRESS
                 externalPaymentKey = result.transactionKey
-                PgPaymentResult.InProgress(this)
             }
 
             is PgPaymentCreateResult.Uncertain -> {
                 status = PaymentStatus.IN_PROGRESS
-                PgPaymentResult.InProgress(this)
             }
 
             is PgPaymentCreateResult.NotReached -> {
                 status = PaymentStatus.FAILED
                 failureMessage = "PG 서비스에 연결할 수 없습니다"
-                PgPaymentResult.Failed(this, failureMessage ?: "알 수 없는 오류")
+                getDomainEvents().add(PaymentFailedEventV1.from(this))
             }
 
             is PgPaymentCreateResult.NotRequired -> {
                 status = PaymentStatus.PAID
-                PgPaymentResult.NotRequired(this)
+                getDomainEvents().add(PaymentPaidEventV1.from(this))
             }
         }
     }
