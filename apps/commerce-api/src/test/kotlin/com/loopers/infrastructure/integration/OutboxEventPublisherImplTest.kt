@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 @Disabled("카프카 발행 테스트 - 로컬 1회 테스트")
 @DisplayName("OutboxEventPublisherImpl 통합 테스트")
@@ -30,7 +30,7 @@ class OutboxEventPublisherImplTest : IntegrationTest() {
             productId = 1L,
             userId = 100L,
             action = OutboxEvent.LikeCountChanged.LikeAction.LIKED,
-            timestamp = LocalDateTime.now(),
+            timestamp = ZonedDateTime.now(),
         )
 
         val outbox = Outbox.create(
@@ -54,7 +54,7 @@ class OutboxEventPublisherImplTest : IntegrationTest() {
         val event = OutboxEvent.ViewCountIncreased(
             productId = 1L,
             userId = 100L,
-            timestamp = LocalDateTime.now(),
+            timestamp = ZonedDateTime.now(),
         )
 
         val outbox = Outbox.create(
@@ -111,7 +111,7 @@ class OutboxEventPublisherImplTest : IntegrationTest() {
                     quantity = 1,
                 ),
             ),
-            timestamp = LocalDateTime.now(),
+            timestamp = ZonedDateTime.now(),
         )
 
         val outbox = Outbox.create(
@@ -142,7 +142,7 @@ class OutboxEventPublisherImplTest : IntegrationTest() {
                     quantity = 2,
                 ),
             ),
-            timestamp = LocalDateTime.now(),
+            timestamp = ZonedDateTime.now(),
         )
 
         val outbox = Outbox.create(

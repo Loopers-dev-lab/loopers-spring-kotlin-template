@@ -1,6 +1,6 @@
 package com.loopers.domain.outbox
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 /**
  * 상품 메트릭 이벤트
@@ -24,7 +24,7 @@ object OutboxEvent {
         val productId: Long,
         val userId: Long,
         val action: LikeAction,
-        val timestamp: LocalDateTime = LocalDateTime.now(),
+        val timestamp: ZonedDateTime = ZonedDateTime.now(),
     ) {
         enum class LikeAction {
             LIKED,
@@ -44,7 +44,7 @@ object OutboxEvent {
     data class ViewCountIncreased(
         val productId: Long,
         val userId: Long?,
-        val timestamp: LocalDateTime = LocalDateTime.now(),
+        val timestamp: ZonedDateTime = ZonedDateTime.now(),
     ) {
         companion object {
             const val EVENT_TYPE = "VIEW_COUNT_INCREASED"
@@ -58,9 +58,10 @@ object OutboxEvent {
      */
     data class SoldOut(
         val productId: Long,
+        val timestamp: ZonedDateTime = ZonedDateTime.now(),
     ) {
         companion object {
-            const val EVENT_TYPE = "PRODUCT_SOLD-OUT"
+            const val EVENT_TYPE = "PRODUCT_SOLD_OUT"
             const val TOPIC = "product-sold-out-events"
         }
     }
@@ -74,7 +75,7 @@ object OutboxEvent {
         val userId: Long,
         val totalAmount: Long,
         val items: List<OrderItem>,
-        val timestamp: LocalDateTime = LocalDateTime.now(),
+        val timestamp: ZonedDateTime = ZonedDateTime.now(),
     ) {
         data class OrderItem(
             val productId: Long,
@@ -96,7 +97,7 @@ object OutboxEvent {
         val userId: Long,
         val reason: String?,
         val items: List<OrderItem>,
-        val timestamp: LocalDateTime = LocalDateTime.now(),
+        val timestamp: ZonedDateTime = ZonedDateTime.now(),
     ) {
         data class OrderItem(
             val productId: Long,
