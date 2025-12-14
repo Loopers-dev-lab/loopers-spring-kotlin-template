@@ -14,6 +14,8 @@ interface ProductV1ApiSpec {
         description = "상품 목록을 조회합니다. 브랜드 필터링, 정렬, 페이징을 지원합니다.",
     )
     fun getProducts(
+        @Schema(name = "회원 ID", description = "조회할 회원의 ID")
+        memberId: String?,
         @Schema(name = "브랜드 ID (필터링)", description = "조회할 상품의 ID")
         brandId: Long?,
         @Schema(name = "정렬 기준", description = "정렬 기준 (latest, price_asc, likes_desc)")
@@ -29,6 +31,8 @@ interface ProductV1ApiSpec {
         description = "ID로 상품 상세 정보를 조회합니다."
     )
     fun getProduct(
+        @Schema(name = "회원 ID", description = "조회할 회원의 ID")
+        memberId: String?,
         @Schema(name = "상품 ID", description = "조회할 상품의 ID")
         productId: Long,
     ) : ApiResponse<ProductV1Dto.ProductResponse>

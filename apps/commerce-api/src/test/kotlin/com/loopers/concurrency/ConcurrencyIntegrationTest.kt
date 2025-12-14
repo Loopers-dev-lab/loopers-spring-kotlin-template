@@ -79,7 +79,15 @@ class ConcurrencyIntegrationTest @Autowired constructor(
         executor.shutdown()
         while (!executor.isTerminated) Thread.sleep(50)
 
-        val result = productJpaRepository.findById(product.id).get()
+        // 비동기 이벤트 처리 대기 (최대 5초)
+        var retryCount = 0
+        var result = productJpaRepository.findById(product.id).get()
+        while (result.likesCount != 100 && retryCount < 50) {
+            Thread.sleep(100)
+            result = productJpaRepository.findById(product.id).get()
+            retryCount++
+        }
+
         assertThat(result.likesCount).isEqualTo(100)
     }
 

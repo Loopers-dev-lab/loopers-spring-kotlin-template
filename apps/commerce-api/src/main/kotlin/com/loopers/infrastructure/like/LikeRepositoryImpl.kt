@@ -33,4 +33,8 @@ class LikeRepositoryImpl(
         return likeJpaRepository.existsByMemberIdAndProductId(memberId, productId)
     }
 
+    override fun delete(like: Like) {
+        likeJpaRepository.delete(like)
+    }
+
 }

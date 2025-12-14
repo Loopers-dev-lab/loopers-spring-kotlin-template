@@ -11,8 +11,7 @@ class LikeFacade(
     private val likeService: LikeService,
 ) {
     fun addLike(memberId: String, productId: Long): LikeInfo {
-        val like = likeService.addLike(memberId, productId)
-        return LikeInfo.from(like)
+        return likeService.addLike(memberId, productId)
     }
 
     fun cancelLike(memberId: String, productId: Long) {
@@ -21,7 +20,6 @@ class LikeFacade(
 
     @Transactional(readOnly = true)
     fun getMyLikes(memberId: String, pageable: Pageable): Page<LikeInfo> {
-        val likes = likeService.getMyLikes(memberId, pageable)
-        return likes.map { LikeInfo.from(it) }
+        return likeService.getMyLikes(memberId, pageable)
     }
 }

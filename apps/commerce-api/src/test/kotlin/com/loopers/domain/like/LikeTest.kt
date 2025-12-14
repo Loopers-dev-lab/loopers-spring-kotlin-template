@@ -1,6 +1,5 @@
 package com.loopers.domain.like
 
-import com.loopers.domain.brand.Brand
 import com.loopers.domain.member.BirthDate
 import com.loopers.domain.member.Gender
 import com.loopers.domain.member.Member
@@ -26,9 +25,9 @@ class LikeTest {
         )
         val product = Product("상품1", "상품 설명", Money.of(10000L), Stock.of(100), 1L)
 
-        val like = Like.of(member, product)
+        val like = Like.of(member.id, product.id)
 
-        assertThat(like.member).isEqualTo(member)
-        assertThat(like.product).isEqualTo(product)
+        assertThat(like.memberId).isEqualTo(member.id)
+        assertThat(like.productId).isEqualTo(product.id)
     }
 }
