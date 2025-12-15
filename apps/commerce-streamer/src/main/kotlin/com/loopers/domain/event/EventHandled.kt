@@ -18,7 +18,7 @@ import java.time.ZonedDateTime
     uniqueConstraints = [
         UniqueConstraint(
             name = "uk_event_handled_key",
-            columnNames = ["eventType", "aggregateType", "aggregateId", "eventVersion"],
+            columnNames = ["event_type", "aggregate_type", "aggregate_id", "event_version"],
         ),
     ],
     indexes = [
@@ -29,38 +29,38 @@ class EventHandled(
     /**
      * 이벤트 타입 (e.g. OrderCreated, LikeAdded)
      */
-    @Column(nullable = false, length = 100)
+    @Column(name = "event_type", nullable = false, length = 100)
     val eventType: String,
 
     /**
      * 집계 타입 (e.g. Order, Product, Like)
      */
-    @Column(nullable = false, length = 50)
+    @Column(name = "aggregate_type", nullable = false, length = 50)
     val aggregateType: String,
 
     /**
      * 집계 ID
      */
-    @Column(nullable = false)
+    @Column(name = "aggregate_id", nullable = false)
     val aggregateId: Long,
 
     /**
      * 이벤트 버전 (동일 집계에 대한 순서 보장)
      * 보통 updatedAt 또는 version 컬럼 값 사용
      */
-    @Column(nullable = false)
+    @Column(name = "event_version", nullable = false)
     val eventVersion: Long,
 
     /**
      * 처리 완료 시각
      */
-    @Column(nullable = false)
+    @Column(name = "handled_at", nullable = false)
     val handledAt: ZonedDateTime = ZonedDateTime.now(),
 
     /**
      * 처리자 (consumer group id 등)
      */
-    @Column(nullable = false, length = 100)
+    @Column(name = "handled_by", nullable = false, length = 100)
     val handledBy: String,
 ) : BaseEntity() {
 

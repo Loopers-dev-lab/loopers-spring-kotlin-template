@@ -101,12 +101,16 @@ class ProductMetrics(
      * 판매량 및 판매 금액 감소 (주문 취소 시)
      */
     fun decrementSales(quantity: Long, amount: Long) {
-        if (this.salesCount >= quantity) {
-            this.salesCount -= quantity
+        // 두 값을 함께 검증하여 일관성 보장
+        require(this.salesCount >= quantity && this.totalSalesAmount >= amount) {
+            "판매량 또는 판매 금액이 부족합니다: " +
+                "현재 판매량=$salesCount, 요청 감소량=$quantity, " +
+                "현재 판매 금액=$totalSalesAmount, 요청 감소 금액=$amount"
         }
-        if (this.totalSalesAmount >= amount) {
-            this.totalSalesAmount -= amount
-        }
+
+        // 검증 통과 후 원자적으로 감소
+        this.salesCount -= quantity
+        this.totalSalesAmount -= amount
     }
 
     companion object {

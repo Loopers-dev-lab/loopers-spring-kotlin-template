@@ -1,6 +1,7 @@
 package com.loopers.domain.product
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 
 /**
@@ -104,15 +105,15 @@ class ProductMetricsTest {
     }
 
     @Test
-    fun `판매량이 0일 때 감소시키면 0을 유지한다`() {
+    fun `판매량이 0일 때 감소시키면 예외가 발생한다`() {
         // given
         val metrics = ProductMetrics.create(productId = 100L)
 
-        // when
-        metrics.decrementSales(quantity = 5, amount = 50000)
-
-        // then
-        assertThat(metrics.salesCount).isEqualTo(0)
-        assertThat(metrics.totalSalesAmount).isEqualTo(0)
+        // when & then
+        assertThatThrownBy {
+            metrics.decrementSales(quantity = 5, amount = 50000)
+        }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("판매량 또는 판매 금액이 부족합니다")
     }
 }

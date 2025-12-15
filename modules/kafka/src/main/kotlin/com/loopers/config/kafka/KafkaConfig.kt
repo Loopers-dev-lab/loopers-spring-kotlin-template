@@ -12,9 +12,13 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.core.DefaultKafkaProducerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.core.ProducerFactory
+import org.springframework.kafka.listener.CommonErrorHandler
 import org.springframework.kafka.listener.ContainerProperties
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
+import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.converter.BatchMessagingMessageConverter
 import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
+import org.springframework.util.backoff.FixedBackOff
 import java.util.HashMap
 
 @EnableKafka
@@ -55,6 +59,47 @@ class KafkaConfig {
     @Bean
     fun jsonMessageConverter(objectMapper: ObjectMapper): ByteArrayJsonMessageConverter {
         return ByteArrayJsonMessageConverter(objectMapper)
+    }
+
+    @Bean
+    fun kafkaListenerContainerFactory(
+        kafkaProperties: KafkaProperties,
+        kafkaTemplate: KafkaTemplate<Any, Any>,
+    ): ConcurrentKafkaListenerContainerFactory<*, *> {
+        val consumerConfig = HashMap(kafkaProperties.buildConsumerProperties())
+
+        return ConcurrentKafkaListenerContainerFactory<Any, Any>().apply {
+            consumerFactory = DefaultKafkaConsumerFactory(consumerConfig)
+            containerProperties.ackMode = ContainerProperties.AckMode.MANUAL
+            setConcurrency(3)
+
+            // DLQ 설정
+            setCommonErrorHandler(createErrorHandler(kafkaTemplate))
+        }
+    }
+
+    /**
+     * DLQ를 위한 Error Handler 생성
+     * 실패한 메시지를 {원본토픽}-dlq로 라우팅
+     */
+    private fun createErrorHandler(kafkaTemplate: KafkaTemplate<Any, Any>): CommonErrorHandler {
+        val recoverer = DeadLetterPublishingRecoverer(kafkaTemplate) { consumerRecord, _ ->
+            org.apache.kafka.common.TopicPartition(
+                consumerRecord.topic() + "-dlq",
+                consumerRecord.partition(),
+            )
+        }
+
+        // 3회 재시도 (초기 1회 + 재시도 2회), 각 재시도 간격 1초
+        val backOff = FixedBackOff(1000L, 2L)
+
+        return DefaultErrorHandler(recoverer, backOff).apply {
+            // 재시도할 수 없는 예외는 즉시 DLQ로 전송 (예: 직렬화 오류, 잘못된 데이터 형식 등)
+            addNotRetryableExceptions(
+                org.springframework.kafka.support.serializer.DeserializationException::class.java,
+                org.springframework.messaging.converter.MessageConversionException::class.java,
+            )
+        }
     }
 
     @Bean(BATCH_LISTENER)

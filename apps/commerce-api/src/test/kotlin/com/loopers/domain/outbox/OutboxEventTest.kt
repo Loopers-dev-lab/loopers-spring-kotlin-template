@@ -46,12 +46,14 @@ class OutboxEventTest {
     fun `OutboxEvent가 실패하면 재시도 횟수가 증가하고 에러 메시지가 저장된다`() {
         // given
         val outboxEvent = createOutboxEvent()
+        val maxRetryCount = 3
 
         // when
-        outboxEvent.markAsFailed("Kafka 전송 실패")
+        outboxEvent.markAsFailed("Kafka 전송 실패", maxRetryCount)
 
         // then
-        assertThat(outboxEvent.status).isEqualTo(OutboxEventStatus.FAILED)
+        // 첫 번째 실패 시에는 PENDING 상태 유지 (재시도 가능)
+        assertThat(outboxEvent.status).isEqualTo(OutboxEventStatus.PENDING)
         assertThat(outboxEvent.retryCount).isEqualTo(1)
         assertThat(outboxEvent.errorMessage).isEqualTo("Kafka 전송 실패")
     }
@@ -60,31 +62,37 @@ class OutboxEventTest {
     fun `재시도 가능 여부를 확인할 수 있다`() {
         // given
         val outboxEvent = createOutboxEvent()
+        val maxRetryCount = 3
 
         // when & then
-        assertThat(outboxEvent.canRetry(maxRetryCount = 3)).isTrue
+        assertThat(outboxEvent.canRetry(maxRetryCount = maxRetryCount)).isTrue
 
-        outboxEvent.markAsFailed("실패 1")
-        assertThat(outboxEvent.canRetry(maxRetryCount = 3)).isTrue
+        outboxEvent.markAsFailed("실패 1", maxRetryCount)
+        assertThat(outboxEvent.status).isEqualTo(OutboxEventStatus.PENDING)
+        assertThat(outboxEvent.canRetry(maxRetryCount = maxRetryCount)).isTrue
 
-        outboxEvent.markAsFailed("실패 2")
-        assertThat(outboxEvent.canRetry(maxRetryCount = 3)).isTrue
+        outboxEvent.markAsFailed("실패 2", maxRetryCount)
+        assertThat(outboxEvent.status).isEqualTo(OutboxEventStatus.PENDING)
+        assertThat(outboxEvent.canRetry(maxRetryCount = maxRetryCount)).isTrue
 
-        outboxEvent.markAsFailed("실패 3")
-        assertThat(outboxEvent.canRetry(maxRetryCount = 3)).isFalse
+        outboxEvent.markAsFailed("실패 3", maxRetryCount)
+        assertThat(outboxEvent.status).isEqualTo(OutboxEventStatus.FAILED)
+        assertThat(outboxEvent.canRetry(maxRetryCount = maxRetryCount)).isFalse
     }
 
     @Test
     fun `재시도 횟수가 최대값을 초과하면 재시도할 수 없다`() {
         // given
         val outboxEvent = createOutboxEvent()
-        outboxEvent.markAsFailed("실패 1")
-        outboxEvent.markAsFailed("실패 2")
-        outboxEvent.markAsFailed("실패 3")
-        outboxEvent.markAsFailed("실패 4")
+        val maxRetryCount = 3
+        outboxEvent.markAsFailed("실패 1", maxRetryCount)
+        outboxEvent.markAsFailed("실패 2", maxRetryCount)
+        outboxEvent.markAsFailed("실패 3", maxRetryCount)
+        outboxEvent.markAsFailed("실패 4", maxRetryCount)
 
         // when & then
-        assertThat(outboxEvent.canRetry(maxRetryCount = 3)).isFalse
+        assertThat(outboxEvent.canRetry(maxRetryCount = maxRetryCount)).isFalse
+        assertThat(outboxEvent.status).isEqualTo(OutboxEventStatus.FAILED)
         assertThat(outboxEvent.retryCount).isEqualTo(4)
     }
 

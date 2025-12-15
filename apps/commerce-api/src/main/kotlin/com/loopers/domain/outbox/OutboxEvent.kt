@@ -104,11 +104,16 @@ class OutboxEvent(
     /**
      * 발행 실패 처리
      */
-    fun markAsFailed(errorMessage: String) {
-        this.status = OutboxEventStatus.FAILED
+    fun markAsFailed(errorMessage: String, maxRetryCount: Int) {
         this.errorMessage = errorMessage.take(1000) // 최대 1000자
         this.retryCount++
         this.lastAttemptAt = ZonedDateTime.now()
+
+        // 최대 재시도 횟수를 초과한 경우에만 FAILED 상태로 변경
+        if (this.retryCount >= maxRetryCount) {
+            this.status = OutboxEventStatus.FAILED
+        }
+        // 그 외의 경우 PENDING 상태 유지 (스케줄러가 재시도)
     }
 
     /**

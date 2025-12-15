@@ -115,7 +115,7 @@ class OutboxRelayScheduler(
             true
         } catch (e: Exception) {
             // 실패 처리
-            event.markAsFailed(e.message ?: "알 수 없는 오류")
+            event.markAsFailed(e.message ?: "알 수 없는 오류", maxRetryCount)
             outboxEventRepository.save(event)
 
             logger.error(

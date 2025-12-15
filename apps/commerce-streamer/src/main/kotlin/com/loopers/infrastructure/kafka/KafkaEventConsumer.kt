@@ -62,7 +62,7 @@ class KafkaEventConsumer(
             }
         } catch (e: Exception) {
             logger.error("catalog-events 메시지 처리 실패: key=$key", e)
-            // 에러 발생 시 DLQ로 전송 또는 재시도 로직 필요
+            // DefaultErrorHandler가 재시도 후 DLQ로 라우팅 처리
             throw e
         }
     }
@@ -95,6 +95,7 @@ class KafkaEventConsumer(
             }
         } catch (e: Exception) {
             logger.error("order-events 메시지 처리 실패: key=$key", e)
+            // DefaultErrorHandler가 재시도 후 DLQ로 라우팅 처리
             throw e
         }
     }
@@ -105,12 +106,16 @@ class KafkaEventConsumer(
     private fun handleLikeAdded(message: String, acknowledgment: Acknowledgment) {
         val event: LikeAddedEvent = objectMapper.readValue(message)
 
+        // 전체 타임스탬프를 나노초로 변환 (고유성 보장)
+        val eventVersion = event.createdAt.toEpochSecond(java.time.ZoneOffset.UTC) * 1_000_000_000L +
+            event.createdAt.nano
+
         // 멱등성 체크
         if (isAlreadyHandled(
                 "LikeAddedEvent",
                 "Product",
                 event.productId,
-                event.createdAt.nano.toLong(),
+                eventVersion,
             )
         ) {
             logger.debug("이미 처리된 이벤트: LikeAddedEvent, productId=${event.productId}")
@@ -129,7 +134,7 @@ class KafkaEventConsumer(
                 eventType = "LikeAddedEvent",
                 aggregateType = "Product",
                 aggregateId = event.productId,
-                eventVersion = event.createdAt.nano.toLong(),
+                eventVersion = eventVersion,
             ),
         )
 
@@ -143,11 +148,15 @@ class KafkaEventConsumer(
     private fun handleLikeRemoved(message: String, acknowledgment: Acknowledgment) {
         val event: LikeRemovedEvent = objectMapper.readValue(message)
 
+        // 전체 타임스탬프를 나노초로 변환 (고유성 보장)
+        val eventVersion = event.createdAt.toEpochSecond(java.time.ZoneOffset.UTC) * 1_000_000_000L +
+            event.createdAt.nano
+
         if (isAlreadyHandled(
                 "LikeRemovedEvent",
                 "Product",
                 event.productId,
-                event.createdAt.nano.toLong(),
+                eventVersion,
             )
         ) {
             logger.debug("이미 처리된 이벤트: LikeRemovedEvent, productId=${event.productId}")
@@ -164,7 +173,7 @@ class KafkaEventConsumer(
                 eventType = "LikeRemovedEvent",
                 aggregateType = "Product",
                 aggregateId = event.productId,
-                eventVersion = event.createdAt.nano.toLong(),
+                eventVersion = eventVersion,
             ),
         )
 
