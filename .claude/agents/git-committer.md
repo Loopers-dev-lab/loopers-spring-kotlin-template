@@ -1,8 +1,7 @@
 ---
 name: git-committer
-description: Analyzes git diff and generates Korean commit messages following project conventions. Use after implementation is complete and all validations pass. Stages and commits changes automatically.
-tools: Bash
-model: sonnet
+description: Analyzes git diff and generates Korean commit messages following project conventions. Stages and commits changes automatically. Use after all validations pass. Triggers include "commit", "커밋", "git commit".
+model: opus
 ---
 
 <role>

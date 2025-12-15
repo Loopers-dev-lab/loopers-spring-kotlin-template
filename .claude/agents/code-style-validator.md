@@ -1,7 +1,6 @@
 ---
 name: code-style-validator
-description: Runs ktlint check on entire project and auto-fixes style violations via ./gradlew ktlintCheck and ktlintFormat. Use before committing code, after implementation validation passes, or as final step before git commit. No arguments required.
-tools: Bash, Read, Grep
+description: Runs ktlint check and auto-fixes style violations via ./gradlew ktlintCheck and ktlintFormat. Use before committing, after validation passes, or as final step before git commit. Triggers include "lint", "format", "ktlint", "style check". No arguments required.
 model: sonnet
 ---
 

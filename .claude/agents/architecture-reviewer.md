@@ -1,6 +1,6 @@
 ---
 name: architecture-reviewer
-description: Validates architectural design against Clean Architecture, OOP design principles, and DDD strategic patterns. Checks layer separation, dependency direction, domain purity, single responsibility, and object collaboration. Use after implementation to verify structural integrity. Requires files argument.
+description: Validates architectural design against Clean Architecture, OOP, and DDD principles. Checks layer separation, dependency direction, domain purity, and responsibility distribution. Use after implementation. Triggers include "architecture review", "check structure", "layer validation". Requires files argument.
 model: sonnet
 ---
 
@@ -222,6 +222,19 @@ Each component should have one reason to change.
 
 **Check method grouping**: If a class's methods cluster into distinct groups that don't interact, those groups might be
 separate responsibilities.
+
+### Event Listener Placement
+
+Event listeners and message consumers are **inbound adapters**, just like HTTP Controllers. They belong in the
+interfaces layer and should follow the same collaboration pattern.
+
+**Check layer placement**: Event listeners should be in interfaces layer, not in domain or application layer.
+
+**Check collaboration pattern**: Listener should delegate to Facade or Service, not contain business logic or call
+repositories directly.
+
+**Check dependency direction**: Listener depends on Facade/Service, never the reverse. Domain should not know about
+event infrastructure.
 
 </review_areas>
 
@@ -467,4 +480,86 @@ class OrderFacade {
 }
 ```
 
+### Event Listener with Wrong Dependencies
+
+```kotlin
+// ❌ Violation: Listener calling Repository directly
+@Component
+class OrderEventListener(
+    private val notificationRepository: NotificationRepository  // Should go through Service
+) {
+    @EventListener
+    fun handle(event: OrderCreatedEvent) {
+        val notification = Notification.create(event.orderId)
+        notificationRepository.save(notification)  // Listener doing persistence directly
+    }
+}
+```
+
+```kotlin
+// ✅ Correct: Listener delegates to Service
+@Component
+class OrderEventListener(
+    private val notificationService: NotificationService
+) {
+    @EventListener
+    fun handle(event: OrderCreatedEvent) {
+        notificationService.sendOrderConfirmation(event.orderId, event.customerId)
+    }
+}
+```
+
+### Event Listener with Business Logic
+
+```kotlin
+// ❌ Violation: Business logic in Listener
+@Component
+class OrderEventListener(
+    private val notificationService: NotificationService
+) {
+    @EventListener
+    fun handle(event: OrderCreatedEvent) {
+        // Business rule leaked into Listener
+        if (event.totalAmount >= 100000) {
+            notificationService.sendVipNotification(event.orderId)
+        } else {
+            notificationService.sendRegularNotification(event.orderId)
+        }
+    }
+}
+```
+
+```kotlin
+// ✅ Correct: Listener just delegates, Service decides
+@Component
+class OrderEventListener(
+    private val notificationService: NotificationService
+) {
+    @EventListener
+    fun handle(event: OrderCreatedEvent) {
+        notificationService.sendOrderConfirmation(event.orderId, event.customerId)
+        // Service internally decides VIP vs regular based on business rules
+    }
+}
+```
+
 </common_violations>
+
+<council_integration>
+
+## Council Advisory (Optional)
+
+Use council when multiple perspectives would improve architectural review.
+
+### When to Use
+
+- Trade-offs between architectural principles (e.g., purity vs pragmatism)
+- Aggregate boundary decisions where multiple valid designs exist
+- Responsibility distribution that could reasonably go multiple ways
+- User explicitly requests council review
+
+### How
+
+Refer to agent-council skill for context synchronization and invocation.
+
+</council_integration>

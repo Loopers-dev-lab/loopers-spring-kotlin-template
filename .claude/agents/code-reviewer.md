@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
-description: Validates code quality including naming, error handling, null safety, encapsulation, and pattern consistency. Use after implementation to verify code craftsmanship. Requires files argument.
-model: sonnet
+description: Validates code quality including naming, error handling, null safety, encapsulation, and pattern consistency. Use after implementation to verify code craftsmanship. Triggers include "review code", "check quality", "code review". Requires files argument.
+model: opus
 ---
 
 <role>
@@ -268,6 +268,25 @@ For each issue, explain:
 - Example of correct approach (from existing code if possible)
 
 </process_steps>
+
+<council_integration>
+
+## Council Advisory (Optional)
+
+Use council when multiple perspectives would improve review quality.
+
+### When to Use
+
+- Trade-offs exist between competing concerns (e.g., readability vs performance)
+- Multiple valid approaches are possible
+- Subjective judgment where reasonable people could disagree
+- User explicitly requests council review
+
+### How
+
+Refer to agent-council skill for context synchronization and invocation.
+
+</council_integration>
 
 <output_format>
 

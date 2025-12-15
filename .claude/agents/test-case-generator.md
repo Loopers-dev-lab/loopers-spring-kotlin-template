@@ -1,6 +1,6 @@
 ---
 name: test-case-generator
-description: Extracts test cases from spec and creates test file skeletons with empty test methods. Use before implementer to establish test-first development. Requires milestone instruction and spec references.
+description: Extracts test cases from spec and creates test file skeletons with empty test methods for test-first development. Use before implementer. Triggers include "generate tests", "create test skeleton", "TDD setup". Requires milestone instruction and spec references.
 model: opus
 ---
 
@@ -63,6 +63,67 @@ All cases in output use identical skeleton format with `fail("Not implemented")`
 The critical job is **deciding what to test** based on spec-to-test comparison.
 </context>
 
+<verification_principle>
+
+## CRITICAL: State/Result Verification ONLY
+
+When writing Given/When/Then hints, the **Then** must always describe **observable outcomes**, NOT method calls.
+
+### ✅ ALLOWED "Then" patterns
+
+```
+// Then: Balance becomes 700
+// Then: INSUFFICIENT_BALANCE exception is thrown
+// Then: Order status is PLACED
+// Then: OrderCreatedEvent exists in applicationEvents
+// Then: Response status is 201
+```
+
+### ❌ FORBIDDEN "Then" patterns
+
+```
+// Then: repository.save() is called
+// Then: paymentService.charge() is called once
+// Then: no interaction with externalService
+// Then: verify(mock).method()
+```
+
+</verification_principle>
+
+<assertion_principle>
+
+## Test Case Design Rules
+
+### One Behavior Per Test
+
+Each test case must verify **one behavior**. If you're tempted to write multiple unrelated "Then" conditions, split into
+separate tests.
+
+```kotlin
+// ❌ Bad: Two unrelated behaviors in one test
+@Test
+@DisplayName("주문이 생성되고 사용자 주문 수가 증가한다")
+fun `creates order and increments user order count`() {
+    // Given: ...
+    // When: Create order
+    // Then: Order status is PLACED
+    // Then: User's orderCount is incremented  ← 다른 behavior
+    fail("Not implemented")
+}
+
+// ✅ Good: Split into focused tests
+@Test
+@DisplayName("주문이 생성된다")
+fun `creates order`() {
+    // Given: ...
+    // When: Create order
+    // Then: Order status is PLACED
+    fail("Not implemented")
+}
+```
+
+</assertion_principle>
+
 <test_level_overview>
 
 ## Test Pyramid: Responsibilities of Each Level
@@ -82,6 +143,21 @@ multiple levels.
 
 **Key Classification Criterion**: The presence of external dependencies (DB, external APIs, message queues, etc.)
 determines the test level. If no external dependency is required, it's a Unit test.
+
+### Event-Driven Architecture: Publish/Consume Separation
+
+The purpose of using events is to achieve **loose coupling** between publishers and consumers.
+Test strategy must reflect this architectural decision.
+
+**Principle**: If code coupling is low, test coupling should also be low.
+
+| Test Target      | Verification Scope                           | Level       |
+|------------------|----------------------------------------------|-------------|
+| Event Publishing | Business logic → Event published             | Integration |
+| Event Consuming  | Event received → Service invocation → Result | E2E         |
+
+**What NOT to do**: Do not verify the entire flow from publishing to consuming in a single test.
+This increases the blast radius of test failures, making it difficult to identify the root cause.
 </test_level_overview>
 
 <unit_test>
@@ -283,6 +359,22 @@ point deductions, etc.)
 resource (duplicate prevention), data integrity maintained after concurrent requests. Since these tests are complex and
 lengthy, manage them in a separate file.
 
+**Event Publishing**: The publisher side verifies only "was the correct event published at the right time".
+What the listener does with the event is not the concern of the publisher's test.
+
+<example>
+```kotlin
+@Test
+@DisplayName("주문 생성 시 OrderCreatedEvent가 발행된다")
+fun `publishes OrderCreatedEvent when order is created`() {
+    // Given: Valid order command
+    // When: Create order
+    // Then: OrderCreatedEvent is published with correct orderId
+    fail("Not implemented")
+}
+```
+</example>
+
 <example>
 ```kotlin
 @Test
@@ -407,6 +499,25 @@ assertThat(updatedProduct.stock.amount).isEqualTo(98)
 
 **Minimize Response Verification**: Do not verify all fields. Focus on core identifiers like id and status codes.
 Detailed business logic is already verified in Unit/Integration.
+
+**Event Consumer (Inbound Adapter)**: Event listeners and message consumers serve the same inbound adapter role as HTTP
+Controllers. The only difference is the entry point (message queue/event bus instead of HTTP). Test scope is "event
+received → value transformation → service invocation → result". Test the listener independently without the event
+publishing process.
+
+<example>
+```kotlin
+@Test
+@DisplayName("OrderCreatedEvent 수신 시 알림이 저장된다")
+fun `saves notification when OrderCreatedEvent is received`() {
+    // Given: OrderCreatedEvent with orderId=1, customerId=100
+    // When: Listener handles the event
+    // Then: Notification is saved for orderId=1
+    fail("Not implemented")
+}
+```
+
+</example>
 
 <example>
 ```kotlin
@@ -583,6 +694,20 @@ fun `calculates total amount correctly`() {
 </example>
 </bdd_structure>
 
+<skip_testing>
+
+## When to Skip Test Generation
+
+Pure data objects with no behavior don't need tests:
+
+- **Command** - use case input (e.g., `CreateOrderCommand`)
+- **Event** - immutable fact record (e.g., `OrderCreatedEvent`)
+- **DTO / Request / Response** - data transfer only
+
+If milestone targets only these types, return "No Tests Required" with brief explanation.
+
+</skip_testing>
+
 <extraction_process>
 
 ## Test Case Extraction Process
@@ -632,4 +757,20 @@ in every test body.
 - [ ] Given/When/Then comments specify concrete values and expected results
 - [ ] Verification does not exceed the responsibility of each level
 - [ ] No duplicate verification across levels
-  </common_checklist>
+- [ ] **"Then" describes observable outcomes (state/result/exception), NOT method calls**
+
+</common_checklist>
+
+<forbidden_patterns_summary>
+
+## Quick Reference: Forbidden "Then" Patterns
+
+| ❌ FORBIDDEN                   | ✅ ALLOWED                    |
+|-------------------------------|------------------------------|
+| `repository.save() is called` | `Balance is 700`             |
+| `service.method() is invoked` | `Order status is PLACED`     |
+| `verify(mock).method()`       | `Exception is thrown`        |
+| `no interaction with X`       | `No order exists for userId` |
+| `called N times`              | `Response status is 201`     |
+
+</forbidden_patterns_summary>
