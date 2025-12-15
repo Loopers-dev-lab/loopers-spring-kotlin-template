@@ -6,6 +6,8 @@ import com.loopers.domain.outbox.OutboxEventPublisher
 import io.github.resilience4j.retry.annotation.Retry
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.kafka.support.KafkaHeaders
+import org.springframework.messaging.support.MessageBuilder
 import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
 
@@ -21,6 +23,7 @@ class OutboxEventPublisherImpl(
 
     companion object {
         private const val SEND_TIMEOUT_SECONDS = 10L
+        private const val EVENT_ID_HEADER = "eventId"
 
         /**
          * 이벤트 타입별 토픽 매핑
@@ -45,18 +48,22 @@ class OutboxEventPublisherImpl(
         val topic = resolveTopic(outbox)
 
         return try {
-            val future = kafkaTemplate.send(
-                topic,
-                outbox.aggregateId,
-                outbox.payload,
-            )
+            val message = MessageBuilder
+                .withPayload(outbox.payload)
+                .setHeader(KafkaHeaders.TOPIC, topic)
+                .setHeader(KafkaHeaders.KEY, outbox.aggregateId)
+                .setHeader(EVENT_ID_HEADER, outbox.eventId)
+                .build()
+
+            val future = kafkaTemplate.send(message)
 
             // 동기적으로 발행 결과 확인
             future.get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
             log.debug(
-                "Outbox 이벤트 발행 성공: id={}, topic={}, aggregateType={}, eventType={}",
+                "Outbox 이벤트 발행 성공: id={}, eventId={}, topic={}, aggregateType={}, eventType={}",
                 outbox.id,
+                outbox.eventId,
                 topic,
                 outbox.aggregateType,
                 outbox.eventType,
@@ -64,8 +71,9 @@ class OutboxEventPublisherImpl(
             true
         } catch (e: Exception) {
             log.error(
-                "Outbox 이벤트 발행 실패: id={}, topic={}, aggregateType={}, eventType={}",
+                "Outbox 이벤트 발행 실패: id={}, eventId={}, topic={}, aggregateType={}, eventType={}",
                 outbox.id,
+                outbox.eventId,
                 topic,
                 outbox.aggregateType,
                 outbox.eventType,

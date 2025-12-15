@@ -1,5 +1,6 @@
 package com.loopers.domain.outbox
 
+import com.github.f4b6a3.uuid.UuidCreator
 import com.loopers.domain.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -23,9 +24,13 @@ import java.time.ZonedDateTime
     indexes = [
         Index(name = "idx_outbox_status_created_at", columnList = "status, created_at"),
         Index(name = "idx_outbox_aggregate_id_type", columnList = "aggregate_id, aggregate_type"),
+        Index(name = "idx_outbox_event_id", columnList = "event_id"),
     ],
 )
 class Outbox(
+
+    @Column(name = "event_id", nullable = false, unique = true, length = 36)
+    val eventId: String,
 
     @Column(name = "aggregate_type", nullable = false, length = 100)
     val aggregateType: AggregateType,
@@ -77,6 +82,7 @@ class Outbox(
             payload: String,
         ): Outbox {
             return Outbox(
+                eventId = UuidCreator.getTimeOrderedEpoch().toString(),
                 aggregateType = aggregateType,
                 aggregateId = aggregateId,
                 eventType = eventType,
