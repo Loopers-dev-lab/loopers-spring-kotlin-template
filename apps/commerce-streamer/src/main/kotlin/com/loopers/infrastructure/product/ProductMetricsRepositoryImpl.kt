@@ -18,7 +18,9 @@ class ProductMetricsRepositoryImpl(
     }
 
     override fun findOrCreateByProductId(productId: Long): ProductMetrics {
-        return findByProductId(productId) ?: ProductMetrics.create(productId)
+        return findByProductId(productId) ?: run {
+            jpaRepository.save(ProductMetrics.create(productId))
+        }
     }
 
     override fun findOrCreateByProductIdWithLock(productId: Long): ProductMetrics {
@@ -29,7 +31,6 @@ class ProductMetricsRepositoryImpl(
         }
 
         // 존재하지 않으면 생성 후 저장 (동일 트랜잭션 내에서)
-        val newMetrics = ProductMetrics.create(productId)
-        return jpaRepository.save(newMetrics)
+        return jpaRepository.save(ProductMetrics.create(productId))
     }
 }

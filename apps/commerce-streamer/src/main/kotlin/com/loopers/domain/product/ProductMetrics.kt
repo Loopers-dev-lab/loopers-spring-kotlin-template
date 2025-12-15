@@ -85,6 +85,9 @@ class ProductMetrics(
      * 판매량 및 판매 금액 증가
      */
     fun incrementSales(quantity: Long, amount: Long) {
+        require(quantity > 0 && amount > 0) {
+            "판매량과 판매 금액은 양수여야 합니다: quantity=$quantity, amount=$amount"
+        }
         this.salesCount += quantity
         this.totalSalesAmount += amount
     }
@@ -96,8 +99,8 @@ class ProductMetrics(
         // 두 값을 함께 검증하여 일관성 보장
         require(this.salesCount >= quantity && this.totalSalesAmount >= amount) {
             "판매량 또는 판매 금액이 부족합니다: " +
-                "현재 판매량=$salesCount, 요청 감소량=$quantity, " +
-                "현재 판매 금액=$totalSalesAmount, 요청 감소 금액=$amount"
+                    "현재 판매량=$salesCount, 요청 감소량=$quantity, " +
+                    "현재 판매 금액=$totalSalesAmount, 요청 감소 금액=$amount"
         }
 
         // 검증 통과 후 원자적으로 감소
