@@ -3,6 +3,7 @@ package com.loopers.infrastructure.product
 import com.loopers.domain.product.ProductMetrics
 import com.loopers.domain.product.ProductMetricsRepository
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 
 @Repository
 class ProductMetricsRepositoryImpl(
@@ -23,8 +24,9 @@ class ProductMetricsRepositoryImpl(
         }
     }
 
+    @Transactional
     override fun findOrCreateByProductIdWithLock(productId: Long): ProductMetrics {
-        // 비관적 락으로 조회
+        // 비관적 락으로 조회 (DB 레벨 행 잠금)
         val existing = jpaRepository.findByProductIdWithLock(productId)
         if (existing != null) {
             return existing
