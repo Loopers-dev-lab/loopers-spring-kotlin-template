@@ -123,8 +123,8 @@ class KafkaEventConsumer(
             return
         }
 
-        // 집계 처리
-        val metrics = productMetricsRepository.findOrCreateByProductId(event.productId)
+        // 집계 처리 (비관적 락 사용)
+        val metrics = productMetricsRepository.findOrCreateByProductIdWithLock(event.productId)
         metrics.incrementLikeCount()
         productMetricsRepository.save(metrics)
 
@@ -164,7 +164,8 @@ class KafkaEventConsumer(
             return
         }
 
-        val metrics = productMetricsRepository.findOrCreateByProductId(event.productId)
+        // 집계 처리 (비관적 락 사용)
+        val metrics = productMetricsRepository.findOrCreateByProductIdWithLock(event.productId)
         metrics.decrementLikeCount()
         productMetricsRepository.save(metrics)
 
@@ -201,9 +202,9 @@ class KafkaEventConsumer(
             return
         }
 
-        // 주문 상품별 판매량 집계
+        // 주문 상품별 판매량 집계 (비관적 락 사용)
         event.items.forEach { item ->
-            val metrics = productMetricsRepository.findOrCreateByProductId(item.productId)
+            val metrics = productMetricsRepository.findOrCreateByProductIdWithLock(item.productId)
             val totalAmount = item.priceAtOrder * item.quantity
             metrics.incrementSales(
                 quantity = item.quantity.toLong(),

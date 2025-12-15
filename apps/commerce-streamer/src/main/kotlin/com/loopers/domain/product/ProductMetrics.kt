@@ -6,7 +6,6 @@ import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
-import jakarta.persistence.Version
 
 /**
  * 상품별 집계 메트릭 테이블
@@ -18,52 +17,45 @@ import jakarta.persistence.Version
     uniqueConstraints = [
         UniqueConstraint(
             name = "uk_product_metrics_product_id",
-            columnNames = ["productId"],
+            columnNames = ["product_id"],
         ),
     ],
     indexes = [
-        Index(name = "idx_product_metrics_like_count", columnList = "likeCount DESC"),
-        Index(name = "idx_product_metrics_view_count", columnList = "viewCount DESC"),
-        Index(name = "idx_product_metrics_sales_count", columnList = "salesCount DESC"),
+        Index(name = "idx_product_metrics_like_count", columnList = "like_count DESC"),
+        Index(name = "idx_product_metrics_view_count", columnList = "view_count DESC"),
+        Index(name = "idx_product_metrics_sales_count", columnList = "sales_count DESC"),
     ],
 )
 class ProductMetrics(
     /**
      * 상품 ID
      */
-    @Column(nullable = false, unique = true)
+    @Column(name = "product_id", nullable = false, unique = true)
     val productId: Long,
 
     /**
      * 좋아요 수
      */
-    @Column(nullable = false)
+    @Column(name = "like_count", nullable = false)
     var likeCount: Long = 0,
 
     /**
      * 조회 수 (상세 페이지 조회)
      */
-    @Column(nullable = false)
+    @Column(name = "view_count", nullable = false)
     var viewCount: Long = 0,
 
     /**
      * 판매량 (주문 완료 기준)
      */
-    @Column(nullable = false)
+    @Column(name = "sales_count", nullable = false)
     var salesCount: Long = 0,
 
     /**
      * 총 판매 금액
      */
-    @Column(nullable = false)
+    @Column(name = "total_sales_amount", nullable = false)
     var totalSalesAmount: Long = 0,
-
-    /**
-     * 낙관적 락 버전 (동시성 제어)
-     */
-    @Version
-    @Column(nullable = false)
-    var version: Long = 0,
 ) : BaseEntity() {
 
     /**

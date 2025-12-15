@@ -22,7 +22,7 @@ import java.time.ZonedDateTime
         ),
     ],
     indexes = [
-        Index(name = "idx_event_handled_created", columnList = "createdAt"),
+        Index(name = "idx_event_handled_created", columnList = "created_at"),
     ],
 )
 class EventHandled(
