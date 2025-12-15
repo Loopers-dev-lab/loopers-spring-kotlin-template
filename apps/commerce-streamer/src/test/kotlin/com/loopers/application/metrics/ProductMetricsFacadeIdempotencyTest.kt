@@ -21,6 +21,12 @@ class ProductMetricsFacadeIdempotencyTest : IntegrationTest() {
     @Autowired
     private lateinit var eventHandledRepository: EventHandledRepository
 
+    companion object {
+        private const val LIKE_CONSUMER_GROUP = "product-metrics-like-consumer"
+        private const val VIEW_CONSUMER_GROUP = "product-metrics-view-consumer"
+        private const val ORDER_CONSUMER_GROUP = "order-metrics-consumer"
+    }
+
     @Test
     @DisplayName("동일한 좋아요 증가 이벤트를 3번 전송해도 1번만 반영된다")
     fun `duplicate like increase events should be processed only once`() {
@@ -31,9 +37,9 @@ class ProductMetricsFacadeIdempotencyTest : IntegrationTest() {
         val eventTimestamp = ZonedDateTime.now()
 
         // when - 동일한 이벤트를 3번 전송
-        productMetricsFacade.increaseLikeCount(productId, eventId, eventType, eventTimestamp)
-        productMetricsFacade.increaseLikeCount(productId, eventId, eventType, eventTimestamp)
-        productMetricsFacade.increaseLikeCount(productId, eventId, eventType, eventTimestamp)
+        productMetricsFacade.increaseLikeCount(productId, eventId, eventType, eventTimestamp, LIKE_CONSUMER_GROUP)
+        productMetricsFacade.increaseLikeCount(productId, eventId, eventType, eventTimestamp, LIKE_CONSUMER_GROUP)
+        productMetricsFacade.increaseLikeCount(productId, eventId, eventType, eventTimestamp, LIKE_CONSUMER_GROUP)
 
         // then
         val metrics = productMetricsRepository.findByProductId(productId)
@@ -55,7 +61,7 @@ class ProductMetricsFacadeIdempotencyTest : IntegrationTest() {
 
         // when - 동일한 이벤트를 5번 전송
         repeat(5) {
-            productMetricsFacade.increaseViewCount(productId, eventId, eventType, eventTimestamp)
+            productMetricsFacade.increaseViewCount(productId, eventId, eventType, eventTimestamp, VIEW_CONSUMER_GROUP)
         }
 
         // then
@@ -75,9 +81,9 @@ class ProductMetricsFacadeIdempotencyTest : IntegrationTest() {
         val eventTimestamp = ZonedDateTime.now()
 
         // when - 동일한 이벤트를 3번 전송
-        productMetricsFacade.increaseSoldCount(productId, quantity, eventId, eventType, eventTimestamp)
-        productMetricsFacade.increaseSoldCount(productId, quantity, eventId, eventType, eventTimestamp)
-        productMetricsFacade.increaseSoldCount(productId, quantity, eventId, eventType, eventTimestamp)
+        productMetricsFacade.increaseSoldCount(productId, quantity, eventId, eventType, eventTimestamp, ORDER_CONSUMER_GROUP)
+        productMetricsFacade.increaseSoldCount(productId, quantity, eventId, eventType, eventTimestamp, ORDER_CONSUMER_GROUP)
+        productMetricsFacade.increaseSoldCount(productId, quantity, eventId, eventType, eventTimestamp, ORDER_CONSUMER_GROUP)
 
         // then
         val metrics = productMetricsRepository.findByProductId(productId)
@@ -97,9 +103,9 @@ class ProductMetricsFacadeIdempotencyTest : IntegrationTest() {
         val eventTimestamp = ZonedDateTime.now()
 
         // when - 서로 다른 이벤트를 3번 전송
-        productMetricsFacade.increaseLikeCount(productId, eventId1, eventType, eventTimestamp)
-        productMetricsFacade.increaseLikeCount(productId, eventId2, eventType, eventTimestamp.plusSeconds(1L))
-        productMetricsFacade.increaseLikeCount(productId, eventId3, eventType, eventTimestamp.plusSeconds(2L))
+        productMetricsFacade.increaseLikeCount(productId, eventId1, eventType, eventTimestamp, LIKE_CONSUMER_GROUP)
+        productMetricsFacade.increaseLikeCount(productId, eventId2, eventType, eventTimestamp.plusSeconds(1L), LIKE_CONSUMER_GROUP)
+        productMetricsFacade.increaseLikeCount(productId, eventId3, eventType, eventTimestamp.plusSeconds(2L), LIKE_CONSUMER_GROUP)
 
         // then - 3번 모두 반영되어야 함
         val metrics = productMetricsRepository.findByProductId(productId)
@@ -119,10 +125,10 @@ class ProductMetricsFacadeIdempotencyTest : IntegrationTest() {
 
         // when - 증가 이벤트 3번, 감소 이벤트 3번
         repeat(3) {
-            productMetricsFacade.increaseLikeCount(productId, increaseEventId, eventType, eventTimestamp)
+            productMetricsFacade.increaseLikeCount(productId, increaseEventId, eventType, eventTimestamp, LIKE_CONSUMER_GROUP)
         }
         repeat(3) {
-            productMetricsFacade.decreaseLikeCount(productId, decreaseEventId, eventType, eventTimestamp.plusSeconds(1))
+            productMetricsFacade.decreaseLikeCount(productId, decreaseEventId, eventType, eventTimestamp.plusSeconds(1), LIKE_CONSUMER_GROUP)
         }
 
         // then - 증가 1번, 감소 1번만 반영 (최종 0)
@@ -145,10 +151,10 @@ class ProductMetricsFacadeIdempotencyTest : IntegrationTest() {
 
         // when - 완료 이벤트 3번, 취소 이벤트 3번
         repeat(3) {
-            productMetricsFacade.increaseSoldCount(productId, quantity, completedEventId, completedEventType, eventTimestamp)
+            productMetricsFacade.increaseSoldCount(productId, quantity, completedEventId, completedEventType, eventTimestamp, ORDER_CONSUMER_GROUP)
         }
         repeat(3) {
-            productMetricsFacade.decreaseSoldCount(productId, quantity, canceledEventId, canceledEventType, eventTimestamp.plusSeconds(1))
+            productMetricsFacade.decreaseSoldCount(productId, quantity, canceledEventId, canceledEventType, eventTimestamp.plusSeconds(1), ORDER_CONSUMER_GROUP)
         }
 
         // then - 증가 1번, 감소 1번만 반영 (최종 0)
@@ -169,9 +175,9 @@ class ProductMetricsFacadeIdempotencyTest : IntegrationTest() {
 
         // when - 각 이벤트를 여러 번 전송
         repeat(2) {
-            productMetricsFacade.increaseLikeCount(productId, likeEventId, "LikeCountChanged", baseTimestamp)
-            productMetricsFacade.increaseViewCount(productId, viewEventId, "ViewCountIncreased", baseTimestamp.plusSeconds(1))
-            productMetricsFacade.increaseSoldCount(productId, 3, soldEventId, "OrderCompleted", baseTimestamp.plusSeconds(2))
+            productMetricsFacade.increaseLikeCount(productId, likeEventId, "LikeCountChanged", baseTimestamp, LIKE_CONSUMER_GROUP)
+            productMetricsFacade.increaseViewCount(productId, viewEventId, "ViewCountIncreased", baseTimestamp.plusSeconds(1), VIEW_CONSUMER_GROUP)
+            productMetricsFacade.increaseSoldCount(productId, 3, soldEventId, "OrderCompleted", baseTimestamp.plusSeconds(2), ORDER_CONSUMER_GROUP)
         }
 
         // then - 각각 1번씩만 반영

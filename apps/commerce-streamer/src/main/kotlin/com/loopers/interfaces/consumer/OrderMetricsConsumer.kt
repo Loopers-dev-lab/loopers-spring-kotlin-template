@@ -35,7 +35,7 @@ class OrderMetricsConsumer(
         log.info("주문 완료 이벤트 배치 수신: {} 건", records.size)
 
         try {
-            productMetricsFacade.handleOrderCompletedEvents(records)
+            productMetricsFacade.handleOrderCompletedEvents(records, "order-metrics-consumer")
             acknowledgment.acknowledge()
             log.info("주문 완료 이벤트 배치 처리 완료: {} 건", records.size)
         } catch (e: Exception) {
@@ -59,7 +59,7 @@ class OrderMetricsConsumer(
         log.info("주문 취소 이벤트 배치 수신: {} 건", records.size)
 
         try {
-            productMetricsFacade.handleOrderCanceledEvents(records)
+            productMetricsFacade.handleOrderCanceledEvents(records, "order-metrics-consumer")
             acknowledgment.acknowledge()
             log.info("주문 취소 이벤트 배치 처리 완료: {} 건", records.size)
         } catch (e: Exception) {

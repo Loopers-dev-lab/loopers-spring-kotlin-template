@@ -8,6 +8,7 @@ import com.loopers.domain.event.EventProcessingTimestampRepository
 import com.loopers.domain.event.OutboxEvent
 import com.loopers.domain.metrics.ProductMetrics
 import com.loopers.domain.metrics.ProductMetricsRepository
+import com.loopers.support.util.EventIdExtractor
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -23,30 +24,23 @@ class ProductMetricsFacade(
 ) {
     private val log = LoggerFactory.getLogger(ProductMetricsFacade::class.java)
 
-    companion object {
-        private const val CONSUMER_GROUP = "product-metrics-consumer"
-    }
-
-    /**
-     * 좋아요 수 증가
-     */
     @Transactional
     fun increaseLikeCount(
         productId: Long,
         eventId: String,
         eventType: String,
         eventTimestamp: ZonedDateTime,
+        consumerGroup: String,
     ) {
+        val aggregateId = productId.toString()
         // 멱등성 체크
         if (eventHandledRepository.existsById(eventId)) {
             log.debug("이미 처리된 이벤트입니다: eventId={}", eventId)
             return
         }
 
-        val aggregateId = EventProcessingTimestamp.generateProductAggregateId(productId)
-
         // 순서 체크: 과거 이벤트인지 확인
-        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(CONSUMER_GROUP, aggregateId)
+        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(consumerGroup, aggregateId)
         if (lastProcessed != null && !lastProcessed.shouldProcess(eventTimestamp)) {
             log.warn(
                 "오래된 이벤트 무시: productId={}, eventTimestamp={}, lastProcessedAt={}",
@@ -59,7 +53,7 @@ class ProductMetricsFacade(
             return
         }
 
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
             ?: ProductMetrics.create(productId)
 
         metrics.increaseLikeCount()
@@ -68,7 +62,7 @@ class ProductMetricsFacade(
         // 마지막 처리 시간 업데이트
         if (lastProcessed == null) {
             eventProcessingTimestampRepository.save(
-                EventProcessingTimestamp.create(CONSUMER_GROUP, aggregateId, eventTimestamp),
+                EventProcessingTimestamp.create(consumerGroup, aggregateId, eventTimestamp),
             )
         } else {
             lastProcessed.updateLastProcessedAt(eventTimestamp)
@@ -81,26 +75,23 @@ class ProductMetricsFacade(
         log.info("좋아요 수 증가: productId={}, likeCount={}", productId, metrics.likeCount)
     }
 
-    /**
-     * 좋아요 수 감소
-     */
     @Transactional
     fun decreaseLikeCount(
         productId: Long,
         eventId: String,
         eventType: String,
         eventTimestamp: ZonedDateTime,
+        consumerGroup: String,
     ) {
+        val aggregateId = productId.toString()
         // 멱등성 체크
         if (eventHandledRepository.existsById(eventId)) {
             log.debug("이미 처리된 이벤트입니다: eventId={}", eventId)
             return
         }
 
-        val aggregateId = EventProcessingTimestamp.generateProductAggregateId(productId)
-
         // 순서 체크
-        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(CONSUMER_GROUP, aggregateId)
+        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(consumerGroup, aggregateId)
         if (lastProcessed != null && !lastProcessed.shouldProcess(eventTimestamp)) {
             log.warn(
                 "오래된 이벤트 무시: productId={}, eventTimestamp={}, lastProcessedAt={}",
@@ -112,7 +103,7 @@ class ProductMetricsFacade(
             return
         }
 
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
             ?: ProductMetrics.create(productId)
 
         metrics.decreaseLikeCount()
@@ -121,7 +112,7 @@ class ProductMetricsFacade(
         // 마지막 처리 시간 업데이트
         if (lastProcessed == null) {
             eventProcessingTimestampRepository.save(
-                EventProcessingTimestamp.create(CONSUMER_GROUP, aggregateId, eventTimestamp),
+                EventProcessingTimestamp.create(consumerGroup, aggregateId, eventTimestamp),
             )
         } else {
             lastProcessed.updateLastProcessedAt(eventTimestamp)
@@ -134,26 +125,23 @@ class ProductMetricsFacade(
         log.info("좋아요 수 감소: productId={}, likeCount={}", productId, metrics.likeCount)
     }
 
-    /**
-     * 조회 수 증가
-     */
     @Transactional
     fun increaseViewCount(
         productId: Long,
         eventId: String,
         eventType: String,
         eventTimestamp: ZonedDateTime,
+        consumerGroup: String,
     ) {
+        val aggregateId = productId.toString()
         // 멱등성 체크
         if (eventHandledRepository.existsById(eventId)) {
             log.debug("이미 처리된 이벤트입니다: eventId={}", eventId)
             return
         }
 
-        val aggregateId = EventProcessingTimestamp.generateProductAggregateId(productId)
-
         // 순서 체크
-        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(CONSUMER_GROUP, aggregateId)
+        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(consumerGroup, aggregateId)
         if (lastProcessed != null && !lastProcessed.shouldProcess(eventTimestamp)) {
             log.warn(
                 "오래된 이벤트 무시: productId={}, eventTimestamp={}, lastProcessedAt={}",
@@ -165,7 +153,7 @@ class ProductMetricsFacade(
             return
         }
 
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
             ?: ProductMetrics.create(productId)
 
         metrics.increaseViewCount()
@@ -174,7 +162,7 @@ class ProductMetricsFacade(
         // 마지막 처리 시간 업데이트
         if (lastProcessed == null) {
             eventProcessingTimestampRepository.save(
-                EventProcessingTimestamp.create(CONSUMER_GROUP, aggregateId, eventTimestamp),
+                EventProcessingTimestamp.create(consumerGroup, aggregateId, eventTimestamp),
             )
         } else {
             lastProcessed.updateLastProcessedAt(eventTimestamp)
@@ -197,17 +185,17 @@ class ProductMetricsFacade(
         eventId: String,
         eventType: String,
         eventTimestamp: ZonedDateTime,
+        consumerGroup: String,
     ) {
+        val aggregateId = productId.toString()
         // 멱등성 체크
         if (eventHandledRepository.existsById(eventId)) {
             log.debug("이미 처리된 이벤트입니다: eventId={}", eventId)
             return
         }
 
-        val aggregateId = EventProcessingTimestamp.generateProductAggregateId(productId)
-
         // 순서 체크
-        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(CONSUMER_GROUP, aggregateId)
+        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(consumerGroup, aggregateId)
         if (lastProcessed != null && !lastProcessed.shouldProcess(eventTimestamp)) {
             log.warn(
                 "오래된 이벤트 무시: productId={}, eventTimestamp={}, lastProcessedAt={}",
@@ -219,7 +207,7 @@ class ProductMetricsFacade(
             return
         }
 
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
             ?: ProductMetrics.create(productId)
 
         metrics.increaseSoldCount(quantity)
@@ -228,7 +216,7 @@ class ProductMetricsFacade(
         // 마지막 처리 시간 업데이트
         if (lastProcessed == null) {
             eventProcessingTimestampRepository.save(
-                EventProcessingTimestamp.create(CONSUMER_GROUP, aggregateId, eventTimestamp),
+                EventProcessingTimestamp.create(consumerGroup, aggregateId, eventTimestamp),
             )
         } else {
             lastProcessed.updateLastProcessedAt(eventTimestamp)
@@ -251,17 +239,17 @@ class ProductMetricsFacade(
         eventId: String,
         eventType: String,
         eventTimestamp: ZonedDateTime,
+        consumerGroup: String,
     ) {
+        val aggregateId = productId.toString()
         // 멱등성 체크
         if (eventHandledRepository.existsById(eventId)) {
             log.debug("이미 처리된 이벤트입니다: eventId={}", eventId)
             return
         }
 
-        val aggregateId = EventProcessingTimestamp.generateProductAggregateId(productId)
-
         // 순서 체크
-        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(CONSUMER_GROUP, aggregateId)
+        val lastProcessed = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(consumerGroup, aggregateId)
         if (lastProcessed != null && !lastProcessed.shouldProcess(eventTimestamp)) {
             log.warn(
                 "오래된 이벤트 무시: productId={}, eventTimestamp={}, lastProcessedAt={}",
@@ -273,7 +261,7 @@ class ProductMetricsFacade(
             return
         }
 
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
             ?: ProductMetrics.create(productId)
 
         metrics.decreaseSoldCount(quantity)
@@ -282,7 +270,7 @@ class ProductMetricsFacade(
         // 마지막 처리 시간 업데이트
         if (lastProcessed == null) {
             eventProcessingTimestampRepository.save(
-                EventProcessingTimestamp.create(CONSUMER_GROUP, aggregateId, eventTimestamp),
+                EventProcessingTimestamp.create(consumerGroup, aggregateId, eventTimestamp),
             )
         } else {
             lastProcessed.updateLastProcessedAt(eventTimestamp)
@@ -298,10 +286,10 @@ class ProductMetricsFacade(
     /**
      * 좋아요 이벤트 배치 처리
      */
-    fun handleLikeEvents(records: List<ConsumerRecord<Any, Any>>) {
+    fun handleLikeEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
         records.forEach { record ->
             val event = objectMapper.readValue(record.value() as String, OutboxEvent.LikeCountChanged::class.java)
-            val eventId = EventHandled.generateEventId(record.topic(), record.partition(), record.offset())
+            val eventId = EventIdExtractor.extract(record)
 
             log.debug(
                 "좋아요 이벤트 처리: productId={}, action={}, eventId={}",
@@ -317,6 +305,7 @@ class ProductMetricsFacade(
                         eventId = eventId,
                         eventType = OutboxEvent.LikeCountChanged.EVENT_TYPE,
                         eventTimestamp = event.timestamp,
+                        consumerGroup = consumerGroup,
                     )
                 }
 
@@ -326,6 +315,7 @@ class ProductMetricsFacade(
                         eventId = eventId,
                         eventType = OutboxEvent.LikeCountChanged.EVENT_TYPE,
                         eventTimestamp = event.timestamp,
+                        consumerGroup = consumerGroup,
                     )
                 }
             }
@@ -335,10 +325,10 @@ class ProductMetricsFacade(
     /**
      * 조회수 이벤트 배치 처리
      */
-    fun handleViewEvents(records: List<ConsumerRecord<Any, Any>>) {
+    fun handleViewEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
         records.forEach { record ->
             val event = objectMapper.readValue(record.value() as String, OutboxEvent.ViewCountIncreased::class.java)
-            val eventId = EventHandled.generateEventId(record.topic(), record.partition(), record.offset())
+            val eventId = EventIdExtractor.extract(record)
 
             log.debug("조회수 이벤트 처리: productId={}, eventId={}", event.productId, eventId)
 
@@ -347,6 +337,7 @@ class ProductMetricsFacade(
                 eventId = eventId,
                 eventType = OutboxEvent.ViewCountIncreased.EVENT_TYPE,
                 eventTimestamp = event.timestamp,
+                consumerGroup = consumerGroup,
             )
         }
     }
@@ -354,10 +345,10 @@ class ProductMetricsFacade(
     /**
      * 주문 완료 이벤트 배치 처리
      */
-    fun handleOrderCompletedEvents(records: List<ConsumerRecord<Any, Any>>) {
+    fun handleOrderCompletedEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
         records.forEach { record ->
             val event = objectMapper.readValue(record.value() as String, OutboxEvent.OrderCompleted::class.java)
-            val eventId = EventHandled.generateEventId(record.topic(), record.partition(), record.offset())
+            val eventId = EventIdExtractor.extract(record)
 
             log.debug(
                 "주문 완료 이벤트 처리: orderId={}, items={}, eventId={}",
@@ -374,6 +365,7 @@ class ProductMetricsFacade(
                     eventId = "$eventId-${item.productId}",
                     eventType = OutboxEvent.OrderCompleted.EVENT_TYPE,
                     eventTimestamp = event.timestamp,
+                    consumerGroup = consumerGroup,
                 )
             }
         }
@@ -382,10 +374,10 @@ class ProductMetricsFacade(
     /**
      * 주문 취소 이벤트 배치 처리
      */
-    fun handleOrderCanceledEvents(records: List<ConsumerRecord<Any, Any>>) {
+    fun handleOrderCanceledEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
         records.forEach { record ->
             val event = objectMapper.readValue(record.value() as String, OutboxEvent.OrderCanceled::class.java)
-            val eventId = EventHandled.generateEventId(record.topic(), record.partition(), record.offset())
+            val eventId = EventIdExtractor.extract(record)
 
             log.debug(
                 "주문 취소 이벤트 처리: orderId={}, items={}, reason={}, eventId={}",
@@ -403,6 +395,7 @@ class ProductMetricsFacade(
                     eventId = "$eventId-${item.productId}",
                     eventType = OutboxEvent.OrderCanceled.EVENT_TYPE,
                     eventTimestamp = event.timestamp,
+                    consumerGroup = consumerGroup,
                 )
             }
         }

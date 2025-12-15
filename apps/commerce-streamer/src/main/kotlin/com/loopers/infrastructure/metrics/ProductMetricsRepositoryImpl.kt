@@ -14,6 +14,10 @@ class ProductMetricsRepositoryImpl(
         return productMetricsJpaRepository.findByIdOrNull(productId)
     }
 
+    override fun findByProductIdWithLock(productId: Long): ProductMetrics? {
+        return productMetricsJpaRepository.findByProductIdWithLock(productId)
+    }
+
     override fun save(productMetrics: ProductMetrics): ProductMetrics {
         return productMetricsJpaRepository.save(productMetrics)
     }

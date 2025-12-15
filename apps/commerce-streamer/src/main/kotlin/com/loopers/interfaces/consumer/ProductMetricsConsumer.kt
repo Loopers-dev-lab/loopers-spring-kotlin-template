@@ -35,7 +35,7 @@ class ProductMetricsConsumer(
         log.info("좋아요 이벤트 배치 수신: {} 건", records.size)
 
         try {
-            productMetricsFacade.handleLikeEvents(records)
+            productMetricsFacade.handleLikeEvents(records, "product-metrics-like-consumer")
             acknowledgment.acknowledge()
             log.info("좋아요 이벤트 배치 처리 완료: {} 건", records.size)
         } catch (e: Exception) {
@@ -59,7 +59,7 @@ class ProductMetricsConsumer(
         log.info("조회수 이벤트 배치 수신: {} 건", records.size)
 
         try {
-            productMetricsFacade.handleViewEvents(records)
+            productMetricsFacade.handleViewEvents(records, "product-metrics-view-consumer")
             acknowledgment.acknowledge()
             log.info("조회수 이벤트 배치 처리 완료: {} 건", records.size)
         } catch (e: Exception) {

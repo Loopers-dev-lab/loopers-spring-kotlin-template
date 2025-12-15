@@ -5,6 +5,7 @@ import com.loopers.application.cache.ProductCache
 import com.loopers.domain.event.EventHandled
 import com.loopers.domain.event.EventHandledRepository
 import com.loopers.domain.event.OutboxEvent
+import com.loopers.support.util.EventIdExtractor
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -25,7 +26,7 @@ class ProductStockFacade(
     fun handleSoldOutEvents(records: List<ConsumerRecord<Any, Any>>) {
         records.forEach { record ->
             val event = objectMapper.readValue(record.value() as String, OutboxEvent.SoldOut::class.java)
-            val eventId = EventHandled.generateEventId(record.topic(), record.partition(), record.offset())
+            val eventId = EventIdExtractor.extract(record)
 
             // 멱등성 체크
             if (eventHandledRepository.existsById(eventId)) {
