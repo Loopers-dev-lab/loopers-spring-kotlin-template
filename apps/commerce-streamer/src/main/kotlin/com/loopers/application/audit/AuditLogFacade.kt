@@ -2,7 +2,6 @@ package com.loopers.application.audit
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.domain.audit.AuditLogService
-import com.loopers.support.dto.UniversalEventDto
 import com.loopers.support.util.EventIdExtractor
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
@@ -36,20 +35,28 @@ class AuditLogFacade(
                     else -> objectMapper.writeValueAsString(value)
                 }
 
-                // 범용 DTO로 변환
-                val dto = objectMapper.readValue(rawPayload, UniversalEventDto::class.java)
-                dto.topicName = topicName
-                dto.rawPayload = rawPayload
-
-                // EventId 추출 (헤더 우선, 없으면 payload에서)
-                if (dto.eventId.isNullOrBlank()) {
-                    dto.eventId = EventIdExtractor.extract(record)
+                // EventId 추출
+                val eventId = EventIdExtractor.extract(record)
+                if (eventId.isBlank()) {
+                    log.warn(
+                        "eventId를 추출할 수 없음: topic={}, partition={}, offset={}",
+                        topicName,
+                        record.partition(),
+                        record.offset(),
+                    )
+                    failed++
+                    updateTopicStats(topicStats, topicName, 0, 0, 1)
+                    continue
                 }
 
-                // 유효성 검증
-                if (!dto.isValid()) {
+                // 토픽에서 eventType 추출
+                val eventType = extractEventType(topicName)
+
+                // 원본 JSON에서 aggregateId 추출
+                val aggregateId = extractAggregateId(rawPayload, topicName)
+                if (aggregateId == null) {
                     log.warn(
-                        "유효하지 않은 이벤트: topic={}, partition={}, offset={}",
+                        "aggregateId를 추출할 수 없음: topic={}, partition={}, offset={}",
                         topicName,
                         record.partition(),
                         record.offset(),
@@ -60,7 +67,14 @@ class AuditLogFacade(
                 }
 
                 // 감사 로그 저장
-                val saved = saveAuditLog(dto)
+                val saved = auditLogService.saveAuditLog(
+                    eventId = eventId,
+                    eventType = eventType,
+                    topicName = topicName,
+                    aggregateId = aggregateId,
+                    rawPayload = rawPayload,
+                )
+
                 if (saved) {
                     processed++
                     updateTopicStats(topicStats, topicName, 1, 0, 0)
@@ -103,19 +117,46 @@ class AuditLogFacade(
     }
 
     /**
-     * 감사 로그 저장
-     * 중복 체크 후 저장
+     * 토픽 이름에서 eventType 추출
      */
-    fun saveAuditLog(dto: UniversalEventDto): Boolean {
-        val eventId = dto.eventId ?: return false
+    private fun extractEventType(topicName: String): String {
+        return when (topicName) {
+            "product-like-events" -> "LIKE_COUNT_CHANGED"
+            "product-view-events" -> "VIEW_COUNT_INCREASED"
+            "order-completed-events" -> "ORDER_COMPLETED"
+            "order-canceled-events" -> "ORDER_CANCELED"
+            "product-sold-out-events" -> "PRODUCT_SOLD_OUT"
+            else -> "UNKNOWN"
+        }
+    }
 
-        return auditLogService.saveAuditLog(
-            eventId = eventId,
-            eventType = dto.eventType ?: "UNKNOWN",
-            topicName = dto.topicName ?: "UNKNOWN",
-            aggregateId = dto.aggregateId ?: "UNKNOWN",
-            rawPayload = dto.rawPayload ?: "",
-        )
+    /**
+     * 원본 JSON에서 aggregateId 추출
+     * 각 이벤트 타입별로 주요 ID 필드 추출
+     */
+    private fun extractAggregateId(rawPayload: String, topicName: String): String? {
+        return try {
+            val jsonNode = objectMapper.readTree(rawPayload)
+            when (topicName) {
+                "product-like-events",
+                "product-view-events",
+                "product-sold-out-events",
+                    -> {
+                    jsonNode.get("productId")?.asText()
+                }
+
+                "order-completed-events",
+                "order-canceled-events",
+                    -> {
+                    jsonNode.get("orderId")?.asText()
+                }
+
+                else -> null
+            }
+        } catch (e: Exception) {
+            log.error("aggregateId 추출 실패: topic={}", topicName, e)
+            null
+        }
     }
 
     private fun updateTopicStats(
