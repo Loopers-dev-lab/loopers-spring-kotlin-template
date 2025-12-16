@@ -1,18 +1,16 @@
 package com.loopers.application.audit
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.loopers.domain.audit.AuditLog
-import com.loopers.domain.audit.AuditLogRepository
+import com.loopers.domain.audit.AuditLogService
 import com.loopers.support.dto.UniversalEventDto
 import com.loopers.support.util.EventIdExtractor
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class AuditLogFacade(
-    private val auditLogRepository: AuditLogRepository,
+    private val auditLogService: AuditLogService,
     private val objectMapper: ObjectMapper,
 ) {
     private val log = LoggerFactory.getLogger(AuditLogFacade::class.java)
@@ -108,28 +106,16 @@ class AuditLogFacade(
      * 감사 로그 저장
      * 중복 체크 후 저장
      */
-    @Transactional
     fun saveAuditLog(dto: UniversalEventDto): Boolean {
         val eventId = dto.eventId ?: return false
 
-        // 중복 체크
-        if (auditLogRepository.existsByEventId(eventId)) {
-            log.debug("이미 기록된 감사 로그: eventId={}", eventId)
-            return false
-        }
-
-        // 감사 로그 저장
-        val auditLog = AuditLog.create(
+        return auditLogService.saveAuditLog(
             eventId = eventId,
             eventType = dto.eventType ?: "UNKNOWN",
             topicName = dto.topicName ?: "UNKNOWN",
             aggregateId = dto.aggregateId ?: "UNKNOWN",
             rawPayload = dto.rawPayload ?: "",
         )
-
-        auditLogRepository.save(auditLog)
-        log.info("감사 로그 저장 완료: eventId={}, eventType={}, topic={}", eventId, dto.eventType, dto.topicName)
-        return true
     }
 
     private fun updateTopicStats(
