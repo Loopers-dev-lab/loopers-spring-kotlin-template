@@ -17,12 +17,12 @@ class EventService(
     private val log = LoggerFactory.getLogger(EventService::class.java)
 
     /**
-     * 이벤트 멱등성 체크
+     * 이벤트 멱등성 체크 (eventId + aggregateId)
      *
      * @return true: 이미 처리된 이벤트, false: 처리되지 않은 이벤트
      */
-    fun isAlreadyHandled(eventId: String): Boolean {
-        return eventHandledRepository.existsById(eventId)
+    fun isAlreadyHandled(eventId: String, aggregateId: String): Boolean {
+        return eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId)
     }
 
     /**
@@ -43,14 +43,15 @@ class EventService(
     }
 
     /**
-     * 이벤트 처리 완료 기록 (멱등성 용)
+     * 이벤트 처리 완료 기록 (멱등성 용 - eventId + aggregateId)
      */
     fun markAsHandled(
         eventId: String,
+        aggregateId: String,
         eventType: String,
         eventTimestamp: ZonedDateTime,
     ) {
-        eventHandledRepository.save(EventHandled.create(eventId, eventType, eventTimestamp))
+        eventHandledRepository.save(EventHandled.create(eventId, aggregateId, eventType, eventTimestamp))
     }
 
     /**
@@ -88,9 +89,9 @@ class EventService(
         consumerGroup: String,
         aggregateId: String,
     ): EventProcessingResult {
-        // 1. 멱등성 체크
-        if (isAlreadyHandled(eventId)) {
-            log.debug("이미 처리된 이벤트입니다: eventId={}", eventId)
+        // 1. 멱등성 체크 (eventId + aggregateId 조합)
+        if (isAlreadyHandled(eventId, aggregateId)) {
+            log.debug("이미 처리된 이벤트입니다: eventId={}, aggregateId={}", eventId, aggregateId)
             return EventProcessingResult.ALREADY_HANDLED
         }
 
@@ -102,7 +103,7 @@ class EventService(
                 eventTimestamp,
             )
             // 무시한 이벤트도 처리 완료로 마킹 (재처리 방지)
-            markAsHandled(eventId, eventType, eventTimestamp)
+            markAsHandled(eventId, aggregateId, eventType, eventTimestamp)
             return EventProcessingResult.OUTDATED
         }
 
@@ -122,8 +123,8 @@ class EventService(
         // 마지막 처리 시간 업데이트
         updateProcessingTimestamp(consumerGroup, aggregateId, eventTimestamp)
 
-        // 이벤트 처리 기록
-        markAsHandled(eventId, eventType, eventTimestamp)
+        // 이벤트 처리 기록 (eventId + aggregateId 조합)
+        markAsHandled(eventId, aggregateId, eventType, eventTimestamp)
     }
 
     enum class EventProcessingResult {

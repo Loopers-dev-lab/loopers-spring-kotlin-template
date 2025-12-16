@@ -35,9 +35,10 @@ class EventServiceTest : IntegrationTest() {
         fun `returns false for unhandled event`() {
             // given
             val eventId = "new-event-id"
+            val aggregateId = "1"
 
             // when
-            val result = eventService.isAlreadyHandled(eventId)
+            val result = eventService.isAlreadyHandled(eventId, aggregateId)
 
             // then
             assertThat(result).isFalse()
@@ -48,10 +49,11 @@ class EventServiceTest : IntegrationTest() {
         fun `returns true for already handled event`() {
             // given
             val eventId = "handled-event-id"
-            eventService.markAsHandled(eventId, EVENT_TYPE, ZonedDateTime.now())
+            val aggregateId = "1"
+            eventService.markAsHandled(eventId, aggregateId, EVENT_TYPE, ZonedDateTime.now())
 
             // when
-            val result = eventService.isAlreadyHandled(eventId)
+            val result = eventService.isAlreadyHandled(eventId, aggregateId)
 
             // then
             assertThat(result).isTrue()
@@ -153,10 +155,11 @@ class EventServiceTest : IntegrationTest() {
         fun `marks event as handled`() {
             // given
             val eventId = "event-to-mark"
+            val aggregateId = "1"
             val eventTimestamp = ZonedDateTime.now()
 
             // when
-            eventService.markAsHandled(eventId, EVENT_TYPE, eventTimestamp)
+            eventService.markAsHandled(eventId, EVENT_TYPE, aggregateId, eventTimestamp)
 
             // then
             assertThat(eventHandledRepository.existsById(eventId)).isTrue()
@@ -236,7 +239,7 @@ class EventServiceTest : IntegrationTest() {
             val aggregateId = "product-21"
             val timestamp = ZonedDateTime.now()
 
-            eventService.markAsHandled(eventId, EVENT_TYPE, timestamp)
+            eventService.markAsHandled(eventId, aggregateId, EVENT_TYPE, timestamp)
 
             // when
             val result = eventService.checkAndPrepareForProcessing(
