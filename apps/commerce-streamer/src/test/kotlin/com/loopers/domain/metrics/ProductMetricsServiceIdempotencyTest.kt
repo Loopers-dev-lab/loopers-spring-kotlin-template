@@ -74,7 +74,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         // given
         val productId = 3L
         val quantity = 5
-        val eventId = "order-completed-events-0-11111-$productId"
+        val eventId = "order-completed-events-0-11111"
         val eventType = "OrderCompleted"
         val eventTimestamp = ZonedDateTime.now()
 
@@ -141,8 +141,8 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         // given
         val productId = 6L
         val quantity = 10
-        val completedEventId = "order-completed-events-0-3001-$productId"
-        val canceledEventId = "order-canceled-events-0-3002-$productId"
+        val completedEventId = "order-completed-events-0-3001"
+        val canceledEventId = "order-canceled-events-0-3002"
         val completedEventType = "OrderCompleted"
         val canceledEventType = "OrderCanceled"
         val eventTimestamp = ZonedDateTime.now()
@@ -168,7 +168,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         val productId = 7L
         val likeEventId = "product-like-events-0-4001"
         val viewEventId = "product-view-events-0-4002"
-        val soldEventId = "order-completed-events-0-4003-$productId"
+        val soldEventId = "order-completed-events-0-4003"
         val baseTimestamp = ZonedDateTime.now()
 
         // when - 각 이벤트를 여러 번 전송

@@ -93,7 +93,7 @@ class ProductMetricsFacade(
                 productMetricsService.increaseSoldCount(
                     productId = item.productId,
                     quantity = item.quantity,
-                    eventId = "$eventId-${item.productId}",
+                    eventId = eventId,
                     eventType = OutboxEvent.OrderCompleted.EVENT_TYPE,
                     eventTimestamp = event.timestamp,
                     consumerGroup = consumerGroup,
@@ -123,7 +123,7 @@ class ProductMetricsFacade(
                 productMetricsService.decreaseSoldCount(
                     productId = item.productId,
                     quantity = item.quantity,
-                    eventId = "$eventId-${item.productId}",
+                    eventId = eventId,
                     eventType = OutboxEvent.OrderCanceled.EVENT_TYPE,
                     eventTimestamp = event.timestamp,
                     consumerGroup = consumerGroup,

@@ -117,9 +117,11 @@ class ProductMetricsService(
         eventType: String,
         eventTimestamp: ZonedDateTime,
     ) {
-        // 멱등성 체크만 수행 (순서 보장 불필요)
-        if (eventService.isAlreadyHandled(eventId)) {
-            log.debug("이미 처리된 조회수 이벤트입니다: eventId={}", eventId)
+        val aggregateId = productId.toString()
+
+        // 멱등성 체크만 수행 (순서 보장 불필요) - eventId + aggregateId 조합
+        if (eventService.isAlreadyHandled(eventId, aggregateId)) {
+            log.debug("이미 처리된 조회수 이벤트입니다: eventId={}, productId={}", eventId, productId)
             return
         }
 
@@ -129,8 +131,8 @@ class ProductMetricsService(
         metrics.increaseViewCount()
         productMetricsRepository.save(metrics)
 
-        // 이벤트 처리 완료 기록 (멱등성 용)
-        eventService.markAsHandled(eventId, eventType, eventTimestamp)
+        // 이벤트 처리 완료 기록 (멱등성 용) - eventId + aggregateId 조합
+        eventService.markAsHandled(eventId, aggregateId, eventType, eventTimestamp)
 
         log.debug("조회 수 증가: productId={}, viewCount={}", productId, metrics.viewCount)
     }

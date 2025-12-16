@@ -30,9 +30,11 @@ class ProductStockService(
         eventType: String,
         eventTimestamp: ZonedDateTime,
     ) {
-        // 멱등성 체크
-        if (eventService.isAlreadyHandled(eventId)) {
-            log.debug("이미 처리된 품절 이벤트입니다: eventId={}", eventId)
+        val aggregateId = productId.toString()
+
+        // 멱등성 체크 (eventId + aggregateId 조합)
+        if (eventService.isAlreadyHandled(eventId, aggregateId)) {
+            log.debug("이미 처리된 품절 이벤트입니다: eventId={}, productId={}", eventId, productId)
             return
         }
 
@@ -41,8 +43,8 @@ class ProductStockService(
         // 상품 상세 캐시 삭제 (모든 사용자)
         productCacheRepository.evictProductDetail(productId)
 
-        // 이벤트 처리 기록
-        eventService.markAsHandled(eventId, eventType, eventTimestamp)
+        // 이벤트 처리 기록 (eventId + aggregateId 조합)
+        eventService.markAsHandled(eventId, aggregateId, eventType, eventTimestamp)
 
         log.debug("품절 이벤트 처리 완료: productId={}", productId)
     }
