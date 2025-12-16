@@ -18,6 +18,7 @@ import kotlin.test.Test
 class ProductServiceIntegrationTest @Autowired constructor(
     private val productService: ProductService,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val brandRepository: BrandRepository,
     private val databaseCleanUp: DatabaseCleanUp,
@@ -66,11 +67,11 @@ class ProductServiceIntegrationTest @Autowired constructor(
     @Nested
     inner class FindProductViewById {
 
-        @DisplayName("존재하는 상품을 조회하면 상품, 브랜드, 통계 정보가 함께 반환된다")
+        @DisplayName("존재하는 상품을 조회하면 상품, 재고, 브랜드, 통계 정보가 함께 반환된다")
         @Test
         fun `return product view with all related data when product exists`() {
             // given
-            val product = createProduct()
+            val product = createProduct(stockQuantity = 100)
 
             // when
             val productView = productService.findProductViewById(product.id)
@@ -78,6 +79,8 @@ class ProductServiceIntegrationTest @Autowired constructor(
             // then
             assertAll(
                 { assertThat(productView.product.id).isEqualTo(product.id) },
+                { assertThat(productView.stock.productId).isEqualTo(product.id) },
+                { assertThat(productView.stock.quantity).isEqualTo(100) },
                 { assertThat(productView.brand.id).isEqualTo(product.brandId) },
                 { assertThat(productView.statistic.productId).isEqualTo(product.id) },
             )
@@ -155,8 +158,8 @@ class ProductServiceIntegrationTest @Autowired constructor(
         @Test
         fun `decrease stocks for multiple products`() {
             // given
-            val product1 = createProduct(name = "상품1", stock = Stock.of(100))
-            val product2 = createProduct(name = "상품2", stock = Stock.of(50))
+            val product1 = createProduct(name = "상품1", stockQuantity = 100)
+            val product2 = createProduct(name = "상품2", stockQuantity = 50)
 
             // when
             val command = ProductCommand.DecreaseStocks(
@@ -168,19 +171,19 @@ class ProductServiceIntegrationTest @Autowired constructor(
             productService.decreaseStocks(command)
 
             // then
-            val updatedProduct1 = productRepository.findById(product1.id)!!
-            val updatedProduct2 = productRepository.findById(product2.id)!!
+            val updatedStock1 = stockRepository.findByProductId(product1.id)!!
+            val updatedStock2 = stockRepository.findByProductId(product2.id)!!
             assertAll(
-                { assertThat(updatedProduct1.stock.amount).isEqualTo(90) },
-                { assertThat(updatedProduct2.stock.amount).isEqualTo(45) },
+                { assertThat(updatedStock1.quantity).isEqualTo(90) },
+                { assertThat(updatedStock2.quantity).isEqualTo(45) },
             )
         }
 
-        @DisplayName("재고가 0이 되면 상품 상태가 OUT_OF_STOCK으로 변경된다")
+        @DisplayName("재고가 0이 되어도 정상 처리된다")
         @Test
-        fun `change status to out of stock when stock becomes zero`() {
+        fun `handle zero stock successfully`() {
             // given
-            val product = createProduct(stock = Stock.of(10))
+            val product = createProduct(stockQuantity = 10)
 
             // when
             val command = ProductCommand.DecreaseStocks(
@@ -191,18 +194,15 @@ class ProductServiceIntegrationTest @Autowired constructor(
             productService.decreaseStocks(command)
 
             // then
-            val updatedProduct = productRepository.findById(product.id)!!
-            assertAll(
-                { assertThat(updatedProduct.stock.amount).isEqualTo(0) },
-                { assertThat(updatedProduct.status).isEqualTo(ProductStatus.OUT_OF_STOCK) },
-            )
+            val updatedStock = stockRepository.findByProductId(product.id)!!
+            assertThat(updatedStock.quantity).isEqualTo(0)
         }
 
         @DisplayName("재고가 부족하면 예외가 발생한다")
         @Test
         fun `throw exception when stock is insufficient`() {
             // given
-            val product = createProduct(stock = Stock.of(10))
+            val product = createProduct(stockQuantity = 10)
 
             // when & then
             val command = ProductCommand.DecreaseStocks(
@@ -222,8 +222,8 @@ class ProductServiceIntegrationTest @Autowired constructor(
         @Test
         fun `rollback all stock changes when one product fails`() {
             // given
-            val product1 = createProduct(name = "상품1", stock = Stock.of(100))
-            val product2 = createProduct(name = "상품2", stock = Stock.of(5))
+            val product1 = createProduct(name = "상품1", stockQuantity = 100)
+            val product2 = createProduct(name = "상품2", stockQuantity = 5)
 
             // when
             val command = ProductCommand.DecreaseStocks(
@@ -237,11 +237,11 @@ class ProductServiceIntegrationTest @Autowired constructor(
             }
 
             // then
-            val unchangedProduct1 = productRepository.findById(product1.id)!!
-            val unchangedProduct2 = productRepository.findById(product2.id)!!
+            val unchangedStock1 = stockRepository.findByProductId(product1.id)!!
+            val unchangedStock2 = stockRepository.findByProductId(product2.id)!!
             assertAll(
-                { assertThat(unchangedProduct1.stock.amount).isEqualTo(100) },
-                { assertThat(unchangedProduct2.stock.amount).isEqualTo(5) },
+                { assertThat(unchangedStock1.quantity).isEqualTo(100) },
+                { assertThat(unchangedStock2.quantity).isEqualTo(5) },
             )
         }
     }
@@ -255,7 +255,7 @@ class ProductServiceIntegrationTest @Autowired constructor(
         fun `increase stock successfully`() {
             // given
             val brand = brandRepository.save(Brand.of("브랜드"))
-            val product = createProduct(brandId = brand.id, stock = Stock.of(50))
+            val product = createProduct(brandId = brand.id, stockQuantity = 50)
 
             val command = ProductCommand.IncreaseStocks(
                 units = listOf(
@@ -267,8 +267,8 @@ class ProductServiceIntegrationTest @Autowired constructor(
             productService.increaseStocks(command)
 
             // then
-            val updatedProduct = productRepository.findById(product.id)
-            assertThat(updatedProduct?.stock).isEqualTo(Stock.of(80))
+            val updatedStock = stockRepository.findByProductId(product.id)
+            assertThat(updatedStock?.quantity).isEqualTo(80)
         }
 
         @DisplayName("여러 상품의 재고를 한 번에 복구할 수 있다")
@@ -276,8 +276,8 @@ class ProductServiceIntegrationTest @Autowired constructor(
         fun `increase stocks for multiple products`() {
             // given
             val brand = brandRepository.save(Brand.of("브랜드"))
-            val product1 = createProduct(brandId = brand.id, name = "상품1", stock = Stock.of(10))
-            val product2 = createProduct(brandId = brand.id, name = "상품2", stock = Stock.of(20))
+            val product1 = createProduct(brandId = brand.id, name = "상품1", stockQuantity = 10)
+            val product2 = createProduct(brandId = brand.id, name = "상품2", stockQuantity = 20)
 
             val command = ProductCommand.IncreaseStocks(
                 units = listOf(
@@ -291,8 +291,8 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             assertAll(
-                { assertThat(productRepository.findById(product1.id)?.stock).isEqualTo(Stock.of(15)) },
-                { assertThat(productRepository.findById(product2.id)?.stock).isEqualTo(Stock.of(35)) },
+                { assertThat(stockRepository.findByProductId(product1.id)?.quantity).isEqualTo(15) },
+                { assertThat(stockRepository.findByProductId(product2.id)?.quantity).isEqualTo(35) },
             )
         }
     }
@@ -323,6 +323,7 @@ class ProductServiceIntegrationTest @Autowired constructor(
             productViews.forEach { productView ->
                 assertAll(
                     { assertThat(productView.product).isNotNull() },
+                    { assertThat(productView.stock).isNotNull() },
                     { assertThat(productView.statistic).isNotNull() },
                     { assertThat(productView.brand).isNotNull() },
                 )
@@ -418,7 +419,7 @@ class ProductServiceIntegrationTest @Autowired constructor(
     private fun createProduct(
         name: String = "테스트 상품",
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
         brandId: Long? = null,
     ): Product {
         val brand = if (brandId != null) {
@@ -430,10 +431,10 @@ class ProductServiceIntegrationTest @Autowired constructor(
         val product = Product.create(
             name = name,
             price = price,
-            stock = stock,
             brand = brand,
         )
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }

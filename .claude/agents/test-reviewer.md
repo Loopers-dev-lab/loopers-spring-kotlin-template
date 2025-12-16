@@ -1,6 +1,6 @@
 ---
 name: test-reviewer
-description: Validates test quality as executable documentation. Reviews test structure, readability, isolation, coverage of spec requirements, and alignment with TDD principles. Use after implementation to verify test craftsmanship. Requires files and spec_directory arguments.
+description: Validates test quality as executable documentation. Reviews test structure, readability, isolation, and spec coverage alignment. Use after implementation. Triggers include "review tests", "check test quality", "test review". Requires files and spec_directory arguments.
 model: sonnet
 ---
 
@@ -46,6 +46,106 @@ This project uses:
 - English method names for technical clarity
 - Three test levels: Unit, Integration, E2E
   </context>
+
+<verification_principle>
+
+## CRITICAL: State/Result Verification ONLY
+
+This project follows **Classical TDD (Detroit School)**. All tests MUST verify **outcomes**, NOT **interactions**.
+
+> **Verify WHAT happened, not HOW it happened.**
+
+### ✅ ALLOWED: State/Result Verification
+
+```kotlin
+// Return value
+assertThat(result).isEqualTo(expected)
+
+// Object state
+assertThat(point.balance).isEqualTo(700L)
+
+// Exception
+assertThatThrownBy { point.use(500L) }
+    .isInstanceOf(CoreException::class.java)
+
+// Database state via query
+val saved = repository.findById(id)
+assertThat(saved?.status).isEqualTo(OrderStatus.PLACED)
+
+// Published events via @RecordApplicationEvents
+val events = applicationEvents.stream(OrderCreatedEvent::class.java).toList()
+assertThat(events).hasSize(1)
+```
+
+### ❌ FORBIDDEN: Behavior Verification
+
+```kotlin
+verify(repository).save(any())
+verify(mock, times(1)).method()
+verify(mock, never()).method()
+verifyNoInteractions(mock)
+verifyNoMoreInteractions(mock)
+inOrder(mock1, mock2).verify(...)
+argumentCaptor<T>()  // when used with verify()
+```
+
+### Stub vs Verify
+
+**Stub is allowed** (controls input), **Verify is forbidden** (checks method calls).
+
+```kotlin
+// ✅ Stub - OK
+whenever(repository.findByUserId(userId)).thenReturn(emptyList())
+
+// ❌ Verify - FORBIDDEN
+verify(repository).findByUserId(userId)
+```
+
+</verification_principle>
+
+<assertion_principle>
+
+## Assertion Quality Rules
+
+### Verify Only What Is Necessary
+
+Every test should verify only what is **necessary to confirm the spec is satisfied**. Do not assert on fields irrelevant
+to the behavior under test.
+
+```kotlin
+// ❌ Bad: Verifying irrelevant fields
+assertThat(order.id).isNotNull()
+assertThat(order.userId).isEqualTo(1L)
+assertThat(order.status).isEqualTo(OrderStatus.PLACED)
+assertThat(order.createdAt).isNotNull()
+assertThat(order.updatedAt).isNotNull()
+
+// ✅ Good: Only status matters for this test
+assertThat(order.status).isEqualTo(OrderStatus.PLACED)
+```
+
+### Clear Assertions
+
+Assert what the test name promises. No more, no less.
+
+If test is named "잔액이 차감된다", verify balance. Don't also verify updatedAt, status, or other fields unless the test name
+promises them.
+
+### Single Logical Assertion
+
+Each test verifies **one behavior**. Multiple `assertThat` calls are fine if they verify aspects of the same result.
+
+```kotlin
+// ✅ Good: Multiple assertions about the same behavior (order creation)
+assertThat(order.status).isEqualTo(OrderStatus.PLACED)
+assertThat(order.items).hasSize(2)
+
+// ❌ Bad: Testing multiple unrelated behaviors
+assertThat(order.status).isEqualTo(OrderStatus.PLACED)
+assertThat(user.orderCount).isEqualTo(1)  // This is a different behavior
+```
+
+</assertion_principle>
 
 <test_philosophy>
 
@@ -230,6 +330,56 @@ When reviewing, check:
 - Are factory functions used instead of inline object construction?
 - Does the test expose only values relevant to what's being verified?
 - Can you understand the expected result's origin without mental calculation?
+
+### Event Test Separation
+
+Event-driven architecture requires loose coupling between publishers and consumers. Tests should reflect this
+separation.
+
+**Publisher tests should only verify publishing.** The test should confirm that the correct event was published with
+correct data. It should NOT verify what listeners do with the event.
+
+**Consumer tests should be independent.** Event listeners should be tested by directly invoking the handler method with
+a manually constructed event object. The test should NOT go through the actual event publishing mechanism.
+
+**Watch for coupling violations:**
+
+```kotlin
+// Poor: Tests entire publish-consume flow together
+@Test
+fun `order creation sends notification`() {
+    orderService.createOrder(command)  // publishes event internally
+
+    // Verifying listener's side effect - coupling publisher and consumer tests
+    assertThat(notificationRepository.findByOrderId(orderId)).isNotEmpty
+}
+
+// Better: Publisher test - verify only publishing
+@Test
+fun `publishes OrderCreatedEvent when order is created`() {
+    orderService.createOrder(command)
+
+    // Verify only that event was published
+    assertThat(events.stream(OrderCreatedEvent::class.java))
+        .anyMatch { it.orderId == expectedOrderId }
+}
+
+// Better: Consumer test - test listener independently
+@Test
+fun `saves notification when OrderCreatedEvent is received`() {
+    // Directly invoke listener with constructed event
+    val event = OrderCreatedEvent(orderId = 1L, customerId = 100L)
+    listener.handle(event)
+
+    assertThat(notificationRepository.findByOrderId(1L)).isNotEmpty
+}
+```
+
+When reviewing event-related tests, check:
+
+- Does the publisher test stop at verifying event publication?
+- Does the consumer test construct its own event instead of triggering actual publishing?
+- Is there any test that couples publisher and consumer verification?
 
 </review_areas>
 
@@ -473,24 +623,24 @@ with meaningful dates. The test verifies a specific, traceable requirement.
 
 ## Patterns to Watch For
 
-### Tests That Test Implementation, Not Behavior
+### ❌ BLOCKER: Behavior Verification
 
 ```kotlin
-// Poor: Tests implementation details
+// FORBIDDEN: Tests implementation details
 @Test
 fun `use calls repository save`() {
     pointService.use(userId, amount)
 
-    verify(repository).save(any())  // Testing HOW, not WHAT
+    verify(repository).save(any())  // ❌ BLOCKER - Testing HOW, not WHAT
 }
 
-// Better: Tests behavior
+// FIX: Test the observable outcome instead
 @Test
 fun `use persists the reduced balance`() {
     pointService.use(userId, 300L)
 
-    val point = pointService.getBalance(userId)
-    assertThat(point).isEqualTo(700L)  // Testing WHAT happens
+    val point = pointRepository.findByUserId(userId)
+    assertThat(point?.balance).isEqualTo(700L)  // ✅ Testing WHAT happens
 }
 ```
 
@@ -562,3 +712,17 @@ fun `each test is self-contained`() {
 ```
 
 </common_issues>
+
+<forbidden_patterns_summary>
+
+## Quick Reference: Forbidden vs Allowed
+
+| ❌ FORBIDDEN               | ✅ ALLOWED                                   |
+|---------------------------|---------------------------------------------|
+| `verify(mock).method()`   | `assertThat(result).isEqualTo(expected)`    |
+| `verify(mock, times(N))`  | `assertThat(entity.field).isEqualTo(value)` |
+| `verify(mock, never())`   | `assertThatThrownBy { }.isInstanceOf()`     |
+| `verifyNoInteractions()`  | `repository.findById()` + assert            |
+| `argumentCaptor` + verify | `applicationEvents.stream()` + assert       |
+
+</forbidden_patterns_summary>

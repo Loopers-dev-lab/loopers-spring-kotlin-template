@@ -2,12 +2,14 @@ package com.loopers.domain.payment
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import java.time.ZonedDateTime
 
 data class PaymentPageQuery(
     val page: Int,
     val size: Int,
     val sort: PaymentSortType,
     val statuses: List<PaymentStatus>,
+    val createdBefore: ZonedDateTime? = null,
 ) {
     init {
         if (page < 0) {
@@ -32,12 +34,14 @@ data class PaymentPageQuery(
             size: Int? = null,
             sort: PaymentSortType? = null,
             statuses: List<PaymentStatus> = emptyList(),
+            createdBefore: ZonedDateTime? = null,
         ): PaymentPageQuery {
             return PaymentPageQuery(
                 page = page ?: DEFAULT_PAGE,
                 size = size ?: DEFAULT_SIZE,
                 sort = sort ?: DEFAULT_SORT,
                 statuses = statuses,
+                createdBefore = createdBefore,
             )
         }
     }

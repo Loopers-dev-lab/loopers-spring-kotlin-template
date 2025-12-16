@@ -3,8 +3,10 @@ package com.loopers.domain.payment
 import com.loopers.domain.BaseEntity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.event.DomainEvent
 import com.loopers.support.values.Money
 import jakarta.persistence.AttributeOverride
+import jakarta.persistence.Transient
 import jakarta.persistence.Column
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
@@ -32,6 +34,7 @@ class Payment(
     status: PaymentStatus,
     issuedCouponId: Long? = null,
     couponDiscount: Money = Money.ZERO_KRW,
+    cardInfo: CardInfo? = null,
     externalPaymentKey: String? = null,
     failureMessage: String? = null,
     attemptedAt: Instant? = null,
@@ -66,6 +69,10 @@ class Payment(
     var couponDiscount: Money = couponDiscount
         private set
 
+    @Embedded
+    var cardInfo: CardInfo? = cardInfo
+        private set
+
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
     var status: PaymentStatus = status
@@ -88,20 +95,35 @@ class Payment(
     var version: Long = 0
         private set
 
+    @Transient
+    private var domainEvents: MutableList<DomainEvent>? = null
+
+    private fun getDomainEvents(): MutableList<DomainEvent> {
+        if (domainEvents == null) {
+            domainEvents = mutableListOf()
+        }
+        return domainEvents!!
+    }
+
+    fun pollEvents(): List<DomainEvent> {
+        val events = getDomainEvents().toList()
+        getDomainEvents().clear()
+        return events
+    }
+
     /**
-     * 결제를 개시합니다. PENDING → IN_PROGRESS 또는 FAILED 상태 전이
+     * 결제를 개시합니다. PENDING -> IN_PROGRESS, PAID, 또는 FAILED 상태 전이
      * PG 결제 요청 결과에 따라 상태가 결정됩니다.
-     * - Accepted: IN_PROGRESS, transactionKey 저장 -> Success
-     * - Uncertain: IN_PROGRESS, transactionKey null 유지 -> Success
-     * - NotReached: FAILED (PG 서비스 불능) -> Failed
-     * - NotRequired: PAID (0원 결제) -> Success
+     * - Accepted: IN_PROGRESS, transactionKey 저장
+     * - Uncertain: IN_PROGRESS, transactionKey null 유지
+     * - NotReached: FAILED (PG 서비스 불능) -> PaymentFailedEventV1 등록
+     * - NotRequired: PAID (0원 결제) -> PaymentPaidEventV1 등록
      *
      * @param result PG 결제 요청 결과
      * @param attemptedAt 결제 시도 시각
-     * @return PgPaymentResult 결제 개시 결과 (Success 또는 Failed)
      * @throws CoreException PENDING 상태가 아닌 경우
      */
-    fun initiate(result: PgPaymentCreateResult, attemptedAt: Instant): PgPaymentResult {
+    fun initiate(result: PgPaymentCreateResult, attemptedAt: Instant) {
         if (status != PaymentStatus.PENDING) {
             throw CoreException(ErrorType.BAD_REQUEST, "결제 대기 상태에서만 결제를 개시할 수 있습니다")
         }
@@ -120,23 +142,20 @@ class Payment(
             is PgPaymentCreateResult.NotReached -> {
                 status = PaymentStatus.FAILED
                 failureMessage = "PG 서비스에 연결할 수 없습니다"
+                getDomainEvents().add(PaymentFailedEventV1.from(this))
             }
 
             is PgPaymentCreateResult.NotRequired -> {
                 status = PaymentStatus.PAID
+                getDomainEvents().add(PaymentPaidEventV1.from(this))
             }
-        }
-
-        return when (status) {
-            PaymentStatus.FAILED -> PgPaymentResult.Failed(this, failureMessage ?: "알 수 없는 오류")
-            else -> PgPaymentResult.Success(this)
         }
     }
 
     /**
      * PG 트랜잭션 결과로 결제 상태를 확정합니다.
      *
-     * 멱등성: 이미 PAID/FAILED 상태면 해당 결과를 그대로 반환
+     * 멱등성: 이미 PAID/FAILED 상태면 아무 동작 없이 종료
      *
      * 매칭 우선순위:
      * 1. externalPaymentKey가 있으면 해당 키와 일치하는 transaction
@@ -144,16 +163,12 @@ class Payment(
      *
      * @param transactions PG에서 조회한 트랜잭션 목록
      * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return ConfirmResult - Paid, Failed, 또는 StillInProgress
      * @throws CoreException PENDING 상태인 경우 (아직 결제 시작 안됨)
      */
-    fun confirmPayment(transactions: List<PgTransaction>, currentTime: Instant): ConfirmResult {
-        // 멱등성: 이미 최종 상태면 해당 결과 반환
-        if (status == PaymentStatus.PAID) {
-            return ConfirmResult.Paid(this)
-        }
-        if (status == PaymentStatus.FAILED) {
-            return ConfirmResult.Failed(this)
+    fun confirmPayment(transactions: List<PgTransaction>, currentTime: Instant) {
+        // 멱등성: 이미 최종 상태면 아무것도 하지 않음
+        if (status == PaymentStatus.PAID || status == PaymentStatus.FAILED) {
+            return
         }
 
         // PENDING 상태면 예외 (아직 결제 시작 안됨)
@@ -167,29 +182,27 @@ class Payment(
             matched?.status == PgTransactionStatus.SUCCESS -> {
                 status = PaymentStatus.PAID
                 externalPaymentKey = matched.transactionKey
+                getDomainEvents().add(PaymentPaidEventV1.from(this))
             }
 
             matched?.status == PgTransactionStatus.FAILED -> {
                 status = PaymentStatus.FAILED
                 externalPaymentKey = matched.transactionKey
                 failureMessage = matched.failureReason
+                getDomainEvents().add(PaymentFailedEventV1.from(this))
             }
 
             matched == null -> {
                 status = PaymentStatus.FAILED
                 failureMessage = "매칭되는 PG 트랜잭션이 없습니다"
+                getDomainEvents().add(PaymentFailedEventV1.from(this))
             }
 
             isTimedOut(currentTime) -> {
                 status = PaymentStatus.FAILED
                 failureMessage = "결제 시간 초과"
+                getDomainEvents().add(PaymentFailedEventV1.from(this))
             }
-        }
-
-        return when (status) {
-            PaymentStatus.PAID -> ConfirmResult.Paid(this)
-            PaymentStatus.FAILED -> ConfirmResult.Failed(this)
-            else -> ConfirmResult.StillInProgress(this)
         }
     }
 
@@ -213,6 +226,8 @@ class Payment(
          * 결제를 생성합니다.
          * paidAmount = totalAmount - usedPoint - couponDiscount 로 자동 계산
          * 모든 결제는 PENDING 상태로 생성됩니다. (0원 결제 포함)
+         *
+         * @param cardInfo 카드 정보 (paidAmount > 0인 경우 필수, 0원 결제인 경우 null 가능)
          */
         fun create(
             userId: Long,
@@ -221,6 +236,7 @@ class Payment(
             usedPoint: Money,
             issuedCouponId: Long?,
             couponDiscount: Money,
+            cardInfo: CardInfo? = null,
         ): Payment {
             if (usedPoint < Money.ZERO_KRW) {
                 throw CoreException(ErrorType.BAD_REQUEST, "사용 포인트는 0 이상이어야 합니다")
@@ -235,6 +251,10 @@ class Payment(
                 throw CoreException(ErrorType.BAD_REQUEST, "포인트와 쿠폰 할인의 합이 주문 금액을 초과합니다")
             }
 
+            if (paidAmount > Money.ZERO_KRW && cardInfo == null) {
+                throw CoreException(ErrorType.BAD_REQUEST, "카드 결제 시 카드 정보는 필수입니다")
+            }
+
             return Payment(
                 orderId = orderId,
                 userId = userId,
@@ -244,6 +264,7 @@ class Payment(
                 status = PaymentStatus.PENDING,
                 issuedCouponId = issuedCouponId,
                 couponDiscount = couponDiscount,
+                cardInfo = cardInfo,
             )
         }
 
@@ -255,6 +276,7 @@ class Payment(
             status: PaymentStatus,
             issuedCouponId: Long? = null,
             couponDiscount: Money = Money.ZERO_KRW,
+            cardInfo: CardInfo? = null,
             paidAmount: Money = Money.ZERO_KRW,
             externalPaymentKey: String? = null,
             failureMessage: String? = null,
@@ -269,6 +291,7 @@ class Payment(
                 status = status,
                 issuedCouponId = issuedCouponId,
                 couponDiscount = couponDiscount,
+                cardInfo = cardInfo,
                 externalPaymentKey = externalPaymentKey,
                 failureMessage = failureMessage,
                 attemptedAt = attemptedAt,

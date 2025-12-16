@@ -2,15 +2,22 @@ package com.loopers.domain.payment
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Slice
+import org.springframework.orm.ObjectOptimisticLockingFailureException
+import org.springframework.retry.annotation.Backoff
+import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.Instant
 
 @Component
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val pgClient: PgClient,
+    private val eventPublisher: ApplicationEventPublisher,
+    private val transactionTemplate: TransactionTemplate,
 ) {
     /**
      * 결제를 생성합니다.
@@ -30,9 +37,16 @@ class PaymentService(
             usedPoint = command.usedPoint,
             issuedCouponId = command.issuedCouponId,
             couponDiscount = command.couponDiscount,
+            cardInfo = command.cardInfo,
         )
 
-        return paymentRepository.save(payment)
+        val savedPayment = paymentRepository.save(payment)
+
+        eventPublisher.publishEvent(
+            PaymentCreatedEventV1(paymentId = savedPayment.id),
+        )
+
+        return savedPayment
     }
 
     /**
@@ -55,7 +69,6 @@ class PaymentService(
      * @param orderId 주문 ID
      * @param externalPaymentKey PG 외부 결제 키
      * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return ConfirmResult - 결제 확정 결과
      * @throws CoreException 결제를 찾을 수 없는 경우
      */
     @Transactional
@@ -63,15 +76,15 @@ class PaymentService(
         orderId: Long,
         externalPaymentKey: String,
         currentTime: Instant = Instant.now(),
-    ): ConfirmResult {
+    ) {
         val payment = paymentRepository.findByOrderId(orderId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
         val transaction = pgClient.findTransaction(externalPaymentKey)
-        val result = payment.confirmPayment(listOf(transaction), currentTime)
+        payment.confirmPayment(listOf(transaction), currentTime)
         paymentRepository.save(payment)
 
-        return result
+        payment.pollEvents().forEach { eventPublisher.publishEvent(it) }
     }
 
     /**
@@ -80,14 +93,13 @@ class PaymentService(
      *
      * @param paymentId 결제 ID
      * @param currentTime 현재 시각 (타임아웃 판단용)
-     * @return ConfirmResult - 결제 확정 결과
      * @throws CoreException 결제를 찾을 수 없는 경우
      */
     @Transactional
     fun processInProgressPayment(
         paymentId: Long,
         currentTime: Instant = Instant.now(),
-    ): ConfirmResult {
+    ) {
         val payment = paymentRepository.findById(paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
@@ -95,10 +107,10 @@ class PaymentService(
             listOf(pgClient.findTransaction(key))
         } ?: pgClient.findTransactionsByPaymentId(payment.id)
 
-        val result = payment.confirmPayment(transactions, currentTime)
+        payment.confirmPayment(transactions, currentTime)
         paymentRepository.save(payment)
 
-        return result
+        payment.pollEvents().forEach { eventPublisher.publishEvent(it) }
     }
 
     /**
@@ -108,14 +120,13 @@ class PaymentService(
      * 0원 결제는 PgClientResultDecorator에서 NotRequired를 반환합니다.
      * 0원 결제가 아닌 경우 cardInfo가 필수입니다.
      *
-     * @param paymentId 결제 ID
-     * @param cardInfo 카드 정보 (0원 결제가 아닌 경우 필수)
-     * @return PgPaymentResult - 결제 결과
+     * @param command 결제 요청 커맨드
+     * @param currentTime 현재 시각
      */
     fun requestPgPayment(
         command: PaymentCommand.RequestPgPayment,
         currentTime: Instant = Instant.now(),
-    ): PgPaymentResult {
+    ) {
         val payment = paymentRepository.findById(command.paymentId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
 
@@ -127,9 +138,47 @@ class PaymentService(
             ),
         )
 
-        val result = payment.initiate(pgResult, currentTime)
+        payment.initiate(pgResult, currentTime)
         paymentRepository.save(payment)
 
-        return result
+        payment.pollEvents().forEach { eventPublisher.publishEvent(it) }
+    }
+
+    /**
+     * PG 결제를 요청하고 결제 상태를 업데이트합니다.
+     * 이 메서드는 비동기 이벤트 리스너에서 사용됩니다. (cardInfo는 Payment에 저장되어 있음)
+     *
+     * PG 호출은 트랜잭션 외부에서 수행하여, PG 응답 대기 중 DB 커넥션을 점유하지 않습니다.
+     * save + event publish만 트랜잭션 내에서 수행합니다.
+     *
+     * @param paymentId 결제 ID
+     * @param currentTime 현재 시각
+     */
+    @Retryable(
+        retryFor = [ObjectOptimisticLockingFailureException::class],
+        maxAttempts = 3,
+        backoff = Backoff(delay = 100),
+    )
+    fun requestPgPayment(
+        paymentId: Long,
+        currentTime: Instant = Instant.now(),
+    ) {
+        val payment = paymentRepository.findById(paymentId)
+            ?: throw CoreException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다")
+
+        val pgResult = pgClient.requestPayment(
+            PgPaymentRequest(
+                paymentId = payment.id,
+                amount = payment.paidAmount,
+                cardInfo = payment.cardInfo,
+            ),
+        )
+
+        payment.initiate(pgResult, currentTime)
+
+        transactionTemplate.execute {
+            paymentRepository.save(payment)
+            payment.pollEvents().forEach { eventPublisher.publishEvent(it) }
+        }
     }
 }

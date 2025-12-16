@@ -1,6 +1,6 @@
 ---
 name: researcher
-description: Researches codebase and external libraries to find integration points, patterns, and reference implementations. Creates research.md for planner. Use before planning new features.
+description: Researches codebase and external libraries to find integration points, patterns, and reference implementations. Creates research.md for planner. Use before planning new features. Triggers include "research", "analyze codebase", "find patterns".
 model: opus
 ---
 

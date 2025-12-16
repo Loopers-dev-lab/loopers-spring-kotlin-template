@@ -14,11 +14,11 @@ import com.loopers.domain.coupon.UsageStatus
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.payment.CardInfo
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
-import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentRepository
-import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -28,6 +28,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
@@ -58,10 +59,10 @@ import java.time.ZonedDateTime
 @DisplayName("PaymentFacade 통합 테스트")
 class PaymentFacadeIntegrationTest @Autowired constructor(
     private val paymentFacade: PaymentFacade,
-    private val paymentService: PaymentService,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
@@ -87,8 +88,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     inner class ProcessCallback {
 
         @Test
-        @DisplayName("결제 성공 시 주문이 PAID 상태가 된다")
-        fun `completes order when payment succeeds`() {
+        @DisplayName("결제 성공 시 Payment가 PAID 상태가 된다")
+        fun `payment becomes PAID when PG returns SUCCESS`() {
             // given
             val payment = createInProgressPayment()
             stubPgTransactionSuccess(payment)
@@ -96,9 +97,9 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // when
             paymentFacade.processCallback(callbackCriteria(payment))
 
-            // then
-            val updatedOrder = orderRepository.findById(payment.orderId)!!
-            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+            // then - PaymentFacade 책임: Payment 상태 변경
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test
@@ -153,10 +154,11 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // given
             val initialStock = 10
             val orderQuantity = 2
-            val product = createProduct(stock = Stock.of(initialStock))
+            val product = createProduct(stockQuantity = initialStock)
 
-            product.decreaseStock(orderQuantity)
-            productRepository.save(product)
+            val stock = stockRepository.findByProductId(product.id)!!
+            stock.decrease(orderQuantity)
+            stockRepository.save(stock)
 
             val payment = createInProgressPaymentWithProduct(product, orderQuantity)
             stubPgTransactionFailed(payment, "카드 오류")
@@ -165,8 +167,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             paymentFacade.processCallback(callbackCriteria(payment))
 
             // then
-            val updatedProduct = productRepository.findById(product.id)!!
-            assertThat(updatedProduct.stock.amount).isEqualTo(initialStock)
+            val updatedStock = stockRepository.findByProductId(product.id)!!
+            assertThat(updatedStock.quantity).isEqualTo(initialStock)
         }
 
         @Test
@@ -193,12 +195,16 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
 
             paymentFacade.processCallback(callbackCriteria(payment))
 
+            // 첫 번째 콜백 처리 확인
+            val firstPayment = paymentRepository.findById(payment.id)!!
+            assertThat(firstPayment.status).isEqualTo(PaymentStatus.PAID)
+
             // when - 중복 콜백 (예외 없이 처리되어야 함)
             paymentFacade.processCallback(callbackCriteria(payment))
 
-            // then
-            val updatedOrder = orderRepository.findById(payment.orderId)!!
-            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+            // then - PaymentFacade 책임: Payment 상태 유지
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
     }
 
@@ -207,8 +213,8 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
     inner class ProcessInProgressPayment {
 
         @Test
-        @DisplayName("PG에서 SUCCESS 조회 시 주문이 완료된다")
-        fun `completes order when PG returns SUCCESS`() {
+        @DisplayName("PG에서 SUCCESS 조회 시 Payment가 PAID 상태가 된다")
+        fun `payment becomes PAID when PG returns SUCCESS in processInProgressPayment`() {
             // given
             val payment = createInProgressPayment()
             stubPgTransactionSuccess(payment)
@@ -216,9 +222,9 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
             // when
             paymentFacade.processInProgressPayment(payment.id)
 
-            // then
-            val updatedOrder = orderRepository.findById(payment.orderId)!!
-            assertThat(updatedOrder.status).isEqualTo(OrderStatus.PAID)
+            // then - PaymentFacade 책임: Payment 상태 변경
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test
@@ -319,11 +325,12 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
 
     private fun createProduct(
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
-        val product = Product.create(name = "테스트 상품", price = price, stock = stock, brand = brand)
+        val product = Product.create(name = "테스트 상품", price = price, brand = brand)
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }
@@ -420,17 +427,22 @@ class PaymentFacadeIntegrationTest @Autowired constructor(
         issuedCouponId: Long?,
         couponDiscount: Money,
     ): Payment {
-        val payment = paymentService.create(
-            PaymentCommand.Create(
-                userId = userId,
-                orderId = order.id,
-                totalAmount = order.totalAmount,
-                usedPoint = usedPoint,
-                issuedCouponId = issuedCouponId,
-                couponDiscount = couponDiscount,
-            ),
+        val totalAmount = order.totalAmount
+        val paidAmount = totalAmount - usedPoint - couponDiscount
+
+        val payment = Payment.of(
+            orderId = order.id,
+            userId = userId,
+            totalAmount = totalAmount,
+            usedPoint = usedPoint,
+            paidAmount = paidAmount,
+            status = PaymentStatus.IN_PROGRESS,
+            issuedCouponId = issuedCouponId,
+            couponDiscount = couponDiscount,
+            cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
+            externalPaymentKey = "tx_test_1",
+            attemptedAt = Instant.now(),
         )
-        payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
         return paymentRepository.save(payment)
     }
 }

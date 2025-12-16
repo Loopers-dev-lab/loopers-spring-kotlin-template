@@ -11,12 +11,14 @@ import org.springframework.stereotype.Repository
 interface ProductLikeJpaRepository : JpaRepository<ProductLike, Long> {
     fun deleteByUserIdAndProductId(userId: Long, productId: Long): Long
 
+    fun countByUserIdAndProductId(userId: Long, productId: Long): Long
+
     @Modifying
     @Query(
         """
-    INSERT IGNORE INTO product_likes 
+    INSERT IGNORE INTO product_likes
         (product_id, user_id, created_at, updated_at, deleted_at)
-    VALUES 
+    VALUES
         (:productId, :userId, NOW(), NOW(), NULL)
     """,
         nativeQuery = true,

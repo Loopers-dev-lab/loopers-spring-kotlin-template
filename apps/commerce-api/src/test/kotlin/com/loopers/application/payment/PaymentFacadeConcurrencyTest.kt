@@ -2,13 +2,12 @@ package com.loopers.application.payment
 
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.payment.CardInfo
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
 import com.loopers.domain.payment.PaymentRepository
-import com.loopers.domain.payment.PaymentCommand
-import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.payment.PgClient
-import com.loopers.domain.payment.PgPaymentCreateResult
 import com.loopers.domain.payment.PgTransaction
 import com.loopers.domain.payment.PgTransactionStatus
 import com.loopers.domain.point.PointAccount
@@ -20,6 +19,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
@@ -49,10 +49,10 @@ import java.util.concurrent.atomic.AtomicInteger
 @DisplayName("결제 동시성 통합 테스트")
 class PaymentFacadeConcurrencyTest @Autowired constructor(
     private val paymentFacade: PaymentFacade,
-    private val paymentService: PaymentService,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
@@ -136,16 +136,16 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
 
     private fun createProduct(
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
         val product = Product.create(
             name = "테스트 상품",
             price = price,
-            stock = stock,
             brand = brand,
         )
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }
@@ -161,7 +161,7 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
     private fun createInProgressPayment(
         userId: Long = 1L,
     ): Payment {
-        val product = createProduct(price = Money.krw(10000), stock = Stock.of(100))
+        val product = createProduct(price = Money.krw(10000), stockQuantity = 100)
         createPointAccount(userId = userId, balance = Money.krw(100000))
 
         val order = Order.place(userId)
@@ -173,19 +173,21 @@ class PaymentFacadeConcurrencyTest @Autowired constructor(
         )
         val savedOrder = orderRepository.save(order)
 
-        val payment = paymentService.create(
-            PaymentCommand.Create(
-                userId = userId,
-                orderId = savedOrder.id,
-                totalAmount = savedOrder.totalAmount,
-                usedPoint = Money.krw(5000),
-                issuedCouponId = null,
-                couponDiscount = Money.ZERO_KRW,
-            ),
-        )
+        val totalAmount = savedOrder.totalAmount
+        val usedPoint = Money.krw(5000)
+        val paidAmount = totalAmount - usedPoint
 
-        // initiate로 IN_PROGRESS 전이 + externalPaymentKey 설정
-        payment.initiate(PgPaymentCreateResult.Accepted("tx_concurrent_test"), Instant.now())
+        val payment = Payment.of(
+            orderId = savedOrder.id,
+            userId = userId,
+            totalAmount = totalAmount,
+            usedPoint = usedPoint,
+            paidAmount = paidAmount,
+            status = PaymentStatus.IN_PROGRESS,
+            cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
+            externalPaymentKey = "tx_concurrent_test",
+            attemptedAt = Instant.now(),
+        )
         return paymentRepository.save(payment)
     }
 

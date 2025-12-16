@@ -2,9 +2,17 @@ package com.loopers.domain.payment
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import jakarta.persistence.Column
+import jakarta.persistence.Embeddable
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 
+@Embeddable
 data class CardInfo(
+    @Enumerated(EnumType.STRING)
+    @Column(name = "card_type")
     val cardType: CardType,
+    @Column(name = "card_no", length = 19)
     val cardNo: String,
 ) {
     init {

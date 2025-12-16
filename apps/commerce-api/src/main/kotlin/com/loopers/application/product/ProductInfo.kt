@@ -1,8 +1,6 @@
 package com.loopers.application.product
 
-import com.loopers.domain.product.ProductStatus
 import com.loopers.domain.product.ProductView
-import com.loopers.domain.product.Stock
 import com.loopers.support.values.Money
 
 class ProductInfo {
@@ -10,8 +8,7 @@ class ProductInfo {
         val productId: Long,
         val name: String,
         val price: Money,
-        val status: ProductStatus,
-        val stock: Stock,
+        val stock: Int,
         val brandId: Long,
         val brandName: String,
         val likeCount: Long,
@@ -22,8 +19,7 @@ class ProductInfo {
                     productId = view.product.id,
                     name = view.product.name,
                     price = view.product.price,
-                    status = view.product.status,
-                    stock = view.product.stock,
+                    stock = view.stock.quantity,
                     brandId = view.brand.id,
                     brandName = view.brand.name,
                     likeCount = view.statistic.likeCount,
@@ -36,8 +32,7 @@ class ProductInfo {
         val productId: Long,
         val name: String,
         val price: Money,
-        val status: ProductStatus,
-        val stock: Stock,
+        val stock: Int,
         val brandId: Long,
         val brandName: String,
         val likeCount: Long,
@@ -48,8 +43,7 @@ class ProductInfo {
                     productId = view.product.id,
                     name = view.product.name,
                     price = view.product.price,
-                    status = view.product.status,
-                    stock = view.product.stock,
+                    stock = view.stock.quantity,
                     brandId = view.brand.id,
                     brandName = view.brand.name,
                     likeCount = view.statistic.likeCount,

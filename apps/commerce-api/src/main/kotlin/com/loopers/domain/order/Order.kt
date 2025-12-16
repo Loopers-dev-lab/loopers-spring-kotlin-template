@@ -3,6 +3,7 @@ package com.loopers.domain.order
 import com.loopers.domain.BaseEntity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.event.DomainEvent
 import com.loopers.support.values.Money
 import jakarta.persistence.AttributeOverride
 import jakarta.persistence.CascadeType
@@ -16,6 +17,7 @@ import jakarta.persistence.ForeignKey
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
+import jakarta.persistence.Transient
 
 @Entity
 @Table(name = "orders")
@@ -49,6 +51,22 @@ class Order(
     )
     var orderItems: MutableList<OrderItem> = orderItems
         private set
+
+    @Transient
+    private var domainEvents: MutableList<DomainEvent>? = null
+
+    private fun getDomainEvents(): MutableList<DomainEvent> {
+        if (domainEvents == null) {
+            domainEvents = mutableListOf()
+        }
+        return domainEvents!!
+    }
+
+    fun pollEvents(): List<DomainEvent> {
+        val events = getDomainEvents().toList()
+        getDomainEvents().clear()
+        return events
+    }
 
     init {
         if (totalAmount < Money.ZERO_KRW) {
@@ -102,6 +120,7 @@ class Order(
 
     /**
      * 주문을 취소합니다. PLACED → CANCELLED 상태 전이
+     * 멱등성: 이미 CANCELLED 상태면 아무 동작 없이 종료
      * @throws CoreException PLACED 상태가 아닌 경우
      */
     fun cancel() {
@@ -112,5 +131,6 @@ class Order(
             throw CoreException(ErrorType.BAD_REQUEST, "주문 대기 상태에서만 취소할 수 있습니다")
         }
         status = OrderStatus.CANCELLED
+        getDomainEvents().add(OrderCanceledEventV1.from(this))
     }
 }

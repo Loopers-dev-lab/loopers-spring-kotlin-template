@@ -26,6 +26,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -48,8 +49,10 @@ import java.time.ZonedDateTime
  * OrderFacade 통합 테스트
  *
  * 검증 범위:
- * - 주문 생성 오케스트레이션 성공/실패
- * - PG 실패 시 리소스 복구 (재고, 포인트, 쿠폰)
+ * - 주문 생성 오케스트레이션 성공
+ * - 단일 트랜잭션 내 리소스 할당 (주문, 쿠폰, 포인트, 결제)
+ * - PG 결제 요청 비동기 처리
+ * - PG 실패 시 리소스 복구 (비동기)
  * - 리소스 할당 실패 시 트랜잭션 롤백
  */
 @SpringBootTest
@@ -61,6 +64,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
     private val orderRepository: OrderRepository,
     private val paymentRepository: PaymentRepository,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
@@ -89,13 +93,12 @@ class OrderFacadeIntegrationTest @Autowired constructor(
     inner class PlaceOrder {
 
         @Test
-        @DisplayName("주문을 생성할 수 있다")
-        fun `creates order successfully`() {
+        @DisplayName("주문을 생성하면 즉시 PENDING 상태의 결제가 반환된다")
+        fun `creates order and returns immediately with PENDING payment`() {
             // given
             val userId = 1L
             val product = createProduct(price = Money.krw(20000))
             createPointAccount(userId, Money.krw(100000))
-            stubPgPaymentSuccess()
 
             val criteria = placeOrderCriteria(
                 userId = userId,
@@ -108,6 +111,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
 
             // then
             assertThat(orderInfo.orderId).isGreaterThan(0)
+            assertThat(orderInfo.paymentStatus).isEqualTo(PaymentStatus.PENDING)
         }
 
         @Test
@@ -118,7 +122,6 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             val product1 = createProduct(price = Money.krw(15000))
             val product2 = createProduct(price = Money.krw(10000))
             createPointAccount(userId, Money.krw(100000))
-            stubPgPaymentSuccess()
 
             val criteria = placeOrderCriteria(
                 userId = userId,
@@ -134,51 +137,7 @@ class OrderFacadeIntegrationTest @Autowired constructor(
 
             // then
             assertThat(orderInfo.orderId).isGreaterThan(0)
-        }
-
-        @Test
-        @DisplayName("PG 결제 요청이 수락되면 결제가 IN_PROGRESS 상태가 된다")
-        fun `payment becomes IN_PROGRESS when PG accepts`() {
-            // given
-            val userId = 1L
-            val product = createProduct(price = Money.krw(20000))
-            createPointAccount(userId, Money.krw(100000))
-            stubPgPaymentSuccess()
-
-            val criteria = placeOrderCriteria(
-                userId = userId,
-                usePoint = Money.krw(10000),
-                items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1)),
-            )
-
-            // when
-            val orderInfo = orderFacade.placeOrder(criteria)
-
-            // then
-            val savedPayment = paymentRepository.findByOrderId(orderInfo.orderId)!!
-            assertThat(savedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
-        }
-
-        @Test
-        @DisplayName("0원 결제 시 PG 호출 없이 PAID 상태가 된다")
-        fun `payment becomes PAID without PG call for zero amount`() {
-            // given
-            val userId = 1L
-            val product = createProduct(price = Money.krw(10000))
-            createPointAccount(userId, Money.krw(100000))
-
-            val criteria = placeOrderCriteria(
-                userId = userId,
-                usePoint = Money.krw(10000),
-                items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1)),
-            )
-
-            // when
-            val orderInfo = orderFacade.placeOrder(criteria)
-
-            // then
-            val savedPayment = paymentRepository.findByOrderId(orderInfo.orderId)!!
-            assertThat(savedPayment.status).isEqualTo(PaymentStatus.PAID)
+            assertThat(orderInfo.paymentStatus).isEqualTo(PaymentStatus.PENDING)
         }
 
         @Test
@@ -191,8 +150,6 @@ class OrderFacadeIntegrationTest @Autowired constructor(
 
             val coupon = createCoupon(discountType = DiscountType.FIXED_AMOUNT, discountValue = 5000)
             val issuedCoupon = createIssuedCoupon(userId, coupon)
-
-            stubPgPaymentSuccess()
 
             val criteria = placeOrderCriteria(
                 userId = userId,
@@ -212,56 +169,58 @@ class OrderFacadeIntegrationTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("PG 결제 실패 시 재고가 복구된다")
-        fun `restores stock when PG payment fails`() {
+        @DisplayName("주문 생성 시 재고가 차감된다")
+        fun `decreases stock when order is placed`() {
             // given
             val userId = 1L
             val initialStock = 100
-            val product = createProduct(price = Money.krw(20000), stock = Stock.of(initialStock))
+            val orderQuantity = 5
+            val product = createProduct(price = Money.krw(20000), stockQuantity = initialStock)
             createPointAccount(userId, Money.krw(100000))
             stubPgPaymentFailure()
 
             val criteria = placeOrderCriteria(
                 userId = userId,
                 usePoint = Money.krw(50000),
-                items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 5)),
+                items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = orderQuantity)),
             )
 
             // when
-            assertThrows<CoreException> { orderFacade.placeOrder(criteria) }
+            orderFacade.placeOrder(criteria)
 
-            // then
-            val restoredProduct = productRepository.findById(product.id)!!
-            assertThat(restoredProduct.stock.amount).isEqualTo(initialStock)
+            // then - 주문 생성 직후 재고는 차감된 상태
+            val stockAfterOrder = stockRepository.findByProductId(product.id)!!
+            assertThat(stockAfterOrder.quantity).isEqualTo(initialStock - orderQuantity)
         }
 
         @Test
-        @DisplayName("PG 결제 실패 시 포인트가 복구된다")
-        fun `restores point when PG payment fails`() {
+        @DisplayName("주문 생성 시 포인트가 차감된다")
+        fun `deducts point when order is placed`() {
             // given
             val userId = 1L
             val initialBalance = Money.krw(100000)
+            val usePoint = Money.krw(30000)
             val product = createProduct(price = Money.krw(50000))
             createPointAccount(userId, initialBalance)
             stubPgPaymentFailure()
 
             val criteria = placeOrderCriteria(
                 userId = userId,
-                usePoint = Money.krw(30000),
+                usePoint = usePoint,
                 items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 1)),
             )
 
             // when
-            assertThrows<CoreException> { orderFacade.placeOrder(criteria) }
+            orderFacade.placeOrder(criteria)
 
-            // then
-            val restoredPointAccount = pointAccountRepository.findByUserId(userId)!!
-            assertThat(restoredPointAccount.balance).isEqualTo(initialBalance)
+            // then - 주문 생성 직후 포인트는 차감된 상태
+            val pointAfterOrder = pointAccountRepository.findByUserId(userId)!!
+            assertThat(pointAfterOrder.balance).isEqualTo(initialBalance - usePoint)
         }
 
         @Test
-        @DisplayName("PG 결제 실패 시 쿠폰이 복구된다")
-        fun `restores coupon when PG payment fails`() {
+        @DisplayName("주문 생성 시 쿠폰이 사용된다")
+        fun `uses coupon when order is placed`() {
             // given
             val userId = 1L
             val product = createProduct(price = Money.krw(30000))
@@ -280,16 +239,16 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             )
 
             // when
-            assertThrows<CoreException> { orderFacade.placeOrder(criteria) }
+            orderFacade.placeOrder(criteria)
 
-            // then
-            val restoredCoupon = issuedCouponRepository.findById(issuedCoupon.id)!!
-            assertThat(restoredCoupon.status).isEqualTo(UsageStatus.AVAILABLE)
+            // then - 주문 생성 직후 쿠폰은 사용된 상태
+            val couponAfterOrder = issuedCouponRepository.findById(issuedCoupon.id)!!
+            assertThat(couponAfterOrder.status).isEqualTo(UsageStatus.USED)
         }
 
         @Test
-        @DisplayName("PG 결제 실패 시 주문이 취소된다")
-        fun `cancels order when PG payment fails`() {
+        @DisplayName("주문 생성 시 PLACED 상태가 된다")
+        fun `creates order with PLACED status`() {
             // given
             val userId = 1L
             val product = createProduct(price = Money.krw(20000))
@@ -303,12 +262,11 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             )
 
             // when
-            assertThrows<CoreException> { orderFacade.placeOrder(criteria) }
+            val orderInfo = orderFacade.placeOrder(criteria)
 
-            // then
-            val orders = orderRepository.findAll()
-            assertThat(orders).hasSize(1)
-            assertThat(orders.first().status).isEqualTo(OrderStatus.CANCELLED)
+            // then - 주문 생성 직후 PLACED 상태
+            val orderAfterPlace = orderRepository.findById(orderInfo.orderId)!!
+            assertThat(orderAfterPlace.status).isEqualTo(OrderStatus.PLACED)
         }
 
         @Test
@@ -317,8 +275,8 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             // given
             val userId = 1L
             val initialStock = 100
-            val normalStock = createProduct(stock = Stock.of(initialStock))
-            val insufficientStock = createProduct(stock = Stock.of(5))
+            val normalStock = createProduct(stockQuantity = initialStock)
+            val insufficientStock = createProduct(stockQuantity = 5)
             val initialBalance = Money.krw(100000)
             createPointAccount(userId, initialBalance)
 
@@ -335,10 +293,10 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             assertThrows<CoreException> { orderFacade.placeOrder(criteria) }
 
             // then
-            val unchangedProduct = productRepository.findById(normalStock.id)!!
+            val unchangedStock = stockRepository.findByProductId(normalStock.id)!!
             val unchangedPoint = pointAccountRepository.findByUserId(userId)!!
 
-            assertThat(unchangedProduct.stock.amount).isEqualTo(initialStock)
+            assertThat(unchangedStock.quantity).isEqualTo(initialStock)
             assertThat(unchangedPoint.balance).isEqualTo(initialBalance)
         }
 
@@ -476,11 +434,12 @@ class OrderFacadeIntegrationTest @Autowired constructor(
 
     private fun createProduct(
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
-        val product = Product.create(name = "테스트 상품", price = price, stock = stock, brand = brand)
+        val product = Product.create(name = "테스트 상품", price = price, brand = brand)
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }

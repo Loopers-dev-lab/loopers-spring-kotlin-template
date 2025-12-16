@@ -10,6 +10,16 @@ import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.point.PointAccount
+import com.loopers.domain.point.PointAccountRepository
+import com.loopers.domain.product.Brand
+import com.loopers.domain.product.BrandRepository
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.ProductStatistic
+import com.loopers.domain.product.ProductStatisticRepository
+import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.values.Money
@@ -26,6 +36,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock
 import org.springframework.test.context.TestPropertySource
+import org.springframework.test.context.event.ApplicationEvents
+import org.springframework.test.context.event.RecordApplicationEvents
 import java.time.Instant
 
 /**
@@ -35,20 +47,32 @@ import java.time.Instant
  * - 결제 생성 및 상태 전이 오케스트레이션
  * - PG API 호출 결과에 따른 상태 전이
  * - 트랜잭션 조회 및 결제 확정 흐름
+ * - 도메인 이벤트 발행 (PaymentCreatedEventV1, PaymentPaidEventV1, PaymentFailedEventV1)
  */
 @SpringBootTest
 @AutoConfigureWireMock(port = 0)
+@RecordApplicationEvents
 @TestPropertySource(properties = ["pg.base-url=http://localhost:\${wiremock.server.port}"])
 @DisplayName("PaymentService 통합 테스트")
 class PaymentServiceIntegrationTest @Autowired constructor(
     private val paymentService: PaymentService,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
+    private val pointAccountRepository: PointAccountRepository,
+    private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
+    private val brandRepository: BrandRepository,
+    private val productStatisticRepository: ProductStatisticRepository,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
+    @Autowired
+    private lateinit var applicationEvents: ApplicationEvents
+
     @BeforeEach
     fun setup() {
+        stubPgPaymentSuccess("tx_default")
+
         for (circuitBreaker in circuitBreakerRegistry.allCircuitBreakers) {
             circuitBreaker.reset()
         }
@@ -69,6 +93,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         fun `creates payment with PENDING status`() {
             // given
             val order = createOrder()
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
 
             // when
             val payment = paymentService.create(
@@ -79,11 +104,13 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                     usedPoint = Money.krw(5000),
                     issuedCouponId = null,
                     couponDiscount = Money.ZERO_KRW,
+                    cardInfo = cardInfo,
                 ),
             )
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+            assertThat(payment.cardInfo).isEqualTo(cardInfo)
         }
 
         @Test
@@ -91,6 +118,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         fun `creates payment with coupon`() {
             // given
             val order = createOrder(totalAmount = Money.krw(15000))
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
 
             // when
             val payment = paymentService.create(
@@ -101,11 +129,41 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                     usedPoint = Money.krw(5000),
                     issuedCouponId = 1L,
                     couponDiscount = Money.krw(3000),
+                    cardInfo = cardInfo,
                 ),
             )
 
             // then
             assertThat(payment.status).isEqualTo(PaymentStatus.PENDING)
+            assertThat(payment.cardInfo).isEqualTo(cardInfo)
+        }
+
+        @Test
+        @DisplayName("결제 생성 시 PaymentCreatedEventV1을 발행한다")
+        fun `publishes PaymentCreatedEventV1 when creating payment`() {
+            // given
+            val order = createOrder()
+            val cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456")
+
+            // when
+            val payment = paymentService.create(
+                PaymentCommand.Create(
+                    userId = order.userId,
+                    orderId = order.id,
+                    totalAmount = order.totalAmount,
+                    usedPoint = Money.krw(5000),
+                    issuedCouponId = null,
+                    couponDiscount = Money.ZERO_KRW,
+                    cardInfo = cardInfo,
+                ),
+            )
+
+            // then
+            val events = applicationEvents.stream(PaymentCreatedEventV1::class.java).toList()
+            assertThat(events).hasSize(1)
+
+            val event = events[0]
+            assertThat(event.paymentId).isEqualTo(payment.id)
         }
     }
 
@@ -161,7 +219,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             stubPgPaymentSuccess("tx_test_123")
 
             // when
-            val result = paymentService.requestPgPayment(
+            paymentService.requestPgPayment(
                 PaymentCommand.RequestPgPayment(
                     paymentId = payment.id,
                     cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
@@ -169,19 +227,19 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
-            assertThat((result as PgPaymentResult.Success).payment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
         }
 
         @Test
-        @DisplayName("PG 응답 data가 null이면 Failed를 반환한다")
+        @DisplayName("PG 응답 data가 null이면 FAILED로 전이된다")
         fun `returns Failed when PG response data is null`() {
             // given
             val payment = createPendingPayment()
             stubPgPaymentDataNull()
 
             // when
-            val result = paymentService.requestPgPayment(
+            paymentService.requestPgPayment(
                 PaymentCommand.RequestPgPayment(
                     paymentId = payment.id,
                     cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
@@ -189,18 +247,19 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Failed::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
 
         @Test
-        @DisplayName("PG 서버 에러 시 Failed를 반환한다")
+        @DisplayName("PG 서버 에러 시 FAILED로 전이된다")
         fun `returns Failed when PG server error`() {
             // given
             val payment = createPendingPayment()
             stubPgPaymentServerError()
 
             // when
-            val result = paymentService.requestPgPayment(
+            paymentService.requestPgPayment(
                 PaymentCommand.RequestPgPayment(
                     paymentId = payment.id,
                     cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
@@ -208,7 +267,8 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Failed::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
 
         @Test
@@ -229,7 +289,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("0원 결제 시 PG 호출 없이 즉시 완료된다")
+        @DisplayName("0원 결제 시 PG 호출 없이 즉시 PAID로 전이된다")
         fun `completes immediately for zero amount payment`() {
             // given
             val order = createOrder(totalAmount = Money.krw(10000))
@@ -245,12 +305,68 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = paymentService.requestPgPayment(
+            paymentService.requestPgPayment(
                 PaymentCommand.RequestPgPayment(paymentId = payment.id, cardInfo = null),
             )
 
             // then
-            assertThat(result).isInstanceOf(PgPaymentResult.Success::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
+        }
+
+        @Test
+        @DisplayName("0원 결제 시 PaymentPaidEventV1을 발행한다")
+        fun `publishes PaymentPaidEventV1 for zero amount payment`() {
+            // given
+            val order = createOrder(totalAmount = Money.krw(10000))
+            val payment = paymentRepository.save(
+                Payment.create(
+                    userId = order.userId,
+                    orderId = order.id,
+                    totalAmount = order.totalAmount,
+                    usedPoint = Money.krw(10000),
+                    issuedCouponId = null,
+                    couponDiscount = Money.ZERO_KRW,
+                ),
+            )
+
+            // when
+            paymentService.requestPgPayment(
+                PaymentCommand.RequestPgPayment(paymentId = payment.id, cardInfo = null),
+            )
+
+            // then
+            val events = applicationEvents.stream(PaymentPaidEventV1::class.java).toList()
+            assertThat(events).hasSize(1)
+
+            val event = events[0]
+            assertThat(event.paymentId).isEqualTo(payment.id)
+            assertThat(event.orderId).isEqualTo(payment.orderId)
+        }
+
+        @Test
+        @DisplayName("PG 결제 실패 시 PaymentFailedEventV1을 발행한다")
+        fun `publishes PaymentFailedEventV1 when PG fails`() {
+            // given
+            val payment = createPendingPayment()
+            stubPgPaymentServerError()
+
+            // when
+            paymentService.requestPgPayment(
+                PaymentCommand.RequestPgPayment(
+                    paymentId = payment.id,
+                    cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
+                ),
+            )
+
+            // then
+            val events = applicationEvents.stream(PaymentFailedEventV1::class.java).toList()
+            assertThat(events).hasSize(1)
+
+            val event = events[0]
+            assertThat(event.paymentId).isEqualTo(payment.id)
+            assertThat(event.orderId).isEqualTo(payment.orderId)
+            assertThat(event.userId).isEqualTo(payment.userId)
         }
     }
 
@@ -266,13 +382,14 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             stubPgTransactionQuery("tx_callback_success", payment.id, "SUCCESS")
 
             // when
-            val result = paymentService.processCallback(
+            paymentService.processCallback(
                 orderId = payment.orderId,
                 externalPaymentKey = "tx_callback_success",
             )
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test
@@ -283,47 +400,50 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             stubPgTransactionQuery("tx_callback_failed", payment.id, "FAILED", "잔액 부족")
 
             // when
-            val result = paymentService.processCallback(
+            paymentService.processCallback(
                 orderId = payment.orderId,
                 externalPaymentKey = "tx_callback_failed",
             )
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
 
         @Test
-        @DisplayName("PENDING 트랜잭션이면 StillInProgress를 반환한다")
-        fun `returns StillInProgress when still PENDING`() {
+        @DisplayName("PENDING 트랜잭션이면 상태가 IN_PROGRESS로 유지된다")
+        fun `stays IN_PROGRESS when still PENDING`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = "tx_callback_pending")
             stubPgTransactionQuery("tx_callback_pending", payment.id, "PENDING")
 
             // when
-            val result = paymentService.processCallback(
+            paymentService.processCallback(
                 orderId = payment.orderId,
                 externalPaymentKey = "tx_callback_pending",
             )
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.StillInProgress::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
         }
 
         @Test
-        @DisplayName("이미 PAID 상태인 결제에 콜백이 오면 Paid를 반환한다")
-        fun `returns Paid for already paid payment`() {
+        @DisplayName("이미 PAID 상태인 결제에 콜백이 오면 상태가 유지된다 (멱등성)")
+        fun `stays PAID for already paid payment (idempotency)`() {
             // given
             val payment = createPaidPayment()
             stubPgTransactionQuery("tx_paid", payment.id, "SUCCESS")
 
             // when
-            val result = paymentService.processCallback(
+            paymentService.processCallback(
                 orderId = payment.orderId,
                 externalPaymentKey = "tx_paid",
             )
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test
@@ -336,6 +456,51 @@ class PaymentServiceIntegrationTest @Autowired constructor(
 
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.NOT_FOUND)
+        }
+
+        @Test
+        @DisplayName("SUCCESS 콜백 시 PaymentPaidEventV1을 발행한다")
+        fun `publishes PaymentPaidEventV1 on SUCCESS callback`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "tx_callback_event_success")
+            stubPgTransactionQuery("tx_callback_event_success", payment.id, "SUCCESS")
+
+            // when
+            paymentService.processCallback(
+                orderId = payment.orderId,
+                externalPaymentKey = "tx_callback_event_success",
+            )
+
+            // then
+            val events = applicationEvents.stream(PaymentPaidEventV1::class.java).toList()
+            assertThat(events).hasSize(1)
+
+            val event = events[0]
+            assertThat(event.paymentId).isEqualTo(payment.id)
+            assertThat(event.orderId).isEqualTo(payment.orderId)
+        }
+
+        @Test
+        @DisplayName("FAILED 콜백 시 PaymentFailedEventV1을 발행한다")
+        fun `publishes PaymentFailedEventV1 on FAILED callback`() {
+            // given
+            val payment = createInProgressPayment(externalPaymentKey = "tx_callback_event_failed")
+            stubPgTransactionQuery("tx_callback_event_failed", payment.id, "FAILED", "잔액 부족")
+
+            // when
+            paymentService.processCallback(
+                orderId = payment.orderId,
+                externalPaymentKey = "tx_callback_event_failed",
+            )
+
+            // then
+            val events = applicationEvents.stream(PaymentFailedEventV1::class.java).toList()
+            assertThat(events).hasSize(1)
+
+            val event = events[0]
+            assertThat(event.paymentId).isEqualTo(payment.id)
+            assertThat(event.orderId).isEqualTo(payment.orderId)
+            assertThat(event.userId).isEqualTo(payment.userId)
         }
     }
 
@@ -351,10 +516,11 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             stubPgTransactionQuery("tx_scheduler_success", payment.id, "SUCCESS")
 
             // when
-            val result = paymentService.processInProgressPayment(paymentId = payment.id)
+            paymentService.processInProgressPayment(paymentId = payment.id)
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test
@@ -365,10 +531,11 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             stubPgTransactionQuery("tx_scheduler_failed", payment.id, "FAILED", "카드 한도 초과")
 
             // when
-            val result = paymentService.processInProgressPayment(paymentId = payment.id)
+            paymentService.processInProgressPayment(paymentId = payment.id)
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
 
         @Test
@@ -382,10 +549,11 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = paymentService.processInProgressPayment(paymentId = payment.id)
+            paymentService.processInProgressPayment(paymentId = payment.id)
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Paid::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.PAID)
         }
 
         @Test
@@ -399,24 +567,26 @@ class PaymentServiceIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = paymentService.processInProgressPayment(paymentId = payment.id)
+            paymentService.processInProgressPayment(paymentId = payment.id)
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.Failed::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.FAILED)
         }
 
         @Test
-        @DisplayName("PENDING 트랜잭션이면 StillInProgress를 반환한다")
-        fun `returns StillInProgress when still PENDING`() {
+        @DisplayName("PENDING 트랜잭션이면 상태가 IN_PROGRESS로 유지된다")
+        fun `stays IN_PROGRESS when still PENDING`() {
             // given
             val payment = createInProgressPayment(externalPaymentKey = "tx_scheduler_pending")
             stubPgTransactionQuery("tx_scheduler_pending", payment.id, "PENDING")
 
             // when
-            val result = paymentService.processInProgressPayment(paymentId = payment.id)
+            paymentService.processInProgressPayment(paymentId = payment.id)
 
             // then
-            assertThat(result).isInstanceOf(ConfirmResult.StillInProgress::class.java)
+            val updatedPayment = paymentRepository.findById(payment.id)!!
+            assertThat(updatedPayment.status).isEqualTo(PaymentStatus.IN_PROGRESS)
         }
 
         @Test
@@ -548,14 +718,32 @@ class PaymentServiceIntegrationTest @Autowired constructor(
     // 도메인 픽스처 헬퍼
     // ===========================================
 
+    private fun createProduct(
+        price: Money = Money.krw(10000),
+        stockQuantity: Int = 100,
+    ): Product {
+        val brand = brandRepository.save(Brand.create("테스트 브랜드"))
+        val product = Product.create(name = "테스트 상품", price = price, brand = brand)
+        val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
+        productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
+        return savedProduct
+    }
+
     private fun createOrder(totalAmount: Money = Money.krw(10000)): Order {
+        // PaymentFailedEventV1 처리 시 재고 복구를 위해 Product/Stock 생성
+        val product = createProduct(price = totalAmount)
         val order = Order.place(1L)
-        order.addOrderItem(productId = 1L, quantity = 1, productName = "테스트 상품", unitPrice = totalAmount)
+        order.addOrderItem(productId = product.id, quantity = 1, productName = "테스트 상품", unitPrice = totalAmount)
         return orderRepository.save(order)
     }
 
     private fun createPendingPayment(): Payment {
         val order = createOrder()
+        // PaymentEventListener가 PaymentFailedEventV1을 처리할 때 포인트 복구가 가능하도록 포인트 계좌 생성
+        if (pointAccountRepository.findByUserId(1L) == null) {
+            pointAccountRepository.save(PointAccount.of(userId = 1L, balance = Money.krw(10000)))
+        }
         return paymentRepository.save(
             Payment.create(
                 userId = 1L,
@@ -564,6 +752,7 @@ class PaymentServiceIntegrationTest @Autowired constructor(
                 usedPoint = Money.krw(5000),
                 issuedCouponId = null,
                 couponDiscount = Money.ZERO_KRW,
+                cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
             ),
         )
     }

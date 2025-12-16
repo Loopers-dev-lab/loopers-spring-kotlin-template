@@ -7,11 +7,11 @@ import com.github.tomakehurst.wiremock.client.WireMock.stubFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.payment.CardInfo
+import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.Payment
-import com.loopers.domain.payment.PaymentCommand
 import com.loopers.domain.payment.PaymentRepository
-import com.loopers.domain.payment.PaymentService
-import com.loopers.domain.payment.PgPaymentCreateResult
+import com.loopers.domain.payment.PaymentStatus
 import com.loopers.domain.point.PointAccount
 import com.loopers.domain.point.PointAccountRepository
 import com.loopers.domain.product.Brand
@@ -21,6 +21,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
 import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
@@ -51,10 +52,10 @@ import java.time.Instant
 @DisplayName("PaymentWebhookV1Api E2E 테스트")
 class PaymentWebhookV1ApiE2ETest @Autowired constructor(
     private val testRestTemplate: TestRestTemplate,
-    private val paymentService: PaymentService,
     private val paymentRepository: PaymentRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val brandRepository: BrandRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val pointAccountRepository: PointAccountRepository,
@@ -266,33 +267,36 @@ class PaymentWebhookV1ApiE2ETest @Autowired constructor(
         )
         val savedOrder = orderRepository.save(order)
 
-        val payment = paymentService.create(
-            PaymentCommand.Create(
-                userId = userId,
-                orderId = savedOrder.id,
-                totalAmount = savedOrder.totalAmount,
-                usedPoint = Money.krw(5000),
-                issuedCouponId = null,
-                couponDiscount = Money.ZERO_KRW,
-            ),
-        )
+        val totalAmount = savedOrder.totalAmount
+        val usedPoint = Money.krw(5000)
+        val paidAmount = totalAmount - usedPoint
 
-        payment.initiate(PgPaymentCreateResult.Accepted("tx_test_${payment.id}"), Instant.now())
+        val payment = Payment.of(
+            orderId = savedOrder.id,
+            userId = userId,
+            totalAmount = totalAmount,
+            usedPoint = usedPoint,
+            paidAmount = paidAmount,
+            status = PaymentStatus.IN_PROGRESS,
+            cardInfo = CardInfo(cardType = CardType.KB, cardNo = "1234-5678-9012-3456"),
+            externalPaymentKey = "tx_test_1",
+            attemptedAt = Instant.now(),
+        )
         return paymentRepository.save(payment)
     }
 
     private fun createProduct(
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(100),
+        stockQuantity: Int = 100,
     ): Product {
         val brand = brandRepository.save(Brand.create("테스트 브랜드"))
         val product = Product.create(
             name = "테스트 상품",
             price = price,
-            stock = stock,
             brand = brand,
         )
         val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
         productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
         return savedProduct
     }

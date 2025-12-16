@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class ProductService(
     private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val brandRepository: BrandRepository,
 ) {
@@ -29,6 +30,12 @@ class ProductService(
                 customMessage = "[id = $id] 상품을 찾을 수 없습니다.",
             )
 
+        val stock = stockRepository.findByProductId(id)
+            ?: throw CoreException(
+                errorType = ErrorType.INTERNAL_ERROR,
+                customMessage = "[productId = $id] 상품의 재고를 찾을 수 없습니다.",
+            )
+
         val brand = brandRepository.findById(product.brandId)
             ?: throw CoreException(
                 errorType = ErrorType.INTERNAL_ERROR,
@@ -43,6 +50,7 @@ class ProductService(
 
         return ProductView(
             product = product,
+            stock = stock,
             statistic = statistic,
             brand = brand,
         )
@@ -54,6 +62,11 @@ class ProductService(
         val slicedProduct = productRepository.findAllBy(pageQuery)
 
         val slicedProductIds = slicedProduct.content.map { it.id }
+
+        val stocksToMap = stockRepository
+            .findAllByProductIds(slicedProductIds)
+            .associateBy { it.productId }
+
         val productStatisticsToMap = productStatisticRepository
             .findAllByProductIds(slicedProductIds)
             .associateBy { it.productId }
@@ -66,6 +79,11 @@ class ProductService(
         return slicedProduct.map {
             ProductView(
                 product = it,
+                stock = stocksToMap[it.id]
+                    ?: throw CoreException(
+                        errorType = ErrorType.INTERNAL_ERROR,
+                        customMessage = "[productId = ${it.id}] 상품의 재고를 찾을 수 없습니다.",
+                    ),
                 statistic = productStatisticsToMap[it.id]
                     ?: throw CoreException(
                         errorType = ErrorType.INTERNAL_ERROR,
@@ -115,6 +133,10 @@ class ProductService(
             )
         }
 
+        val stocksToMap = stockRepository
+            .findAllByProductIds(ids)
+            .associateBy { it.productId }
+
         val productStatisticsToMap = productStatisticRepository
             .findAllByProductIds(ids)
             .associateBy { it.productId }
@@ -127,6 +149,11 @@ class ProductService(
         return products.map { product ->
             ProductView(
                 product = product,
+                stock = stocksToMap[product.id]
+                    ?: throw CoreException(
+                        errorType = ErrorType.INTERNAL_ERROR,
+                        customMessage = "[productId = ${product.id}] 상품의 재고를 찾을 수 없습니다.",
+                    ),
                 statistic = productStatisticsToMap[product.id]
                     ?: throw CoreException(
                         errorType = ErrorType.INTERNAL_ERROR,
@@ -146,19 +173,29 @@ class ProductService(
         val decreaseStockMap = command.units.associateBy { it.productId }
 
         val decreaseProductIds = decreaseStockMap.keys.toList()
-        val lockedProducts = productRepository.findAllByIdsWithLock(decreaseProductIds)
+        val lockedStocks = stockRepository.findAllByProductIdsWithLock(decreaseProductIds)
 
-        lockedProducts.forEach { product ->
-            val decreasedStock = decreaseStockMap[product.id]
-                ?: throw CoreException(
-                    errorType = ErrorType.BAD_REQUEST,
-                    customMessage = "[productId = ${product.id}] 상품의 재고를 감소할 수 없습니다.",
-                )
-
-            product.decreaseStock(decreasedStock.amount)
+        // 요청한 상품 ID에 대한 재고가 모두 존재하는지 확인
+        val foundProductIds = lockedStocks.map { it.productId }.toSet()
+        val notFoundProductIds = decreaseProductIds.filterNot { it in foundProductIds }
+        if (notFoundProductIds.isNotEmpty()) {
+            throw CoreException(
+                errorType = ErrorType.INTERNAL_ERROR,
+                customMessage = "재고를 찾을 수 없는 상품입니다: ${notFoundProductIds.joinToString()}",
+            )
         }
 
-        productRepository.saveAll(lockedProducts)
+        lockedStocks.forEach { stock ->
+            val decreasedStock = decreaseStockMap[stock.productId]
+                ?: throw CoreException(
+                    errorType = ErrorType.BAD_REQUEST,
+                    customMessage = "[productId = ${stock.productId}] 상품의 재고를 감소할 수 없습니다.",
+                )
+
+            stock.decrease(decreasedStock.amount)
+        }
+
+        stockRepository.saveAll(lockedStocks)
     }
 
     @Transactional
@@ -181,18 +218,28 @@ class ProductService(
         val increaseStockMap = command.units.associateBy { it.productId }
 
         val increaseProductIds = increaseStockMap.keys.toList()
-        val lockedProducts = productRepository.findAllByIdsWithLock(increaseProductIds)
+        val lockedStocks = stockRepository.findAllByProductIdsWithLock(increaseProductIds)
 
-        lockedProducts.forEach { product ->
-            val increasedStock = increaseStockMap[product.id]
-                ?: throw CoreException(
-                    errorType = ErrorType.BAD_REQUEST,
-                    customMessage = "[productId = ${product.id}] 상품의 재고를 증가할 수 없습니다.",
-                )
-
-            product.increaseStock(increasedStock.amount)
+        // 요청한 상품 ID에 대한 재고가 모두 존재하는지 확인
+        val foundProductIds = lockedStocks.map { it.productId }.toSet()
+        val notFoundProductIds = increaseProductIds.filterNot { it in foundProductIds }
+        if (notFoundProductIds.isNotEmpty()) {
+            throw CoreException(
+                errorType = ErrorType.INTERNAL_ERROR,
+                customMessage = "재고를 찾을 수 없는 상품입니다: ${notFoundProductIds.joinToString()}",
+            )
         }
 
-        productRepository.saveAll(lockedProducts)
+        lockedStocks.forEach { stock ->
+            val increasedStock = increaseStockMap[stock.productId]
+                ?: throw CoreException(
+                    errorType = ErrorType.BAD_REQUEST,
+                    customMessage = "[productId = ${stock.productId}] 상품의 재고를 증가할 수 없습니다.",
+                )
+
+            stock.increase(increasedStock.amount)
+        }
+
+        stockRepository.saveAll(lockedStocks)
     }
 }

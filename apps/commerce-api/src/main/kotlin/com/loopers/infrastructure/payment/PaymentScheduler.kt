@@ -2,12 +2,14 @@ package com.loopers.infrastructure.payment
 
 import com.loopers.application.payment.PaymentCriteria
 import com.loopers.application.payment.PaymentFacade
+import com.loopers.application.payment.PaymentJob
 import com.loopers.domain.payment.PaymentSortType
 import com.loopers.domain.payment.PaymentStatus
 import org.slf4j.LoggerFactory
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import java.time.ZonedDateTime
 
 /**
  * IN_PROGRESS 상태로 남아있는 결제를 주기적으로 확인하여 최종 상태로 전환하는 스케줄러
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Component
 @Component
 class PaymentScheduler(
     private val paymentFacade: PaymentFacade,
+    private val paymentJob: PaymentJob,
 ) {
     private val logger = LoggerFactory.getLogger(PaymentScheduler::class.java)
 
@@ -90,5 +93,16 @@ class PaymentScheduler(
                 totalSkipped,
             )
         }
+    }
+
+    /**
+     * 매 30초마다 실행
+     * - 이벤트 유실로 PENDING 상태로 남은 결제를 복구
+     * - 30초 이전에 생성된 PENDING 결제만 대상
+     */
+    @Scheduled(fixedRate = 30_000)
+    fun recoverPendingPayments() {
+        val threshold = ZonedDateTime.now().minusSeconds(30)
+        paymentJob.recoverPendingPayments(threshold)
     }
 }

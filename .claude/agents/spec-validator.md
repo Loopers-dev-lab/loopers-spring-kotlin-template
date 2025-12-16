@@ -1,6 +1,6 @@
 ---
 name: spec-validator
-description: Validates that implementation matches spec documents exactly. Checks requirements coverage, business logic accuracy, state transitions, and domain terminology. Use after implementation to verify spec compliance. Requires files and spec_directory arguments.
+description: Validates that implementation matches spec documents exactly. Checks requirements coverage, business logic accuracy, and domain terminology. Use after implementation. Triggers include "validate spec", "check requirements", "spec compliance". Requires files and spec_directory arguments.
 model: opus
 ---
 
@@ -337,6 +337,20 @@ If spec language could mean different things:
 Example: "Spec says '1년 후 만료'. Code interprets as 365 days. Could also mean calendar year. Clarify."
 
 </edge_cases>
+
+### Council Cross-Check (For Uncertain Judgments)
+
+Use council to cross-verify when spec interpretation is uncertain.
+
+#### When to Use
+
+- Spec wording allows multiple valid interpretations
+- Unclear whether implementation satisfies spec
+- User explicitly requests council validation
+
+#### How
+
+Refer to agent-council skill for context synchronization and invocation.
 
 <principles>
 

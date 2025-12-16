@@ -18,103 +18,50 @@ class ProductTest {
             val brand = createBrand()
             val name = "맥북 프로"
             val price = Money.krw(2000000)
-            val stock = Stock.of(10)
 
             // when
             val product = createNewProduct(
                 brand = brand,
                 name = name,
                 price = price,
-                stock = stock,
             )
 
             // then
-            assertThat(product.stock).isEqualTo(stock)
             assertThat(product.brandId).isEqualTo(brand.id)
             assertThat(product.name).isEqualTo(name)
             assertThat(product.price).isEqualTo(price)
         }
 
-        @DisplayName("재고 0으로 생성하면 품절 상태다")
+        @DisplayName("of 팩토리 메서드로 상품을 생성할 수 있다")
         @Test
-        fun `create out of stock status product when stock is zero`() {
+        fun `create product with of factory method`() {
             // given
-            val stock = Stock.of(0)
+            val brandId = 1L
+            val name = "테스트 상품"
+            val price = Money.krw(10000)
 
             // when
-            val product = createNewProduct(
-                stock = stock,
+            val product = Product.of(
+                brandId = brandId,
+                name = name,
+                price = price,
             )
 
             // then
-            assertThat(product.status).isEqualTo(ProductStatus.OUT_OF_STOCK)
-        }
-
-        @DisplayName("재고를 지정하여 생성하면 활성 상태다")
-        @Test
-        fun `create active product when valid stock is provided`() {
-            // given
-            val stock = Stock.of(10)
-
-            // when
-            val product = createNewProduct(
-                stock = stock,
-            )
-
-            // then
-            assertThat(product.status).isEqualTo(ProductStatus.ACTIVE)
-        }
-    }
-
-    @DisplayName("재고 감소 테스트")
-    @Nested
-    inner class DecreaseStock {
-
-        @DisplayName("유효한 amount가 주어지면 재고가 감소한다.")
-        @Test
-        fun `decrease stock when valid amount is provided`() {
-            // given
-            val existingStock = 10
-            val product = createProduct(
-                stock = Stock.of(existingStock),
-            )
-
-            // when
-            val decreaseAmount = 3
-            product.decreaseStock(decreaseAmount)
-
-            // then
-            assertThat(product.stock.amount).isEqualTo(existingStock - decreaseAmount)
-        }
-
-        @DisplayName("재고가 0이 되면 품절 상태로 변경된다.")
-        @Test
-        fun `change status to OUT_OF_STOCK when stock becomes zero`() {
-            // given
-            val existingStock = 5
-            val product = createProduct(
-                stock = Stock.of(existingStock),
-            )
-
-            // when
-            product.decreaseStock(existingStock)
-
-            // then
-            assertThat(product.stock.amount).isEqualTo(0)
-            assertThat(product.status).isEqualTo(ProductStatus.OUT_OF_STOCK)
+            assertThat(product.brandId).isEqualTo(brandId)
+            assertThat(product.name).isEqualTo(name)
+            assertThat(product.price).isEqualTo(price)
         }
     }
 
     private fun createNewProduct(
         name: String = "테스트 상품",
         price: Money = Money.krw(10000),
-        stock: Stock = Stock.of(10),
         brand: Brand = createBrand(),
     ): Product {
         return Product.create(
             name = name,
             price = price,
-            stock = stock,
             brand = brand,
         )
     }
@@ -123,21 +70,5 @@ class ProductTest {
         name: String = "테스트 브랜드",
     ): Brand {
         return Brand.of(name)
-    }
-
-    private fun createProduct(
-        brandId: Long = 1L,
-        name: String = "테스트 상품",
-        price: Money = Money.krw(10000),
-        status: ProductStatus = ProductStatus.ACTIVE,
-        stock: Stock = Stock.of(10),
-    ): Product {
-        return Product.of(
-            brandId = brandId,
-            name = name,
-            price = price,
-            status = status,
-            stock = stock,
-        )
     }
 }
