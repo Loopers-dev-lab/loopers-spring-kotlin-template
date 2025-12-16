@@ -1,20 +1,19 @@
-package com.loopers.application.metrics
+package com.loopers.domain.metrics
 
 import com.loopers.IntegrationTest
 import com.loopers.domain.event.EventHandledRepository
 import com.loopers.domain.event.EventProcessingTimestampRepository
-import com.loopers.domain.metrics.ProductMetricsRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import java.time.ZonedDateTime
 
-@DisplayName("ProductMetricsFacade 순서 보장 테스트 - 늦게 온 메시지 무시")
-class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
+@DisplayName("ProductMetricsService 순서 보장 테스트 - 늦게 온 메시지 무시")
+class ProductMetricsServiceOutOfOrderTest : IntegrationTest() {
 
     @Autowired
-    private lateinit var productMetricsFacade: ProductMetricsFacade
+    private lateinit var productMetricsService: ProductMetricsService
 
     @Autowired
     private lateinit var productMetricsRepository: ProductMetricsRepository
@@ -27,7 +26,6 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
 
     companion object {
         private const val LIKE_CONSUMER_GROUP = "product-metrics-like-consumer"
-        private const val VIEW_CONSUMER_GROUP = "product-metrics-view-consumer"
         private const val ORDER_CONSUMER_GROUP = "order-metrics-consumer"
     }
 
@@ -42,10 +40,10 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
         val eventType = "LikeCountChanged"
 
         // when - 최신 이벤트를 먼저 처리
-        productMetricsFacade.increaseLikeCount(productId, newEventId, eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, newEventId, eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP)
 
         // then - 과거 이벤트는 무시됨
-        productMetricsFacade.increaseLikeCount(productId, oldEventId, eventType, now, LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, oldEventId, eventType, now, LIKE_CONSUMER_GROUP)
 
         val metrics = productMetricsRepository.findByProductId(productId)
         assertThat(metrics).isNotNull
@@ -68,9 +66,9 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
         val eventType = "LikeCountChanged"
 
         // when - 시간 순서대로 이벤트 처리
-        productMetricsFacade.increaseLikeCount(productId, event1Id, eventType, now, LIKE_CONSUMER_GROUP)
-        productMetricsFacade.increaseLikeCount(productId, event2Id, eventType, now.plusSeconds(1), LIKE_CONSUMER_GROUP)
-        productMetricsFacade.increaseLikeCount(productId, event3Id, eventType, now.plusSeconds(2), LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, event1Id, eventType, now, LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, event2Id, eventType, now.plusSeconds(1), LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, event3Id, eventType, now.plusSeconds(2), LIKE_CONSUMER_GROUP)
 
         // then - 3개 모두 반영
         val metrics = productMetricsRepository.findByProductId(productId)
@@ -90,9 +88,9 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
         val eventType = "LikeCountChanged"
 
         // when - 역순으로 이벤트 도착 (최신 → 과거)
-        productMetricsFacade.increaseLikeCount(productId, newestEventId, eventType, now.plusSeconds(10), LIKE_CONSUMER_GROUP)
-        productMetricsFacade.increaseLikeCount(productId, middleEventId, eventType, now.plusSeconds(5), LIKE_CONSUMER_GROUP)
-        productMetricsFacade.increaseLikeCount(productId, oldestEventId, eventType, now, LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, newestEventId, eventType, now.plusSeconds(10), LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, middleEventId, eventType, now.plusSeconds(5), LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, oldestEventId, eventType, now, LIKE_CONSUMER_GROUP)
 
         // then - 첫 번째 이벤트(가장 최신)만 반영
         val metrics = productMetricsRepository.findByProductId(productId)
@@ -109,35 +107,16 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
         val eventType = "LikeCountChanged"
 
         // when - 무작위 순서로 이벤트 도착: t+5, t+1, t+10, t+3, t+7
-        productMetricsFacade.increaseLikeCount(productId, "event-1", eventType, now.plusSeconds(5), LIKE_CONSUMER_GROUP) // 반영됨
-        productMetricsFacade.increaseLikeCount(productId, "event-2", eventType, now.plusSeconds(1), LIKE_CONSUMER_GROUP) // 무시됨 (t+5보다 과거)
-        productMetricsFacade.increaseLikeCount(productId, "event-3", eventType, now.plusSeconds(10), LIKE_CONSUMER_GROUP) // 반영됨 (t+5보다 최신)
-        productMetricsFacade.increaseLikeCount(productId, "event-4", eventType, now.plusSeconds(3), LIKE_CONSUMER_GROUP) // 무시됨 (t+10보다 과거)
-        productMetricsFacade.increaseLikeCount(productId, "event-5", eventType, now.plusSeconds(7), LIKE_CONSUMER_GROUP) // 무시됨 (t+10보다 과거)
+        productMetricsService.increaseLikeCount(productId, "event-1", eventType, now.plusSeconds(5), LIKE_CONSUMER_GROUP) // 반영됨
+        productMetricsService.increaseLikeCount(productId, "event-2", eventType, now.plusSeconds(1), LIKE_CONSUMER_GROUP) // 무시됨 (t+5보다 과거)
+        productMetricsService.increaseLikeCount(productId, "event-3", eventType, now.plusSeconds(10), LIKE_CONSUMER_GROUP) // 반영됨 (t+5보다 최신)
+        productMetricsService.increaseLikeCount(productId, "event-4", eventType, now.plusSeconds(3), LIKE_CONSUMER_GROUP) // 무시됨 (t+10보다 과거)
+        productMetricsService.increaseLikeCount(productId, "event-5", eventType, now.plusSeconds(7), LIKE_CONSUMER_GROUP) // 무시됨 (t+10보다 과거)
 
         // then - event-1(t+5), event-3(t+10) 2개만 반영
         val metrics = productMetricsRepository.findByProductId(productId)
         assertThat(metrics).isNotNull
         assertThat(metrics!!.likeCount).isEqualTo(2)
-    }
-
-    @Test
-    @DisplayName("조회수 증가 이벤트도 시간 순서가 보장된다")
-    fun `view count events should respect time ordering`() {
-        // given
-        val productId = 5L
-        val now = ZonedDateTime.now()
-        val eventType = "ViewCountIncreased"
-
-        // when - 최신 이벤트 먼저 처리 후 과거 이벤트 도착
-        productMetricsFacade.increaseViewCount(productId, "view-1", eventType, now.plusMinutes(5), VIEW_CONSUMER_GROUP)
-        productMetricsFacade.increaseViewCount(productId, "view-2", eventType, now.plusMinutes(10), VIEW_CONSUMER_GROUP) // 반영
-        productMetricsFacade.increaseViewCount(productId, "view-3", eventType, now.plusMinutes(3), VIEW_CONSUMER_GROUP) // 무시
-
-        // then
-        val metrics = productMetricsRepository.findByProductId(productId)
-        assertThat(metrics).isNotNull
-        assertThat(metrics!!.viewCount).isEqualTo(2) // view-1, view-2만 반영
     }
 
     @Test
@@ -149,9 +128,9 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
         val eventType = "OrderCompleted"
 
         // when - 시간 역순으로 도착
-        productMetricsFacade.increaseSoldCount(productId, 5, "order-1", eventType, now.plusHours(2), ORDER_CONSUMER_GROUP)
-        productMetricsFacade.increaseSoldCount(productId, 3, "order-2", eventType, now.plusHours(1), ORDER_CONSUMER_GROUP) // 무시
-        productMetricsFacade.increaseSoldCount(productId, 2, "order-3", eventType, now.plusHours(3), ORDER_CONSUMER_GROUP) // 반영
+        productMetricsService.increaseSoldCount(productId, 5, "order-1", eventType, now.plusHours(2), ORDER_CONSUMER_GROUP)
+        productMetricsService.increaseSoldCount(productId, 3, "order-2", eventType, now.plusHours(1), ORDER_CONSUMER_GROUP) // 무시
+        productMetricsService.increaseSoldCount(productId, 2, "order-3", eventType, now.plusHours(3), ORDER_CONSUMER_GROUP) // 반영
 
         // then
         val metrics = productMetricsRepository.findByProductId(productId)
@@ -168,11 +147,11 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
         val eventType = "LikeCountChanged"
 
         // when - 복잡한 시나리오
-        productMetricsFacade.increaseLikeCount(productId, "like-1", eventType, now.plusMinutes(5), LIKE_CONSUMER_GROUP) // +1 (반영)
-        productMetricsFacade.increaseLikeCount(productId, "like-2", eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP) // +1 (반영)
-        productMetricsFacade.decreaseLikeCount(productId, "unlike-1", eventType, now.plusMinutes(3), LIKE_CONSUMER_GROUP) // -1 (무시, t+10보다 과거)
-        productMetricsFacade.decreaseLikeCount(productId, "unlike-2", eventType, now.plusMinutes(15), LIKE_CONSUMER_GROUP) // -1 (반영)
-        productMetricsFacade.increaseLikeCount(productId, "like-3", eventType, now.plusMinutes(7), LIKE_CONSUMER_GROUP) // +1 (무시, t+15보다 과거)
+        productMetricsService.increaseLikeCount(productId, "like-1", eventType, now.plusMinutes(5), LIKE_CONSUMER_GROUP) // +1 (반영)
+        productMetricsService.increaseLikeCount(productId, "like-2", eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP) // +1 (반영)
+        productMetricsService.decreaseLikeCount(productId, "unlike-1", eventType, now.plusMinutes(3), LIKE_CONSUMER_GROUP) // -1 (무시, t+10보다 과거)
+        productMetricsService.decreaseLikeCount(productId, "unlike-2", eventType, now.plusMinutes(15), LIKE_CONSUMER_GROUP) // -1 (반영)
+        productMetricsService.increaseLikeCount(productId, "like-3", eventType, now.plusMinutes(7), LIKE_CONSUMER_GROUP) // +1 (무시, t+15보다 과거)
 
         // then - like-1(+1) + like-2(+1) + unlike-2(-1) = 1
         val metrics = productMetricsRepository.findByProductId(productId)
@@ -189,9 +168,9 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
         val eventType = "LikeCountChanged"
 
         // when - 동일한 타임스탬프로 여러 이벤트 (서로 다른 eventId)
-        productMetricsFacade.increaseLikeCount(productId, "like-1", eventType, now, LIKE_CONSUMER_GROUP)
-        productMetricsFacade.increaseLikeCount(productId, "like-2", eventType, now, LIKE_CONSUMER_GROUP)
-        productMetricsFacade.increaseLikeCount(productId, "like-3", eventType, now, LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, "like-1", eventType, now, LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, "like-2", eventType, now, LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, "like-3", eventType, now, LIKE_CONSUMER_GROUP)
 
         // then - 첫 번째만 반영됨 (같은 시간은 isAfter가 false이므로 무시됨)
         val metrics = productMetricsRepository.findByProductId(productId)
@@ -209,11 +188,11 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
         val eventType = "LikeCountChanged"
 
         // when - 상품1은 최신 이벤트 먼저, 상품2는 과거 이벤트 먼저
-        productMetricsFacade.increaseLikeCount(productId1, "p1-new", eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP)
-        productMetricsFacade.increaseLikeCount(productId1, "p1-old", eventType, now, LIKE_CONSUMER_GROUP) // 무시됨
+        productMetricsService.increaseLikeCount(productId1, "p1-new", eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId1, "p1-old", eventType, now, LIKE_CONSUMER_GROUP) // 무시됨
 
-        productMetricsFacade.increaseLikeCount(productId2, "p2-old", eventType, now, LIKE_CONSUMER_GROUP)
-        productMetricsFacade.increaseLikeCount(productId2, "p2-new", eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP) // 반영됨
+        productMetricsService.increaseLikeCount(productId2, "p2-old", eventType, now, LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId2, "p2-new", eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP) // 반영됨
 
         // then
         val metrics1 = productMetricsRepository.findByProductId(productId1)
@@ -232,8 +211,8 @@ class ProductMetricsFacadeOutOfOrderTest : IntegrationTest() {
         val eventType = "LikeCountChanged"
 
         // when
-        productMetricsFacade.increaseLikeCount(productId, "event-1", eventType, now.plusMinutes(5), LIKE_CONSUMER_GROUP)
-        productMetricsFacade.increaseLikeCount(productId, "event-2", eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, "event-1", eventType, now.plusMinutes(5), LIKE_CONSUMER_GROUP)
+        productMetricsService.increaseLikeCount(productId, "event-2", eventType, now.plusMinutes(10), LIKE_CONSUMER_GROUP)
 
         // then - EventProcessingTimestamp가 최신 시간으로 업데이트됨
         val timestamp = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(LIKE_CONSUMER_GROUP, productId.toString())

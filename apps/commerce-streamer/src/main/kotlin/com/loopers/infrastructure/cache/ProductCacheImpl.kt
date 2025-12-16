@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.cache
 
 import com.loopers.application.cache.ProductCache
+import com.loopers.domain.stock.ProductCacheRepository
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Component
@@ -8,7 +9,7 @@ import org.springframework.stereotype.Component
 @Component
 class ProductCacheImpl(
     private val redisTemplate: RedisTemplate<String, Any>,
-) : ProductCache {
+) : ProductCache, ProductCacheRepository {
 
     private val log = LoggerFactory.getLogger(ProductCacheImpl::class.java)
 
