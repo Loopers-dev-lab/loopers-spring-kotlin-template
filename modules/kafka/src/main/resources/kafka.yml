@@ -28,7 +28,8 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-serializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
       properties:
-        enable-auto-commit: false  # 자동 커밋 비활성화 (수동 ACK)
+        enable-auto-commit: false   # 자동 커밋 비활성화 (수동 ACK)
+        auto-offset-reset: earliest # 신규 컨슈머는 과거부터 소비
 
     # Listener 설정
     listener:
