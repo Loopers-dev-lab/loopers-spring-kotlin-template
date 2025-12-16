@@ -65,6 +65,8 @@ subprojects {
         implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
         // Spring
         implementation("org.springframework.boot:spring-boot-starter")
+        // uuid
+        implementation("com.github.f4b6a3:uuid-creator:5.3.7")
         // Serialize
         implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
