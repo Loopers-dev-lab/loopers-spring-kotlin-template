@@ -3,6 +3,7 @@ package com.loopers.domain.event.handler
 import com.loopers.domain.event.LikeAddedEvent
 import com.loopers.domain.event.LikeRemovedEvent
 import com.loopers.domain.event.UserActionEvent
+import com.loopers.domain.outbox.OutboxEventPublisher
 import com.loopers.domain.product.ProductCacheRepository
 import com.loopers.domain.product.ProductLikeCountService
 import io.mockk.every
@@ -19,11 +20,13 @@ class LikeEventHandlerTest {
     private val productLikeCountService = mockk<ProductLikeCountService>()
     private val productCacheRepository = mockk<ProductCacheRepository>(relaxed = true)
     private val eventPublisher = mockk<ApplicationEventPublisher>(relaxed = true)
+    private val outboxEventPublisher = mockk<OutboxEventPublisher>(relaxed = true)
 
     private val likeEventHandler = LikeEventHandler(
         productLikeCountService,
         productCacheRepository,
         eventPublisher,
+        outboxEventPublisher,
     )
 
     @DisplayName("좋아요 추가 이벤트를 처리할 때,")

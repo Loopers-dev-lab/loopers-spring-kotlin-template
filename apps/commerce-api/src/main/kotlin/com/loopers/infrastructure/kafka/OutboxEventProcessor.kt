@@ -56,6 +56,7 @@ class OutboxEventProcessor(
                 topic = event.topic,
                 key = event.partitionKey,
                 message = event.payload,
+                eventType = event.eventType,
             )
 
             // 동기적으로 결과 대기 (타임아웃 5초)

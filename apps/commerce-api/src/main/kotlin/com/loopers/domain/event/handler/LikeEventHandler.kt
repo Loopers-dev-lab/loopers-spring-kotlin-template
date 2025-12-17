@@ -4,6 +4,7 @@ import com.loopers.domain.event.LikeAddedEvent
 import com.loopers.domain.event.LikeRemovedEvent
 import com.loopers.domain.event.UserActionEvent
 import com.loopers.domain.event.UserActionType
+import com.loopers.domain.outbox.OutboxEventPublisher
 import com.loopers.domain.product.ProductCacheRepository
 import com.loopers.domain.product.ProductLikeCountService
 import org.slf4j.LoggerFactory
@@ -22,6 +23,7 @@ class LikeEventHandler(
     private val productLikeCountService: ProductLikeCountService,
     private val productCacheRepository: ProductCacheRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val outboxEventPublisher: OutboxEventPublisher,
 ) {
     private val logger = LoggerFactory.getLogger(LikeEventHandler::class.java)
 
@@ -41,6 +43,16 @@ class LikeEventHandler(
 
             // 캐시 무효화
             evictProductCache(event.productId)
+
+            // Outbox 테이블에 이벤트 저장 (Kafka 전송을 위해)
+            outboxEventPublisher.publish(
+                eventType = "LikeAddedEvent",
+                topic = "catalog-events",
+                partitionKey = event.productId.toString(),
+                payload = event,
+                aggregateType = "Product",
+                aggregateId = event.productId,
+            )
 
             logger.info("좋아요 집계 처리 완료: productId=${event.productId}")
 
@@ -75,6 +87,16 @@ class LikeEventHandler(
 
             // 캐시 무효화
             evictProductCache(event.productId)
+
+            // Outbox 테이블에 이벤트 저장 (Kafka 전송을 위해)
+            outboxEventPublisher.publish(
+                eventType = "LikeRemovedEvent",
+                topic = "catalog-events",
+                partitionKey = event.productId.toString(),
+                payload = event,
+                aggregateType = "Product",
+                aggregateId = event.productId,
+            )
 
             logger.info("좋아요 제거 집계 처리 완료: productId=${event.productId}")
 

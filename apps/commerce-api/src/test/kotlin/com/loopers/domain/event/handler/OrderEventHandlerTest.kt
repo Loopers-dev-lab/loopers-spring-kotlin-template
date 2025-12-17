@@ -7,6 +7,7 @@ import com.loopers.domain.event.PaymentFailedEvent
 import com.loopers.domain.order.OrderItem
 import com.loopers.domain.order.OrderRepository
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.outbox.OutboxEventPublisher
 import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
 import com.loopers.fixtures.createTestOrder
@@ -29,12 +30,14 @@ class OrderEventHandlerTest {
     private val orderRepository = mockk<OrderRepository>()
     private val eventPublisher = mockk<ApplicationEventPublisher>(relaxed = true)
     private val dataPlatformClient = mockk<DataPlatformClient>(relaxed = true)
+    private val outboxEventPublisher = mockk<OutboxEventPublisher>(relaxed = true)
 
     private val orderEventHandler = OrderEventHandler(
         couponService,
         orderRepository,
         eventPublisher,
         dataPlatformClient,
+        outboxEventPublisher,
     )
 
     @DisplayName("주문 생성 이벤트를 처리할 때,")

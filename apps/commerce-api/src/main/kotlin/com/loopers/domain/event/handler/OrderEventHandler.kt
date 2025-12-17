@@ -7,6 +7,7 @@ import com.loopers.domain.event.PaymentFailedEvent
 import com.loopers.domain.event.UserActionEvent
 import com.loopers.domain.event.UserActionType
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.outbox.OutboxEventPublisher
 import com.loopers.infrastructure.dataplatform.client.DataPlatformClient
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -26,6 +27,7 @@ class OrderEventHandler(
     private val orderRepository: OrderRepository,
     private val eventPublisher: ApplicationEventPublisher,
     private val dataPlatformClient: DataPlatformClient,
+    private val outboxEventPublisher: OutboxEventPublisher,
 ) {
     private val logger = LoggerFactory.getLogger(OrderEventHandler::class.java)
 
@@ -70,6 +72,16 @@ class OrderEventHandler(
             logger.info("데이터 플랫폼 전송 시작: orderId=${event.orderId}")
             dataPlatformClient.sendOrderCreated(event)
             logger.info("데이터 플랫폼 전송 완료: orderId=${event.orderId}")
+
+            // Outbox 테이블에 이벤트 저장 (Kafka 전송을 위해)
+            outboxEventPublisher.publish(
+                eventType = "OrderCreatedEvent",
+                topic = "order-events",
+                partitionKey = event.orderId.toString(),
+                payload = event,
+                aggregateType = "Order",
+                aggregateId = event.orderId,
+            )
         } catch (e: Exception) {
             // 데이터 플랫폼 전송 실패는 주문에 영향을 주지 않음
             logger.error("데이터 플랫폼 전송 실패: orderId=${event.orderId}", e)
