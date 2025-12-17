@@ -17,12 +17,12 @@ class OrderDataPlatformEventListener(
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onPaymentPaid(event: PaymentPaidEventV1) {
-        logger.info("onPaymentPaid start - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}")
+        logger.info("[PaymentPaidEventV1] start - paymentId: ${event.paymentId}, orderId: ${event.orderId}")
         try {
             orderDataPlatformClient.sendOrderCompleted(event.orderId)
-            logger.info("onPaymentPaid success - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}")
+            logger.info("[PaymentPaidEventV1] success - paymentId: ${event.paymentId}, orderId: ${event.orderId}")
         } catch (e: Exception) {
-            logger.error("onPaymentPaid failed - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}", e)
+            logger.error("[PaymentPaidEventV1] failed - paymentId: ${event.paymentId}, orderId: ${event.orderId}", e)
         }
     }
 }

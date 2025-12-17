@@ -17,12 +17,12 @@ class PaymentEventListener(
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onPaymentCreated(event: PaymentCreatedEventV1) {
-        logger.info("onPaymentCreated start - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}")
+        logger.info("[PaymentCreatedEventV1] start - paymentId: ${event.paymentId}")
         try {
             paymentService.requestPgPayment(event.paymentId)
-            logger.info("onPaymentCreated success - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}")
+            logger.info("[PaymentCreatedEventV1] success - paymentId: ${event.paymentId}")
         } catch (e: Exception) {
-            logger.error("onPaymentCreated failed - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}", e)
+            logger.error("[PaymentCreatedEventV1] failed - paymentId: ${event.paymentId}", e)
         }
     }
 }
