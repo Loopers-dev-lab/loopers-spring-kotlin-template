@@ -289,16 +289,33 @@ class KafkaConsumerE2ETest {
     @Test
     fun `알 수 없는 이벤트 타입은 무시된다`() {
         // given: Kafka가 실행 중이어야 함
-        if (kafkaTemplate == null) return
+        if (kafkaTemplate == null || productMetricsRepository == null) return
 
-        val payload = """{"unknown":"event"}"""
+        val unknownPayload = """{"unknown":"event"}"""
+        val productId = 700L
 
         // when: 알 수 없는 이벤트 전송
-        kafkaTemplate!!.send("catalog-events", "999", payload)
+        kafkaTemplate!!.send("catalog-events", "999", unknownPayload)
             .get(5, TimeUnit.SECONDS)
 
-        // then: 에러 없이 무시됨 (로그만 출력)
-        Thread.sleep(2000) // 2초 대기
-        // 에러가 발생하지 않았으면 성공
+        // 알 수 없는 이벤트 이후 정상 이벤트 전송하여 컨슈머가 여전히 작동하는지 확인
+        val normalEvent = LikeAddedEvent(
+            eventId = UUID.randomUUID(),
+            userId = 1L,
+            productId = productId,
+            createdAt = ZonedDateTime.now(),
+        )
+        kafkaTemplate!!.send("catalog-events", productId.toString(), objectMapper.writeValueAsString(normalEvent))
+            .get(5, TimeUnit.SECONDS)
+
+        // then: 알 수 없는 이벤트는 무시되고, 정상 이벤트는 처리됨
+        await()
+            .atMost(10, TimeUnit.SECONDS)
+            .pollInterval(500, TimeUnit.MILLISECONDS)
+            .untilAsserted {
+                val metrics = productMetricsRepository!!.findByProductId(productId)
+                assertThat(metrics).isNotNull
+                assertThat(metrics!!.likeCount).isEqualTo(1)
+            }
     }
 }
