@@ -18,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.test.context.ActiveProfiles
 import java.time.ZonedDateTime
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
@@ -88,6 +89,7 @@ class KafkaConsumerE2ETest {
 
         val productId = 100L
         val event = LikeAddedEvent(
+            eventId = UUID.randomUUID(),
             userId = 1L,
             productId = productId,
             createdAt = ZonedDateTime.now(),
@@ -119,6 +121,7 @@ class KafkaConsumerE2ETest {
 
         // 먼저 좋아요 추가
         val addEvent = LikeAddedEvent(
+            eventId = UUID.randomUUID(),
             userId = 1L,
             productId = productId,
             createdAt = ZonedDateTime.now(),
@@ -134,9 +137,9 @@ class KafkaConsumerE2ETest {
                 assertThat(metrics?.likeCount).isGreaterThan(0)
             }
 
-        // when: 좋아요 제거 이벤트 전송
-        Thread.sleep(1000) // 1초 대기 (eventVersion 중복 방지)
+        // when: 좋아요 제거 이벤트 전송 (UUID로 고유성 보장, Thread.sleep 불필요)
         val removeEvent = LikeRemovedEvent(
+            eventId = UUID.randomUUID(),
             userId = 1L,
             productId = productId,
             createdAt = ZonedDateTime.now(),
@@ -161,6 +164,7 @@ class KafkaConsumerE2ETest {
         val orderId = 1000L
         val productId = 300L
         val event = OrderCreatedEvent(
+            eventId = UUID.randomUUID(),
             orderId = orderId,
             userId = 1L,
             amount = 50000,
@@ -199,11 +203,12 @@ class KafkaConsumerE2ETest {
         if (kafkaTemplate == null || eventHandledRepository == null || productMetricsRepository == null) return
 
         val productId = 400L
-        val createdAt = ZonedDateTime.now()
+        val eventId = UUID.randomUUID()
         val event = LikeAddedEvent(
+            eventId = eventId,
             userId = 1L,
             productId = productId,
-            createdAt = createdAt,
+            createdAt = ZonedDateTime.now(),
         )
         val payload = objectMapper.writeValueAsString(event)
 
@@ -225,12 +230,7 @@ class KafkaConsumerE2ETest {
             }
 
         // EventHandled 테이블 확인 - 한 번만 기록됨
-        val eventHandled = eventHandledRepository!!.existsByEventKey(
-            eventType = "LikeAddedEvent",
-            aggregateType = "Product",
-            aggregateId = productId,
-            eventVersion = createdAt.nano.toLong(),
-        )
+        val eventHandled = eventHandledRepository!!.existsByEventId(eventId)
         assertThat(eventHandled).isTrue
     }
 
@@ -241,6 +241,7 @@ class KafkaConsumerE2ETest {
 
         val orderId = 2000L
         val event = OrderCreatedEvent(
+            eventId = UUID.randomUUID(),
             orderId = orderId,
             userId = 1L,
             amount = 100000,

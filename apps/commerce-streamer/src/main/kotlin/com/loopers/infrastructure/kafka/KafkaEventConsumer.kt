@@ -108,19 +108,9 @@ class KafkaEventConsumer(
     private fun handleLikeAdded(message: String, acknowledgment: Acknowledgment) {
         val event: LikeAddedEvent = objectMapper.readValue(message)
 
-        // 전체 타임스탬프를 나노초로 변환 (고유성 보장)
-        val eventVersion = event.createdAt.toEpochSecond() * 1_000_000_000L +
-            event.createdAt.nano
-
         // 멱등성 체크
-        if (isAlreadyHandled(
-                "LikeAddedEvent",
-                "Product",
-                event.productId,
-                eventVersion,
-            )
-        ) {
-            logger.debug("이미 처리된 이벤트: LikeAddedEvent, productId=${event.productId}")
+        if (isAlreadyHandled(event.eventId)) {
+            logger.debug("이미 처리된 이벤트: LikeAddedEvent, eventId=${event.eventId}, productId=${event.productId}")
             acknowledgeAfterCommit(acknowledgment)
             return
         }
@@ -133,15 +123,17 @@ class KafkaEventConsumer(
         // 처리 완료 기록
         eventHandledRepository.save(
             EventHandled.create(
+                eventId = event.eventId,
                 eventType = "LikeAddedEvent",
                 aggregateType = "Product",
                 aggregateId = event.productId,
-                eventVersion = eventVersion,
             ),
         )
 
         acknowledgeAfterCommit(acknowledgment)
-        logger.info("LikeAddedEvent 처리 완료: productId=${event.productId}, likeCount=${metrics.likeCount}")
+        logger.info(
+            "LikeAddedEvent 처리 완료: eventId=${event.eventId}, productId=${event.productId}, likeCount=${metrics.likeCount}",
+        )
     }
 
     /**
@@ -150,18 +142,8 @@ class KafkaEventConsumer(
     private fun handleLikeRemoved(message: String, acknowledgment: Acknowledgment) {
         val event: LikeRemovedEvent = objectMapper.readValue(message)
 
-        // 전체 타임스탬프를 나노초로 변환 (고유성 보장)
-        val eventVersion = event.createdAt.toEpochSecond() * 1_000_000_000L +
-            event.createdAt.nano
-
-        if (isAlreadyHandled(
-                "LikeRemovedEvent",
-                "Product",
-                event.productId,
-                eventVersion,
-            )
-        ) {
-            logger.debug("이미 처리된 이벤트: LikeRemovedEvent, productId=${event.productId}")
+        if (isAlreadyHandled(event.eventId)) {
+            logger.debug("이미 처리된 이벤트: LikeRemovedEvent, eventId=${event.eventId}, productId=${event.productId}")
             acknowledgeAfterCommit(acknowledgment)
             return
         }
@@ -173,15 +155,17 @@ class KafkaEventConsumer(
 
         eventHandledRepository.save(
             EventHandled.create(
+                eventId = event.eventId,
                 eventType = "LikeRemovedEvent",
                 aggregateType = "Product",
                 aggregateId = event.productId,
-                eventVersion = eventVersion,
             ),
         )
 
         acknowledgeAfterCommit(acknowledgment)
-        logger.info("LikeRemovedEvent 처리 완료: productId=${event.productId}, likeCount=${metrics.likeCount}")
+        logger.info(
+            "LikeRemovedEvent 처리 완료: eventId=${event.eventId}, productId=${event.productId}, likeCount=${metrics.likeCount}",
+        )
     }
 
     /**
@@ -190,18 +174,8 @@ class KafkaEventConsumer(
     private fun handleOrderCreated(message: String, acknowledgment: Acknowledgment) {
         val event: OrderCreatedEvent = objectMapper.readValue(message)
 
-        // 전체 타임스탬프를 나노초로 변환 (고유성 보장)
-        val eventVersion = event.createdAt.toEpochSecond() * 1_000_000_000L +
-            event.createdAt.nano
-
-        if (isAlreadyHandled(
-                "OrderCreatedEvent",
-                "Order",
-                event.orderId,
-                eventVersion,
-            )
-        ) {
-            logger.debug("이미 처리된 이벤트: OrderCreatedEvent, orderId=${event.orderId}")
+        if (isAlreadyHandled(event.eventId)) {
+            logger.debug("이미 처리된 이벤트: OrderCreatedEvent, eventId=${event.eventId}, orderId=${event.orderId}")
             acknowledgeAfterCommit(acknowledgment)
             return
         }
@@ -225,16 +199,16 @@ class KafkaEventConsumer(
 
         eventHandledRepository.save(
             EventHandled.create(
+                eventId = event.eventId,
                 eventType = "OrderCreatedEvent",
                 aggregateType = "Order",
                 aggregateId = event.orderId,
-                eventVersion = eventVersion,
             ),
         )
 
         acknowledgeAfterCommit(acknowledgment)
         logger.info(
-            "OrderCreatedEvent 처리 완료: orderId=${event.orderId}, " +
+            "OrderCreatedEvent 처리 완료: eventId=${event.eventId}, orderId=${event.orderId}, " +
                 "items=${event.items.size}개 상품 판매량 집계",
         )
     }
@@ -242,18 +216,8 @@ class KafkaEventConsumer(
     /**
      * 이미 처리된 이벤트인지 확인 (멱등성 보장)
      */
-    private fun isAlreadyHandled(
-        eventType: String,
-        aggregateType: String,
-        aggregateId: Long,
-        eventVersion: Long,
-    ): Boolean {
-        return eventHandledRepository.existsByEventKey(
-            eventType = eventType,
-            aggregateType = aggregateType,
-            aggregateId = aggregateId,
-            eventVersion = eventVersion,
-        )
+    private fun isAlreadyHandled(eventId: java.util.UUID): Boolean {
+        return eventHandledRepository.existsByEventId(eventId)
     }
 
     /**

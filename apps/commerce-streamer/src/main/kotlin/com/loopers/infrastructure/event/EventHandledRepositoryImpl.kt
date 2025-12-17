@@ -4,6 +4,7 @@ import com.loopers.domain.event.EventHandled
 import com.loopers.domain.event.EventHandledRepository
 import org.springframework.stereotype.Repository
 import java.time.ZonedDateTime
+import java.util.UUID
 
 @Repository
 class EventHandledRepositoryImpl(
@@ -14,18 +15,8 @@ class EventHandledRepositoryImpl(
         return jpaRepository.save(eventHandled)
     }
 
-    override fun existsByEventKey(
-        eventType: String,
-        aggregateType: String,
-        aggregateId: Long,
-        eventVersion: Long,
-    ): Boolean {
-        return jpaRepository.existsByEventTypeAndAggregateTypeAndAggregateIdAndEventVersion(
-            eventType = eventType,
-            aggregateType = aggregateType,
-            aggregateId = aggregateId,
-            eventVersion = eventVersion,
-        )
+    override fun existsByEventId(eventId: UUID): Boolean {
+        return jpaRepository.existsByEventId(eventId.toString())
     }
 
     override fun deleteHandledEventsBefore(handledBefore: ZonedDateTime): Int {

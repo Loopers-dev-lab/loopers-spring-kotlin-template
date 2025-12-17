@@ -7,6 +7,7 @@ import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import java.time.ZonedDateTime
+import java.util.UUID
 
 /**
  * 이벤트 처리 기록 테이블 (멱등성 보장)
@@ -17,15 +18,23 @@ import java.time.ZonedDateTime
     name = "event_handled",
     uniqueConstraints = [
         UniqueConstraint(
-            name = "uk_event_handled_key",
-            columnNames = ["event_type", "aggregate_type", "aggregate_id", "event_version"],
+            name = "uk_event_handled_event_id",
+            columnNames = ["event_id"],
         ),
     ],
     indexes = [
         Index(name = "idx_event_handled_created", columnList = "created_at"),
+        Index(name = "idx_event_handled_aggregate", columnList = "event_type, aggregate_type, aggregate_id"),
     ],
 )
 class EventHandled(
+    /**
+     * 이벤트 고유 ID (UUID)
+     * 이벤트의 고유성을 보장하는 키
+     */
+    @Column(name = "event_id", nullable = false, length = 36)
+    val eventId: String,
+
     /**
      * 이벤트 타입 (e.g. OrderCreated, LikeAdded)
      */
@@ -45,13 +54,6 @@ class EventHandled(
     val aggregateId: Long,
 
     /**
-     * 이벤트 버전 (동일 집계에 대한 순서 보장)
-     * 보통 updatedAt 또는 version 컬럼 값 사용
-     */
-    @Column(name = "event_version", nullable = false)
-    val eventVersion: Long,
-
-    /**
      * 처리 완료 시각
      */
     @Column(name = "handled_at", nullable = false)
@@ -69,17 +71,17 @@ class EventHandled(
          * 새로운 처리 기록 생성
          */
         fun create(
+            eventId: UUID,
             eventType: String,
             aggregateType: String,
             aggregateId: Long,
-            eventVersion: Long,
             handledBy: String = "commerce-streamer",
         ): EventHandled {
             return EventHandled(
+                eventId = eventId.toString(),
                 eventType = eventType,
                 aggregateType = aggregateType,
                 aggregateId = aggregateId,
-                eventVersion = eventVersion,
                 handledBy = handledBy,
             )
         }

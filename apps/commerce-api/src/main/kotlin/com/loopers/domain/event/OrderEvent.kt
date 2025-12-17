@@ -3,12 +3,14 @@ package com.loopers.domain.event
 import com.loopers.domain.order.Order
 import com.loopers.domain.payment.Payment
 import java.time.ZonedDateTime
+import java.util.UUID
 
 /**
  * 주문 생성 이벤트
  * 주문이 생성되었을 때 발행
  */
 data class OrderCreatedEvent(
+    val eventId: UUID = UUID.randomUUID(),
     val orderId: Long,
     val userId: Long,
     val amount: Long,
@@ -19,6 +21,7 @@ data class OrderCreatedEvent(
     companion object {
         fun from(order: Order, couponId: Long?): OrderCreatedEvent {
             return OrderCreatedEvent(
+                eventId = UUID.randomUUID(),
                 orderId = requireNotNull(order.id) { "Order id must not be null when creating OrderCreatedEvent" },
                 userId = order.userId,
                 amount = order.totalAmount.amount.toLong(),

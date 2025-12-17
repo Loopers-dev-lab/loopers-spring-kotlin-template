@@ -1,6 +1,7 @@
 package com.loopers.domain.event
 
 import java.time.ZonedDateTime
+import java.util.UUID
 
 /**
  * 주문 관련 이벤트
@@ -11,6 +12,7 @@ import java.time.ZonedDateTime
  * 주문이 생성되었을 때 발행
  */
 data class OrderCreatedEvent(
+    val eventId: UUID,
     val orderId: Long,
     val userId: Long,
     val amount: Long,
