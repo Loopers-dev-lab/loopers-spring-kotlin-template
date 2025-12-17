@@ -109,8 +109,10 @@ class KafkaConsumerE2ETest {
 
     @Test
     fun `Kafka가 실행 중이지 않으면 KafkaTemplate 빈이 생성되지 않는다`() {
-        // Kafka가 없으면 bean이 null
-        println("KafkaTemplate bean: ${kafkaTemplate != null}")
+        // 이 테스트는 Kafka 없이 실행될 때만 의미가 있음
+        if (System.getenv("KAFKA_BOOTSTRAP_SERVERS") == null) {
+            assertThat(kafkaTemplate).isNull()
+        }
     }
 
     @Test
