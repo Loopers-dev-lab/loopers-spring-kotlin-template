@@ -69,10 +69,6 @@ class OrderEventHandler(
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handleOrderCreatedForDataPlatform(event: OrderCreatedEvent) {
         try {
-            logger.info("데이터 플랫폼 전송 시작: orderId=${event.orderId}")
-            dataPlatformClient.sendOrderCreated(event)
-            logger.info("데이터 플랫폼 전송 완료: orderId=${event.orderId}")
-
             // Outbox 테이블에 이벤트 저장 (Kafka 전송을 위해)
             outboxEventPublisher.publish(
                 eventType = "OrderCreatedEvent",
@@ -82,7 +78,12 @@ class OrderEventHandler(
                 aggregateType = "Order",
                 aggregateId = event.orderId,
             )
+
+            logger.info("데이터 플랫폼 전송 시작: orderId=${event.orderId}")
+            dataPlatformClient.sendOrderCreated(event)
+            logger.info("데이터 플랫폼 전송 완료: orderId=${event.orderId}")
         } catch (e: Exception) {
+            // Outbox는 이미 저장되었으므로 Kafka 전송은 보장됨
             // 데이터 플랫폼 전송 실패는 주문에 영향을 주지 않음
             logger.error("데이터 플랫폼 전송 실패: orderId=${event.orderId}", e)
         }
