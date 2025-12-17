@@ -318,4 +318,52 @@ class KafkaConsumerE2ETest {
                 assertThat(metrics!!.likeCount).isEqualTo(1)
             }
     }
+
+    @Test
+    fun `동일 productId의 이벤트 시퀀스는 파티션 순서가 보장된다`() {
+        // given: Kafka가 실행 중이어야 함
+        if (kafkaTemplate == null || productMetricsRepository == null) return
+
+        val productId = 800L
+        val userId = 1L
+
+        // when: 동일 productId로 빠르게 이벤트 시퀀스 전송 (LikeAdded -> LikeRemoved -> LikeAdded)
+        // 각 이벤트는 고유한 UUID를 가지며, productId를 파티션 키로 사용하여 순서 보장
+        val event1 = LikeAddedEvent(
+            eventId = UUID.randomUUID(),
+            userId = userId,
+            productId = productId,
+            createdAt = ZonedDateTime.now(),
+        )
+        kafkaTemplate!!.send("catalog-events", productId.toString(), objectMapper.writeValueAsString(event1))
+            .get(5, TimeUnit.SECONDS)
+
+        val event2 = LikeRemovedEvent(
+            eventId = UUID.randomUUID(),
+            userId = userId,
+            productId = productId,
+            createdAt = ZonedDateTime.now(),
+        )
+        kafkaTemplate!!.send("catalog-events", productId.toString(), objectMapper.writeValueAsString(event2))
+            .get(5, TimeUnit.SECONDS)
+
+        val event3 = LikeAddedEvent(
+            eventId = UUID.randomUUID(),
+            userId = userId,
+            productId = productId,
+            createdAt = ZonedDateTime.now(),
+        )
+        kafkaTemplate!!.send("catalog-events", productId.toString(), objectMapper.writeValueAsString(event3))
+            .get(5, TimeUnit.SECONDS)
+
+        // then: 최종 상태는 이벤트 순서를 반영 (0 + 1 - 1 + 1 = 1)
+        await()
+            .atMost(10, TimeUnit.SECONDS)
+            .pollInterval(500, TimeUnit.MILLISECONDS)
+            .untilAsserted {
+                val metrics = productMetricsRepository!!.findByProductId(productId)
+                assertThat(metrics).isNotNull
+                assertThat(metrics!!.likeCount).isEqualTo(1)
+            }
+    }
 }
