@@ -96,6 +96,9 @@ class CouponConcurrencyTest {
             assertThat(it.isUsed).isTrue()
             assertThat(it.usedAt).isNotNull()
         }
+        assertThat(savedUserCoupon).isNotNull
+        assertThat(requireNotNull(savedUserCoupon).isUsed).isTrue()
+        assertThat(savedUserCoupon.usedAt).isNotNull()
     }
 
     @Test
@@ -146,9 +149,8 @@ class CouponConcurrencyTest {
         // 모든 쿠폰이 사용됨 상태여야 함
         userCoupons.forEach { (_, uc) ->
             val savedUserCoupon = userCouponRepository.findById(uc.id)
-            savedUserCoupon?.let {
-                assertThat(it.isUsed).isTrue()
-            }
+            assertThat(savedUserCoupon).isNotNull
+            assertThat(requireNotNull(savedUserCoupon).isUsed).isTrue()
         }
     }
 }

@@ -5,6 +5,7 @@ import com.loopers.domain.event.EventHandledRepository
 import com.loopers.domain.event.LikeAddedEvent
 import com.loopers.domain.event.LikeRemovedEvent
 import com.loopers.domain.event.OrderCreatedEvent
+import com.loopers.domain.product.ProductMetrics
 import com.loopers.domain.product.ProductMetricsRepository
 import com.loopers.infrastructure.event.EventHandledJpaRepository
 import com.loopers.infrastructure.product.ProductMetricsJpaRepository
@@ -88,6 +89,24 @@ class KafkaConsumerE2ETest {
         eventHandledJpaRepository?.deleteAll()
     }
 
+    private fun sendEvent(topic: String, key: String, payload: String) {
+        kafkaTemplate?.send(topic, key, payload)
+            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    private fun awaitMetricsUpdate(
+        productId: Long,
+        assertion: (ProductMetrics?) -> Unit,
+    ) {
+        await()
+            .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .pollInterval(AWAIT_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
+            .untilAsserted {
+                val metrics = productMetricsRepository?.findByProductId(productId)
+                assertion(metrics)
+            }
+    }
+
     @Test
     fun `Kafka가 실행 중이지 않으면 KafkaTemplate 빈이 생성되지 않는다`() {
         // Kafka가 없으면 bean이 null
@@ -108,18 +127,13 @@ class KafkaConsumerE2ETest {
         val payload = objectMapper.writeValueAsString(event)
 
         // when: Kafka로 메시지 전송
-        kafkaTemplate?.send("catalog-events", PRODUCT_ID_1.toString(), payload)
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("catalog-events", PRODUCT_ID_1.toString(), payload)
 
         // then: Consumer가 메시지를 처리하고 ProductMetrics 업데이트
-        await()
-            .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .pollInterval(AWAIT_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
-            .untilAsserted {
-                val metrics = productMetricsRepository?.findByProductId(PRODUCT_ID_1)
-                assertThat(metrics).isNotNull
-                assertThat(metrics?.likeCount).isGreaterThan(0)
-            }
+        awaitMetricsUpdate(PRODUCT_ID_1) { metrics ->
+            assertThat(metrics).isNotNull
+            assertThat(metrics?.likeCount).isEqualTo(1)
+        }
     }
 
     @Test
@@ -134,16 +148,12 @@ class KafkaConsumerE2ETest {
             productId = PRODUCT_ID_2,
             createdAt = ZonedDateTime.now(),
         )
-        kafkaTemplate?.send("catalog-events", PRODUCT_ID_2.toString(), objectMapper.writeValueAsString(addEvent))
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("catalog-events", PRODUCT_ID_2.toString(), objectMapper.writeValueAsString(addEvent))
 
         // 좋아요가 추가될 때까지 대기
-        await()
-            .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .untilAsserted {
-                val metrics = productMetricsRepository?.findByProductId(PRODUCT_ID_2)
-                assertThat(metrics?.likeCount).isGreaterThan(0)
-            }
+        awaitMetricsUpdate(PRODUCT_ID_2) { metrics ->
+            assertThat(metrics?.likeCount).isEqualTo(1)
+        }
 
         // when: 좋아요 제거 이벤트 전송 (UUID로 고유성 보장, Thread.sleep 불필요)
         val removeEvent = LikeRemovedEvent(
@@ -152,16 +162,12 @@ class KafkaConsumerE2ETest {
             productId = PRODUCT_ID_2,
             createdAt = ZonedDateTime.now(),
         )
-        kafkaTemplate?.send("catalog-events", PRODUCT_ID_2.toString(), objectMapper.writeValueAsString(removeEvent))
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("catalog-events", PRODUCT_ID_2.toString(), objectMapper.writeValueAsString(removeEvent))
 
         // then: 좋아요 수가 감소함
-        await()
-            .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .untilAsserted {
-                val metrics = productMetricsRepository?.findByProductId(PRODUCT_ID_2)
-                assertThat(metrics?.likeCount).isEqualTo(0)
-            }
+        awaitMetricsUpdate(PRODUCT_ID_2) { metrics ->
+            assertThat(metrics?.likeCount).isEqualTo(0)
+        }
     }
 
     @Test
@@ -189,19 +195,14 @@ class KafkaConsumerE2ETest {
         val payload = objectMapper.writeValueAsString(event)
 
         // when: Kafka로 메시지 전송
-        kafkaTemplate?.send("order-events", orderId.toString(), payload)
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("order-events", orderId.toString(), payload)
 
         // then: Consumer가 메시지를 처리하고 판매량 집계
-        await()
-            .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .pollInterval(AWAIT_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
-            .untilAsserted {
-                val metrics = productMetricsRepository?.findByProductId(PRODUCT_ID_3)
-                assertThat(metrics).isNotNull
-                assertThat(metrics?.salesCount).isEqualTo(2)
-                assertThat(metrics?.totalSalesAmount).isEqualTo(50000)
-            }
+        awaitMetricsUpdate(PRODUCT_ID_3) { metrics ->
+            assertThat(metrics).isNotNull
+            assertThat(metrics?.salesCount).isEqualTo(2)
+            assertThat(metrics?.totalSalesAmount).isEqualTo(50000)
+        }
     }
 
     @Test
@@ -223,20 +224,15 @@ class KafkaConsumerE2ETest {
 
         // when: 같은 메시지를 3번 전송
         repeat(3) {
-            kafkaTemplate?.send("catalog-events", PRODUCT_ID_4.toString(), payload)
-                ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            sendEvent("catalog-events", PRODUCT_ID_4.toString(), payload)
         }
 
         // then: Consumer가 처리하고 ProductMetrics는 1번만 증가
-        await()
-            .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .pollInterval(AWAIT_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
-            .untilAsserted {
-                val metrics = productMetricsRepository?.findByProductId(PRODUCT_ID_4)
-                assertThat(metrics).isNotNull
-                // 멱등성 보장 - 3번 전송했지만 1번만 증가
-                assertThat(metrics?.likeCount).isEqualTo(1)
-            }
+        awaitMetricsUpdate(PRODUCT_ID_4) { metrics ->
+            assertThat(metrics).isNotNull
+            // 멱등성 보장 - 3번 전송했지만 1번만 증가
+            assertThat(metrics?.likeCount).isEqualTo(1)
+        }
 
         // EventHandled 테이블 확인 - 한 번만 기록됨
         val eventHandled = eventHandledRepository?.existsByEventId(eventId)
@@ -274,25 +270,20 @@ class KafkaConsumerE2ETest {
         val payload = objectMapper.writeValueAsString(event)
 
         // when: Kafka로 메시지 전송
-        kafkaTemplate?.send("order-events", orderId.toString(), payload)
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("order-events", orderId.toString(), payload)
 
         // then: 두 상품 모두 판매량이 집계됨
-        await()
-            .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .pollInterval(AWAIT_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
-            .untilAsserted {
-                val metricsA = productMetricsRepository?.findByProductId(PRODUCT_ID_5)
-                val metricsB = productMetricsRepository?.findByProductId(PRODUCT_ID_6)
+        awaitMetricsUpdate(PRODUCT_ID_5) { metrics ->
+            assertThat(metrics).isNotNull
+            assertThat(metrics?.salesCount).isEqualTo(3)
+            assertThat(metrics?.totalSalesAmount).isEqualTo(60000)
+        }
 
-                assertThat(metricsA).isNotNull
-                assertThat(metricsA?.salesCount).isEqualTo(3)
-                assertThat(metricsA?.totalSalesAmount).isEqualTo(60000)
-
-                assertThat(metricsB).isNotNull
-                assertThat(metricsB?.salesCount).isEqualTo(2)
-                assertThat(metricsB?.totalSalesAmount).isEqualTo(40000)
-            }
+        awaitMetricsUpdate(PRODUCT_ID_6) { metrics ->
+            assertThat(metrics).isNotNull
+            assertThat(metrics?.salesCount).isEqualTo(2)
+            assertThat(metrics?.totalSalesAmount).isEqualTo(40000)
+        }
     }
 
     @Test
@@ -303,8 +294,7 @@ class KafkaConsumerE2ETest {
         val unknownPayload = """{"unknown":"event"}"""
 
         // when: 알 수 없는 이벤트 전송
-        kafkaTemplate?.send("catalog-events", "999", unknownPayload)
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("catalog-events", "999", unknownPayload)
 
         // 알 수 없는 이벤트 이후 정상 이벤트 전송하여 컨슈머가 여전히 작동하는지 확인
         val normalEvent = LikeAddedEvent(
@@ -313,18 +303,13 @@ class KafkaConsumerE2ETest {
             productId = PRODUCT_ID_7,
             createdAt = ZonedDateTime.now(),
         )
-        kafkaTemplate?.send("catalog-events", PRODUCT_ID_7.toString(), objectMapper.writeValueAsString(normalEvent))
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("catalog-events", PRODUCT_ID_7.toString(), objectMapper.writeValueAsString(normalEvent))
 
         // then: 알 수 없는 이벤트는 무시되고, 정상 이벤트는 처리됨
-        await()
-            .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .pollInterval(AWAIT_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
-            .untilAsserted {
-                val metrics = productMetricsRepository?.findByProductId(PRODUCT_ID_7)
-                assertThat(metrics).isNotNull
-                assertThat(metrics?.likeCount).isEqualTo(1)
-            }
+        awaitMetricsUpdate(PRODUCT_ID_7) { metrics ->
+            assertThat(metrics).isNotNull
+            assertThat(metrics?.likeCount).isEqualTo(1)
+        }
     }
 
     @Test
@@ -342,8 +327,7 @@ class KafkaConsumerE2ETest {
             productId = PRODUCT_ID_8,
             createdAt = ZonedDateTime.now(),
         )
-        kafkaTemplate?.send("catalog-events", PRODUCT_ID_8.toString(), objectMapper.writeValueAsString(event1))
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("catalog-events", PRODUCT_ID_8.toString(), objectMapper.writeValueAsString(event1))
 
         val event2 = LikeRemovedEvent(
             eventId = UUID.randomUUID(),
@@ -351,8 +335,7 @@ class KafkaConsumerE2ETest {
             productId = PRODUCT_ID_8,
             createdAt = ZonedDateTime.now(),
         )
-        kafkaTemplate?.send("catalog-events", PRODUCT_ID_8.toString(), objectMapper.writeValueAsString(event2))
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("catalog-events", PRODUCT_ID_8.toString(), objectMapper.writeValueAsString(event2))
 
         val event3 = LikeAddedEvent(
             eventId = UUID.randomUUID(),
@@ -360,17 +343,12 @@ class KafkaConsumerE2ETest {
             productId = PRODUCT_ID_8,
             createdAt = ZonedDateTime.now(),
         )
-        kafkaTemplate?.send("catalog-events", PRODUCT_ID_8.toString(), objectMapper.writeValueAsString(event3))
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        sendEvent("catalog-events", PRODUCT_ID_8.toString(), objectMapper.writeValueAsString(event3))
 
         // then: 최종 상태는 이벤트 순서를 반영 (0 + 1 - 1 + 1 = 1)
-        await()
-            .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .pollInterval(AWAIT_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
-            .untilAsserted {
-                val metrics = productMetricsRepository?.findByProductId(PRODUCT_ID_8)
-                assertThat(metrics).isNotNull
-                assertThat(metrics?.likeCount).isEqualTo(1)
-            }
+        awaitMetricsUpdate(PRODUCT_ID_8) { metrics ->
+            assertThat(metrics).isNotNull
+            assertThat(metrics?.likeCount).isEqualTo(1)
+        }
     }
 }
