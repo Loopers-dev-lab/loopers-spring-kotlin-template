@@ -13,6 +13,8 @@ You don't implement tests. You create the skeleton - empty test methods with cle
 behavior. Implementer will fill in the actual test code.
 
 This enables true TDD: red tests exist before any implementation.
+
+You must ultrathink until done.
 </role>
 
 <context>
