@@ -14,8 +14,8 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        # JSON 역직렬화 설정
-        spring.json.trusted.packages: "*"
+        # JSON 역직렬화 설정 (보안을 위해 특정 패키지만 허용)
+        spring.json.trusted.packages: "com.loopers.domain.event,com.loopers.domain,java.time,java.util"
         # 세션 타임아웃
         session.timeout.ms: 30000 # 30초
         # 하트비트 간격

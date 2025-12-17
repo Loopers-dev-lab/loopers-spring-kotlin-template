@@ -130,6 +130,21 @@ class OutboxEvent(
         this.lastAttemptAt = ZonedDateTime.now()
     }
 
+    /**
+     * 처리 중 상태로 변경
+     */
+    fun markAsProcessing() {
+        this.status = OutboxEventStatus.PROCESSING
+        this.lastAttemptAt = ZonedDateTime.now()
+    }
+
+    /**
+     * 처리 실패 후 대기 상태로 복원
+     */
+    fun resetToPending() {
+        this.status = OutboxEventStatus.PENDING
+    }
+
     companion object {
         /**
          * 새로운 Outbox 이벤트 생성
@@ -162,6 +177,11 @@ enum class OutboxEventStatus {
      * 발행 대기 중
      */
     PENDING,
+
+    /**
+     * 처리 중
+     */
+    PROCESSING,
 
     /**
      * 발행 완료

@@ -6,15 +6,17 @@ import com.loopers.domain.event.LikeAddedEvent
 import com.loopers.domain.event.LikeRemovedEvent
 import com.loopers.domain.event.OrderCreatedEvent
 import com.loopers.domain.product.ProductMetricsRepository
+import com.loopers.infrastructure.event.EventHandledJpaRepository
+import com.loopers.infrastructure.product.ProductMetricsJpaRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.test.context.ActiveProfiles
-import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
@@ -44,6 +46,12 @@ class KafkaConsumerE2ETest {
     @Autowired(required = false)
     private var eventHandledRepository: EventHandledRepository? = null
 
+    @Autowired(required = false)
+    private var productMetricsJpaRepository: ProductMetricsJpaRepository? = null
+
+    @Autowired(required = false)
+    private var eventHandledJpaRepository: EventHandledJpaRepository? = null
+
     @Autowired
     private lateinit var objectMapper: ObjectMapper
 
@@ -57,6 +65,17 @@ class KafkaConsumerE2ETest {
         }
     }
 
+    @AfterEach
+    fun cleanup() {
+        // 테스트 데이터 정리
+        if (productMetricsJpaRepository != null) {
+            productMetricsJpaRepository!!.deleteAll()
+        }
+        if (eventHandledJpaRepository != null) {
+            eventHandledJpaRepository!!.deleteAll()
+        }
+    }
+
     @Test
     fun `Kafka가 실행 중이지 않으면 KafkaTemplate 빈이 생성되지 않는다`() {
         // Kafka가 없으면 bean이 null
@@ -64,7 +83,6 @@ class KafkaConsumerE2ETest {
     }
 
     @Test
-    @Transactional
     fun `Consumer가 LikeAddedEvent를 수신하여 ProductMetrics를 업데이트한다`() {
         // given: Kafka가 실행 중이어야 함
         if (kafkaTemplate == null || productMetricsRepository == null) return
@@ -94,7 +112,6 @@ class KafkaConsumerE2ETest {
     }
 
     @Test
-    @Transactional
     fun `Consumer가 LikeRemovedEvent를 수신하여 ProductMetrics를 감소시킨다`() {
         // given: Kafka가 실행 중이어야 함
         if (kafkaTemplate == null || productMetricsRepository == null) return
@@ -138,7 +155,6 @@ class KafkaConsumerE2ETest {
     }
 
     @Test
-    @Transactional
     fun `Consumer가 OrderCreatedEvent를 수신하여 판매량을 집계한다`() {
         // given: Kafka가 실행 중이어야 함
         if (kafkaTemplate == null || productMetricsRepository == null) return
@@ -179,7 +195,6 @@ class KafkaConsumerE2ETest {
     }
 
     @Test
-    @Transactional
     fun `중복 메시지를 재전송해도 멱등성이 보장된다`() {
         // given: Kafka가 실행 중이어야 함
         if (kafkaTemplate == null || eventHandledRepository == null || productMetricsRepository == null) return
@@ -221,7 +236,6 @@ class KafkaConsumerE2ETest {
     }
 
     @Test
-    @Transactional
     fun `여러 상품의 주문을 동시에 처리할 수 있다`() {
         // given: Kafka가 실행 중이어야 함
         if (kafkaTemplate == null || productMetricsRepository == null) return
@@ -273,7 +287,6 @@ class KafkaConsumerE2ETest {
     }
 
     @Test
-    @Transactional
     fun `알 수 없는 이벤트 타입은 무시된다`() {
         // given: Kafka가 실행 중이어야 함
         if (kafkaTemplate == null) return

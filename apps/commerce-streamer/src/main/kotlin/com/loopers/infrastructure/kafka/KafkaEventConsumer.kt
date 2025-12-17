@@ -188,7 +188,9 @@ class KafkaEventConsumer(
     private fun handleOrderCreated(message: String, acknowledgment: Acknowledgment) {
         val event: OrderCreatedEvent = objectMapper.readValue(message)
 
-        val eventVersion = event.createdAt.toEpochSecond()
+        // 전체 타임스탬프를 나노초로 변환 (고유성 보장)
+        val eventVersion = event.createdAt.toEpochSecond() * 1_000_000_000L +
+            event.createdAt.nano
 
         if (isAlreadyHandled(
                 "OrderCreatedEvent",
