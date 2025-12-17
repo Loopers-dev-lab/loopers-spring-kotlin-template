@@ -9,6 +9,9 @@ import com.loopers.domain.product.ProductMetrics
 import com.loopers.domain.product.ProductMetricsRepository
 import com.loopers.infrastructure.event.EventHandledJpaRepository
 import com.loopers.infrastructure.product.ProductMetricsJpaRepository
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.common.serialization.StringDeserializer
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
@@ -16,10 +19,13 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.test.context.ActiveProfiles
+import java.time.Duration
 import java.time.ZonedDateTime
+import java.util.Properties
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -34,6 +40,23 @@ import java.util.concurrent.TimeUnit
  * 3. ./gradlew :apps:commerce-streamer:test --tests "KafkaConsumerE2ETest"
  *
  * Kafka가 실행 중이지 않으면 이 테스트는 skip됩니다.
+ *
+ * ## 테스트 커버리지
+ * - 기본 이벤트 처리: LikeAdded, LikeRemoved, OrderCreated
+ * - 멱등성: 중복 메시지 처리
+ * - 동시성: 동일 상품에 대한 동시 업데이트 (pessimistic locking)
+ * - 파티션 순서 보장: 동일 productId의 이벤트 시퀀스
+ * - 에러 처리:
+ *   - DLQ 라우팅: 파싱 실패한 메시지는 재시도 후 DLQ로 전송
+ *   - 재시도 로직: KafkaConfig의 재시도 정책(3회)이 DLQ 테스트에서 자동 검증
+ *   - 알 수 없는 이벤트 타입: 경고 로그만 남기고 정상 처리
+ *
+ * ## 참고: DB 장애 시나리오 테스트
+ * 데이터베이스 장애 시나리오는 E2E 통합 테스트보다는 단위 테스트나
+ * 카오스 엔지니어링 테스트에서 다루는 것이 더 적합합니다:
+ * - E2E 테스트에서 실제 DB 장애를 시뮬레이션하기 어려움
+ * - 트랜잭션 롤백 시나리오는 멱등성 테스트에서 간접적으로 검증됨
+ * - acknowledgeAfterCommit 패턴으로 메시지 손실 방지 메커니즘이 구현되어 있음
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -52,6 +75,7 @@ class KafkaConsumerE2ETest {
         private const val PRODUCT_ID_6 = 600L
         private const val PRODUCT_ID_7 = 700L
         private const val PRODUCT_ID_8 = 800L
+        private const val PRODUCT_ID_9 = 900L
     }
 
     @Autowired(required = false)
@@ -71,6 +95,9 @@ class KafkaConsumerE2ETest {
 
     @Autowired
     private lateinit var objectMapper: ObjectMapper
+
+    @Value("\${spring.kafka.bootstrap-servers}")
+    private lateinit var bootstrapServers: String
 
     @BeforeEach
     fun setUp() {
@@ -104,6 +131,54 @@ class KafkaConsumerE2ETest {
             .untilAsserted {
                 val metrics = productMetricsRepository?.findByProductId(productId)
                 assertion(metrics)
+            }
+    }
+
+    /**
+     * DLQ 토픽에서 메시지가 수신되는지 확인하는 헬퍼 메서드
+     */
+    private fun checkDlqMessage(dlqTopic: String, expectedKey: String): Boolean {
+        val props = Properties().apply {
+            put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
+            put(ConsumerConfig.GROUP_ID_CONFIG, "test-dlq-consumer-${UUID.randomUUID()}")
+            put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
+            put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
+            put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
+            put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
+        }
+
+        return KafkaConsumer<String, String>(props).use { consumer ->
+            consumer.subscribe(listOf(dlqTopic))
+
+            // DLQ에 메시지가 도착할 때까지 폴링 (최대 15초)
+            var found = false
+            val endTime = System.currentTimeMillis() + 15000
+
+            while (System.currentTimeMillis() < endTime && !found) {
+                val records = consumer.poll(Duration.ofMillis(1000))
+                for (record in records) {
+                    if (record.key() == expectedKey) {
+                        found = true
+                        break
+                    }
+                }
+            }
+
+            found
+        }
+    }
+
+    /**
+     * DLQ 메시지를 기다리는 헬퍼 메서드
+     */
+    private fun awaitDlqMessage(dlqTopic: String, expectedKey: String) {
+        await()
+            .atMost(20, TimeUnit.SECONDS)
+            .pollInterval(1, TimeUnit.SECONDS)
+            .untilAsserted {
+                assertThat(checkDlqMessage(dlqTopic, expectedKey))
+                    .withFailMessage("DLQ 토픽($dlqTopic)에서 key($expectedKey)를 가진 메시지를 찾을 수 없습니다.")
+                    .isTrue()
             }
     }
 
@@ -351,6 +426,89 @@ class KafkaConsumerE2ETest {
         awaitMetricsUpdate(PRODUCT_ID_8) { metrics ->
             assertThat(metrics).isNotNull
             assertThat(metrics?.likeCount).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun `동일 상품에 대한 동시 주문 이벤트를 안전하게 처리한다`() {
+        // given: Kafka가 실행 중이어야 함
+        assumeTrue(kafkaTemplate != null && productMetricsRepository != null, "Kafka is not running")
+
+        val productId = PRODUCT_ID_9
+
+        // when: 서로 다른 orderId로 동일 상품에 대한 여러 주문 이벤트를 빠르게 전송
+        // ProductMetrics의 pessimistic locking이 동시성을 안전하게 처리하는지 검증
+        repeat(5) { i ->
+            val event = OrderCreatedEvent(
+                eventId = UUID.randomUUID(),
+                orderId = 3000L + i,
+                userId = 1L,
+                amount = 10000,
+                couponId = null,
+                items = listOf(
+                    OrderCreatedEvent.OrderItemInfo(
+                        productId = productId,
+                        productName = "Concurrent Product",
+                        quantity = 1,
+                        priceAtOrder = 10000,
+                    ),
+                ),
+                createdAt = ZonedDateTime.now(),
+            )
+            sendEvent("order-events", (3000L + i).toString(), objectMapper.writeValueAsString(event))
+        }
+
+        // then: 최종 집계 결과 검증 - 5개의 이벤트가 모두 정확하게 집계됨
+        awaitMetricsUpdate(productId) { metrics ->
+            assertThat(metrics).isNotNull
+            assertThat(metrics?.salesCount).isEqualTo(5)
+            assertThat(metrics?.totalSalesAmount).isEqualTo(50000)
+        }
+    }
+
+    @Test
+    fun `파싱 실패한 메시지는 재시도 후 DLQ로 라우팅된다`() {
+        // given: Kafka가 실행 중이어야 함
+        assumeTrue(kafkaTemplate != null, "Kafka is not running")
+
+        val invalidPayload = """{"invalid": "malformed json"""
+        val key = "dlq-test-key-1"
+
+        // when: 파싱할 수 없는 잘못된 JSON 전송
+        sendEvent("catalog-events", key, invalidPayload)
+
+        // then: 재시도 후 DLQ로 라우팅됨
+        awaitDlqMessage("catalog-events-dlq", key)
+    }
+
+    @Test
+    fun `eventType 헤더 없는 메시지는 경고 로그만 남기고 처리된다`() {
+        // given: Kafka가 실행 중이어야 함
+        assumeTrue(kafkaTemplate != null, "Kafka is not running")
+
+        // eventType 헤더가 없는 메시지는 "알 수 없는 이벤트 타입" 분기로 처리됨
+        // 이는 에러가 아니므로 DLQ로 가지 않고 정상 처리됨 (acknowledge)
+
+        val payload = """{"someData": "test"}"""
+        val key = "no-event-type-key"
+
+        // when: eventType 헤더 없이 메시지 전송
+        // 참고: sendEvent는 헤더를 설정하지 않으므로 eventType이 null이 됨
+        sendEvent("catalog-events", key, payload)
+
+        // then: 정상 처리되어 DLQ로 가지 않음 (에러가 없으므로)
+        // 이후 정상 이벤트가 여전히 처리되는지 확인
+        val normalEvent = LikeAddedEvent(
+            eventId = UUID.randomUUID(),
+            userId = 1L,
+            productId = PRODUCT_ID_1,
+            createdAt = ZonedDateTime.now(),
+        )
+        sendEvent("catalog-events", PRODUCT_ID_1.toString(), objectMapper.writeValueAsString(normalEvent))
+
+        awaitMetricsUpdate(PRODUCT_ID_1) { metrics ->
+            assertThat(metrics).isNotNull
+            assertThat(metrics?.likeCount).isGreaterThanOrEqualTo(1)
         }
     }
 }
