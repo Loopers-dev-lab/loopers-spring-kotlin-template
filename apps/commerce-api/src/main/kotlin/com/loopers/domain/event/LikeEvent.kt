@@ -1,6 +1,6 @@
 package com.loopers.domain.event
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 /**
  * 좋아요 추가 이벤트
@@ -9,7 +9,7 @@ import java.time.LocalDateTime
 data class LikeAddedEvent(
     val userId: Long,
     val productId: Long,
-    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val createdAt: ZonedDateTime = ZonedDateTime.now(),
 )
 
 /**
@@ -19,5 +19,5 @@ data class LikeAddedEvent(
 data class LikeRemovedEvent(
     val userId: Long,
     val productId: Long,
-    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val createdAt: ZonedDateTime = ZonedDateTime.now(),
 )

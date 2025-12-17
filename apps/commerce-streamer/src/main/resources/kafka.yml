@@ -62,15 +62,21 @@ spring:
   config:
     activate:
       on-profile: dev
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:dev-kafka:9092}
 
 ---
 spring:
   config:
     activate:
       on-profile: qa
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:qa-kafka:9092}
 
 ---
 spring:
   config:
     activate:
       on-profile: prd
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:prod-kafka-1:9092,prod-kafka-2:9092}

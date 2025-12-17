@@ -17,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.test.context.ActiveProfiles
-import java.time.LocalDateTime
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
@@ -91,7 +90,7 @@ class KafkaConsumerE2ETest {
         val event = LikeAddedEvent(
             userId = 1L,
             productId = productId,
-            createdAt = LocalDateTime.now(),
+            createdAt = ZonedDateTime.now(),
         )
         val payload = objectMapper.writeValueAsString(event)
 
@@ -122,7 +121,7 @@ class KafkaConsumerE2ETest {
         val addEvent = LikeAddedEvent(
             userId = 1L,
             productId = productId,
-            createdAt = LocalDateTime.now(),
+            createdAt = ZonedDateTime.now(),
         )
         kafkaTemplate!!.send("catalog-events", productId.toString(), objectMapper.writeValueAsString(addEvent))
             .get(5, TimeUnit.SECONDS)
@@ -140,7 +139,7 @@ class KafkaConsumerE2ETest {
         val removeEvent = LikeRemovedEvent(
             userId = 1L,
             productId = productId,
-            createdAt = LocalDateTime.now(),
+            createdAt = ZonedDateTime.now(),
         )
         kafkaTemplate!!.send("catalog-events", productId.toString(), objectMapper.writeValueAsString(removeEvent))
             .get(5, TimeUnit.SECONDS)
@@ -200,7 +199,7 @@ class KafkaConsumerE2ETest {
         if (kafkaTemplate == null || eventHandledRepository == null || productMetricsRepository == null) return
 
         val productId = 400L
-        val createdAt = LocalDateTime.now()
+        val createdAt = ZonedDateTime.now()
         val event = LikeAddedEvent(
             userId = 1L,
             productId = productId,

@@ -18,6 +18,8 @@ import org.springframework.messaging.handler.annotation.Header
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * Kafka 이벤트 Consumer
@@ -57,7 +59,7 @@ class KafkaEventConsumer(
                 "LikeRemovedEvent" -> handleLikeRemoved(message, acknowledgment)
                 else -> {
                     logger.warn("알 수 없는 이벤트 타입: $eventType")
-                    acknowledgment.acknowledge()
+                    acknowledgeAfterCommit(acknowledgment)
                 }
             }
         } catch (e: Exception) {
@@ -90,7 +92,7 @@ class KafkaEventConsumer(
                 "OrderCreatedEvent" -> handleOrderCreated(message, acknowledgment)
                 else -> {
                     logger.warn("알 수 없는 이벤트 타입: $eventType")
-                    acknowledgment.acknowledge()
+                    acknowledgeAfterCommit(acknowledgment)
                 }
             }
         } catch (e: Exception) {
@@ -107,7 +109,7 @@ class KafkaEventConsumer(
         val event: LikeAddedEvent = objectMapper.readValue(message)
 
         // 전체 타임스탬프를 나노초로 변환 (고유성 보장)
-        val eventVersion = event.createdAt.toEpochSecond(java.time.ZoneOffset.UTC) * 1_000_000_000L +
+        val eventVersion = event.createdAt.toEpochSecond() * 1_000_000_000L +
             event.createdAt.nano
 
         // 멱등성 체크
@@ -119,7 +121,7 @@ class KafkaEventConsumer(
             )
         ) {
             logger.debug("이미 처리된 이벤트: LikeAddedEvent, productId=${event.productId}")
-            acknowledgment.acknowledge()
+            acknowledgeAfterCommit(acknowledgment)
             return
         }
 
@@ -138,7 +140,7 @@ class KafkaEventConsumer(
             ),
         )
 
-        acknowledgment.acknowledge()
+        acknowledgeAfterCommit(acknowledgment)
         logger.info("LikeAddedEvent 처리 완료: productId=${event.productId}, likeCount=${metrics.likeCount}")
     }
 
@@ -149,7 +151,7 @@ class KafkaEventConsumer(
         val event: LikeRemovedEvent = objectMapper.readValue(message)
 
         // 전체 타임스탬프를 나노초로 변환 (고유성 보장)
-        val eventVersion = event.createdAt.toEpochSecond(java.time.ZoneOffset.UTC) * 1_000_000_000L +
+        val eventVersion = event.createdAt.toEpochSecond() * 1_000_000_000L +
             event.createdAt.nano
 
         if (isAlreadyHandled(
@@ -160,7 +162,7 @@ class KafkaEventConsumer(
             )
         ) {
             logger.debug("이미 처리된 이벤트: LikeRemovedEvent, productId=${event.productId}")
-            acknowledgment.acknowledge()
+            acknowledgeAfterCommit(acknowledgment)
             return
         }
 
@@ -178,7 +180,7 @@ class KafkaEventConsumer(
             ),
         )
 
-        acknowledgment.acknowledge()
+        acknowledgeAfterCommit(acknowledgment)
         logger.info("LikeRemovedEvent 처리 완료: productId=${event.productId}, likeCount=${metrics.likeCount}")
     }
 
@@ -200,7 +202,7 @@ class KafkaEventConsumer(
             )
         ) {
             logger.debug("이미 처리된 이벤트: OrderCreatedEvent, orderId=${event.orderId}")
-            acknowledgment.acknowledge()
+            acknowledgeAfterCommit(acknowledgment)
             return
         }
 
@@ -230,7 +232,7 @@ class KafkaEventConsumer(
             ),
         )
 
-        acknowledgment.acknowledge()
+        acknowledgeAfterCommit(acknowledgment)
         logger.info(
             "OrderCreatedEvent 처리 완료: orderId=${event.orderId}, " +
                 "items=${event.items.size}개 상품 판매량 집계",
@@ -251,6 +253,20 @@ class KafkaEventConsumer(
             aggregateType = aggregateType,
             aggregateId = aggregateId,
             eventVersion = eventVersion,
+        )
+    }
+
+    /**
+     * DB 트랜잭션 커밋 후 Kafka offset을 acknowledge
+     * 이를 통해 DB 커밋 실패 시 메시지 손실을 방지
+     */
+    private fun acknowledgeAfterCommit(acknowledgment: Acknowledgment) {
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCommit() {
+                    acknowledgment.acknowledge()
+                }
+            },
         )
     }
 }

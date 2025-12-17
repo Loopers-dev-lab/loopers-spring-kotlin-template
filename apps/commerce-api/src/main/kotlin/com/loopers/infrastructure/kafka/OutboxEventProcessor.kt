@@ -43,6 +43,9 @@ class OutboxEventProcessor(
                     "Outbox 이벤트 최대 재시도 횟수 초과: " +
                         "eventId=${event.id}, retryCount=${event.retryCount}",
                 )
+                // 최대 재시도 횟수 초과 시 FAILED 상태로 설정 및 저장
+                event.markAsFailed("최대 재시도 횟수 초과", maxRetryCount)
+                outboxEventRepository.save(event)
                 return false
             }
 
