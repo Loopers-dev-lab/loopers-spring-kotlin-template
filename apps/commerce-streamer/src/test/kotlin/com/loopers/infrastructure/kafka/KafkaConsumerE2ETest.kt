@@ -51,12 +51,6 @@ import java.util.concurrent.TimeUnit
  *   - 재시도 로직: KafkaConfig의 재시도 정책(3회)이 DLQ 테스트에서 자동 검증
  *   - 알 수 없는 이벤트 타입: 경고 로그만 남기고 정상 처리
  *
- * ## 참고: DB 장애 시나리오 테스트
- * 데이터베이스 장애 시나리오는 E2E 통합 테스트보다는 단위 테스트나
- * 카오스 엔지니어링 테스트에서 다루는 것이 더 적합합니다:
- * - E2E 테스트에서 실제 DB 장애를 시뮬레이션하기 어려움
- * - 트랜잭션 롤백 시나리오는 멱등성 테스트에서 간접적으로 검증됨
- * - acknowledgeAfterCommit 패턴으로 메시지 손실 방지 메커니즘이 구현되어 있음
  */
 @SpringBootTest
 @ActiveProfiles("test")
