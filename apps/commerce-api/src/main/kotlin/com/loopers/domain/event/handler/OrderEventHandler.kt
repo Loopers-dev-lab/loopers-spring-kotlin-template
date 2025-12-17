@@ -78,12 +78,17 @@ class OrderEventHandler(
                 aggregateType = "Order",
                 aggregateId = event.orderId,
             )
+        } catch (e: Exception) {
+            // Outbox 발행 실패는 재시도 가능하도록 로깅
+            logger.error("Outbox 이벤트 발행 실패: orderId=${event.orderId}", e)
+            throw e
+        }
 
+        try {
             logger.info("데이터 플랫폼 전송 시작: orderId=${event.orderId}")
             dataPlatformClient.sendOrderCreated(event)
             logger.info("데이터 플랫폼 전송 완료: orderId=${event.orderId}")
         } catch (e: Exception) {
-            // Outbox는 이미 저장되었으므로 Kafka 전송은 보장됨
             // 데이터 플랫폼 전송 실패는 주문에 영향을 주지 않음
             logger.error("데이터 플랫폼 전송 실패: orderId=${event.orderId}", e)
         }
@@ -134,6 +139,22 @@ class OrderEventHandler(
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handlePaymentCompletedForDataPlatform(event: PaymentCompletedEvent) {
+        try {
+            // Outbox 테이블에 이벤트 저장 (Kafka 전송을 위해)
+            outboxEventPublisher.publish(
+                eventType = "PaymentCompletedEvent",
+                topic = "payment-events",
+                partitionKey = event.paymentId.toString(),
+                payload = event,
+                aggregateType = "Payment",
+                aggregateId = event.paymentId,
+            )
+        } catch (e: Exception) {
+            // Outbox 발행 실패는 재시도 가능하도록 로깅
+            logger.error("Outbox 이벤트 발행 실패: paymentId=${event.paymentId}", e)
+            throw e
+        }
+
         try {
             logger.info("결제 완료 데이터 플랫폼 전송 시작: orderId=${event.orderId}, paymentId=${event.paymentId}")
             dataPlatformClient.sendPaymentCompleted(event)
