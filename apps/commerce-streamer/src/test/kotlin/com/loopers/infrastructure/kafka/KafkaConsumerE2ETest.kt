@@ -60,6 +60,7 @@ class KafkaConsumerE2ETest {
         private const val KAFKA_SEND_TIMEOUT_SECONDS = 5L
         private const val AWAIT_TIMEOUT_SECONDS = 10L
         private const val AWAIT_POLL_INTERVAL_MILLIS = 500L
+        private const val DLQ_POLL_TIMEOUT_MILLIS = 15000L
 
         private const val PRODUCT_ID_1 = 100L
         private const val PRODUCT_ID_2 = 200L
@@ -146,7 +147,7 @@ class KafkaConsumerE2ETest {
 
             // DLQ에 메시지가 도착할 때까지 폴링 (최대 15초)
             var found = false
-            val endTime = System.currentTimeMillis() + 15000
+            val endTime = System.currentTimeMillis() + DLQ_POLL_TIMEOUT_MILLIS
 
             while (System.currentTimeMillis() < endTime && !found) {
                 val records = consumer.poll(Duration.ofMillis(1000))
@@ -502,7 +503,7 @@ class KafkaConsumerE2ETest {
 
         awaitMetricsUpdate(PRODUCT_ID_1) { metrics ->
             assertThat(metrics).isNotNull
-            assertThat(metrics?.likeCount).isGreaterThanOrEqualTo(1)
+            assertThat(metrics?.likeCount).isEqualTo(1)
         }
     }
 }
