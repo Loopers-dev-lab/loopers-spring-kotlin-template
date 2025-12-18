@@ -54,7 +54,7 @@ class ProductFacade(
 
             val cachedProducts = cacheTemplate.getAll(detailCacheKeys, TYPE_PRODUCT_VIEW)
 
-            val cachedMap = cachedProducts.associateBy { it.product.id }
+            val cachedMap = cachedProducts.associateBy { it.productId }
 
             val cachedIds = cachedMap.keys
             val missingIds = cachedList.productIds.filterNot { it in cachedIds }
@@ -62,7 +62,7 @@ class ProductFacade(
             // 캐시 미스된 상품들만 DB 조회
             val dbProducts = productService.findAllProductViewByIds(missingIds)
 
-            val dbMap = dbProducts.associateBy { it.product.id }
+            val dbMap = dbProducts.associateBy { it.productId }
 
             val orderedProducts = cachedList.productIds.mapNotNull { id ->
                 cachedMap[id] ?: dbMap[id]
@@ -70,7 +70,7 @@ class ProductFacade(
 
             // 누락된 상품들 detail 캐싱
             val dbCacheMap = dbProducts.associateBy {
-                ProductCacheKeys.ProductDetail(productId = it.product.id)
+                ProductCacheKeys.ProductDetail(productId = it.productId)
             }
             cacheTemplate.putAll(dbCacheMap)
 
@@ -86,7 +86,7 @@ class ProductFacade(
         val slice = productService.findProducts(command)
 
         val cachedProductList = CachedProductList(
-            productIds = slice.content.map { it.product.id },
+            productIds = slice.content.map { it.productId },
             hasNext = slice.hasNext(),
         )
 
@@ -94,7 +94,7 @@ class ProductFacade(
         cacheTemplate.put(cacheKey, cachedProductList)
 
         val productCacheKeys = slice.content
-            .associateBy { ProductCacheKeys.ProductDetail(productId = it.product.id) }
+            .associateBy { ProductCacheKeys.ProductDetail(productId = it.productId) }
 
         cacheTemplate.putAll(productCacheKeys)
 

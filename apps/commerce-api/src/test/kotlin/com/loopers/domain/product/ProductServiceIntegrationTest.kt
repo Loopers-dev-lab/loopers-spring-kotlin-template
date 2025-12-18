@@ -78,11 +78,10 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             assertAll(
-                { assertThat(productView.product.id).isEqualTo(product.id) },
-                { assertThat(productView.stock.productId).isEqualTo(product.id) },
-                { assertThat(productView.stock.quantity).isEqualTo(100) },
-                { assertThat(productView.brand.id).isEqualTo(product.brandId) },
-                { assertThat(productView.statistic.productId).isEqualTo(product.id) },
+                { assertThat(productView.productId).isEqualTo(product.id) },
+                { assertThat(productView.stockQuantity).isEqualTo(100) },
+                { assertThat(productView.brandId).isEqualTo(product.brandId) },
+                { assertThat(productView.likeCount).isEqualTo(0L) },
             )
         }
 
@@ -146,7 +145,7 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             assertThat(result.content).hasSize(2)
-            assertThat(result.content).allMatch { it.brand.id == brand1.id }
+            assertThat(result.content).allMatch { it.brandId == brand1.id }
         }
     }
 
@@ -315,17 +314,17 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             assertThat(productViews).hasSize(3)
-            assertThat(productViews.map { it.product.id }).containsExactlyInAnyOrder(
+            assertThat(productViews.map { it.productId }).containsExactlyInAnyOrder(
                 product1.id,
                 product2.id,
                 product3.id,
             )
             productViews.forEach { productView ->
                 assertAll(
-                    { assertThat(productView.product).isNotNull() },
-                    { assertThat(productView.stock).isNotNull() },
-                    { assertThat(productView.statistic).isNotNull() },
-                    { assertThat(productView.brand).isNotNull() },
+                    { assertThat(productView.productId).isNotNull() },
+                    { assertThat(productView.stockQuantity).isNotNull() },
+                    { assertThat(productView.likeCount).isNotNull() },
+                    { assertThat(productView.brandId).isNotNull() },
                 )
             }
         }
@@ -371,7 +370,7 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             assertThat(productViews).hasSize(1)
-            assertThat(productViews[0].product.id).isEqualTo(product.id)
+            assertThat(productViews[0].productId).isEqualTo(product.id)
         }
     }
 

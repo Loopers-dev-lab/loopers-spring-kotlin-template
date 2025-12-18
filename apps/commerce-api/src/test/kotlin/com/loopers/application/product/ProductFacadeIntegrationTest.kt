@@ -94,9 +94,9 @@ class ProductFacadeIntegrationTest @Autowired constructor(
             )
 
             assertThat(cachedValue).isNotNull()
-            assertThat(cachedValue!!.product.id).isEqualTo(product.id)
-            assertThat(cachedValue.product.name).isEqualTo("테스트 상품")
-            assertThat(cachedValue.product.price).isEqualTo(Money.krw(50000))
+            assertThat(cachedValue!!.productId).isEqualTo(product.id)
+            assertThat(cachedValue.productName).isEqualTo("테스트 상품")
+            assertThat(cachedValue.price).isEqualTo(Money.krw(50000))
         }
     }
 
@@ -288,7 +288,7 @@ class ProductFacadeIntegrationTest @Autowired constructor(
                 object : com.fasterxml.jackson.core.type.TypeReference<com.loopers.domain.product.ProductView>() {},
             )
             assertThat(product2CachedAgain).isNotNull()
-            assertThat(product2CachedAgain!!.stock.quantity).isEqualTo(originalQuantity - 10)
+            assertThat(product2CachedAgain!!.stockQuantity).isEqualTo(originalQuantity - 10)
         }
 
         @Test
