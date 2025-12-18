@@ -6,8 +6,7 @@ data class CatalogEventPayload(val productId: Long, val userId: Long) : EventPay
 
 data class OrderEventPayload(val productId: Long, val orderId: Long) : EventPayload
 
-data class LikeEventPayload(val productId: Long, val userId: Long, val type: LikeType) :
-        EventPayload {
+data class LikeEventPayload(val eventId: String, val productId: Long, val userId: Long, val type: LikeType) : EventPayload {
     enum class LikeType {
         LIKED,
         UNLIKED,

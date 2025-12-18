@@ -22,6 +22,7 @@ import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
 class KafkaConfig {
     companion object {
         const val BATCH_LISTENER = "BATCH_LISTENER_DEFAULT"
+        const val LIKE_METRICS_LISTENER = "LIKE_METRICS_LISTENER"
 
         private const val MAX_POLLING_SIZE = 3000 // read 3000 msg
         private const val FETCH_MIN_BYTES = (1024 * 1024) // 1mb
@@ -86,5 +87,47 @@ class KafkaConfig {
             setConcurrency(3)
             isBatchListener = true
         }
+    }
+
+    @Bean(LIKE_METRICS_LISTENER)
+    fun likeMetricsKafkaListenerContainerFactory(
+        jsonConverter: ByteArrayJsonMessageConverter,
+        kafkaTemplate: KafkaTemplate<Any, Any>,
+        consumerFactory: ConsumerFactory<Any, Any>,
+        kafkaProperties: KafkaProperties,
+    ): ConcurrentKafkaListenerContainerFactory<Any, Any> {
+        // 기본 Consumer 설정 복사 + 오버라이드
+        val propMap = HashMap(kafkaProperties.buildConsumerProperties()).apply {
+            put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest") // ✅ 과거 이벤트부터 모두 소비 (정확한 집계 보장)
+            put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, MAX_POLLING_SIZE)
+            put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, FETCH_MIN_BYTES)
+            put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, FETCH_MAX_WAIT_MS)
+            put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, SESSION_TIMEOUT_MS)
+            put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, HEARTBEAT_INTERVAL_MS)
+            put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, MAX_POLL_INTERVAL_MS)
+        }
+
+        val factory = ConcurrentKafkaListenerContainerFactory<Any, Any>().apply {
+            this.consumerFactory = DefaultKafkaConsumerFactory(propMap)
+
+            // 파티션 수에 맞춰 병렬 처리(예: 3 파티션 가정)
+            // - 이유: 병렬로 배치를 처리해 처리량/지연을 동시에 잡는다.
+            setConcurrency(3)
+
+            // 배치 리스너로 동작
+            // - 이유: 여러 레코드를 모아 한 번에 DB에 반영 → 트랜잭션/커넥션 비용 절감
+            isBatchListener = true
+
+            // 컨테이너 동작 세부
+            containerProperties.apply {
+                pollTimeout = 1000 // 1초마다 poll → 실시간성 유지(대기 과도 방지)
+                ackMode = ContainerProperties.AckMode.MANUAL // 수동 커밋 → 처리 성공 후에만 커밋(멱등성/재처리 제어)
+                isSyncCommits = true // 커밋 응답 대기 → 중복 소비/유실 리스크 감소
+                isObservationEnabled = true // Micrometer 관측(메트릭/트레이싱)
+                isDeliveryAttemptHeader = true // 재시도 횟수 헤더 노출 → 운영 관측성 향상
+            }
+        }
+
+        return factory
     }
 }
