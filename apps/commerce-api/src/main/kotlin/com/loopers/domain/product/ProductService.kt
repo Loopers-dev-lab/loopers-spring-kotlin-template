@@ -195,7 +195,16 @@ class ProductService(
             stock.decrease(decreasedStock.amount)
         }
 
+        // Product status update
+        val products = productRepository.findAllByIds(decreaseProductIds)
+        val productsMap = products.associateBy { it.id }
+
+        lockedStocks.forEach { stock ->
+            productsMap[stock.productId]?.updateSaleStatus(stock.quantity)
+        }
+
         stockRepository.saveAll(lockedStocks)
+        productRepository.saveAll(products)
     }
 
     @Transactional
@@ -240,6 +249,15 @@ class ProductService(
             stock.increase(increasedStock.amount)
         }
 
+        // Product status update
+        val products = productRepository.findAllByIds(increaseProductIds)
+        val productsMap = products.associateBy { it.id }
+
+        lockedStocks.forEach { stock ->
+            productsMap[stock.productId]?.updateSaleStatus(stock.quantity)
+        }
+
         stockRepository.saveAll(lockedStocks)
+        productRepository.saveAll(products)
     }
 }
