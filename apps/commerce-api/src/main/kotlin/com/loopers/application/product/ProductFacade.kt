@@ -3,7 +3,6 @@ package com.loopers.application.product
 import com.fasterxml.jackson.core.type.TypeReference
 import com.loopers.cache.CacheTemplate
 import com.loopers.domain.product.ProductService
-import com.loopers.domain.product.ProductView
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
 import org.springframework.stereotype.Component
@@ -14,18 +13,21 @@ class ProductFacade(
     private val cacheTemplate: CacheTemplate,
 ) {
     companion object {
-        private val TYPE_PRODUCT_VIEW = object : TypeReference<ProductView>() {}
+        private val TYPE_CACHED_PRODUCT_DETAIL_V1 = object : TypeReference<CachedProductDetailV1>() {}
         private val TYPE_CACHED_PRODUCT_LIST = object : TypeReference<CachedProductList>() {}
     }
 
     fun findProductById(id: Long): ProductInfo.FindProductById {
         val cacheKey = ProductCacheKeys.ProductDetail(productId = id)
 
-        val productView = cacheTemplate.cacheAside(
-            cacheKey = cacheKey,
-            typeReference = TYPE_PRODUCT_VIEW,
-        ) {
-            productService.findProductViewById(id)
+        val cached = cacheTemplate.get(cacheKey, TYPE_CACHED_PRODUCT_DETAIL_V1)
+
+        val productView = if (cached != null) {
+            cached.toProductView()
+        } else {
+            val view = productService.findProductViewById(id)
+            cacheTemplate.put(cacheKey, CachedProductDetailV1.from(view))
+            view
         }
 
         return ProductInfo.FindProductById.from(productView)
@@ -52,7 +54,8 @@ class ProductFacade(
                 ProductCacheKeys.ProductDetail(productId = it)
             }
 
-            val cachedProducts = cacheTemplate.getAll(detailCacheKeys, TYPE_PRODUCT_VIEW)
+            val cachedProducts = cacheTemplate.getAll(detailCacheKeys, TYPE_CACHED_PRODUCT_DETAIL_V1)
+                .map { it.toProductView() }
 
             val cachedMap = cachedProducts.associateBy { it.productId }
 
@@ -69,8 +72,8 @@ class ProductFacade(
             }
 
             // 누락된 상품들 detail 캐싱
-            val dbCacheMap = dbProducts.associateBy {
-                ProductCacheKeys.ProductDetail(productId = it.productId)
+            val dbCacheMap = dbProducts.associate {
+                ProductCacheKeys.ProductDetail(productId = it.productId) to CachedProductDetailV1.from(it)
             }
             cacheTemplate.putAll(dbCacheMap)
 
@@ -93,8 +96,9 @@ class ProductFacade(
         // 조회 결과 캐싱
         cacheTemplate.put(cacheKey, cachedProductList)
 
-        val productCacheKeys = slice.content
-            .associateBy { ProductCacheKeys.ProductDetail(productId = it.productId) }
+        val productCacheKeys = slice.content.associate {
+            ProductCacheKeys.ProductDetail(productId = it.productId) to CachedProductDetailV1.from(it)
+        }
 
         cacheTemplate.putAll(productCacheKeys)
 

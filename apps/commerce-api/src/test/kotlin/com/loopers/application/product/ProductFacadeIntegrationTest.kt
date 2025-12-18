@@ -90,13 +90,13 @@ class ProductFacadeIntegrationTest @Autowired constructor(
             // then - Redis에서 직접 조회해서 데이터 확인
             val cachedValue = cacheTemplate.get(
                 cacheKey,
-                object : com.fasterxml.jackson.core.type.TypeReference<com.loopers.domain.product.ProductView>() {},
+                object : com.fasterxml.jackson.core.type.TypeReference<CachedProductDetailV1>() {},
             )
 
             assertThat(cachedValue).isNotNull()
             assertThat(cachedValue!!.productId).isEqualTo(product.id)
             assertThat(cachedValue.productName).isEqualTo("테스트 상품")
-            assertThat(cachedValue.price).isEqualTo(Money.krw(50000))
+            assertThat(cachedValue.price).isEqualTo(50000L)
         }
     }
 
@@ -285,7 +285,7 @@ class ProductFacadeIntegrationTest @Autowired constructor(
             // then - product2의 detail 캐시가 다시 저장되었는지 확인
             val product2CachedAgain = cacheTemplate.get(
                 product2CacheKey,
-                object : com.fasterxml.jackson.core.type.TypeReference<com.loopers.domain.product.ProductView>() {},
+                object : com.fasterxml.jackson.core.type.TypeReference<CachedProductDetailV1>() {},
             )
             assertThat(product2CachedAgain).isNotNull()
             assertThat(product2CachedAgain!!.stockQuantity).isEqualTo(originalQuantity - 10)
