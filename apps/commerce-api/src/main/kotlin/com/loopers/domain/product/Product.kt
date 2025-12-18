@@ -6,6 +6,8 @@ import jakarta.persistence.AttributeOverride
 import jakarta.persistence.Column
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
+import jakarta.persistence.Enumerated
+import jakarta.persistence.EnumType
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 
@@ -40,6 +42,15 @@ class Product(
     @AttributeOverride(name = "amount", column = Column(name = "price", nullable = false))
     var price: Money = price
         private set
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    var status: ProductSaleStatus = ProductSaleStatus.ON_SALE
+        private set
+
+    fun updateSaleStatus(stockQuantity: Int) {
+        this.status = if (stockQuantity == 0) ProductSaleStatus.SOLD_OUT else ProductSaleStatus.ON_SALE
+    }
 
     companion object {
         fun create(

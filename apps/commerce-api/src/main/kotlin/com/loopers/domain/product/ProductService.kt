@@ -48,11 +48,11 @@ class ProductService(
                 customMessage = "[productId = $id] 상품의 통계를 찾을 수 없습니다.",
             )
 
-        return ProductView(
+        return ProductView.of(
             product = product,
             stock = stock,
-            statistic = statistic,
             brand = brand,
+            statistic = statistic,
         )
     }
 
@@ -77,22 +77,22 @@ class ProductService(
             .associateBy { it.id }
 
         return slicedProduct.map {
-            ProductView(
+            ProductView.of(
                 product = it,
                 stock = stocksToMap[it.id]
                     ?: throw CoreException(
                         errorType = ErrorType.INTERNAL_ERROR,
                         customMessage = "[productId = ${it.id}] 상품의 재고를 찾을 수 없습니다.",
                     ),
-                statistic = productStatisticsToMap[it.id]
-                    ?: throw CoreException(
-                        errorType = ErrorType.INTERNAL_ERROR,
-                        customMessage = "[productId = ${it.id}] 상품의 통계를 찾을 수 없습니다.",
-                    ),
                 brand = brandsToMap[it.brandId]
                     ?: throw CoreException(
                         errorType = ErrorType.INTERNAL_ERROR,
                         customMessage = "[brandId = ${it.brandId}] 상품의 브랜드를 찾을 수 없습니다.",
+                    ),
+                statistic = productStatisticsToMap[it.id]
+                    ?: throw CoreException(
+                        errorType = ErrorType.INTERNAL_ERROR,
+                        customMessage = "[productId = ${it.id}] 상품의 통계를 찾을 수 없습니다.",
                     ),
             )
         }
@@ -147,22 +147,22 @@ class ProductService(
             .associateBy { it.id }
 
         return products.map { product ->
-            ProductView(
+            ProductView.of(
                 product = product,
                 stock = stocksToMap[product.id]
                     ?: throw CoreException(
                         errorType = ErrorType.INTERNAL_ERROR,
                         customMessage = "[productId = ${product.id}] 상품의 재고를 찾을 수 없습니다.",
                     ),
-                statistic = productStatisticsToMap[product.id]
-                    ?: throw CoreException(
-                        errorType = ErrorType.INTERNAL_ERROR,
-                        customMessage = "[productId = ${product.id}] 상품의 통계를 찾을 수 없습니다.",
-                    ),
                 brand = brandsToMap[product.brandId]
                     ?: throw CoreException(
                         errorType = ErrorType.INTERNAL_ERROR,
                         customMessage = "[brandId = ${product.brandId}] 상품의 브랜드를 찾을 수 없습니다.",
+                    ),
+                statistic = productStatisticsToMap[product.id]
+                    ?: throw CoreException(
+                        errorType = ErrorType.INTERNAL_ERROR,
+                        customMessage = "[productId = ${product.id}] 상품의 통계를 찾을 수 없습니다.",
                     ),
             )
         }
@@ -195,7 +195,16 @@ class ProductService(
             stock.decrease(decreasedStock.amount)
         }
 
+        // Product status update
+        val products = productRepository.findAllByIds(decreaseProductIds)
+        val productsMap = products.associateBy { it.id }
+
+        lockedStocks.forEach { stock ->
+            productsMap[stock.productId]?.updateSaleStatus(stock.quantity)
+        }
+
         stockRepository.saveAll(lockedStocks)
+        productRepository.saveAll(products)
     }
 
     @Transactional
@@ -240,6 +249,15 @@ class ProductService(
             stock.increase(increasedStock.amount)
         }
 
+        // Product status update
+        val products = productRepository.findAllByIds(increaseProductIds)
+        val productsMap = products.associateBy { it.id }
+
+        lockedStocks.forEach { stock ->
+            productsMap[stock.productId]?.updateSaleStatus(stock.quantity)
+        }
+
         stockRepository.saveAll(lockedStocks)
+        productRepository.saveAll(products)
     }
 }

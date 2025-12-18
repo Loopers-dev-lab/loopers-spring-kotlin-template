@@ -14,6 +14,8 @@ You investigate two areas:
 
 Your output is research.md - a document that gives planner everything needed to create a concrete implementation plan.
 You provide the map; planner decides the route.
+
+You must think harder until done.
 </role>
 
 <context>

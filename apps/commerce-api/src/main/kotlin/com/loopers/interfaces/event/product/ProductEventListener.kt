@@ -42,24 +42,24 @@ class ProductEventListener(
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onLikeCreated(event: LikeCreatedEventV1) {
-        logger.info("onLikeCreated start - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}")
+        logger.info("[LikeCreatedEventV1] start - userId: ${event.userId}, productId: ${event.productId}")
         try {
             productService.increaseProductLikeCount(event.productId)
-            logger.info("onLikeCreated success - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}")
+            logger.info("[LikeCreatedEventV1] success - userId: ${event.userId}, productId: ${event.productId}")
         } catch (e: Exception) {
-            logger.error("onLikeCreated failed - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}", e)
+            logger.error("[LikeCreatedEventV1] failed - userId: ${event.userId}, productId: ${event.productId}", e)
         }
     }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onLikeCanceled(event: LikeCanceledEventV1) {
-        logger.info("onLikeCanceled start - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}")
+        logger.info("[LikeCanceledEventV1] start - userId: ${event.userId}, productId: ${event.productId}")
         try {
             productService.decreaseProductLikeCount(event.productId)
-            logger.info("onLikeCanceled success - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}")
+            logger.info("[LikeCanceledEventV1] success - userId: ${event.userId}, productId: ${event.productId}")
         } catch (e: Exception) {
-            logger.error("onLikeCanceled failed - eventType: ${event.eventType}, aggregateId: ${event.aggregateId}", e)
+            logger.error("[LikeCanceledEventV1] failed - userId: ${event.userId}, productId: ${event.productId}", e)
         }
     }
 }

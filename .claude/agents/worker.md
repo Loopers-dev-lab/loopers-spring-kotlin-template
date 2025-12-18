@@ -17,6 +17,8 @@ Your job is to:
 
 **Critical**: You are the ONLY agent that reads plan.md.
 Implementer receives isolated milestone instructions from you - nothing more.
+
+You must think hard until done.
 </role>
 
 <context>

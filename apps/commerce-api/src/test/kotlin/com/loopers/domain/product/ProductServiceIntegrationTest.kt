@@ -78,11 +78,10 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             assertAll(
-                { assertThat(productView.product.id).isEqualTo(product.id) },
-                { assertThat(productView.stock.productId).isEqualTo(product.id) },
-                { assertThat(productView.stock.quantity).isEqualTo(100) },
-                { assertThat(productView.brand.id).isEqualTo(product.brandId) },
-                { assertThat(productView.statistic.productId).isEqualTo(product.id) },
+                { assertThat(productView.productId).isEqualTo(product.id) },
+                { assertThat(productView.stockQuantity).isEqualTo(100) },
+                { assertThat(productView.brandId).isEqualTo(product.brandId) },
+                { assertThat(productView.likeCount).isEqualTo(0L) },
             )
         }
 
@@ -146,7 +145,7 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             assertThat(result.content).hasSize(2)
-            assertThat(result.content).allMatch { it.brand.id == brand1.id }
+            assertThat(result.content).allMatch { it.brandId == brand1.id }
         }
     }
 
@@ -173,9 +172,13 @@ class ProductServiceIntegrationTest @Autowired constructor(
             // then
             val updatedStock1 = stockRepository.findByProductId(product1.id)!!
             val updatedStock2 = stockRepository.findByProductId(product2.id)!!
+            val updatedProduct1 = productRepository.findById(product1.id)!!
+            val updatedProduct2 = productRepository.findById(product2.id)!!
             assertAll(
                 { assertThat(updatedStock1.quantity).isEqualTo(90) },
                 { assertThat(updatedStock2.quantity).isEqualTo(45) },
+                { assertThat(updatedProduct1.status).isEqualTo(ProductSaleStatus.ON_SALE) },
+                { assertThat(updatedProduct2.status).isEqualTo(ProductSaleStatus.ON_SALE) },
             )
         }
 
@@ -195,7 +198,11 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             val updatedStock = stockRepository.findByProductId(product.id)!!
-            assertThat(updatedStock.quantity).isEqualTo(0)
+            val updatedProduct = productRepository.findById(product.id)!!
+            assertAll(
+                { assertThat(updatedStock.quantity).isEqualTo(0) },
+                { assertThat(updatedProduct.status).isEqualTo(ProductSaleStatus.SOLD_OUT) },
+            )
         }
 
         @DisplayName("재고가 부족하면 예외가 발생한다")
@@ -295,6 +302,42 @@ class ProductServiceIntegrationTest @Autowired constructor(
                 { assertThat(stockRepository.findByProductId(product2.id)?.quantity).isEqualTo(35) },
             )
         }
+
+        @DisplayName("재고가 0에서 증가하면 상품 상태가 ON_SALE로 변경된다")
+        @Test
+        fun `update product status to ON_SALE when stock increases from zero`() {
+            // given
+            val brand = brandRepository.save(Brand.of("브랜드"))
+            val product = createProduct(brandId = brand.id, stockQuantity = 10)
+
+            // 재고를 0으로 감소시킴
+            val decreaseCommand = ProductCommand.DecreaseStocks(
+                units = listOf(
+                    ProductCommand.DecreaseStockUnit(productId = product.id, amount = 10),
+                ),
+            )
+            productService.decreaseStocks(decreaseCommand)
+
+            // 상품이 SOLD_OUT 상태인지 확인
+            val soldOutProduct = productRepository.findById(product.id)!!
+            assertThat(soldOutProduct.status).isEqualTo(ProductSaleStatus.SOLD_OUT)
+
+            // when
+            val increaseCommand = ProductCommand.IncreaseStocks(
+                units = listOf(
+                    ProductCommand.IncreaseStockUnit(productId = product.id, amount = 5),
+                ),
+            )
+            productService.increaseStocks(increaseCommand)
+
+            // then
+            val updatedStock = stockRepository.findByProductId(product.id)
+            val updatedProduct = productRepository.findById(product.id)!!
+            assertAll(
+                { assertThat(updatedStock?.quantity).isEqualTo(5) },
+                { assertThat(updatedProduct.status).isEqualTo(ProductSaleStatus.ON_SALE) },
+            )
+        }
     }
 
     @DisplayName("여러 상품 상세 조회 통합테스트")
@@ -315,17 +358,17 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             assertThat(productViews).hasSize(3)
-            assertThat(productViews.map { it.product.id }).containsExactlyInAnyOrder(
+            assertThat(productViews.map { it.productId }).containsExactlyInAnyOrder(
                 product1.id,
                 product2.id,
                 product3.id,
             )
             productViews.forEach { productView ->
                 assertAll(
-                    { assertThat(productView.product).isNotNull() },
-                    { assertThat(productView.stock).isNotNull() },
-                    { assertThat(productView.statistic).isNotNull() },
-                    { assertThat(productView.brand).isNotNull() },
+                    { assertThat(productView.productId).isNotNull() },
+                    { assertThat(productView.stockQuantity).isNotNull() },
+                    { assertThat(productView.likeCount).isNotNull() },
+                    { assertThat(productView.brandId).isNotNull() },
                 )
             }
         }
@@ -371,7 +414,7 @@ class ProductServiceIntegrationTest @Autowired constructor(
 
             // then
             assertThat(productViews).hasSize(1)
-            assertThat(productViews[0].product.id).isEqualTo(product.id)
+            assertThat(productViews[0].productId).isEqualTo(product.id)
         }
     }
 
