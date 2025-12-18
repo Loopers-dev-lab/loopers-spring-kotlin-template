@@ -1,4 +1,5 @@
 server:
+  port: 9999
   shutdown: graceful
   tomcat:
     threads:
@@ -19,11 +20,11 @@ spring:
     active: local
   config:
     import:
-      - jpa.yml
+      - jpa-streamer.yml
       - redis.yml
       - kafka.yml
       - logging.yml
-      - monitoring.yml
+      - monitoring-streamer.yml
 
 demo-kafka:
   test:

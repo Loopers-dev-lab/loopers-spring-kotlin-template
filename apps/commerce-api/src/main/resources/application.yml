@@ -1,4 +1,9 @@
+management:
+  server:
+    port: 8082
+
 server:
+  port: 8080
   shutdown: graceful
   tomcat:
     threads:
@@ -22,6 +27,7 @@ spring:
       - jpa.yml
       - redis.yml
       - logging.yml
+      - kafka.yml
       - monitoring.yml
       - resilience.yml
 
