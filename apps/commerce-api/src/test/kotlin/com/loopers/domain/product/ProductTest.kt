@@ -30,6 +30,7 @@ class ProductTest {
             assertThat(product.brandId).isEqualTo(brand.id)
             assertThat(product.name).isEqualTo(name)
             assertThat(product.price).isEqualTo(price)
+            assertThat(product.status).isEqualTo(ProductSaleStatus.ON_SALE)
         }
 
         @DisplayName("of 팩토리 메서드로 상품을 생성할 수 있다")
@@ -51,6 +52,38 @@ class ProductTest {
             assertThat(product.brandId).isEqualTo(brandId)
             assertThat(product.name).isEqualTo(name)
             assertThat(product.price).isEqualTo(price)
+        }
+    }
+
+    @DisplayName("상품 판매 상태 변경 테스트")
+    @Nested
+    inner class UpdateSaleStatus {
+
+        @DisplayName("재고가 0이면 품절 상태로 변경된다")
+        @Test
+        fun `updateSaleStatus with zero stock sets SOLD_OUT`() {
+            // given
+            val product = createNewProduct()
+
+            // when
+            product.updateSaleStatus(0)
+
+            // then
+            assertThat(product.status).isEqualTo(ProductSaleStatus.SOLD_OUT)
+        }
+
+        @DisplayName("재고가 0보다 크면 판매중 상태로 변경된다")
+        @Test
+        fun `updateSaleStatus with positive stock sets ON_SALE`() {
+            // given
+            val product = createNewProduct()
+            product.updateSaleStatus(0) // 먼저 품절 상태로 변경
+
+            // when
+            product.updateSaleStatus(10)
+
+            // then
+            assertThat(product.status).isEqualTo(ProductSaleStatus.ON_SALE)
         }
     }
 
