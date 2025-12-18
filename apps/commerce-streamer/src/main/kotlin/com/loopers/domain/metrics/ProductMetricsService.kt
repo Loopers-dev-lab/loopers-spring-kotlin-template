@@ -1,5 +1,6 @@
 package com.loopers.domain.metrics
 
+import com.loopers.domain.event.EventProcessingResult.SHOULD_PROCESS
 import com.loopers.domain.event.EventService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -12,6 +13,7 @@ import java.time.ZonedDateTime
  * 좋아요, 조회수, 판매 수량 등 상품 메트릭스 업데이트 로직을 담당
  */
 @Service
+@Transactional
 class ProductMetricsService(
     private val productMetricsRepository: ProductMetricsRepository,
     private val eventService: EventService,
@@ -21,7 +23,6 @@ class ProductMetricsService(
     /**
      * 좋아요 수 증가
      */
-    @Transactional
     fun increaseLikeCount(
         productId: Long,
         eventId: String,
@@ -40,7 +41,7 @@ class ProductMetricsService(
             aggregateId = aggregateId,
         )
 
-        if (result != EventService.EventProcessingResult.SHOULD_PROCESS) {
+        if (result != SHOULD_PROCESS) {
             return
         }
 
@@ -66,7 +67,6 @@ class ProductMetricsService(
     /**
      * 좋아요 수 감소
      */
-    @Transactional
     fun decreaseLikeCount(
         productId: Long,
         eventId: String,
@@ -84,7 +84,7 @@ class ProductMetricsService(
             aggregateId = aggregateId,
         )
 
-        if (result != EventService.EventProcessingResult.SHOULD_PROCESS) {
+        if (result != SHOULD_PROCESS) {
             return
         }
 
@@ -110,7 +110,6 @@ class ProductMetricsService(
      *
      * 조회수는 단순 증가만 있으므로 순서 보장이 필요 없고, 멱등성만 체크한다.
      */
-    @Transactional
     fun increaseViewCount(
         productId: Long,
         eventId: String,
@@ -140,7 +139,6 @@ class ProductMetricsService(
     /**
      * 판매 수량 증가 (주문 완료)
      */
-    @Transactional
     fun increaseSoldCount(
         productId: Long,
         quantity: Int,
@@ -159,7 +157,7 @@ class ProductMetricsService(
             aggregateId = aggregateId,
         )
 
-        if (result != EventService.EventProcessingResult.SHOULD_PROCESS) {
+        if (result != SHOULD_PROCESS) {
             return
         }
 
@@ -183,7 +181,6 @@ class ProductMetricsService(
     /**
      * 판매 수량 감소 (주문 취소)
      */
-    @Transactional
     fun decreaseSoldCount(
         productId: Long,
         quantity: Int,
@@ -202,7 +199,7 @@ class ProductMetricsService(
             aggregateId = aggregateId,
         )
 
-        if (result != EventService.EventProcessingResult.SHOULD_PROCESS) {
+        if (result != SHOULD_PROCESS) {
             return
         }
 

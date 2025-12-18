@@ -23,5 +23,5 @@ dependencies {
     testImplementation(testFixtures(project(":modules:redis")))
 
     // awaitility (비동기 테스트)
-    testImplementation("org.awaitility:awaitility-kotlin:4.2.0")
+    testImplementation("org.awaitility:awaitility-kotlin:4.3.0")
 }

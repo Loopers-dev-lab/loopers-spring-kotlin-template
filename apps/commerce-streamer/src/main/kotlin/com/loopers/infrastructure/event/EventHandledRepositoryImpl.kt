@@ -9,10 +9,6 @@ class EventHandledRepositoryImpl(
     private val eventHandledJpaRepository: EventHandledJpaRepository,
 ) : EventHandledRepository {
 
-    override fun existsById(eventId: String): Boolean {
-        return eventHandledJpaRepository.existsEventHandledByEventId(eventId)
-    }
-
     override fun existsByEventIdAndAggregateId(eventId: String, aggregateId: String): Boolean {
         return eventHandledJpaRepository.existsByEventIdAndAggregateId(eventId, aggregateId)
     }

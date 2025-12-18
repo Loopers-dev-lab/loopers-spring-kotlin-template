@@ -106,7 +106,6 @@ class ProductEventListener(
         )
     }
 
-    @Async
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     fun handle(event: ProductEvent.OutOfStock) {
         log.debug("Outbox 저장: OutOfStock - productId={}", event.productId)

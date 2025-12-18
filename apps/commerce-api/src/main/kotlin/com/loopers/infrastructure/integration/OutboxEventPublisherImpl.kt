@@ -88,6 +88,6 @@ class OutboxEventPublisherImpl(
      */
     private fun resolveTopic(outbox: Outbox): String {
         return EVENT_TOPIC_MAP[outbox.eventType]
-            ?: throw IllegalArgumentException("No topic mapping for aggregateType: ${outbox.aggregateType}")
+            ?: throw IllegalArgumentException("No topic mapping for eventType: ${outbox.eventType}")
     }
 }

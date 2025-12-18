@@ -1,7 +1,6 @@
 package com.loopers.domain.event
 
 import com.loopers.IntegrationTest
-import com.loopers.domain.event.EventService.EventProcessingResult
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -159,10 +158,10 @@ class EventServiceTest : IntegrationTest() {
             val eventTimestamp = ZonedDateTime.now()
 
             // when
-            eventService.markAsHandled(eventId, EVENT_TYPE, aggregateId, eventTimestamp)
+            eventService.markAsHandled(eventId, aggregateId, EVENT_TYPE, eventTimestamp)
 
             // then
-            assertThat(eventHandledRepository.existsById(eventId)).isTrue()
+            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId)).isTrue()
         }
     }
 
@@ -278,7 +277,7 @@ class EventServiceTest : IntegrationTest() {
             // then
             assertThat(result).isEqualTo(EventProcessingResult.OUTDATED)
             // 과거 이벤트도 처리 완료로 마킹되어야 함 (재처리 방지)
-            assertThat(eventHandledRepository.existsById(eventId)).isTrue()
+            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId)).isTrue()
         }
     }
 
@@ -304,7 +303,7 @@ class EventServiceTest : IntegrationTest() {
             )
 
             // then
-            assertThat(eventHandledRepository.existsById(eventId)).isTrue()
+            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId)).isTrue()
 
             val processingTimestamp = eventProcessingTimestampRepository.findByConsumerGroupAndAggregateId(
                 CONSUMER_GROUP,

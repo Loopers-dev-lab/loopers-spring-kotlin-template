@@ -45,7 +45,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         assertThat(metrics!!.likeCount).isEqualTo(1) // 3번 호출했지만 1만 증가
 
         // 이벤트 처리 기록이 1개만 있어야 함
-        assertThat(eventHandledRepository.existsById(eventId)).isTrue()
+        assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, productId.toString())).isTrue()
     }
 
     @Test

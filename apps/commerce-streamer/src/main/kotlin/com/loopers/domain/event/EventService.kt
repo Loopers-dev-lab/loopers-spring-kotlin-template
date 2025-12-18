@@ -2,6 +2,7 @@ package com.loopers.domain.event
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.ZonedDateTime
 
 /**
@@ -10,6 +11,7 @@ import java.time.ZonedDateTime
  * 멱등성 체크, 순서 보장, 이벤트 처리 기록 등의 로직을 담당
  */
 @Service
+@Transactional
 class EventService(
     private val eventHandledRepository: EventHandledRepository,
     private val eventProcessingTimestampRepository: EventProcessingTimestampRepository,
@@ -125,11 +127,5 @@ class EventService(
 
         // 이벤트 처리 기록 (eventId + aggregateId 조합)
         markAsHandled(eventId, aggregateId, eventType, eventTimestamp)
-    }
-
-    enum class EventProcessingResult {
-        SHOULD_PROCESS,
-        ALREADY_HANDLED,
-        OUTDATED,
     }
 }

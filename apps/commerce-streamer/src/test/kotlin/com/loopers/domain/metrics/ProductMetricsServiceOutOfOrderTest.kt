@@ -50,8 +50,8 @@ class ProductMetricsServiceOutOfOrderTest : IntegrationTest() {
         assertThat(metrics!!.likeCount).isEqualTo(1) // 최신 이벤트 1번만 반영
 
         // 과거 이벤트도 event_handled에는 기록됨 (중복 처리 방지)
-        assertThat(eventHandledRepository.existsById(oldEventId)).isTrue()
-        assertThat(eventHandledRepository.existsById(newEventId)).isTrue()
+        assertThat(eventHandledRepository.existsByEventIdAndAggregateId(oldEventId, productId.toString())).isTrue()
+        assertThat(eventHandledRepository.existsByEventIdAndAggregateId(newEventId, productId.toString())).isTrue()
     }
 
     @Test

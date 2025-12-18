@@ -66,7 +66,7 @@ subprojects {
         // Spring
         implementation("org.springframework.boot:spring-boot-starter")
         // uuid
-        implementation("com.github.f4b6a3:uuid-creator:5.3.7")
+        implementation("com.github.f4b6a3:uuid-creator:6.1.1")
         // Serialize
         implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
         implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")

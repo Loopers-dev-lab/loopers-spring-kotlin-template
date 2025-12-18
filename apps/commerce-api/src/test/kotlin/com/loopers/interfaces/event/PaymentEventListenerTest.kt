@@ -127,7 +127,8 @@ class PaymentEventListenerTest {
     inner class HandlePaymentSucceeded {
 
         @Test
-        fun `should complete order, deduct stock, and publish order complet@DisplayName("주문 완료 처리, 재고 차감, outbox 저장, 주문 완료 이벤트를 발행한다")ed event`() {
+        @DisplayName("주문 완료 처리, 재고 차감, outbox 저장을 수행한다")
+        fun `should complete order, deduct stock, and save to outbox`() {
             // given
             val event = PaymentEvent.PaymentSucceeded(
                 paymentId = 1L,

@@ -3,7 +3,9 @@ package com.loopers.domain.event
 import com.loopers.domain.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.Index
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import java.time.ZonedDateTime
 
 /**
@@ -15,7 +17,15 @@ import java.time.ZonedDateTime
  * - last_processed_at: 마지막으로 처리한 이벤트 시간
  */
 @Entity
-@Table(name = "event_processing_timestamp")
+@Table(
+    name = "event_processing_timestamp",
+    indexes = [
+        Index(name = "idx_consumer_group_aggregate_id", columnList = "consumer_group, aggregate_id"),
+    ],
+    uniqueConstraints = [
+        UniqueConstraint(name = "uk_consumer_group_aggregate_id", columnNames = ["consumer_group", "aggregate_id"]),
+    ],
+)
 class EventProcessingTimestamp(
     @Column(name = "consumer_group", nullable = false, length = 100)
     val consumerGroup: String,
