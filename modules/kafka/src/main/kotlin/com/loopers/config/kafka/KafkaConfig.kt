@@ -2,6 +2,7 @@ package com.loopers.config.kafka
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.producer.ProducerConfig
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -15,7 +16,6 @@ import org.springframework.kafka.core.ProducerFactory
 import org.springframework.kafka.listener.ContainerProperties
 import org.springframework.kafka.support.converter.BatchMessagingMessageConverter
 import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
-import java.util.HashMap
 
 @EnableKafka
 @Configuration
@@ -31,11 +31,20 @@ class KafkaConfig {
         private const val MAX_POLL_INTERVAL_MS = 2 * 60 * 1000 // max poll interval = 2m
     }
 
+    /**
+     *  ACKS_CONFIG 설정 -> 모든 in-sync replica가 메시지를 받을 때까지 대기
+     *  ( The number of acknowledgments the producer requires the leader to have received before considering a request complete )
+     *  idempotence config 설정 -> 중복 전송 방지
+     *  ( When set to 'true', the producer will ensure that exactly one copy of each message is written in the stream )
+     */
     @Bean
     fun producerFactory(
         kafkaProperties: KafkaProperties,
     ): ProducerFactory<Any, Any> {
-        val props: Map<String, Any> = HashMap(kafkaProperties.buildProducerProperties())
+        val props: Map<String, Any> = HashMap(kafkaProperties.buildProducerProperties()).apply {
+            put(ProducerConfig.ACKS_CONFIG, "all")
+            put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true)
+        }
         return DefaultKafkaProducerFactory(props)
     }
 
@@ -48,14 +57,12 @@ class KafkaConfig {
     }
 
     @Bean
-    fun kafkaTemplate(producerFactory: ProducerFactory<Any, Any>): KafkaTemplate<Any, Any> {
-        return KafkaTemplate(producerFactory)
-    }
+    fun kafkaTemplate(producerFactory: ProducerFactory<Any, Any>): KafkaTemplate<Any, Any> = KafkaTemplate(producerFactory)
 
     @Bean
-    fun jsonMessageConverter(objectMapper: ObjectMapper): ByteArrayJsonMessageConverter {
-        return ByteArrayJsonMessageConverter(objectMapper)
-    }
+    fun jsonMessageConverter(
+        objectMapper: ObjectMapper,
+    ): ByteArrayJsonMessageConverter = ByteArrayJsonMessageConverter(objectMapper)
 
     @Bean(BATCH_LISTENER)
     fun defaultBatchListenerContainerFactory(
