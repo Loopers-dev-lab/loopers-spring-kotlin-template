@@ -8,9 +8,6 @@ import com.loopers.support.outbox.OutboxFailed
 import com.loopers.support.outbox.OutboxFailedRepository
 import com.loopers.support.outbox.OutboxRepository
 import com.loopers.utils.DatabaseCleanUp
-import io.github.resilience4j.circuitbreaker.CircuitBreaker
-import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
@@ -45,32 +42,18 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
 ) {
     private lateinit var mockKafkaTemplate: KafkaTemplate<String, String>
     private lateinit var outboxRelayService: OutboxRelayService
-    private lateinit var circuitBreakerRegistry: CircuitBreakerRegistry
-    private lateinit var circuitBreaker: CircuitBreaker
 
     @BeforeEach
     fun setUp() {
         mockKafkaTemplate = mockk(relaxed = true)
-
-        circuitBreakerRegistry = CircuitBreakerRegistry.of(
-            CircuitBreakerConfig.custom()
-                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
-                .slidingWindowSize(10)
-                .minimumNumberOfCalls(5)
-                .failureRateThreshold(50f)
-                .build(),
-        )
-        circuitBreaker = circuitBreakerRegistry.circuitBreaker("outbox-relay")
 
         outboxRelayService = OutboxRelayService(
             kafkaTemplate = mockKafkaTemplate,
             outboxRepository = outboxRepository,
             outboxCursorRepository = outboxCursorRepository,
             outboxFailedRepository = outboxFailedRepository,
-            circuitBreakerRegistry = circuitBreakerRegistry,
         )
 
-        circuitBreaker.transitionToClosedState()
         clearMocks(mockKafkaTemplate)
     }
 
@@ -141,40 +124,61 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("전송 실패한 메시지를 OutboxFailed로 이동한다")
-        fun `saves failed messages to OutboxFailed`() {
+        @DisplayName("부분 실패 시 실패한 메시지를 OutboxFailed로 이동한다")
+        fun `saves failed messages to OutboxFailed on partial failure`() {
             // given
-            val outbox = saveOutbox(aggregateId = "123")
-            mockKafkaSendFailure(RuntimeException("Kafka send failed"))
+            saveOutbox(aggregateId = "1")
+            val outbox2 = saveOutbox(aggregateId = "2")
+
+            // outbox1: success, outbox2: fail
+            var callCount = 0
+            every { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) } answers {
+                callCount++
+                if (callCount == 2) {
+                    createFailedFuture(RuntimeException("Kafka send failed"))
+                } else {
+                    createSuccessFuture()
+                }
+            }
 
             // when
             val result = outboxRelayService.relayNewMessages()
 
             // then
-            assertThat(result.successCount).isEqualTo(0)
+            assertThat(result.successCount).isEqualTo(1)
             assertThat(result.failedCount).isEqualTo(1)
+            assertThat(result.lastProcessedId).isEqualTo(outbox2.id)
 
             val failedMessages = findAllOutboxFailed()
             assertThat(failedMessages).hasSize(1)
-            assertThat(failedMessages[0].eventId).isEqualTo(outbox.eventId)
+            assertThat(failedMessages[0].aggregateId).isEqualTo("2")
             assertThat(failedMessages[0].lastError).contains("Kafka send failed")
         }
 
         @Test
-        @DisplayName("서킷브레이커가 OPEN이면 카운트 0을 반환한다")
-        fun `returns zero counts when circuit breaker is OPEN`() {
+        @DisplayName("전부 실패 시 커서를 이동하지 않고 OutboxFailed에 저장하지 않는다")
+        fun `does not update cursor and does not save to OutboxFailed when all messages fail`() {
             // given
-            saveOutbox(aggregateId = "123")
-            circuitBreaker.transitionToOpenState()
+            val initialCursor = outboxCursorRepository.save(OutboxCursor.create(100L))
+            saveOutbox(aggregateId = "1")
+            saveOutbox(aggregateId = "2")
+            mockKafkaSendFailure(RuntimeException("Kafka is down"))
 
             // when
             val result = outboxRelayService.relayNewMessages()
 
             // then
             assertThat(result.successCount).isEqualTo(0)
-            assertThat(result.failedCount).isEqualTo(0)
-            assertThat(result.lastProcessedId).isEqualTo(0L)
-            verify(exactly = 0) { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) }
+            assertThat(result.failedCount).isEqualTo(2)
+            assertThat(result.lastProcessedId).isEqualTo(initialCursor.lastProcessedId)
+
+            // 커서가 이동하지 않았는지 확인
+            val cursor = outboxCursorRepository.findLatest()
+            assertThat(cursor!!.lastProcessedId).isEqualTo(initialCursor.lastProcessedId)
+
+            // OutboxFailed에 저장되지 않았는지 확인
+            val failedMessages = findAllOutboxFailed()
+            assertThat(failedMessages).isEmpty()
         }
 
         @Test
@@ -302,22 +306,6 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             assertThat(allFailed).hasSize(1)
             assertThat(allFailed[0].retryCount).isEqualTo(initialRetryCount + 1)
             assertThat(allFailed[0].lastError).contains("Retry failed")
-        }
-
-        @Test
-        @DisplayName("서킷브레이커가 OPEN이면 카운트 0을 반환한다")
-        fun `returns zero counts when circuit breaker is OPEN`() {
-            // given
-            saveOutboxFailed(aggregateId = "123")
-            circuitBreaker.transitionToOpenState()
-
-            // when
-            val result = outboxRelayService.retryFailedMessages()
-
-            // then
-            assertThat(result.successCount).isEqualTo(0)
-            assertThat(result.failedCount).isEqualTo(0)
-            verify(exactly = 0) { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) }
         }
 
         @Test

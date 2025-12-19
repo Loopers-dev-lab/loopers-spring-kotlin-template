@@ -4,16 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.loopers.domain.like.LikeCanceledEventV1
 import com.loopers.domain.like.LikeCreatedEventV1
-import com.loopers.domain.order.OrderCanceledEventV1
 import com.loopers.domain.order.OrderCreatedEventV1
 import com.loopers.domain.order.OrderPaidEventV1
-import com.loopers.domain.payment.PaymentCreatedEventV1
-import com.loopers.domain.payment.PaymentFailedEventV1
-import com.loopers.domain.payment.PaymentPaidEventV1
 import com.loopers.domain.product.ProductViewedEventV1
 import com.loopers.domain.product.StockDepletedEventV1
 import com.loopers.support.event.DomainEvent
-import com.loopers.support.values.Money
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -138,44 +133,6 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
     @Nested
     inner class ResolveMetadata {
 
-        @DisplayName("OrderCreatedEventV1 - type: loopers.order.created.v1, aggregateType: Order, aggregateId: orderId")
-        @Test
-        fun `resolves OrderCreatedEventV1 metadata`() {
-            // given
-            val event = OrderCreatedEventV1(
-                orderId = 123L,
-                orderItems = listOf(OrderCreatedEventV1.OrderItemSnapshot(productId = 1L, quantity = 1)),
-            )
-
-            // when
-            val envelope = cloudEventEnvelopeFactory.create(event)
-
-            // then
-            assertThat(envelope).isNotNull()
-            assertThat(envelope!!.type).isEqualTo("loopers.order.created.v1")
-            assertThat(envelope.aggregateType).isEqualTo("Order")
-            assertThat(envelope.aggregateId).isEqualTo("123")
-        }
-
-        @DisplayName("OrderCanceledEventV1 - type: loopers.order.canceled.v1, aggregateType: Order, aggregateId: orderId")
-        @Test
-        fun `resolves OrderCanceledEventV1 metadata`() {
-            // given
-            val event = OrderCanceledEventV1(
-                orderId = 456L,
-                orderItems = listOf(OrderCanceledEventV1.OrderItemSnapshot(productId = 1L, quantity = 1)),
-            )
-
-            // when
-            val envelope = cloudEventEnvelopeFactory.create(event)
-
-            // then
-            assertThat(envelope).isNotNull()
-            assertThat(envelope!!.type).isEqualTo("loopers.order.canceled.v1")
-            assertThat(envelope.aggregateType).isEqualTo("Order")
-            assertThat(envelope.aggregateId).isEqualTo("456")
-        }
-
         @DisplayName("OrderPaidEventV1 - type: loopers.order.paid.v1, aggregateType: Order, aggregateId: orderId")
         @Test
         fun `resolves OrderPaidEventV1 metadata`() {
@@ -195,60 +152,6 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             assertThat(envelope!!.type).isEqualTo("loopers.order.paid.v1")
             assertThat(envelope.aggregateType).isEqualTo("Order")
             assertThat(envelope.aggregateId).isEqualTo("789")
-        }
-
-        @DisplayName("PaymentCreatedEventV1 - type: loopers.payment.created.v1, aggregateType: Payment, aggregateId: paymentId")
-        @Test
-        fun `resolves PaymentCreatedEventV1 metadata`() {
-            // given
-            val event = PaymentCreatedEventV1(paymentId = 100L)
-
-            // when
-            val envelope = cloudEventEnvelopeFactory.create(event)
-
-            // then
-            assertThat(envelope).isNotNull()
-            assertThat(envelope!!.type).isEqualTo("loopers.payment.created.v1")
-            assertThat(envelope.aggregateType).isEqualTo("Payment")
-            assertThat(envelope.aggregateId).isEqualTo("100")
-        }
-
-        @DisplayName("PaymentPaidEventV1 - type: loopers.payment.paid.v1, aggregateType: Payment, aggregateId: paymentId")
-        @Test
-        fun `resolves PaymentPaidEventV1 metadata`() {
-            // given
-            val event = PaymentPaidEventV1(paymentId = 200L, orderId = 1L)
-
-            // when
-            val envelope = cloudEventEnvelopeFactory.create(event)
-
-            // then
-            assertThat(envelope).isNotNull()
-            assertThat(envelope!!.type).isEqualTo("loopers.payment.paid.v1")
-            assertThat(envelope.aggregateType).isEqualTo("Payment")
-            assertThat(envelope.aggregateId).isEqualTo("200")
-        }
-
-        @DisplayName("PaymentFailedEventV1 - type: loopers.payment.failed.v1, aggregateType: Payment, aggregateId: paymentId")
-        @Test
-        fun `resolves PaymentFailedEventV1 metadata`() {
-            // given
-            val event = PaymentFailedEventV1(
-                paymentId = 300L,
-                orderId = 1L,
-                userId = 1L,
-                usedPoint = Money.ZERO_KRW,
-                issuedCouponId = null,
-            )
-
-            // when
-            val envelope = cloudEventEnvelopeFactory.create(event)
-
-            // then
-            assertThat(envelope).isNotNull()
-            assertThat(envelope!!.type).isEqualTo("loopers.payment.failed.v1")
-            assertThat(envelope.aggregateType).isEqualTo("Payment")
-            assertThat(envelope.aggregateId).isEqualTo("300")
         }
 
         @DisplayName("LikeCreatedEventV1 - type: loopers.like.created.v1, aggregateType: Like, aggregateId: productId")

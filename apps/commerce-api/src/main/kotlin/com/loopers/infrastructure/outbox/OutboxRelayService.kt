@@ -7,8 +7,6 @@ import com.loopers.support.outbox.OutboxFailed
 import com.loopers.support.outbox.OutboxFailedRepository
 import com.loopers.support.outbox.OutboxRepository
 import com.loopers.support.outbox.TopicResolver
-import io.github.resilience4j.circuitbreaker.CircuitBreaker
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Service
 import java.util.concurrent.CompletableFuture
@@ -19,7 +17,11 @@ import java.util.concurrent.TimeUnit
  *
  * - relayNewMessages(): 새 메시지 비동기 배치 발행
  * - retryFailedMessages(): 실패 메시지 비동기 배치 재시도
- * - 서킷브레이커 OPEN 시 조기 반환, 실패 시 자동 기록
+ *
+ * 전부 실패 시 커서 유지 전략:
+ * - 배치 전체가 실패하면 Kafka 장애로 간주
+ * - 커서를 이동시키지 않고 다음 스케줄에서 동일 메시지로 재시도
+ * - OutboxFailed에 쌓이지 않아 불필요한 중복 방지
  */
 @Service
 class OutboxRelayService(
@@ -27,12 +29,8 @@ class OutboxRelayService(
     private val outboxRepository: OutboxRepository,
     private val outboxCursorRepository: OutboxCursorRepository,
     private val outboxFailedRepository: OutboxFailedRepository,
-    circuitBreakerRegistry: CircuitBreakerRegistry,
 ) {
-    private val circuitBreaker: CircuitBreaker = circuitBreakerRegistry.circuitBreaker(CIRCUIT_BREAKER_NAME)
-
     companion object {
-        private const val CIRCUIT_BREAKER_NAME = "outbox-relay"
         private const val BATCH_SIZE = 100
         private const val RETRY_BATCH_SIZE = 50
         private const val BATCH_TIMEOUT_SECONDS = 10L
@@ -41,17 +39,12 @@ class OutboxRelayService(
     /**
      * 새 메시지를 Kafka로 비동기 배치 릴레이한다.
      * - 커서 이후의 메시지를 조회하여 비동기 배치 전송
-     * - 실패한 메시지는 OutboxFailed로 이동
-     * - 처리 완료 후 커서 갱신
-     * - Circuit Breaker에 성공/실패 자동 기록
+     * - 부분 성공: 성공분까지 커서 이동 + 실패분 OutboxFailed 저장
+     * - 전부 실패: 커서 유지, OutboxFailed 저장 안함 (다음 스케줄에서 재시도)
      *
      * @return RelayResult 성공/실패 카운트 및 마지막 처리 ID
      */
     fun relayNewMessages(): RelayResult {
-        if (isCircuitBreakerOpen()) {
-            return RelayResult(successCount = 0, failedCount = 0, lastProcessedId = 0L)
-        }
-
         val cursor = outboxCursorRepository.findLatest()
         val cursorId = cursor?.lastProcessedId ?: 0L
         val outboxMessages = outboxRepository.findAllByIdGreaterThanOrderByIdAsc(cursorId, BATCH_SIZE)
@@ -70,28 +63,39 @@ class OutboxRelayService(
             .join()
 
         // 결과 집계
-        val failedMessages = mutableListOf<OutboxFailed>()
-        var successCount = 0
-        var failedCount = 0
+        val successMessages = mutableListOf<Outbox>()
+        val failedMessages = mutableListOf<Outbox>()
 
         futures.forEachIndexed { index, future ->
             val outbox = outboxMessages[index]
             if (future.isCompletedExceptionally || !future.isDone) {
-                failedCount++
-                val error = runCatching { future.getNow(Unit) }
-                    .exceptionOrNull()?.message ?: "Timeout"
-                failedMessages.add(OutboxFailed.from(outbox, error))
+                failedMessages.add(outbox)
             } else {
-                successCount++
+                successMessages.add(outbox)
             }
         }
 
-        outboxFailedRepository.saveAll(failedMessages)
+        // 전부 실패: 커서 유지, OutboxFailed 저장 안함 (Kafka 장애로 간주)
+        if (successMessages.isEmpty()) {
+            return RelayResult(successCount = 0, failedCount = failedMessages.size, lastProcessedId = cursorId)
+        }
+
+        // 부분/전체 성공: 실패분 OutboxFailed 저장 + 커서 이동
+        val outboxFailedList = failedMessages.map { outbox ->
+            val error = futures[outboxMessages.indexOf(outbox)]
+                .let { future ->
+                    runCatching { future.getNow(Unit) }
+                        .exceptionOrNull()?.message ?: "Timeout"
+                }
+            OutboxFailed.from(outbox, error)
+        }
+
+        outboxFailedRepository.saveAll(outboxFailedList)
         outboxCursorRepository.save(OutboxCursor.create(outboxMessages.last().id))
 
         return RelayResult(
-            successCount = successCount,
-            failedCount = failedCount,
+            successCount = successMessages.size,
+            failedCount = failedMessages.size,
             lastProcessedId = outboxMessages.last().id,
         )
     }
@@ -100,15 +104,10 @@ class OutboxRelayService(
      * 실패한 메시지를 비동기 배치 재시도한다.
      * - nextRetryAt이 현재 시각 이전인 메시지를 조회
      * - 성공 시 삭제, 실패 시 retryCount 증가
-     * - Circuit Breaker에 성공/실패 자동 기록
      *
      * @return RetryResult 성공/실패 카운트
      */
     fun retryFailedMessages(): RetryResult {
-        if (isCircuitBreakerOpen()) {
-            return RetryResult(successCount = 0, failedCount = 0)
-        }
-
         val retryableMessages = outboxFailedRepository.findRetryable(RETRY_BATCH_SIZE)
 
         if (retryableMessages.isEmpty()) {
@@ -150,18 +149,14 @@ class OutboxRelayService(
     }
 
     private fun sendToKafkaAsync(outbox: Outbox): CompletableFuture<Unit> {
-        val startTime = System.nanoTime()
         val topic = TopicResolver.resolve(outbox.eventType)
         val result = CompletableFuture<Unit>()
 
         kafkaTemplate.send(topic, outbox.aggregateId, outbox.payload)
             .whenComplete { _, ex ->
-                val duration = System.nanoTime() - startTime
                 if (ex != null) {
-                    circuitBreaker.onError(duration, TimeUnit.NANOSECONDS, ex)
                     result.completeExceptionally(ex)
                 } else {
-                    circuitBreaker.onSuccess(duration, TimeUnit.NANOSECONDS)
                     result.complete(Unit)
                 }
             }
@@ -170,27 +165,19 @@ class OutboxRelayService(
     }
 
     private fun sendFailedToKafkaAsync(failed: OutboxFailed): CompletableFuture<Unit> {
-        val startTime = System.nanoTime()
         val topic = TopicResolver.resolve(failed.eventType)
         val result = CompletableFuture<Unit>()
 
         kafkaTemplate.send(topic, failed.aggregateId, failed.payload)
             .whenComplete { _, ex ->
-                val duration = System.nanoTime() - startTime
                 if (ex != null) {
-                    circuitBreaker.onError(duration, TimeUnit.NANOSECONDS, ex)
                     result.completeExceptionally(ex)
                 } else {
-                    circuitBreaker.onSuccess(duration, TimeUnit.NANOSECONDS)
                     result.complete(Unit)
                 }
             }
 
         return result
-    }
-
-    private fun isCircuitBreakerOpen(): Boolean {
-        return circuitBreaker.state == CircuitBreaker.State.OPEN
     }
 }
 

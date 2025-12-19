@@ -90,17 +90,6 @@ resilience4j:
         minimum-number-of-calls: 5
         failure-rate-threshold: 20
         slow-call-duration-threshold: 400ms
-      outbox-relay:
-        sliding-window-type: COUNT_BASED
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 30s
-        permitted-number-of-calls-in-half-open-state: 3
-        record-exceptions:
-          - org.apache.kafka.common.errors.TimeoutException
-          - org.apache.kafka.common.errors.NotLeaderOrFollowerException
-          - org.apache.kafka.common.errors.NetworkException
     circuit-breaker-aspect-order: 1
 
   retry:
