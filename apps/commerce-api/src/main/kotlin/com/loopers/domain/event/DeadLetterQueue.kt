@@ -22,6 +22,9 @@ class DeadLetterQueue(
     @Column(nullable = false, length = 50)
     val eventType: String,
 
+    @Column(nullable = false)
+    val aggregateId: Long,
+
     @Column(nullable = false, columnDefinition = "TEXT")
     val payload: String,
 

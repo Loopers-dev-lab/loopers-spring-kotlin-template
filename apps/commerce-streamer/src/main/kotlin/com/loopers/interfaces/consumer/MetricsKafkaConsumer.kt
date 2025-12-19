@@ -18,7 +18,6 @@ import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.messaging.handler.annotation.Header
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 
 /**
  * Kafka Consumer (Kafka 수신 전용)
@@ -38,7 +37,6 @@ class MetricsKafkaConsumer(
         groupId = "metrics-consumer-group",
         containerFactory = "manualAckKafkaListenerContainerFactory",
     )
-    @Transactional
     fun consume(
         @Payload message: String,
         @Header(KafkaHeaders.RECEIVED_KEY) key: String,

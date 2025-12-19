@@ -39,13 +39,31 @@ class ProductCacheService(
     /**
      * 상품 목록 캐시 전체 무효화
      * - 재고 소진 시 목록에서도 제거되어야 하므로
+     * - SCAN 명령어 사용 (KEYS는 Redis를 블로킹하므로 프로덕션에서 위험)
      */
     fun invalidateProductListCache() {
         try {
             val pattern = "$PRODUCT_LIST_CACHE_PREFIX*"
-            val keys = redisTemplate.keys(pattern)
-            if (!keys.isNullOrEmpty()) {
-                val deletedCount = redisTemplate.delete(keys)
+            var deletedCount = 0L
+
+            redisTemplate.execute { connection ->
+                val scanOptions = org.springframework.data.redis.core.ScanOptions.scanOptions()
+                    .match(pattern)
+                    .count(100)
+                    .build()
+
+                val cursor = connection.scan(scanOptions)
+                while (cursor.hasNext()) {
+                    val key = String(cursor.next())
+                    if (redisTemplate.delete(key)) {
+                        deletedCount++
+                    }
+                }
+                cursor.close()
+                null
+            }
+
+            if (deletedCount > 0) {
                 logger.info("상품 목록 캐시 무효화 성공: ${deletedCount}개")
             } else {
                 logger.debug("상품 목록 캐시 없음")

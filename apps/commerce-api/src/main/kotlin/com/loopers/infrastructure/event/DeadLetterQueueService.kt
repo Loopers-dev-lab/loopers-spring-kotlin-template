@@ -17,17 +17,23 @@ class DeadLetterQueueService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun moveToDeadLetterQueue(outbox: EventOutbox, error: Exception) {
-        val dlq = DeadLetterQueue(
-            eventId = outbox.eventId,
-            eventType = outbox.eventType,
-            payload = outbox.payload,
-            errorMessage = error.message ?: "Unknown error",
-            stackTrace = error.stackTraceToString(),
-            originalRetryCount = outbox.retryCount
-        )
+        try {
+            val dlq = DeadLetterQueue(
+                eventId = outbox.eventId,
+                eventType = outbox.eventType,
+                aggregateId = outbox.aggregateId,
+                payload = outbox.payload,
+                errorMessage = error.message ?: "Unknown error",
+                stackTrace = error.stackTraceToString(),
+                originalRetryCount = outbox.retryCount
+            )
 
-        deadLetterQueueRepository.save(dlq)
-        logger.warn("이벤트 DLQ 이동: eventId=${outbox.eventId}, type=${outbox.eventType}")
+            deadLetterQueueRepository.save(dlq)
+            logger.warn("이벤트 DLQ 이동: eventId=${outbox.eventId}, type=${outbox.eventType}, aggregateId=${outbox.aggregateId}")
+        } catch (e: Exception) {
+            logger.error("DLQ 이동 실패: eventId=${outbox.eventId}, type=${outbox.eventType}", e)
+            throw e
+        }
     }
 
     @Transactional
@@ -41,7 +47,7 @@ class DeadLetterQueueService(
 
         return try {
             val topic = getTopicForEventType(dlq.eventType)
-            kafkaTemplate.send(topic, dlq.eventId, dlq.payload).get(30, TimeUnit.SECONDS)
+            kafkaTemplate.send(topic, dlq.aggregateId.toString(), dlq.payload).get(30, TimeUnit.SECONDS)
 
             dlq.processed = true
             dlq.processedAt = Instant.now()
@@ -59,8 +65,8 @@ class DeadLetterQueueService(
 
     private fun getTopicForEventType(eventType: String): String {
         return when {
-            eventType.startsWith("product") -> "catalog-event"
-            eventType.startsWith("order") -> "order-event"
+            eventType.startsWith("product") -> "catalog-events"
+            eventType.startsWith("order") -> "order-events"
             else -> "general-events"
         }
     }

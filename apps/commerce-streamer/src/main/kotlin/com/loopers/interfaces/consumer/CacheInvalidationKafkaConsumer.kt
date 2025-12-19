@@ -11,7 +11,6 @@ import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.messaging.handler.annotation.Header
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 
 /**
  * 캐시 무효화 전용 Kafka Consumer
@@ -30,7 +29,6 @@ class CacheInvalidationKafkaConsumer(
         groupId = "cache-invalidation-consumer-group",
         containerFactory = "manualAckKafkaListenerContainerFactory"
     )
-    @Transactional
     fun consume(
         @Payload message: String,
         @Header(KafkaHeaders.RECEIVED_KEY) key: String,
@@ -42,6 +40,13 @@ class CacheInvalidationKafkaConsumer(
 
         try {
             val event = parseEvent(message)
+
+            // 비대상 이벤트는 ACK만 하고 스킵
+            if (event == null) {
+                acknowledgment.acknowledge()
+                logger.debug("비대상 이벤트 스킵: partition=$partition, offset=$offset")
+                return
+            }
 
             // 캐시 무효화 처리
             cacheInvalidationFacade.handleEvent(event)
@@ -59,8 +64,9 @@ class CacheInvalidationKafkaConsumer(
     /**
      * JSON 메시지 파싱
      * - StockDecreasedEvent만 처리
+     * - 비대상 이벤트는 null 반환 (무한 재시도 방지)
      */
-    private fun parseEvent(message: String): DomainEvent {
+    private fun parseEvent(message: String): DomainEvent? {
         val node = objectMapper.readTree(message)
         val eventType = node["eventType"]?.asText()
             ?: throw IllegalArgumentException("Missing eventType in message: $message")
@@ -68,9 +74,9 @@ class CacheInvalidationKafkaConsumer(
         return when (eventType) {
             "STOCK_DECREASED" -> objectMapper.readValue(message, StockDecreasedEvent::class.java)
             else -> {
-                // 다른 이벤트는 무시 (빈 이벤트 객체 반환하면 facade에서 필터링됨)
+                // 다른 이벤트는 무시 - null 반환하여 ACK 처리
                 logger.debug("캐시 무효화 대상 아님: eventType=$eventType")
-                throw IllegalArgumentException("Not a cache invalidation event: $eventType")
+                null
             }
         }
     }

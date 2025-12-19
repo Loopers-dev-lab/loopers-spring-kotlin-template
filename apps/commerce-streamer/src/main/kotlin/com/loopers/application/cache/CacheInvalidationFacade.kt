@@ -6,7 +6,9 @@ import com.loopers.domain.event.product.StockDecreasedEvent
 import com.loopers.domain.cache.ProductCacheService
 import com.loopers.infrastructure.event.EventHandledRepository
 import org.slf4j.LoggerFactory
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 /**
@@ -20,14 +22,16 @@ class CacheInvalidationFacade(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
+    @Transactional
     fun handleEvent(event: DomainEvent) {
-        if (isAlreadyHandled(event)) {
+        try {
+            markAsHandled(event)
+        } catch (e: DataIntegrityViolationException) {
             logger.warn("중복 이벤트 무시: eventId=${event.eventId}, eventType=${event.eventType}")
             return
         }
 
         routeAndProcess(event)
-        markAsHandled(event)
     }
 
     private fun routeAndProcess(event: DomainEvent) {
@@ -48,15 +52,12 @@ class CacheInvalidationFacade(
         }
     }
 
-    private fun isAlreadyHandled(event: DomainEvent): Boolean {
-        return eventHandledRepository.existsByEventId(event.eventId)
-    }
-
     private fun markAsHandled(event: DomainEvent) {
         eventHandledRepository.save(
             EventHandled(
                 eventId = event.eventId,
                 eventType = event.eventType,
+                occurredAt = event.occurredAt,
                 handledAt = Instant.now()
             )
         )

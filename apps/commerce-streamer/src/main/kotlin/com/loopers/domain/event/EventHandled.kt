@@ -16,5 +16,8 @@ class EventHandled(
     val eventType: String,
 
     @Column(nullable = false)
+    val occurredAt: Instant,
+
+    @Column(nullable = false)
     val handledAt: Instant = Instant.now()
 )

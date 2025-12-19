@@ -10,6 +10,7 @@ import com.loopers.domain.product.event.ProductViewedEvent
 import com.loopers.infrastructure.event.EventHandledRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 @Component
@@ -19,6 +20,7 @@ class MetricsEventFacade(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
+    @Transactional
     fun handleEvent(event: DomainEvent) {
         if (isAlreadyHandled(event)) {
             logger.warn("중복 이벤트 무시: eventId=${event.eventId}, eventType=${event.eventType}")
@@ -64,6 +66,7 @@ class MetricsEventFacade(
             EventHandled(
                 eventId = event.eventId,
                 eventType = event.eventType,
+                occurredAt = event.occurredAt,
                 handledAt = Instant.now()
             )
         )
