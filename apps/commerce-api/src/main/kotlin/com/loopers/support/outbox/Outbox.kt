@@ -1,5 +1,6 @@
 package com.loopers.support.outbox
 
+import com.loopers.eventschema.CloudEventEnvelope
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue

@@ -5,7 +5,7 @@ import com.loopers.config.kafka.KafkaConfig
 import com.loopers.domain.product.OrderItemSnapshot
 import com.loopers.domain.product.ProductStatisticService
 import com.loopers.infrastructure.product.ProductCacheRepository
-import com.loopers.interfaces.consumer.dto.CloudEventEnvelope
+import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.interfaces.consumer.dto.LikeCanceledEventPayload
 import com.loopers.interfaces.consumer.dto.LikeCreatedEventPayload
 import com.loopers.interfaces.consumer.dto.OrderPaidEventPayload

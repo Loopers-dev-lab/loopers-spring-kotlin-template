@@ -2,7 +2,7 @@ package com.loopers.infrastructure.outbox
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.support.event.DomainEvent
-import com.loopers.support.outbox.CloudEventEnvelope
+import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.support.outbox.EventTypeResolver
 import org.springframework.stereotype.Component
 import java.util.UUID

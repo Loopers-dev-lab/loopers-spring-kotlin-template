@@ -1,5 +1,6 @@
 package com.loopers.support.outbox
 
+import com.loopers.eventschema.CloudEventEnvelope
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested

@@ -1,6 +1,6 @@
 package com.loopers.infrastructure.outbox
 
-import com.loopers.support.outbox.CloudEventEnvelope
+import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.support.outbox.Outbox
 import com.loopers.support.outbox.OutboxFailed
 import com.loopers.support.outbox.OutboxFailedRepository
