@@ -7,6 +7,7 @@ import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.support.idempotency.EventHandled
 import com.loopers.support.idempotency.EventHandledRepository
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.listener.BatchListenerFailedException
 import org.springframework.kafka.support.Acknowledgment
@@ -28,6 +29,8 @@ class ProductViewEventConsumer(
     private val eventHandledRepository: EventHandledRepository,
     private val objectMapper: ObjectMapper,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     companion object {
         private const val CONSUMER_GROUP = "product-statistic"
     }
@@ -70,10 +73,10 @@ class ProductViewEventConsumer(
                 envelopes.maxBy { (envelope, _) -> envelope.time }
             }
 
-        // 3. Check DB idempotency
-        val newEnvelopes = deduplicatedEnvelopes.filter { (_, idempotencyKey) ->
-            !eventHandledRepository.existsByIdempotencyKey(idempotencyKey)
-        }
+        // 3. Check DB idempotency (batch)
+        val allKeys = deduplicatedEnvelopes.map { (_, key) -> key }.toSet()
+        val existingKeys = eventHandledRepository.findAllExistingKeys(allKeys)
+        val newEnvelopes = deduplicatedEnvelopes.filter { (_, key) -> key !in existingKeys }
 
         if (newEnvelopes.isEmpty()) {
             ack.acknowledge()
@@ -85,9 +88,13 @@ class ProductViewEventConsumer(
         val command = productEventMapper.toViewCommand(envelopesToProcess)
         productStatisticService.updateViewCount(command)
 
-        // 5. Save idempotency keys
-        newEnvelopes.forEach { (_, idempotencyKey) ->
-            eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
+        // 5. Save idempotency keys (batch, ignore errors)
+        runCatching {
+            eventHandledRepository.saveAll(
+                newEnvelopes.map { (_, key) -> EventHandled(idempotencyKey = key) },
+            )
+        }.onFailure { e ->
+            log.warn("Failed to save idempotency keys, duplicates may occur on retry", e)
         }
 
         ack.acknowledge()

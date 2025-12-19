@@ -84,8 +84,8 @@ class ProductLikeEventConsumerTest {
                 createConsumerRecord("like-events", likeCanceledEnvelope),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { productStatisticService.updateLikeCount(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
@@ -143,7 +143,7 @@ class ProductLikeEventConsumerTest {
 
             val records = listOf(createConsumerRecord("like-events", likeEnvelope))
 
-            every { eventHandledRepository.existsByIdempotencyKey("product-statistic:already-processed-event") } returns true
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns setOf("product-statistic:already-processed-event")
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -151,7 +151,7 @@ class ProductLikeEventConsumerTest {
 
             // then
             verify(exactly = 0) { productStatisticService.updateLikeCount(any()) }
-            verify(exactly = 0) { eventHandledRepository.save(any()) }
+            verify(exactly = 0) { eventHandledRepository.saveAll(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -180,8 +180,8 @@ class ProductLikeEventConsumerTest {
                 createConsumerRecord("like-events", duplicateEnvelope2),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { productStatisticService.updateLikeCount(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
@@ -194,7 +194,7 @@ class ProductLikeEventConsumerTest {
                     match { command -> command.items.size == 1 },
                 )
             }
-            verify(exactly = 1) { eventHandledRepository.save(any()) }
+            verify(exactly = 1) { eventHandledRepository.saveAll(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -225,9 +225,8 @@ class ProductLikeEventConsumerTest {
                 createConsumerRecord("like-events", processedEnvelope),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey("product-statistic:new-event") } returns false
-            every { eventHandledRepository.existsByIdempotencyKey("product-statistic:processed-event") } returns true
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns setOf("product-statistic:processed-event")
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { productStatisticService.updateLikeCount(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
@@ -242,7 +241,7 @@ class ProductLikeEventConsumerTest {
                     },
                 )
             }
-            verify(exactly = 1) { eventHandledRepository.save(any()) }
+            verify(exactly = 1) { eventHandledRepository.saveAll(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
     }
@@ -301,8 +300,8 @@ class ProductLikeEventConsumerTest {
                 createConsumerRecord("like-events", unsupportedEnvelope),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { productStatisticService.updateLikeCount(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 

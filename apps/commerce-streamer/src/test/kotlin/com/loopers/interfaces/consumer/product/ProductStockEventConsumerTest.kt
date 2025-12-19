@@ -4,10 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import com.loopers.application.product.ProductCacheKeys
-import com.loopers.cache.CacheTemplate
+import com.loopers.domain.product.EvictStockDepletedCommand
+import com.loopers.domain.product.ProductCacheService
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.interfaces.consumer.product.event.StockDepletedEventPayload
+import com.loopers.support.idempotency.EventHandledRepository
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -26,15 +27,17 @@ import java.time.Instant
 @DisplayName("ProductStockEventConsumer 배치 처리 단위 테스트")
 class ProductStockEventConsumerTest {
 
-    private lateinit var cacheTemplate: CacheTemplate
+    private lateinit var productCacheService: ProductCacheService
     private lateinit var productEventMapper: ProductEventMapper
+    private lateinit var eventHandledRepository: EventHandledRepository
     private lateinit var objectMapper: ObjectMapper
     private lateinit var acknowledgment: Acknowledgment
     private lateinit var productStockEventConsumer: ProductStockEventConsumer
 
     @BeforeEach
     fun setUp() {
-        cacheTemplate = mockk()
+        productCacheService = mockk()
+        eventHandledRepository = mockk()
         objectMapper = ObjectMapper()
             .registerKotlinModule()
             .registerModule(JavaTimeModule())
@@ -43,8 +46,9 @@ class ProductStockEventConsumerTest {
         acknowledgment = mockk()
 
         productStockEventConsumer = ProductStockEventConsumer(
-            cacheTemplate,
+            productCacheService,
             productEventMapper,
+            eventHandledRepository,
             objectMapper,
         )
     }
@@ -59,6 +63,7 @@ class ProductStockEventConsumerTest {
             // given
             val stockDepletedPayload1 = StockDepletedEventPayload(productId = 1L)
             val stockDepletedEnvelope1 = createEnvelope(
+                id = "event-1",
                 type = "loopers.stock.depleted.v1",
                 aggregateType = "Stock",
                 aggregateId = "1",
@@ -67,6 +72,7 @@ class ProductStockEventConsumerTest {
 
             val stockDepletedPayload2 = StockDepletedEventPayload(productId = 2L)
             val stockDepletedEnvelope2 = createEnvelope(
+                id = "event-2",
                 type = "loopers.stock.depleted.v1",
                 aggregateType = "Stock",
                 aggregateId = "2",
@@ -78,7 +84,9 @@ class ProductStockEventConsumerTest {
                 createConsumerRecord("stock-events", stockDepletedEnvelope2),
             )
 
-            every { cacheTemplate.evictAll(any<List<ProductCacheKeys.ProductDetail>>()) } just runs
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { productCacheService.evictStockDepletedProducts(any()) } just runs
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -86,20 +94,24 @@ class ProductStockEventConsumerTest {
 
             // then
             verify(exactly = 1) {
-                cacheTemplate.evictAll(
-                    match<List<ProductCacheKeys.ProductDetail>> { cacheKeys ->
-                        cacheKeys.size == 2 &&
-                            cacheKeys[0].key == "product-detail:v1:1" &&
-                            cacheKeys[1].key == "product-detail:v1:2"
+                productCacheService.evictStockDepletedProducts(
+                    match<EvictStockDepletedCommand> { command ->
+                        command.productIds.size == 2 &&
+                            command.productIds.containsAll(listOf(1L, 2L))
                     },
+                )
+            }
+            verify(exactly = 1) {
+                eventHandledRepository.saveAll(
+                    match { list -> list.size == 2 },
                 )
             }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
-        @DisplayName("빈 배치인 경우 evictAll()을 호출하지 않는다")
+        @DisplayName("빈 배치인 경우 evictStockDepletedProducts()를 호출하지 않는다")
         @Test
-        fun `does not call evictAll for empty batch`() {
+        fun `does not call evictStockDepletedProducts for empty batch`() {
             // given
             val records = emptyList<ConsumerRecord<String, String>>()
 
@@ -109,8 +121,116 @@ class ProductStockEventConsumerTest {
             productStockEventConsumer.consume(records, acknowledgment)
 
             // then
-            verify(exactly = 0) { cacheTemplate.evictAll(any<List<ProductCacheKeys.ProductDetail>>()) }
+            verify(exactly = 0) { productCacheService.evictStockDepletedProducts(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
+        }
+    }
+
+    @DisplayName("멱등성 처리")
+    @Nested
+    inner class IdempotencyHandling {
+
+        @DisplayName("이미 처리된 이벤트는 건너뛴다")
+        @Test
+        fun `skips already processed events`() {
+            // given
+            val stockPayload = StockDepletedEventPayload(productId = 1L)
+            val stockEnvelope = createEnvelope(
+                id = "event-1",
+                type = "loopers.stock.depleted.v1",
+                aggregateType = "Stock",
+                aggregateId = "1",
+                payload = objectMapper.writeValueAsString(stockPayload),
+            )
+
+            val records = listOf(createConsumerRecord("stock-events", stockEnvelope))
+
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns setOf("product-cache:event-1")
+            every { acknowledgment.acknowledge() } just runs
+
+            // when
+            productStockEventConsumer.consume(records, acknowledgment)
+
+            // then
+            verify(exactly = 0) { productCacheService.evictStockDepletedProducts(any()) }
+            verify(exactly = 0) { eventHandledRepository.saveAll(any()) }
+            verify(exactly = 1) { acknowledgment.acknowledge() }
+        }
+
+        @DisplayName("멱등성 키 저장 실패해도 ack는 호출된다")
+        @Test
+        fun `acknowledges even when idempotency key save fails`() {
+            // given
+            val stockPayload = StockDepletedEventPayload(productId = 1L)
+            val stockEnvelope = createEnvelope(
+                id = "event-1",
+                type = "loopers.stock.depleted.v1",
+                aggregateType = "Stock",
+                aggregateId = "1",
+                payload = objectMapper.writeValueAsString(stockPayload),
+            )
+
+            val records = listOf(createConsumerRecord("stock-events", stockEnvelope))
+
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { productCacheService.evictStockDepletedProducts(any()) } just runs
+            every { eventHandledRepository.saveAll(any()) } throws RuntimeException("DB error")
+            every { acknowledgment.acknowledge() } just runs
+
+            // when
+            productStockEventConsumer.consume(records, acknowledgment)
+
+            // then
+            verify(exactly = 1) { productCacheService.evictStockDepletedProducts(any()) }
+            verify(exactly = 1) { acknowledgment.acknowledge() }
+        }
+
+        @DisplayName("배치 내 중복 이벤트는 하나만 처리한다")
+        @Test
+        fun `deduplicates events within batch by event id`() {
+            // given
+            val stockPayload = StockDepletedEventPayload(productId = 1L)
+            val stockEnvelope1 = createEnvelope(
+                id = "same-event-id",
+                type = "loopers.stock.depleted.v1",
+                aggregateType = "Stock",
+                aggregateId = "1",
+                payload = objectMapper.writeValueAsString(stockPayload),
+            )
+            val stockEnvelope2 = createEnvelope(
+                id = "same-event-id",
+                type = "loopers.stock.depleted.v1",
+                aggregateType = "Stock",
+                aggregateId = "1",
+                payload = objectMapper.writeValueAsString(stockPayload),
+            )
+
+            val records = listOf(
+                createConsumerRecord("stock-events", stockEnvelope1),
+                createConsumerRecord("stock-events", stockEnvelope2),
+            )
+
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { productCacheService.evictStockDepletedProducts(any()) } just runs
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { acknowledgment.acknowledge() } just runs
+
+            // when
+            productStockEventConsumer.consume(records, acknowledgment)
+
+            // then
+            verify(exactly = 1) {
+                productCacheService.evictStockDepletedProducts(
+                    match<EvictStockDepletedCommand> { command ->
+                        command.productIds.size == 1 && command.productIds[0] == 1L
+                    },
+                )
+            }
+            verify(exactly = 1) {
+                eventHandledRepository.saveAll(
+                    match { list -> list.size == 1 },
+                )
+            }
         }
     }
 
@@ -137,7 +257,7 @@ class ProductStockEventConsumerTest {
             productStockEventConsumer.consume(records, acknowledgment)
 
             // then
-            verify(exactly = 0) { cacheTemplate.evictAll(any<List<ProductCacheKeys.ProductDetail>>()) }
+            verify(exactly = 0) { productCacheService.evictStockDepletedProducts(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -147,6 +267,7 @@ class ProductStockEventConsumerTest {
             // given
             val stockPayload = StockDepletedEventPayload(productId = 1L)
             val stockEnvelope = createEnvelope(
+                id = "event-1",
                 type = "loopers.stock.depleted.v1",
                 aggregateType = "Stock",
                 aggregateId = "1",
@@ -165,7 +286,9 @@ class ProductStockEventConsumerTest {
                 createConsumerRecord("stock-events", unsupportedEnvelope),
             )
 
-            every { cacheTemplate.evictAll(any<List<ProductCacheKeys.ProductDetail>>()) } just runs
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { productCacheService.evictStockDepletedProducts(any()) } just runs
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -173,10 +296,9 @@ class ProductStockEventConsumerTest {
 
             // then
             verify(exactly = 1) {
-                cacheTemplate.evictAll(
-                    match<List<ProductCacheKeys.ProductDetail>> { cacheKeys ->
-                        cacheKeys.size == 1 &&
-                            cacheKeys[0].key == "product-detail:v1:1"
+                productCacheService.evictStockDepletedProducts(
+                    match<EvictStockDepletedCommand> { command ->
+                        command.productIds.size == 1 && command.productIds[0] == 1L
                     },
                 )
             }
@@ -235,7 +357,7 @@ class ProductStockEventConsumerTest {
             assertThrows<BatchListenerFailedException> {
                 productStockEventConsumer.consume(records, acknowledgment)
             }
-            verify(exactly = 0) { cacheTemplate.evictAll(any<List<ProductCacheKeys.ProductDetail>>()) }
+            verify(exactly = 0) { productCacheService.evictStockDepletedProducts(any()) }
         }
     }
 

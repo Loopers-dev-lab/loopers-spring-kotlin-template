@@ -15,8 +15,20 @@ class EventHandledRdbRepository(
         return eventHandledJpaRepository.saveAndFlush(eventHandled)
     }
 
+    @Transactional
+    override fun saveAll(eventHandledList: List<EventHandled>): List<EventHandled> {
+        if (eventHandledList.isEmpty()) return emptyList()
+        return eventHandledJpaRepository.saveAllAndFlush(eventHandledList)
+    }
+
     @Transactional(readOnly = true)
     override fun existsByIdempotencyKey(idempotencyKey: String): Boolean {
         return eventHandledJpaRepository.existsByIdempotencyKey(idempotencyKey)
+    }
+
+    @Transactional(readOnly = true)
+    override fun findAllExistingKeys(idempotencyKeys: Set<String>): Set<String> {
+        if (idempotencyKeys.isEmpty()) return emptySet()
+        return eventHandledJpaRepository.findIdempotencyKeysByKeyIn(idempotencyKeys)
     }
 }

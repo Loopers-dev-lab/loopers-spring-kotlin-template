@@ -7,16 +7,13 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.loopers.domain.product.ProductStatisticService
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.interfaces.consumer.product.event.ProductViewedEventPayload
-import com.loopers.support.idempotency.EventHandled
 import com.loopers.support.idempotency.EventHandledRepository
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
-import io.mockk.slot
 import io.mockk.verify
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -77,9 +74,9 @@ class ProductViewEventConsumerTest {
 
             val records = listOf(createConsumerRecord("product-events", viewedEnvelope))
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -124,9 +121,9 @@ class ProductViewEventConsumerTest {
                 createConsumerRecord("product-events", viewedEnvelope2),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -213,9 +210,9 @@ class ProductViewEventConsumerTest {
                 createConsumerRecord("product-events", unsupportedEnvelope),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -267,9 +264,9 @@ class ProductViewEventConsumerTest {
                 createConsumerRecord("product-events", newerEnvelope),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -313,9 +310,9 @@ class ProductViewEventConsumerTest {
                 createConsumerRecord("product-events", envelope2),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -353,7 +350,7 @@ class ProductViewEventConsumerTest {
 
             val records = listOf(createConsumerRecord("product-events", viewedEnvelope))
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns true
+            every { eventHandledRepository.findAllExistingKeys(any()) } answers { firstArg() }
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -361,7 +358,7 @@ class ProductViewEventConsumerTest {
 
             // then
             verify(exactly = 0) { productStatisticService.updateViewCount(any()) }
-            verify(exactly = 0) { eventHandledRepository.save(any()) }
+            verify(exactly = 0) { eventHandledRepository.saveAll(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -392,10 +389,9 @@ class ProductViewEventConsumerTest {
                 createConsumerRecord("product-events", newEnvelope),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey("product-statistic:event-1") } returns true
-            every { eventHandledRepository.existsByIdempotencyKey("product-statistic:event-2") } returns false
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns setOf("product-statistic:event-1")
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -410,7 +406,14 @@ class ProductViewEventConsumerTest {
                     },
                 )
             }
-            verify(exactly = 1) { eventHandledRepository.save(any()) }
+            verify(exactly = 1) {
+                eventHandledRepository.saveAll(
+                    match { list ->
+                        list.size == 1 &&
+                            list[0].idempotencyKey == "product-statistic:event-2"
+                    },
+                )
+            }
         }
 
         @DisplayName("Saves idempotency keys after processing")
@@ -428,17 +431,23 @@ class ProductViewEventConsumerTest {
 
             val records = listOf(createConsumerRecord("product-events", viewedEnvelope))
 
-            val savedEventHandled = slot<EventHandled>()
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.save(capture(savedEventHandled)) } answers { firstArg() }
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
             productViewEventConsumer.consume(records, acknowledgment)
 
             // then
-            assertThat(savedEventHandled.captured.idempotencyKey).isEqualTo("product-statistic:event-abc-123")
+            verify(exactly = 1) {
+                eventHandledRepository.saveAll(
+                    match { list ->
+                        list.size == 1 &&
+                            list[0].idempotencyKey == "product-statistic:event-abc-123"
+                    },
+                )
+            }
         }
     }
 
@@ -461,17 +470,23 @@ class ProductViewEventConsumerTest {
 
             val records = listOf(createConsumerRecord("product-events", viewedEnvelope))
 
-            val idempotencyKeySlot = slot<String>()
-            every { eventHandledRepository.existsByIdempotencyKey(capture(idempotencyKeySlot)) } returns false
+            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.save(any()) } answers { firstArg() }
+            every { eventHandledRepository.saveAll(any()) } returns emptyList()
             every { acknowledgment.acknowledge() } just runs
 
             // when
             productViewEventConsumer.consume(records, acknowledgment)
 
             // then
-            assertThat(idempotencyKeySlot.captured).isEqualTo("product-statistic:unique-event-uuid")
+            verify(exactly = 1) {
+                eventHandledRepository.saveAll(
+                    match { list ->
+                        list.size == 1 &&
+                            list[0].idempotencyKey == "product-statistic:unique-event-uuid"
+                    },
+                )
+            }
         }
     }
 

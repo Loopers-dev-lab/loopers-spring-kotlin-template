@@ -8,5 +8,7 @@ package com.loopers.support.idempotency
  */
 interface EventHandledRepository {
     fun save(eventHandled: EventHandled): EventHandled
+    fun saveAll(eventHandledList: List<EventHandled>): List<EventHandled>
     fun existsByIdempotencyKey(idempotencyKey: String): Boolean
+    fun findAllExistingKeys(idempotencyKeys: Set<String>): Set<String>
 }
