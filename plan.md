@@ -74,20 +74,20 @@ This plan implements the event publishing migration for ProductStatistic metrics
 
 ---
 
-- [ ] Milestone 3: StockDepletedEventV1 event class
+- [x] Milestone 3: StockDepletedEventV1 event class
 
 ### TODO
 
-- [ ] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/product/StockDepletedEventV1.kt` - stock depleted event with productId and stockId (spec: spec#5.3, pattern: `domain/payment/PaymentPaidEventV1.kt:L5-18`)
+- [x] Create `apps/commerce-api/src/main/kotlin/com/loopers/domain/product/StockDepletedEventV1.kt` - stock depleted event with productId and stockId (spec: spec#5.3, pattern: `domain/payment/PaymentPaidEventV1.kt:L5-18`)
 
 ### Tests
 
-- [ ] Create `apps/commerce-api/src/test/kotlin/com/loopers/domain/product/StockDepletedEventV1Test.kt` - from() factory creates event with correct properties
+- [x] Create `apps/commerce-api/src/test/kotlin/com/loopers/domain/product/StockDepletedEventV1Test.kt` - from() factory creates event with correct properties
 
 ### Done When
 
-- [ ] `./gradlew :apps:commerce-api:compileKotlin` passes
-- [ ] `./gradlew :apps:commerce-api:test --tests "*StockDepletedEventV1Test"` passes
+- [x] `./gradlew :apps:commerce-api:compileKotlin` passes
+- [x] `./gradlew :apps:commerce-api:test --tests "*StockDepletedEventV1Test"` passes
 
 ---
 
