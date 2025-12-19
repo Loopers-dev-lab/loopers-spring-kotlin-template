@@ -58,6 +58,8 @@ class KafkaConfig(
         val props = HashMap(kafkaProperties.buildProducerProperties()).apply {
             put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer::class.java)
             put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer::class.java)
+            put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true)
+            put(ProducerConfig.ACKS_CONFIG, "all")
         }
         return KafkaTemplate(DefaultKafkaProducerFactory(props))
     }

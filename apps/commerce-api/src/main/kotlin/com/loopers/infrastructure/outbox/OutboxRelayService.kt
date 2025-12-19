@@ -53,12 +53,11 @@ class OutboxRelayService(
             return RelayResult(successCount = 0, failedCount = 0, lastProcessedId = cursorId)
         }
 
-        // 비동기 배치 전송
+        // 비동기 배치 전송 (각 future에 개별 타임아웃 적용됨)
         val futures = outboxMessages.map { outbox -> sendToKafkaAsync(outbox) }
 
-        // 전체 대기
+        // 전체 대기 (개별 타임아웃이 적용되어 모든 future는 확정적으로 완료됨)
         CompletableFuture.allOf(*futures.toTypedArray())
-            .orTimeout(BATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .handle { _, _ -> }
             .join()
 
@@ -68,7 +67,7 @@ class OutboxRelayService(
 
         futures.forEachIndexed { index, future ->
             val outbox = outboxMessages[index]
-            if (future.isCompletedExceptionally || !future.isDone) {
+            if (future.isCompletedExceptionally) {
                 failedMessages.add(outbox)
             } else {
                 successMessages.add(outbox)
@@ -82,11 +81,7 @@ class OutboxRelayService(
 
         // 부분/전체 성공: 실패분 OutboxFailed 저장 + 커서 이동
         val outboxFailedList = failedMessages.map { outbox ->
-            val error = futures[outboxMessages.indexOf(outbox)]
-                .let { future ->
-                    runCatching { future.getNow(Unit) }
-                        .exceptionOrNull()?.message ?: "Timeout"
-                }
+            val error = extractError(futures[outboxMessages.indexOf(outbox)])
             OutboxFailed.from(outbox, error)
         }
 
@@ -114,12 +109,11 @@ class OutboxRelayService(
             return RetryResult(successCount = 0, failedCount = 0)
         }
 
-        // 비동기 배치 전송
+        // 비동기 배치 전송 (각 future에 개별 타임아웃 적용됨)
         val futures = retryableMessages.map { failed -> sendFailedToKafkaAsync(failed) }
 
-        // 전체 대기
+        // 전체 대기 (개별 타임아웃이 적용되어 모든 future는 확정적으로 완료됨)
         CompletableFuture.allOf(*futures.toTypedArray())
-            .orTimeout(BATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .handle { _, _ -> }
             .join()
 
@@ -129,9 +123,8 @@ class OutboxRelayService(
 
         futures.forEachIndexed { index, future ->
             val failed = retryableMessages[index]
-            if (future.isCompletedExceptionally || !future.isDone) {
-                val error = runCatching { future.getNow(Unit) }
-                    .exceptionOrNull()?.message ?: "Timeout"
+            if (future.isCompletedExceptionally) {
+                val error = extractError(future)
                 failed.incrementRetryCount(error)
                 failedToRetry.add(failed)
             } else {
@@ -161,7 +154,7 @@ class OutboxRelayService(
                 }
             }
 
-        return result
+        return result.orTimeout(BATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
     private fun sendFailedToKafkaAsync(failed: OutboxFailed): CompletableFuture<Unit> {
@@ -177,7 +170,19 @@ class OutboxRelayService(
                 }
             }
 
-        return result
+        return result.orTimeout(BATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    private fun extractError(future: CompletableFuture<Unit>): String {
+        return try {
+            future.join()
+            "Unknown error"
+        } catch (e: Exception) {
+            when (val cause = e.cause ?: e) {
+                is java.util.concurrent.TimeoutException -> "Timeout"
+                else -> cause.message ?: "Unknown error"
+            }
+        }
     }
 }
 
