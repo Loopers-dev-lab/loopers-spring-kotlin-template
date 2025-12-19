@@ -7,6 +7,7 @@ import com.loopers.domain.event.EventHandledRepository
 import com.loopers.domain.event.LikeAddedEvent
 import com.loopers.domain.event.LikeRemovedEvent
 import com.loopers.domain.event.OrderCreatedEvent
+import com.loopers.domain.event.StockDepletedEvent
 import com.loopers.domain.product.ProductMetricsRepository
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
@@ -57,6 +58,7 @@ class KafkaEventConsumer(
             when (eventType) {
                 "LikeAddedEvent" -> handleLikeAdded(message, acknowledgment)
                 "LikeRemovedEvent" -> handleLikeRemoved(message, acknowledgment)
+                "StockDepletedEvent" -> handleStockDepleted(message, acknowledgment)
                 else -> {
                     logger.warn("알 수 없는 이벤트 타입: $eventType")
                     acknowledgeAfterCommit(acknowledgment)
@@ -210,6 +212,42 @@ class KafkaEventConsumer(
         logger.info(
             "OrderCreatedEvent 처리 완료: eventId=${event.eventId}, orderId=${event.orderId}, " +
                 "items=${event.items.size}개 상품 판매량 집계",
+        )
+    }
+
+    /**
+     * StockDepletedEvent 처리
+     * 재고 소진 시 캐시 갱신은 commerce-api에서 이미 처리되었으므로
+     * 여기서는 이벤트 로깅 및 추후 알림 등의 처리를 위한 기록만 수행
+     */
+    private fun handleStockDepleted(message: String, acknowledgment: Acknowledgment) {
+        val event: StockDepletedEvent = objectMapper.readValue(message)
+
+        if (isAlreadyHandled(event.eventId)) {
+            logger.debug("이미 처리된 이벤트: StockDepletedEvent, eventId=${event.eventId}, productId=${event.productId}")
+            acknowledgeAfterCommit(acknowledgment)
+            return
+        }
+
+        // 재고 소진 이벤트 처리 (추후 알림 발송 등의 로직 추가 가능)
+        logger.warn(
+            "재고 소진 이벤트 수신: productId=${event.productId}, " +
+                "previousQuantity=${event.previousQuantity}",
+        )
+
+        // 처리 완료 기록
+        eventHandledRepository.save(
+            EventHandled.create(
+                eventId = event.eventId,
+                eventType = "StockDepletedEvent",
+                aggregateType = "Product",
+                aggregateId = event.productId,
+            ),
+        )
+
+        acknowledgeAfterCommit(acknowledgment)
+        logger.info(
+            "StockDepletedEvent 처리 완료: eventId=${event.eventId}, productId=${event.productId}",
         )
     }
 
