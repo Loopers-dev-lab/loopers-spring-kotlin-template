@@ -47,7 +47,7 @@ class StockService(
         // 재고가 소진되었을 때 이벤트 발행
         if (updatedStock.quantity == 0 && previousQuantity > 0) {
             eventPublisher.publishEvent(
-                StockDepletedEvent(
+                StockDepletedEvent.create(
                     productId = productId,
                     previousQuantity = previousQuantity,
                 ),

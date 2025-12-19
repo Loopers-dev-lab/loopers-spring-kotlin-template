@@ -217,8 +217,13 @@ class KafkaEventConsumer(
 
     /**
      * StockDepletedEvent 처리
-     * 재고 소진 시 캐시 갱신은 commerce-api에서 이미 처리되었으므로
-     * 여기서는 이벤트 로깅 및 추후 알림 등의 처리를 위한 기록만 수행
+     *
+     * 재고 소진 시 상품 캐시 갱신은 commerce-api의 StockEventHandler에서 처리됨
+     * (이벤트 기반 아키텍처: 재고 차감 로직과 캐시 관리 완전 분리)
+     *
+     * commerce-streamer는 다음을 담당:
+     * - 재고 소진 이벤트 기록 (멱등성 보장)
+     * - 추후 확장: 재고 소진 알림 발송, 자동 발주 등
      */
     private fun handleStockDepleted(message: String, acknowledgment: Acknowledgment) {
         val event: StockDepletedEvent = objectMapper.readValue(message)
@@ -229,7 +234,7 @@ class KafkaEventConsumer(
             return
         }
 
-        // 재고 소진 이벤트 처리 (추후 알림 발송 등의 로직 추가 가능)
+        // 재고 소진 이벤트 로깅
         logger.warn(
             "재고 소진 이벤트 수신: productId=${event.productId}, " +
                 "previousQuantity=${event.previousQuantity}",

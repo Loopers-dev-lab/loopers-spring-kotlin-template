@@ -11,11 +11,11 @@ data class StockDepletedEvent(
     val eventId: UUID,
     val productId: Long,
     val previousQuantity: Int,
-    val createdAt: ZonedDateTime = ZonedDateTime.now(),
+    val createdAt: ZonedDateTime,
 )
 
 /**
- * 재고 부족 이벤트 (선택적)
+ * 재고 부족 이벤트
  * 상품의 재고가 특정 임계값 이하로 떨어졌을 때 발행
  */
 data class StockLowEvent(
@@ -23,5 +23,5 @@ data class StockLowEvent(
     val productId: Long,
     val currentQuantity: Int,
     val threshold: Int,
-    val createdAt: ZonedDateTime = ZonedDateTime.now(),
+    val createdAt: ZonedDateTime,
 )
