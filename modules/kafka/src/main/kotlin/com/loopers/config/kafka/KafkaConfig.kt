@@ -2,6 +2,8 @@ package com.loopers.config.kafka
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.common.serialization.StringSerializer
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -50,6 +52,17 @@ class KafkaConfig {
     @Bean
     fun kafkaTemplate(producerFactory: ProducerFactory<Any, Any>): KafkaTemplate<Any, Any> {
         return KafkaTemplate(producerFactory)
+    }
+
+    @Bean
+    fun stringKafkaTemplate(
+        kafkaProperties: KafkaProperties,
+    ): KafkaTemplate<String, String> {
+        val props = HashMap(kafkaProperties.buildProducerProperties()).apply {
+            put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer::class.java)
+            put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer::class.java)
+        }
+        return KafkaTemplate(DefaultKafkaProducerFactory(props))
     }
 
     @Bean
