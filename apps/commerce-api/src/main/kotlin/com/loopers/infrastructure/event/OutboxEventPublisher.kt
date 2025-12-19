@@ -1,6 +1,5 @@
 package com.loopers.infrastructure.event
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.domain.event.EventOutbox
 import jakarta.transaction.Transactional
 import org.slf4j.LoggerFactory
@@ -8,6 +7,7 @@ import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 
 /**
  * Outbox 이벤트를 Kafka로 발행
@@ -62,7 +62,7 @@ class OutboxEventPublisher(
         }
 
         val partitionKey = outbox.aggregateId.toString()
-        val result = kafkaTemplate.send(topic, partitionKey, outbox.payload).get()
+        val result = kafkaTemplate.send(topic, partitionKey, outbox.payload).get(30, TimeUnit.SECONDS)
 
         outbox.kafkaPartition = result.recordMetadata.partition()
         outbox.kafkaOffset = result.recordMetadata.offset()
@@ -71,7 +71,6 @@ class OutboxEventPublisher(
     private fun handlePublishFailure(outbox: EventOutbox, e: Exception) {
         outbox.retryCount++
         outbox.lastError = e.message?.take(500)
-        eventOutboxRepository.save(outbox)
 
         if (outbox.retryCount >= MAX_RETRY) {
             logger.error(
@@ -81,11 +80,11 @@ class OutboxEventPublisher(
 
             outbox.processed = true
             outbox.processedAt = Instant.now()
-            eventOutboxRepository.save(outbox)
         } else {
             logger.warn(
                 "Kafka 발행 실패 (재시도 ${outbox.retryCount}회): eventId=${outbox.eventId}", e
             )
         }
+        eventOutboxRepository.save(outbox)
     }
 }

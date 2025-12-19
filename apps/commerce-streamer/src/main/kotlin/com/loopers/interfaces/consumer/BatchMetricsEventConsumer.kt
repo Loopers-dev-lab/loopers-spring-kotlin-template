@@ -53,7 +53,8 @@ class BatchMetricsKafkaConsumer(
 
     private fun parseEvent(message: String): DomainEvent {
         val node = objectMapper.readTree(message)
-        val eventType = node["eventType"].asText()
+        val eventType = node["eventType"]?.asText()
+            ?: throw IllegalArgumentException("Missing eventType in message: $message")
 
         return when (eventType) {
             "PRODUCT_LIKED" -> objectMapper.readValue(message, ProductLikedEvent::class.java)

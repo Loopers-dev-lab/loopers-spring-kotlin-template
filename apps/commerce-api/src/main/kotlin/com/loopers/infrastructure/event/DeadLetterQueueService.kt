@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 
 @Component
 class DeadLetterQueueService(
@@ -40,7 +41,7 @@ class DeadLetterQueueService(
 
         return try {
             val topic = getTopicForEventType(dlq.eventType)
-            kafkaTemplate.send(topic, dlq.eventId, dlq.payload).get()
+            kafkaTemplate.send(topic, dlq.eventId, dlq.payload).get(30, TimeUnit.SECONDS)
 
             dlq.processed = true
             dlq.processedAt = Instant.now()
