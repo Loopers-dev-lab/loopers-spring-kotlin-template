@@ -1,10 +1,14 @@
 package com.loopers.domain.order
 
 import com.loopers.domain.coupon.CouponService
+import com.loopers.domain.coupon.MemberCoupon
+import com.loopers.domain.coupon.event.CouponUsedEvent
 import com.loopers.domain.member.MemberRepository
 import com.loopers.domain.order.event.OrderCreatedEvent
+import com.loopers.domain.order.event.OrderItemDto
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.event.StockDecreasedEvent
 import com.loopers.domain.shared.Money
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -23,10 +27,6 @@ class OrderService(
     private val eventPublisher: ApplicationEventPublisher,
     private val couponService: CouponService,
 ) {
-    /**
-     * 주문 생성 및 계산 (쿠폰 할인, 포인트 사용 검증)
-     * 순수 도메인 로직만 처리
-     */
     @Transactional
     fun createOrderWithCalculation(
         memberId: String,
@@ -34,42 +34,76 @@ class OrderService(
         couponId: Long? = null,
         usePoint: Long = 0L
     ): Order {
-        // 주문 생성 시에는 Product를 읽기만 하므로 락 불필요 (재고 차감은 결제 완료 시)
         val productMap = loadProductsWithoutLock(orderItems)
-
-
-        // 쿠폰 할인 계산 및 사용 처리
-        val discountAmount = couponService.applyAndUseCouponForOrder(
-            memberId = memberId,
-            couponId = couponId,
-            orderItems = orderItems,
-            productMap = productMap
-        )
-
-        // 주문 생성
+        val (discountAmount, memberCoupon) = applyCouponDiscount(memberId, couponId, orderItems, productMap)
         val order = createOrder(memberId, orderItems, productMap, discountAmount)
 
-        // 포인트 사용 검증 및 차감
-        val finalPaymentAmount = order.finalAmount.amount - usePoint
-        if (finalPaymentAmount < 0) {
-            throw CoreException(
-                ErrorType.BAD_REQUEST,
-                "포인트를 너무 많이 사용했습니다. 최종 금액: ${order.finalAmount.amount}, 사용 포인트: $usePoint"
-            )
-        }
-
-        if (usePoint > 0) {
-            // Member는 포인트 차감이 발생하므로 비관적 락 필요
-            val member = memberRepository.findByMemberIdWithLockOrThrow(memberId)
-            member.usePoint(usePoint)
-        }
+        applyPointDiscount(memberId, order, usePoint)
 
         val savedOrder = orderRepository.save(order)
 
-        // 항상 이벤트 발행 (couponId nullable로 전달)
-        publishOrderCreatedEvent(savedOrder, couponId)
+        publishOrderEvents(savedOrder, couponId, memberCoupon, discountAmount)
 
         return savedOrder
+    }
+
+    private fun applyCouponDiscount(
+        memberId: String,
+        couponId: Long?,
+        orderItems: List<OrderItemCommand>,
+        productMap: Map<Long, Product>
+    ): Pair<Money, MemberCoupon?> {
+        if (couponId == null) return Pair(Money.zero(), null)
+
+        val coupon = couponService.getMemberCoupon(memberId, couponId)
+            ?: throw IllegalArgumentException("쿠폰을 찾을 수 없습니다")
+
+        val totalAmount = calculateTotalAmount(orderItems, productMap)
+        val discount = couponService.calculateDiscount(coupon, totalAmount)
+
+        coupon.use()
+
+        return Pair(discount, coupon)
+    }
+
+    private fun calculateTotalAmount(
+        orderItems: List<OrderItemCommand>,
+        productMap: Map<Long, Product>
+    ): Money {
+        return orderItems.sumOf { item ->
+            productMap[item.productId]!!.price.amount * item.quantity
+        }.let { Money(it) }
+    }
+
+    private fun applyPointDiscount(memberId: String, order: Order, usePoint: Long) {
+        if (usePoint == 0L) return
+
+        order.validatePointUsage(usePoint)
+
+        val member = memberRepository.findByMemberIdWithLockOrThrow(memberId)
+        member.usePoint(usePoint)
+    }
+
+    private fun publishOrderEvents(
+        savedOrder: Order,
+        couponId: Long?,
+        memberCoupon: MemberCoupon?,
+        discountAmount: Money
+    ) {
+        publishOrderCreatedEvent(savedOrder, couponId)
+
+        if (couponId != null && memberCoupon != null) {
+            eventPublisher.publishEvent(
+                CouponUsedEvent(
+                    aggregateId = savedOrder.id,
+                    orderId = savedOrder.id,
+                    memberId = savedOrder.memberId,
+                    couponId = couponId,
+                    memberCouponId = memberCoupon.id,
+                    discountAmount = discountAmount.amount
+                )
+            )
+        }
     }
 
     private fun createOrder(
@@ -85,12 +119,22 @@ class OrderService(
     )
 
     private fun publishOrderCreatedEvent(savedOrder: Order, couponId: Long?) {
+        val orderItems = savedOrder.items.map {
+            OrderItemDto(
+                productId = it.productId,
+                quantity = it.quantity.value,
+                price = it.price.amount
+            )
+        }
+
         eventPublisher.publishEvent(
             OrderCreatedEvent(
+                aggregateId = savedOrder.id,
                 orderId = savedOrder.id,
                 memberId = savedOrder.memberId,
                 orderAmount = savedOrder.totalAmount.amount,
                 couponId = couponId,
+                orderItems = orderItems,
                 createdAt = Instant.now(),
             ),
         )
@@ -106,33 +150,34 @@ class OrderService(
     fun completeOrderWithPayment(orderId: Long) {
         val order = orderRepository.findByIdOrThrow(orderId)
 
-        // 재고 차감을 위해 상품 조회 (락 필요)
         val productIds = order.items.map { it.productId }
         val products = productRepository.findAllByIdInWithLock(productIds)
-
-        // 검증 추가
         validateProducts(products, productIds)
 
         val productMap = products.associateBy { it.id }
 
-        // 재고 차감
         order.items.forEach { orderItem ->
             val product = productMap[orderItem.productId]!!
             product.decreaseStock(orderItem.quantity)
+            val afterStock = product.stock.quantity
+
+            eventPublisher.publishEvent(
+                StockDecreasedEvent(
+                    aggregateId = product.id,
+                    productId = product.id,
+                    orderId = order.id,
+                    quantity = orderItem.quantity.value,
+                    remainingStock = afterStock,
+                )
+            )
         }
 
-        // 주문 완료 처리
         order.complete()
     }
 
-    /**
-     * 주문 생성 시 상품 조회 (락 없음 - 가격 조회용)
-     */
     private fun loadProductsWithoutLock(orderItems: List<OrderItemCommand>): Map<Long, Product> {
         val productIds = orderItems.map { it.productId }
         val products = productRepository.findAllByIdIn(productIds)
-        
-        // 검증 추가
         validateProducts(products, productIds)
 
         return products.associateBy { it.id }     

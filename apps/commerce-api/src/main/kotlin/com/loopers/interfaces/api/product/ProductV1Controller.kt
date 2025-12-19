@@ -36,12 +36,11 @@ class ProductV1Controller(
             .map { ProductV1Dto.ProductResponse.from(it) }
             .let { ApiResponse.success(it) }
 
-        // 목록 조회 성공 후 이벤트 발행
         eventPublisher.publishEvent(
             ProductBrowsedEvent(
                 memberId = memberId,
                 brandId = brandId,
-                sortType = sort,
+                sortType = sort.name, // Enum을 String으로 변환
                 page = page,
                 browsedAt = Instant.now()
             )
@@ -59,9 +58,9 @@ class ProductV1Controller(
             .let { ProductV1Dto.ProductResponse.from(it) }
             .let { ApiResponse.success(it) }
 
-        // 상품 조회 성공 후 이벤트 발행 (도메인 이벤트는 비회원도 발행, UserActionEvent는 인증 사용자만)
         eventPublisher.publishEvent(
             ProductViewedEvent(
+                aggregateId = productId,
                 productId = productId,
                 memberId = memberId,
                 viewedAt = Instant.now()
