@@ -32,6 +32,15 @@ dependencies {
     // 테스트용
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 
+    // Kafka
+    implementation("org.springframework.kafka:spring-kafka")
+
+    // 테스트용 Kafka
+    testImplementation("org.springframework.kafka:spring-kafka-test")
+
+    // 비동기 테스트를 위한 Awaitility
+    testImplementation("org.awaitility:awaitility-kotlin:4.2.0")
+
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))
     testImplementation(testFixtures(project(":modules:redis")))
