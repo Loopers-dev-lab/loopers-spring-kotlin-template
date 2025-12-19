@@ -25,8 +25,21 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      retries: 3
+      properties:
+        retry.backoff.ms: 1000
+        delivery.timeout.ms: 120000
+        request.timeout.ms: 30000
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        linger.ms: 5
   cloud:
     openfeign:
       client:
@@ -72,6 +85,17 @@ resilience4j:
         minimum-number-of-calls: 5
         failure-rate-threshold: 20
         slow-call-duration-threshold: 400ms
+      outbox-relay:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - org.apache.kafka.common.errors.TimeoutException
+          - org.apache.kafka.common.errors.NotLeaderOrFollowerException
+          - org.apache.kafka.common.errors.NetworkException
     circuit-breaker-aspect-order: 1
 
   retry:
