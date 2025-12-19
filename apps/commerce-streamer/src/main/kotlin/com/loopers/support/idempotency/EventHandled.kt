@@ -6,7 +6,6 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
 import java.time.Instant
 
 /**
@@ -14,43 +13,18 @@ import java.time.Instant
  *
  * - BaseEntity를 상속하지 않음 (인프라 데이터)
  * - INSERT only (UPDATE 없음)
+ * - idempotencyKey는 유니크 컬럼으로 중복 체크에 사용
  */
 @Entity
-@Table(
-    name = "event_handled",
-    uniqueConstraints = [
-        UniqueConstraint(
-            name = "uk_event_handled",
-            columnNames = ["aggregate_type", "aggregate_id", "action"],
-        ),
-    ],
-)
+@Table(name = "event_handled")
 class EventHandled(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 
-    @Column(name = "aggregate_type", nullable = false, length = 100)
-    val aggregateType: String,
-
-    @Column(name = "aggregate_id", nullable = false, length = 255)
-    val aggregateId: String,
-
-    @Column(name = "action", nullable = false, length = 100)
-    val action: String,
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 500)
+    val idempotencyKey: String,
 
     @Column(name = "handled_at", nullable = false, updatable = false)
     val handledAt: Instant = Instant.now(),
-) {
-    companion object {
-        fun create(
-            aggregateType: String,
-            aggregateId: String,
-            action: String,
-        ): EventHandled = EventHandled(
-            aggregateType = aggregateType,
-            aggregateId = aggregateId,
-            action = action,
-        )
-    }
-}
+)

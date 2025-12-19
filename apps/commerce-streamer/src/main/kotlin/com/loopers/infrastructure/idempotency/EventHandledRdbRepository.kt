@@ -16,15 +16,7 @@ class EventHandledRdbRepository(
     }
 
     @Transactional(readOnly = true)
-    override fun existsByAggregateTypeAndAggregateIdAndAction(
-        aggregateType: String,
-        aggregateId: String,
-        action: String,
-    ): Boolean {
-        return eventHandledJpaRepository.existsByAggregateTypeAndAggregateIdAndAction(
-            aggregateType = aggregateType,
-            aggregateId = aggregateId,
-            action = action,
-        )
+    override fun existsByIdempotencyKey(idempotencyKey: String): Boolean {
+        return eventHandledJpaRepository.existsByIdempotencyKey(idempotencyKey)
     }
 }

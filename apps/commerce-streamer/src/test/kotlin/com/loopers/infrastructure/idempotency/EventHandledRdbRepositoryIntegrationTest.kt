@@ -33,42 +33,31 @@ class EventHandledRdbRepositoryIntegrationTest @Autowired constructor(
         @Test
         fun `persists EventHandled and returns entity with generated id greater than 0`() {
             // given
-            val eventHandled = EventHandled.create(
-                aggregateType = "Order",
-                aggregateId = "123",
-                action = "deductPoint",
-            )
+            val idempotencyKey = "product-statistic:Order:123:paid"
+            val eventHandled = EventHandled(idempotencyKey = idempotencyKey)
 
             // when
             val saved = eventHandledRepository.save(eventHandled)
 
             // then
             assertThat(saved.id).isGreaterThan(0L)
-            assertThat(saved.aggregateType).isEqualTo(eventHandled.aggregateType)
-            assertThat(saved.aggregateId).isEqualTo(eventHandled.aggregateId)
-            assertThat(saved.action).isEqualTo(eventHandled.action)
+            assertThat(saved.idempotencyKey).isEqualTo(idempotencyKey)
             assertThat(saved.handledAt).isNotNull()
         }
     }
 
-    @DisplayName("existsByAggregateTypeAndAggregateIdAndAction()")
+    @DisplayName("existsByIdempotencyKey()")
     @Nested
-    inner class ExistsByAggregateTypeAndAggregateIdAndAction {
+    inner class ExistsByIdempotencyKey {
 
         @DisplayName("레코드가 없으면 false를 반환한다")
         @Test
         fun `returns false when no record exists`() {
             // given
-            val aggregateType = "Order"
-            val aggregateId = "123"
-            val action = "deductPoint"
+            val idempotencyKey = "product-statistic:Order:123:paid"
 
             // when
-            val exists = eventHandledRepository.existsByAggregateTypeAndAggregateIdAndAction(
-                aggregateType = aggregateType,
-                aggregateId = aggregateId,
-                action = action,
-            )
+            val exists = eventHandledRepository.existsByIdempotencyKey(idempotencyKey)
 
             // then
             assertThat(exists).isFalse()
@@ -78,51 +67,28 @@ class EventHandledRdbRepositoryIntegrationTest @Autowired constructor(
         @Test
         fun `returns true when matching record exists`() {
             // given
-            val aggregateType = "Order"
-            val aggregateId = "123"
-            val action = "deductPoint"
+            val idempotencyKey = "product-statistic:Order:123:paid"
 
-            eventHandledRepository.save(
-                EventHandled.create(
-                    aggregateType = aggregateType,
-                    aggregateId = aggregateId,
-                    action = action,
-                ),
-            )
+            eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
 
             // when
-            val exists = eventHandledRepository.existsByAggregateTypeAndAggregateIdAndAction(
-                aggregateType = aggregateType,
-                aggregateId = aggregateId,
-                action = action,
-            )
+            val exists = eventHandledRepository.existsByIdempotencyKey(idempotencyKey)
 
             // then
             assertThat(exists).isTrue()
         }
 
-        @DisplayName("부분 일치 (다른 action)일 경우 false를 반환한다")
+        @DisplayName("다른 idempotencyKey로 조회시 false를 반환한다")
         @Test
-        fun `returns false for partial match with different action`() {
+        fun `returns false for different idempotencyKey`() {
             // given
-            val aggregateType = "Order"
-            val aggregateId = "123"
-            val action = "deductPoint"
+            val idempotencyKey = "product-statistic:Order:123:paid"
+            val differentKey = "product-statistic:Order:456:paid"
 
-            eventHandledRepository.save(
-                EventHandled.create(
-                    aggregateType = aggregateType,
-                    aggregateId = aggregateId,
-                    action = action,
-                ),
-            )
+            eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
 
-            // when - 다른 action으로 조회
-            val exists = eventHandledRepository.existsByAggregateTypeAndAggregateIdAndAction(
-                aggregateType = aggregateType,
-                aggregateId = aggregateId,
-                action = "updateStock",
-            )
+            // when
+            val exists = eventHandledRepository.existsByIdempotencyKey(differentKey)
 
             // then
             assertThat(exists).isFalse()
@@ -133,31 +99,17 @@ class EventHandledRdbRepositoryIntegrationTest @Autowired constructor(
     @Nested
     inner class UniqueConstraint {
 
-        @DisplayName("중복된 (aggregate_type, aggregate_id, action) 조합은 저장할 수 없다")
+        @DisplayName("중복된 idempotencyKey는 저장할 수 없다")
         @Test
-        fun `prevents duplicate aggregate_type aggregate_id action combination`() {
+        fun `prevents duplicate idempotencyKey`() {
             // given
-            val aggregateType = "Order"
-            val aggregateId = "123"
-            val action = "deductPoint"
+            val idempotencyKey = "product-statistic:Order:123:paid"
 
-            eventHandledRepository.save(
-                EventHandled.create(
-                    aggregateType = aggregateType,
-                    aggregateId = aggregateId,
-                    action = action,
-                ),
-            )
+            eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
 
             // when & then
             assertThrows<DataIntegrityViolationException> {
-                eventHandledRepository.save(
-                    EventHandled.create(
-                        aggregateType = aggregateType,
-                        aggregateId = aggregateId,
-                        action = action,
-                    ),
-                )
+                eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
             }
         }
     }

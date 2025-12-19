@@ -7,9 +7,5 @@ import org.springframework.stereotype.Repository
 @Repository
 interface EventHandledJpaRepository : JpaRepository<EventHandled, Long> {
 
-    fun existsByAggregateTypeAndAggregateIdAndAction(
-        aggregateType: String,
-        aggregateId: String,
-        action: String,
-    ): Boolean
+    fun existsByIdempotencyKey(idempotencyKey: String): Boolean
 }

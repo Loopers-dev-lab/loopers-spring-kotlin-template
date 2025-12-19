@@ -8,5 +8,5 @@ package com.loopers.support.idempotency
  */
 interface EventHandledRepository {
     fun save(eventHandled: EventHandled): EventHandled
-    fun existsByAggregateTypeAndAggregateIdAndAction(aggregateType: String, aggregateId: String, action: String): Boolean
+    fun existsByIdempotencyKey(idempotencyKey: String): Boolean
 }

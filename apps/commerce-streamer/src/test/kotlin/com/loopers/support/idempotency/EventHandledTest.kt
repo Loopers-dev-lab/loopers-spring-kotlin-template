@@ -8,50 +8,37 @@ import org.junit.jupiter.api.Test
 @DisplayName("EventHandled 단위 테스트")
 class EventHandledTest {
 
-    @DisplayName("create() 팩토리 메서드")
+    @DisplayName("생성자")
     @Nested
-    inner class CreateFactory {
+    inner class Constructor {
 
-        @DisplayName("주어진 파라미터로 EventHandled를 생성한다")
+        @DisplayName("idempotencyKey로 EventHandled를 생성한다")
         @Test
-        fun `creates EventHandled with given parameters`() {
+        fun `creates EventHandled with idempotencyKey`() {
             // given
-            val aggregateType = "Order"
-            val aggregateId = "123"
-            val action = "deductPoint"
+            val idempotencyKey = "product-statistic:Order:123:paid"
 
             // when
-            val eventHandled = EventHandled.create(
-                aggregateType = aggregateType,
-                aggregateId = aggregateId,
-                action = action,
-            )
+            val eventHandled = EventHandled(idempotencyKey = idempotencyKey)
 
             // then
-            assertThat(eventHandled.aggregateType).isEqualTo(aggregateType)
-            assertThat(eventHandled.aggregateId).isEqualTo(aggregateId)
-            assertThat(eventHandled.action).isEqualTo(action)
+            assertThat(eventHandled.idempotencyKey).isEqualTo(idempotencyKey)
         }
 
-        @DisplayName("다른 액션 타입의 EventHandled를 생성한다")
+        @DisplayName("다양한 형식의 idempotencyKey로 생성할 수 있다")
         @Test
-        fun `creates EventHandled with different action type`() {
+        fun `creates EventHandled with various idempotencyKey formats`() {
             // given
-            val aggregateType = "Payment"
-            val aggregateId = "789"
-            val action = "updateStock"
+            val idempotencyKey1 = "product-statistic:Order:123:paid"
+            val idempotencyKey2 = "product-statistic:event-uuid-abc-123"
 
             // when
-            val eventHandled = EventHandled.create(
-                aggregateType = aggregateType,
-                aggregateId = aggregateId,
-                action = action,
-            )
+            val eventHandled1 = EventHandled(idempotencyKey = idempotencyKey1)
+            val eventHandled2 = EventHandled(idempotencyKey = idempotencyKey2)
 
             // then
-            assertThat(eventHandled.aggregateType).isEqualTo(aggregateType)
-            assertThat(eventHandled.aggregateId).isEqualTo(aggregateId)
-            assertThat(eventHandled.action).isEqualTo(action)
+            assertThat(eventHandled1.idempotencyKey).isEqualTo(idempotencyKey1)
+            assertThat(eventHandled2.idempotencyKey).isEqualTo(idempotencyKey2)
         }
     }
 
@@ -63,16 +50,10 @@ class EventHandledTest {
         @Test
         fun `id is 0 before persistence`() {
             // given
-            val aggregateType = "Like"
-            val aggregateId = "product-456"
-            val action = "createLike"
+            val idempotencyKey = "product-statistic:Order:123:paid"
 
             // when
-            val eventHandled = EventHandled.create(
-                aggregateType = aggregateType,
-                aggregateId = aggregateId,
-                action = action,
-            )
+            val eventHandled = EventHandled(idempotencyKey = idempotencyKey)
 
             // then
             assertThat(eventHandled.id).isEqualTo(0L)
@@ -82,16 +63,10 @@ class EventHandledTest {
         @Test
         fun `handledAt is set automatically and not null`() {
             // given
-            val aggregateType = "Order"
-            val aggregateId = "123"
-            val action = "completeOrder"
+            val idempotencyKey = "product-statistic:Order:123:paid"
 
             // when
-            val eventHandled = EventHandled.create(
-                aggregateType = aggregateType,
-                aggregateId = aggregateId,
-                action = action,
-            )
+            val eventHandled = EventHandled(idempotencyKey = idempotencyKey)
 
             // then
             assertThat(eventHandled.handledAt).isNotNull()
@@ -101,22 +76,14 @@ class EventHandledTest {
         @Test
         fun `all fields are correctly mapped`() {
             // given
-            val aggregateType = "Coupon"
-            val aggregateId = "coupon-999"
-            val action = "issueCoupon"
+            val idempotencyKey = "product-statistic:Coupon:coupon-999:issue"
 
             // when
-            val eventHandled = EventHandled.create(
-                aggregateType = aggregateType,
-                aggregateId = aggregateId,
-                action = action,
-            )
+            val eventHandled = EventHandled(idempotencyKey = idempotencyKey)
 
             // then
             assertThat(eventHandled.id).isEqualTo(0L)
-            assertThat(eventHandled.aggregateType).isEqualTo(aggregateType)
-            assertThat(eventHandled.aggregateId).isEqualTo(aggregateId)
-            assertThat(eventHandled.action).isEqualTo(action)
+            assertThat(eventHandled.idempotencyKey).isEqualTo(idempotencyKey)
             assertThat(eventHandled.handledAt).isNotNull()
         }
     }

@@ -3,6 +3,7 @@ package com.loopers.config.kafka
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringSerializer
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -15,9 +16,13 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.core.DefaultKafkaProducerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.core.ProducerFactory
+import org.springframework.kafka.listener.CommonErrorHandler
 import org.springframework.kafka.listener.ContainerProperties
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
+import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.converter.BatchMessagingMessageConverter
 import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
+import org.springframework.util.backoff.FixedBackOff
 import java.util.HashMap
 
 @EnableKafka
@@ -62,10 +67,19 @@ class KafkaConfig(
         return ByteArrayJsonMessageConverter(objectMapper)
     }
 
+    @Bean
+    fun commonErrorHandler(kafkaTemplate: KafkaTemplate<String, String>): CommonErrorHandler {
+        val recoverer = DeadLetterPublishingRecoverer(kafkaTemplate) { record, _ ->
+            TopicPartition("${record.topic()}.DLT", record.partition())
+        }
+        return DefaultErrorHandler(recoverer, FixedBackOff(0L, 0L))
+    }
+
     @Bean(BATCH_LISTENER)
     fun defaultBatchListenerContainerFactory(
         kafkaProperties: KafkaProperties,
         converter: ByteArrayJsonMessageConverter,
+        commonErrorHandler: CommonErrorHandler,
     ): ConcurrentKafkaListenerContainerFactory<*, *> {
         val consumerConfig = HashMap(kafkaProperties.buildConsumerProperties())
             .apply {
@@ -81,6 +95,7 @@ class KafkaConfig(
             consumerFactory = DefaultKafkaConsumerFactory(consumerConfig)
             containerProperties.ackMode = ContainerProperties.AckMode.MANUAL
             setBatchMessageConverter(BatchMessagingMessageConverter(converter))
+            setCommonErrorHandler(commonErrorHandler)
             setConcurrency(3)
             isBatchListener = true
         }
