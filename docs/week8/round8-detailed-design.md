@@ -71,6 +71,13 @@ loopers.product.viewed.v1 → product-events
 | product-events | 3     | ProductViewedEventV1                    |
 | stock-events   | 3     | StockDepletedEventV1                    |
 
+> **⚠️ 토픽 관리 방침**
+>
+> 이 프로젝트에서는 애플리케이션 코드 내에서 토픽을 생성하지 않는다.
+> 토픽 생성 및 설정(파티션 수, 리텐션 등)은 별도의 인프라 관리 도구에서 수행할 예정이다.
+> - 개발 환경: docker-compose 또는 Kafka CLI로 수동 생성
+> - 운영 환경: IaC(Terraform, Strimzi Operator 등) 또는 Kafka 관리 콘솔에서 관리
+
 ---
 
 ## 2. 시스템 플로우차트

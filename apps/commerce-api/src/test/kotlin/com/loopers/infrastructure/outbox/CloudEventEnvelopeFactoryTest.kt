@@ -48,7 +48,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.id).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         }
 
@@ -67,7 +67,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.source).isEqualTo("commerce-api")
         }
 
@@ -88,7 +88,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.time).isEqualTo(occurredAt)
         }
 
@@ -109,7 +109,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             val deserializedEvent = objectMapper.readValue<OrderCreatedEventV1>(envelope!!.payload)
             assertThat(deserializedEvent.orderId).isEqualTo(1L)
             assertThat(deserializedEvent.orderItems).hasSize(1)
@@ -151,7 +151,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.order.created.v1")
             assertThat(envelope.aggregateType).isEqualTo("Order")
             assertThat(envelope.aggregateId).isEqualTo("123")
@@ -170,7 +170,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.order.canceled.v1")
             assertThat(envelope.aggregateType).isEqualTo("Order")
             assertThat(envelope.aggregateId).isEqualTo("456")
@@ -191,7 +191,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.order.paid.v1")
             assertThat(envelope.aggregateType).isEqualTo("Order")
             assertThat(envelope.aggregateId).isEqualTo("789")
@@ -207,7 +207,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.payment.created.v1")
             assertThat(envelope.aggregateType).isEqualTo("Payment")
             assertThat(envelope.aggregateId).isEqualTo("100")
@@ -223,7 +223,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.payment.paid.v1")
             assertThat(envelope.aggregateType).isEqualTo("Payment")
             assertThat(envelope.aggregateId).isEqualTo("200")
@@ -245,7 +245,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.payment.failed.v1")
             assertThat(envelope.aggregateType).isEqualTo("Payment")
             assertThat(envelope.aggregateId).isEqualTo("300")
@@ -261,7 +261,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.like.created.v1")
             assertThat(envelope.aggregateType).isEqualTo("Like")
             assertThat(envelope.aggregateId).isEqualTo("500")
@@ -277,7 +277,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.like.canceled.v1")
             assertThat(envelope.aggregateType).isEqualTo("Like")
             assertThat(envelope.aggregateId).isEqualTo("600")
@@ -293,7 +293,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.product.viewed.v1")
             assertThat(envelope.aggregateType).isEqualTo("Product")
             assertThat(envelope.aggregateId).isEqualTo("700")
@@ -309,7 +309,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val envelope = cloudEventEnvelopeFactory.create(event)
 
             // then
-            assertThat(envelope).isNotNull
+            assertThat(envelope).isNotNull()
             assertThat(envelope!!.type).isEqualTo("loopers.stock.depleted.v1")
             assertThat(envelope.aggregateType).isEqualTo("Stock")
             assertThat(envelope.aggregateId).isEqualTo("800")

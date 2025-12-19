@@ -35,24 +35,22 @@ class OutboxResilienceConfigIntegrationTest @Autowired constructor(
         fun `event listeners are attached to outbox-relay circuit breaker`() {
             // given
             val circuitBreaker = circuitBreakerRegistry.circuitBreaker("outbox-relay")
-            val eventPublisher = circuitBreaker.eventPublisher
+            val stateTransitionEvents = mutableListOf<CircuitBreaker.StateTransition>()
 
-            // when - 상태 전환을 트리거하여 리스너가 동작하는지 확인
-            // 서킷브레이커를 OPEN으로 강제 전환 후 다시 CLOSED로
-            val initialState = circuitBreaker.state
+            // 테스트용 리스너 추가로 등록하여 이벤트 발생 여부 확인
+            circuitBreaker.eventPublisher.onStateTransition { event ->
+                stateTransitionEvents.add(event.stateTransition)
+            }
 
-            // 리스너 등록 여부는 eventPublisher의 onEvent 등록 여부로 간접 확인
-            // 실제 상태 전환을 통해 로그가 출력되는지 확인
+            // when
             circuitBreaker.transitionToOpenState()
-            val openState = circuitBreaker.state
-
             circuitBreaker.transitionToClosedState()
-            val closedState = circuitBreaker.state
 
             // then
-            assertThat(openState).isEqualTo(CircuitBreaker.State.OPEN)
-            assertThat(closedState).isEqualTo(CircuitBreaker.State.CLOSED)
-            // 상태 전환이 가능하면 서킷브레이커가 정상적으로 설정된 것
+            assertThat(stateTransitionEvents).contains(
+                CircuitBreaker.StateTransition.CLOSED_TO_OPEN,
+                CircuitBreaker.StateTransition.OPEN_TO_CLOSED,
+            )
         }
     }
 }

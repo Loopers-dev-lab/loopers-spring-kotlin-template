@@ -13,14 +13,13 @@ import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Service
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 /**
  * OutboxRelayService - Outbox 메시지 Kafka 릴레이 비즈니스 로직
  *
- * - relayNewMessages(): 새 메시지 발행
- * - retryFailedMessages(): 실패 메시지 재시도
- * - 서킷브레이커 OPEN 시 조기 반환
+ * - relayNewMessages(): 새 메시지 비동기 배치 발행
+ * - retryFailedMessages(): 실패 메시지 비동기 배치 재시도
+ * - 서킷브레이커 OPEN 시 조기 반환, 실패 시 자동 기록
  */
 @Service
 class OutboxRelayService(
@@ -36,14 +35,15 @@ class OutboxRelayService(
         private const val CIRCUIT_BREAKER_NAME = "outbox-relay"
         private const val BATCH_SIZE = 100
         private const val RETRY_BATCH_SIZE = 50
-        private const val SEND_TIMEOUT_SECONDS = 30L
+        private const val BATCH_TIMEOUT_SECONDS = 10L
     }
 
     /**
-     * 새 메시지를 Kafka로 릴레이한다.
-     * - 커서 이후의 메시지를 조회하여 배치 전송
+     * 새 메시지를 Kafka로 비동기 배치 릴레이한다.
+     * - 커서 이후의 메시지를 조회하여 비동기 배치 전송
      * - 실패한 메시지는 OutboxFailed로 이동
      * - 처리 완료 후 커서 갱신
+     * - Circuit Breaker에 성공/실패 자동 기록
      *
      * @return RelayResult 성공/실패 카운트 및 마지막 처리 ID
      */
@@ -60,40 +60,47 @@ class OutboxRelayService(
             return RelayResult(successCount = 0, failedCount = 0, lastProcessedId = cursorId)
         }
 
+        // 비동기 배치 전송
+        val futures = outboxMessages.map { outbox -> sendToKafkaAsync(outbox) }
+
+        // 전체 대기
+        CompletableFuture.allOf(*futures.toTypedArray())
+            .orTimeout(BATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .handle { _, _ -> }
+            .join()
+
+        // 결과 집계
+        val failedMessages = mutableListOf<OutboxFailed>()
         var successCount = 0
         var failedCount = 0
-        val failedMessages = mutableListOf<OutboxFailed>()
-        var lastProcessedId = cursorId
 
-        for (outbox in outboxMessages) {
-            if (isCircuitBreakerOpen()) break
-
-            val sendResult = sendToKafka(outbox)
-            if (sendResult.isSuccess) {
-                successCount++
-            } else {
+        futures.forEachIndexed { index, future ->
+            val outbox = outboxMessages[index]
+            if (future.isCompletedExceptionally || !future.isDone) {
                 failedCount++
-                val error = sendResult.exceptionOrNull()?.message ?: "Unknown error"
+                val error = runCatching { future.getNow(Unit) }
+                    .exceptionOrNull()?.message ?: "Timeout"
                 failedMessages.add(OutboxFailed.from(outbox, error))
+            } else {
+                successCount++
             }
-            lastProcessedId = outbox.id
         }
 
         outboxFailedRepository.saveAll(failedMessages)
-
-        outboxCursorRepository.save(OutboxCursor.create(lastProcessedId))
+        outboxCursorRepository.save(OutboxCursor.create(outboxMessages.last().id))
 
         return RelayResult(
             successCount = successCount,
             failedCount = failedCount,
-            lastProcessedId = lastProcessedId,
+            lastProcessedId = outboxMessages.last().id,
         )
     }
 
     /**
-     * 실패한 메시지를 재시도한다.
+     * 실패한 메시지를 비동기 배치 재시도한다.
      * - nextRetryAt이 현재 시각 이전인 메시지를 조회
      * - 성공 시 삭제, 실패 시 retryCount 증가
+     * - Circuit Breaker에 성공/실패 자동 기록
      *
      * @return RetryResult 성공/실패 카운트
      */
@@ -108,80 +115,78 @@ class OutboxRelayService(
             return RetryResult(successCount = 0, failedCount = 0)
         }
 
-        var successCount = 0
-        var failedCount = 0
+        // 비동기 배치 전송
+        val futures = retryableMessages.map { failed -> sendFailedToKafkaAsync(failed) }
 
-        for (failed in retryableMessages) {
-            if (isCircuitBreakerOpen()) break
+        // 전체 대기
+        CompletableFuture.allOf(*futures.toTypedArray())
+            .orTimeout(BATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .handle { _, _ -> }
+            .join()
 
-            val sendResult = sendFailedToKafka(failed)
-            if (sendResult.isSuccess) {
-                outboxFailedRepository.delete(failed)
-                successCount++
-            } else {
-                val error = sendResult.exceptionOrNull()?.message ?: "Unknown error"
+        // 결과 집계 및 처리
+        val successMessages = mutableListOf<OutboxFailed>()
+        val failedToRetry = mutableListOf<OutboxFailed>()
+
+        futures.forEachIndexed { index, future ->
+            val failed = retryableMessages[index]
+            if (future.isCompletedExceptionally || !future.isDone) {
+                val error = runCatching { future.getNow(Unit) }
+                    .exceptionOrNull()?.message ?: "Timeout"
                 failed.incrementRetryCount(error)
-                outboxFailedRepository.save(failed)
-                failedCount++
+                failedToRetry.add(failed)
+            } else {
+                successMessages.add(failed)
             }
         }
 
+        outboxFailedRepository.deleteAll(successMessages)
+        outboxFailedRepository.saveAll(failedToRetry)
+
         return RetryResult(
-            successCount = successCount,
-            failedCount = failedCount,
+            successCount = successMessages.size,
+            failedCount = failedToRetry.size,
         )
     }
 
-    private fun sendToKafka(outbox: Outbox): Result<Unit> {
-        return try {
-            val topic = TopicResolver.resolve(outbox.eventType)
-            val key = outbox.aggregateId
-            val payload = outbox.payload
+    private fun sendToKafkaAsync(outbox: Outbox): CompletableFuture<Unit> {
+        val startTime = System.nanoTime()
+        val topic = TopicResolver.resolve(outbox.eventType)
+        val result = CompletableFuture<Unit>()
 
-            val future = kafkaTemplate.send(topic, key, payload)
-            val completableFuture = CompletableFuture<Unit>()
-
-            future.whenComplete { _, ex ->
+        kafkaTemplate.send(topic, outbox.aggregateId, outbox.payload)
+            .whenComplete { _, ex ->
+                val duration = System.nanoTime() - startTime
                 if (ex != null) {
-                    completableFuture.completeExceptionally(ex)
+                    circuitBreaker.onError(duration, TimeUnit.NANOSECONDS, ex)
+                    result.completeExceptionally(ex)
                 } else {
-                    completableFuture.complete(Unit)
+                    circuitBreaker.onSuccess(duration, TimeUnit.NANOSECONDS)
+                    result.complete(Unit)
                 }
             }
 
-            completableFuture.get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            Result.success(Unit)
-        } catch (e: TimeoutException) {
-            Result.failure(e)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return result
     }
 
-    private fun sendFailedToKafka(failed: OutboxFailed): Result<Unit> {
-        return try {
-            val topic = TopicResolver.resolve(failed.eventType)
-            val key = failed.aggregateId
-            val payload = failed.payload
+    private fun sendFailedToKafkaAsync(failed: OutboxFailed): CompletableFuture<Unit> {
+        val startTime = System.nanoTime()
+        val topic = TopicResolver.resolve(failed.eventType)
+        val result = CompletableFuture<Unit>()
 
-            val future = kafkaTemplate.send(topic, key, payload)
-            val completableFuture = CompletableFuture<Unit>()
-
-            future.whenComplete { _, ex ->
+        kafkaTemplate.send(topic, failed.aggregateId, failed.payload)
+            .whenComplete { _, ex ->
+                val duration = System.nanoTime() - startTime
                 if (ex != null) {
-                    completableFuture.completeExceptionally(ex)
+                    circuitBreaker.onError(duration, TimeUnit.NANOSECONDS, ex)
+                    result.completeExceptionally(ex)
                 } else {
-                    completableFuture.complete(Unit)
+                    circuitBreaker.onSuccess(duration, TimeUnit.NANOSECONDS)
+                    result.complete(Unit)
                 }
             }
 
-            completableFuture.get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            Result.success(Unit)
-        } catch (e: TimeoutException) {
-            Result.failure(e)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return result
     }
 
     private fun isCircuitBreakerOpen(): Boolean {

@@ -30,4 +30,9 @@ class OutboxFailedRdbRepository(
     override fun delete(failed: OutboxFailed) {
         outboxFailedJpaRepository.delete(failed)
     }
+
+    override fun deleteAll(failedList: List<OutboxFailed>) {
+        if (failedList.isEmpty()) return
+        outboxFailedJpaRepository.deleteAllInBatch(failedList)
+    }
 }

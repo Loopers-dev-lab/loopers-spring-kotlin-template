@@ -12,4 +12,5 @@ interface OutboxFailedRepository {
     fun saveAll(failedList: List<OutboxFailed>): List<OutboxFailed>
     fun findRetryable(limit: Int): List<OutboxFailed>
     fun delete(failed: OutboxFailed)
+    fun deleteAll(failedList: List<OutboxFailed>)
 }
