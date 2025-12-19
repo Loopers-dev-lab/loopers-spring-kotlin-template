@@ -13,9 +13,11 @@ import com.loopers.domain.product.StockDepletedEventV1
 import com.loopers.interfaces.event.order.OrderEventListener
 import com.loopers.interfaces.event.payment.PaymentEventListener
 import com.loopers.interfaces.event.product.ProductEventListener
+import com.loopers.support.event.DomainEvent
 import com.loopers.support.outbox.OutboxRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
+import java.time.Instant
 import com.ninjasquad.springmockk.MockkBean
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -324,6 +326,29 @@ class OutboxEventListenerIntegrationTest @Autowired constructor(
             assertThat(outboxes[0].aggregateType).isEqualTo("Stock")
             assertThat(outboxes[0].aggregateId).isEqualTo(productId.toString())
             assertThat(outboxes[0].eventType).isEqualTo("loopers.stock.depleted.v1")
+        }
+    }
+
+    @Nested
+    @DisplayName("Unknown Events")
+    inner class UnknownEvents {
+
+        @Test
+        @DisplayName("알 수 없는 이벤트 타입 발행 시 Outbox에 저장되지 않는다")
+        fun `Unknown event type does not trigger Outbox save`() {
+            // given
+            val unknownEvent = object : DomainEvent {
+                override val occurredAt: Instant = Instant.now()
+            }
+
+            // when
+            transactionTemplate.execute {
+                applicationEventPublisher.publishEvent(unknownEvent)
+            }
+
+            // then
+            val outboxes = outboxRepository.findAllByIdGreaterThanOrderByIdAsc(0L, 100)
+            assertThat(outboxes).isEmpty()
         }
     }
 }
