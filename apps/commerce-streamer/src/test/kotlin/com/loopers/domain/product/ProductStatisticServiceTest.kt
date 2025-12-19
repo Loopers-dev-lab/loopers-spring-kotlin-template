@@ -2,22 +2,34 @@ package com.loopers.domain.product
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.springframework.transaction.TransactionStatus
+import org.springframework.transaction.support.TransactionTemplate
+import java.util.function.Consumer
 
 @DisplayName("ProductStatisticService 단위 테스트")
 class ProductStatisticServiceTest {
 
     private lateinit var productStatisticRepository: ProductStatisticRepository
+    private lateinit var transactionTemplate: TransactionTemplate
     private lateinit var productStatisticService: ProductStatisticService
 
     @BeforeEach
     fun setUp() {
         productStatisticRepository = mockk()
-        productStatisticService = ProductStatisticService(productStatisticRepository)
+        transactionTemplate = mockk()
+        productStatisticService = ProductStatisticService(productStatisticRepository, transactionTemplate)
+
+        // TransactionTemplate.executeWithoutResult mock: 전달받은 콜백을 즉시 실행
+        val consumerSlot = slot<Consumer<TransactionStatus>>()
+        every { transactionTemplate.executeWithoutResult(capture(consumerSlot)) } answers {
+            consumerSlot.captured.accept(mockk())
+        }
     }
 
     @DisplayName("updateLikeCount()")
@@ -42,8 +54,8 @@ class ProductStatisticServiceTest {
         @Test
         fun `fetches all productIds, applies changes, and saves`() {
             // given
-            val statistic1 = ProductStatistic(id = 1, productId = 1L, likeCount = 10)
-            val statistic2 = ProductStatistic(id = 2, productId = 2L, likeCount = 5)
+            val statistic1 = ProductStatistic(productId = 1L, likeCount = 10)
+            val statistic2 = ProductStatistic(productId = 2L, likeCount = 5)
             val command = UpdateLikeCountCommand(
                 items = listOf(
                     UpdateLikeCountCommand.Item(productId = 1L, type = UpdateLikeCountCommand.LikeType.CREATED),
@@ -75,7 +87,7 @@ class ProductStatisticServiceTest {
         @Test
         fun `skips missing statistics`() {
             // given
-            val statistic1 = ProductStatistic(id = 1, productId = 1L, likeCount = 10)
+            val statistic1 = ProductStatistic(productId = 1L, likeCount = 10)
             // productId 999L은 존재하지 않음
             val command = UpdateLikeCountCommand(
                 items = listOf(
@@ -123,8 +135,8 @@ class ProductStatisticServiceTest {
         @Test
         fun `aggregates multiple items correctly`() {
             // given
-            val statistic1 = ProductStatistic(id = 1, productId = 1L, salesCount = 100)
-            val statistic2 = ProductStatistic(id = 2, productId = 2L, salesCount = 50)
+            val statistic1 = ProductStatistic(productId = 1L, salesCount = 100)
+            val statistic2 = ProductStatistic(productId = 2L, salesCount = 50)
             val command = UpdateSalesCountCommand(
                 items = listOf(
                     UpdateSalesCountCommand.Item(productId = 1L, quantity = 3),
@@ -156,7 +168,7 @@ class ProductStatisticServiceTest {
         @Test
         fun `skips missing statistics`() {
             // given
-            val statistic1 = ProductStatistic(id = 1, productId = 1L, salesCount = 100)
+            val statistic1 = ProductStatistic(productId = 1L, salesCount = 100)
             val command = UpdateSalesCountCommand(
                 items = listOf(
                     UpdateSalesCountCommand.Item(productId = 1L, quantity = 5),
@@ -203,8 +215,8 @@ class ProductStatisticServiceTest {
         @Test
         fun `counts by productId correctly`() {
             // given
-            val statistic1 = ProductStatistic(id = 1, productId = 1L, viewCount = 1000)
-            val statistic2 = ProductStatistic(id = 2, productId = 2L, viewCount = 500)
+            val statistic1 = ProductStatistic(productId = 1L, viewCount = 1000)
+            val statistic2 = ProductStatistic(productId = 2L, viewCount = 500)
             val command = UpdateViewCountCommand(
                 items = listOf(
                     UpdateViewCountCommand.Item(productId = 1L),
@@ -237,7 +249,7 @@ class ProductStatisticServiceTest {
         @Test
         fun `skips missing statistics`() {
             // given
-            val statistic1 = ProductStatistic(id = 1, productId = 1L, viewCount = 1000)
+            val statistic1 = ProductStatistic(productId = 1L, viewCount = 1000)
             val command = UpdateViewCountCommand(
                 items = listOf(
                     UpdateViewCountCommand.Item(productId = 1L),

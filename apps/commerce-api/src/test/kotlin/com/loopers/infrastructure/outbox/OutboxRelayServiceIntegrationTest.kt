@@ -159,10 +159,11 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
         @DisplayName("전부 실패 시 커서를 이동하지 않고 OutboxFailed에 저장하지 않는다")
         fun `does not update cursor and does not save to OutboxFailed when all messages fail`() {
             // given
-            val initialCursor = outboxCursorRepository.save(OutboxCursor.create(100L))
             saveOutbox(aggregateId = "1")
             saveOutbox(aggregateId = "2")
             mockKafkaSendFailure(RuntimeException("Kafka is down"))
+
+            // 초기 커서 없음 → lastProcessedId = 0L
 
             // when
             val result = outboxRelayService.relayNewMessages()
@@ -170,11 +171,11 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             // then
             assertThat(result.successCount).isEqualTo(0)
             assertThat(result.failedCount).isEqualTo(2)
-            assertThat(result.lastProcessedId).isEqualTo(initialCursor.lastProcessedId)
+            assertThat(result.lastProcessedId).isEqualTo(0L)
 
-            // 커서가 이동하지 않았는지 확인
+            // 커서가 생성되지 않았는지 확인
             val cursor = outboxCursorRepository.findLatest()
-            assertThat(cursor!!.lastProcessedId).isEqualTo(initialCursor.lastProcessedId)
+            assertThat(cursor).isNull()
 
             // OutboxFailed에 저장되지 않았는지 확인
             val failedMessages = findAllOutboxFailed()

@@ -1,25 +1,20 @@
 package com.loopers.domain.product
 
+import com.loopers.domain.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.GeneratedValue
-import jakarta.persistence.GenerationType
-import jakarta.persistence.Id
 import jakarta.persistence.Table
+import jakarta.persistence.Version
 
 /**
  * ProductStatistic 엔티티 - 상품 통계 정보
  *
- * - BaseEntity를 상속하지 않음 (인프라 데이터)
  * - commerce-api와 동일한 테이블(product_statistics)을 참조
+ * - 낙관적 락(@Version)으로 동시성 제어
  */
 @Entity
 @Table(name = "product_statistics")
 class ProductStatistic(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0,
-
     @Column(name = "product_id", nullable = false)
     val productId: Long,
 
@@ -31,7 +26,11 @@ class ProductStatistic(
 
     @Column(name = "view_count", nullable = false)
     var viewCount: Long = 0,
-) {
+
+    @Version
+    @Column(name = "version", nullable = false)
+    val version: Long = 0,
+) : BaseEntity() {
     fun applyLikeChanges(types: List<UpdateLikeCountCommand.LikeType>) {
         val delta = types.sumOf { type ->
             when (type) {

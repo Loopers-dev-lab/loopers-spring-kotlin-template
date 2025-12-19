@@ -32,10 +32,12 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
         @Test
         fun `creates envelope with UUID id`() {
             // given
-            val event = OrderCreatedEventV1(
+            val event = OrderPaidEventV1(
                 orderId = 1L,
+                userId = 1L,
+                totalAmount = 10000L,
                 orderItems = listOf(
-                    OrderCreatedEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
                 ),
             )
 
@@ -51,10 +53,12 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
         @Test
         fun `sets source as commerce-api`() {
             // given
-            val event = OrderCreatedEventV1(
+            val event = OrderPaidEventV1(
                 orderId = 1L,
+                userId = 1L,
+                totalAmount = 10000L,
                 orderItems = listOf(
-                    OrderCreatedEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
                 ),
             )
 
@@ -71,11 +75,13 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
         fun `sets time from event occurredAt`() {
             // given
             val occurredAt = Instant.parse("2024-01-01T12:00:00Z")
-            val event = OrderCreatedEventV1(
+            val event = OrderPaidEventV1(
                 orderId = 1L,
                 orderItems = listOf(
-                    OrderCreatedEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
                 ),
+                userId = 1L,
+                totalAmount = 10000L,
                 occurredAt = occurredAt,
             )
 
@@ -92,10 +98,12 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
         fun `serializes event to JSON payload`() {
             // given
             val occurredAt = Instant.parse("2024-01-01T12:00:00Z")
-            val event = OrderCreatedEventV1(
+            val event = OrderPaidEventV1(
                 orderId = 1L,
+                userId = 1L,
+                totalAmount = 10000L,
                 orderItems = listOf(
-                    OrderCreatedEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
                 ),
                 occurredAt = occurredAt,
             )

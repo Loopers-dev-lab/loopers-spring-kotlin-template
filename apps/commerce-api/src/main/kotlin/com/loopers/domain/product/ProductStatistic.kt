@@ -6,6 +6,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import jakarta.persistence.Version
 
 @Entity
 @Table(
@@ -32,6 +33,9 @@ class ProductStatistic(
     val salesCount: Long = 0,
     @Column(name = "view_count", nullable = false)
     val viewCount: Long = 0,
+    @Version
+    @Column(name = "version", nullable = false)
+    val version: Long = 0,
 ) : BaseEntity() {
     companion object {
         fun create(productId: Long): ProductStatistic {
