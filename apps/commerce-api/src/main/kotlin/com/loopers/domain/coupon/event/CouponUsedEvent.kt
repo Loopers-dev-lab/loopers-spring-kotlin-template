@@ -1,21 +1,24 @@
-package com.loopers.domain.payment.event
+package com.loopers.domain.coupon.event
 
 import com.loopers.domain.event.DomainEvent
 import java.time.Instant
 import java.util.UUID
 
 /**
- * 결제 완료 이벤트
+ * 쿠폰 사용 이벤트
+ * - 주문 생성 시 쿠폰 사용 후 발행
  * - order-events 토픽으로 발행 (key=orderId)
  */
-data class PaymentCompletedEvent(
+data class CouponUsedEvent(
     override val eventId: String = UUID.randomUUID().toString(),
-    override val eventType: String = "PAYMENT_COMPLETED",
+    override val eventType: String = "COUPON_USED",
     override val aggregateId: Long, // orderId (partitionKey)
     override val occurredAt: Instant = Instant.now(),
-    val paymentId: Long,
+
     val orderId: Long,
     val memberId: String,
-    val amount: Long,
-    val completedAt: Instant = Instant.now(),
+    val couponId: Long,
+    val memberCouponId: Long, // 사용된 MemberCoupon ID
+    val discountAmount: Long, // 할인 금액
+    val usedAt: Instant = Instant.now(),
 ) : DomainEvent
