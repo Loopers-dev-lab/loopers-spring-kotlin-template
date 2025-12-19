@@ -2,9 +2,16 @@ package com.loopers
 
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.test.context.TestPropertySource
 
 @SpringBootTest
+@TestPropertySource(properties = ["spring.task.scheduling.enabled=false"])
 class CommerceApiContextTest {
+
+    @MockBean
+    private lateinit var kafkaTemplate: KafkaTemplate<String, String>
     @Test
     fun contextLoads() {
         // 이 테스트는 Spring Boot 애플리케이션 컨텍스트가 로드되는지 확인합니다.

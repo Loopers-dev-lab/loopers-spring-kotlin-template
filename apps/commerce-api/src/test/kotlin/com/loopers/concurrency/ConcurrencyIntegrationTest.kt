@@ -18,6 +18,7 @@ import com.loopers.domain.shared.Money
 import com.loopers.infrastructure.brand.BrandJpaRepository
 import com.loopers.infrastructure.coupon.CouponJpaRepository
 import com.loopers.infrastructure.coupon.MemberCouponJpaRepository
+import com.loopers.infrastructure.event.EventOutboxJpaRepository
 import com.loopers.infrastructure.member.MemberJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
 import com.loopers.utils.DatabaseCleanUp
@@ -28,10 +29,14 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.test.context.TestPropertySource
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 
 @SpringBootTest
+@TestPropertySource(properties = ["spring.task.scheduling.enabled=false"])
 class ConcurrencyIntegrationTest @Autowired constructor(
     private val likeFacade: LikeFacade,
     private val orderFacade: OrderFacade,
@@ -40,8 +45,12 @@ class ConcurrencyIntegrationTest @Autowired constructor(
     private val brandJpaRepository: BrandJpaRepository,
     private val couponJpaRepository: CouponJpaRepository,
     private val memberCouponJpaRepository: MemberCouponJpaRepository,
+    private val eventOutboxRepository: EventOutboxJpaRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
+
+    @MockBean
+    private lateinit var kafkaTemplate: KafkaTemplate<String, String>
 
     private lateinit var brand: Brand
 
@@ -79,16 +88,18 @@ class ConcurrencyIntegrationTest @Autowired constructor(
         executor.shutdown()
         while (!executor.isTerminated) Thread.sleep(50)
 
-        // 비동기 이벤트 처리 대기 (최대 5초)
+        // EventOutbox에 100개의 ProductLikedEvent가 저장되었는지 확인
         var retryCount = 0
-        var result = productJpaRepository.findById(product.id).get()
-        while (result.likesCount != 100 && retryCount < 50) {
+        var outboxEvents = eventOutboxRepository.findAll()
+        while (outboxEvents.size < 100 && retryCount < 50) {
             Thread.sleep(100)
-            result = productJpaRepository.findById(product.id).get()
+            outboxEvents = eventOutboxRepository.findAll()
             retryCount++
         }
 
-        assertThat(result.likesCount).isEqualTo(100)
+        // EventOutbox에 100개의 ProductLikedEvent가 저장되었는지 확인
+        val likedEvents = outboxEvents.filter { it.eventType == "PRODUCT_LIKED" && it.aggregateId == product.id }
+        assertThat(likedEvents).hasSize(100)
     }
 
     @DisplayName("동일한 쿠폰으로 10개 기기에서 동시 주문 시 쿠폰은 1번만 사용되어야 한다")
