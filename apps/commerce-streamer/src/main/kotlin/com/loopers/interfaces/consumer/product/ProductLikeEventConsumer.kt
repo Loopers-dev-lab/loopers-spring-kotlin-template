@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component
  *
  * - 구독 토픽: like-events
  * - 지원 이벤트: loopers.like.created.v1, loopers.like.canceled.v1
- * - 멱등성: 불필요 (도메인 자체 멱등)
  * - 에러 처리: BatchListenerFailedException으로 DLT 전송
  */
 @Component
