@@ -9,7 +9,6 @@ import com.loopers.support.outbox.OutboxRepository
 import com.loopers.support.outbox.TopicResolver
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Service
 import java.util.concurrent.CompletableFuture
@@ -25,7 +24,6 @@ import java.util.concurrent.TimeoutException
  */
 @Service
 class OutboxRelayService(
-    @Qualifier("stringKafkaTemplate")
     private val kafkaTemplate: KafkaTemplate<String, String>,
     private val outboxRepository: OutboxRepository,
     private val outboxCursorRepository: OutboxCursorRepository,

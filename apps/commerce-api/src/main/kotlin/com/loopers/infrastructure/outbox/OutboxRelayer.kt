@@ -10,7 +10,6 @@ import com.loopers.support.outbox.TopicResolver
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -27,8 +26,7 @@ import java.util.concurrent.TimeoutException
  */
 @Component
 class OutboxRelayer(
-    @Qualifier("stringKafkaTemplate")
-    private val stringKafkaTemplate: KafkaTemplate<String, String>,
+    private val kafkaTemplate: KafkaTemplate<String, String>,
     private val outboxRepository: OutboxRepository,
     private val outboxCursorRepository: OutboxCursorRepository,
     private val outboxFailedRepository: OutboxFailedRepository,
@@ -149,7 +147,7 @@ class OutboxRelayer(
             val key = outbox.aggregateId
             val payload = outbox.payload
 
-            val future = stringKafkaTemplate.send(topic, key, payload)
+            val future = kafkaTemplate.send(topic, key, payload)
             val completableFuture = CompletableFuture<Unit>()
 
             future.whenComplete { _, ex ->
@@ -177,7 +175,7 @@ class OutboxRelayer(
             val key = failed.aggregateId
             val payload = failed.payload
 
-            val future = stringKafkaTemplate.send(topic, key, payload)
+            val future = kafkaTemplate.send(topic, key, payload)
             val completableFuture = CompletableFuture<Unit>()
 
             future.whenComplete { _, ex ->

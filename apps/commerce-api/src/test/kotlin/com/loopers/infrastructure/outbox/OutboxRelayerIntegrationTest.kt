@@ -65,7 +65,7 @@ class OutboxRelayerIntegrationTest @Autowired constructor(
 
         // Create OutboxRelayer with mocked dependencies
         outboxRelayer = OutboxRelayer(
-            stringKafkaTemplate = mockKafkaTemplate,
+            kafkaTemplate = mockKafkaTemplate,
             outboxRepository = outboxRepository,
             outboxCursorRepository = outboxCursorRepository,
             outboxFailedRepository = outboxFailedRepository,

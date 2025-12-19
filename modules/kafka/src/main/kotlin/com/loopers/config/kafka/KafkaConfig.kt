@@ -50,12 +50,7 @@ class KafkaConfig {
     }
 
     @Bean
-    fun kafkaTemplate(producerFactory: ProducerFactory<Any, Any>): KafkaTemplate<Any, Any> {
-        return KafkaTemplate(producerFactory)
-    }
-
-    @Bean
-    fun stringKafkaTemplate(
+    fun kafkaTemplate(
         kafkaProperties: KafkaProperties,
     ): KafkaTemplate<String, String> {
         val props = HashMap(kafkaProperties.buildProducerProperties()).apply {
