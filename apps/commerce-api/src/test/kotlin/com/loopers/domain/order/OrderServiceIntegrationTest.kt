@@ -125,6 +125,46 @@ class OrderServiceIntegrationTest @Autowired constructor(
     }
 
     @Nested
+    @DisplayName("completePayment")
+    inner class CompletePayment {
+
+        @Test
+        @DisplayName("결제 완료 시 OrderPaidEventV1을 발행한다")
+        fun `publishes OrderPaidEventV1 when payment is completed`() {
+            // given
+            val product1 = createProduct()
+            val product2 = createProduct()
+            val command = OrderCommand.PlaceOrder(
+                userId = 1L,
+                items = listOf(
+                    placeOrderItem(productId = product1.id, quantity = 2),
+                    placeOrderItem(productId = product2.id, quantity = 3),
+                ),
+            )
+            val savedOrder = orderService.place(command)
+
+            // Clear events from place() to focus on completePayment() events
+            applicationEvents.clear()
+
+            // when
+            val paidOrder = orderService.completePayment(savedOrder.id)
+
+            // then
+            val events = applicationEvents.stream(OrderPaidEventV1::class.java).toList()
+            assertThat(events).hasSize(1)
+
+            val event = events[0]
+            assertThat(event.orderId).isEqualTo(paidOrder.id)
+            assertThat(event.userId).isEqualTo(1L)
+            assertThat(event.orderItems).hasSize(2)
+            assertThat(event.orderItems[0].productId).isEqualTo(product1.id)
+            assertThat(event.orderItems[0].quantity).isEqualTo(2)
+            assertThat(event.orderItems[1].productId).isEqualTo(product2.id)
+            assertThat(event.orderItems[1].quantity).isEqualTo(3)
+        }
+    }
+
+    @Nested
     @DisplayName("cancelOrder")
     inner class CancelOrder {
 

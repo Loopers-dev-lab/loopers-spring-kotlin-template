@@ -27,15 +27,24 @@ class ProductStatistic(
     @Column(name = "product_id", nullable = false)
     val productId: Long,
     @Column(name = "like_count", nullable = false)
-    val likeCount: Long,
+    val likeCount: Long = 0,
+    @Column(name = "sales_count", nullable = false)
+    val salesCount: Long = 0,
+    @Column(name = "view_count", nullable = false)
+    val viewCount: Long = 0,
 ) : BaseEntity() {
     companion object {
         fun create(productId: Long): ProductStatistic {
-            return ProductStatistic(productId, 0)
+            return ProductStatistic(productId, 0, 0, 0)
         }
 
-        fun of(productId: Long, likeCount: Long): ProductStatistic {
-            return ProductStatistic(productId, likeCount)
+        fun of(
+            productId: Long,
+            likeCount: Long,
+            salesCount: Long = 0,
+            viewCount: Long = 0,
+        ): ProductStatistic {
+            return ProductStatistic(productId, likeCount, salesCount, viewCount)
         }
     }
 }

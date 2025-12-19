@@ -4,9 +4,12 @@ import com.loopers.domain.like.LikeCanceledEventV1
 import com.loopers.domain.like.LikeCreatedEventV1
 import com.loopers.domain.order.OrderCanceledEventV1
 import com.loopers.domain.order.OrderCreatedEventV1
+import com.loopers.domain.order.OrderPaidEventV1
 import com.loopers.domain.payment.PaymentCreatedEventV1
 import com.loopers.domain.payment.PaymentFailedEventV1
 import com.loopers.domain.payment.PaymentPaidEventV1
+import com.loopers.domain.product.ProductViewedEventV1
+import com.loopers.domain.product.StockDepletedEventV1
 import com.loopers.support.event.DomainEvent
 import com.loopers.support.values.Money
 import org.assertj.core.api.Assertions.assertThat
@@ -57,6 +60,26 @@ class EventTypeResolverTest {
 
             // then
             assertThat(eventType).isEqualTo("loopers.order.canceled.v1")
+        }
+
+        @DisplayName("OrderPaidEventV1은 'loopers.order.paid.v1'을 반환한다")
+        @Test
+        fun `OrderPaidEventV1 returns loopers_order_paid_v1`() {
+            // given
+            val event = OrderPaidEventV1(
+                orderId = 1L,
+                userId = 10L,
+                totalAmount = 10000L,
+                orderItems = listOf(
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
+                ),
+            )
+
+            // when
+            val eventType = EventTypeResolver.resolve(event)
+
+            // then
+            assertThat(eventType).isEqualTo("loopers.order.paid.v1")
         }
     }
 
@@ -138,6 +161,50 @@ class EventTypeResolverTest {
 
             // then
             assertThat(eventType).isEqualTo("loopers.like.canceled.v1")
+        }
+    }
+
+    @DisplayName("Product 도메인 이벤트 타입 변환")
+    @Nested
+    inner class ProductEvents {
+
+        @DisplayName("ProductViewedEventV1은 'loopers.product.viewed.v1'을 반환한다")
+        @Test
+        fun `ProductViewedEventV1 returns loopers_product_viewed_v1`() {
+            // given
+            val event = ProductViewedEventV1(productId = 100L, userId = 1L)
+
+            // when
+            val eventType = EventTypeResolver.resolve(event)
+
+            // then
+            assertThat(eventType).isEqualTo("loopers.product.viewed.v1")
+        }
+
+        @DisplayName("ProductViewedEventV1은 userId가 null이어도 'loopers.product.viewed.v1'을 반환한다")
+        @Test
+        fun `ProductViewedEventV1 with null userId returns loopers_product_viewed_v1`() {
+            // given
+            val event = ProductViewedEventV1(productId = 100L, userId = null)
+
+            // when
+            val eventType = EventTypeResolver.resolve(event)
+
+            // then
+            assertThat(eventType).isEqualTo("loopers.product.viewed.v1")
+        }
+
+        @DisplayName("StockDepletedEventV1은 'loopers.stock.depleted.v1'을 반환한다")
+        @Test
+        fun `StockDepletedEventV1 returns loopers_stock_depleted_v1`() {
+            // given
+            val event = StockDepletedEventV1(productId = 100L, stockId = 1L)
+
+            // when
+            val eventType = EventTypeResolver.resolve(event)
+
+            // then
+            assertThat(eventType).isEqualTo("loopers.stock.depleted.v1")
         }
     }
 

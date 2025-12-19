@@ -9,39 +9,29 @@ import org.springframework.transaction.annotation.Transactional
 class ProductStatisticRdbRepository(
     private val productStatisticJpaRepository: ProductStatisticJpaRepository,
 ) : ProductStatisticRepository {
+
     @Transactional(readOnly = true)
     override fun findByProductId(productId: Long): ProductStatistic? {
         return productStatisticJpaRepository.findByProductId(productId)
     }
 
-    @Transactional(readOnly = true)
-    override fun findAllByProductIds(productIds: List<Long>): List<ProductStatistic> {
-        if (productIds.isEmpty()) return emptyList()
-        return productStatisticJpaRepository.findAllByProductIdIn(productIds)
+    @Transactional
+    override fun incrementLikeCount(productId: Long) {
+        productStatisticJpaRepository.incrementLikeCount(productId)
     }
 
     @Transactional
-    override fun increaseLikeCountBy(productId: Long) {
-        return productStatisticJpaRepository.incrementLikeCount(productId)
+    override fun decrementLikeCount(productId: Long) {
+        productStatisticJpaRepository.decrementLikeCount(productId)
     }
 
     @Transactional
-    override fun decreaseLikeCountBy(productId: Long) {
-        return productStatisticJpaRepository.decrementLikeCount(productId)
-    }
-
-    @Transactional
-    override fun increaseSalesCountBy(productId: Long, amount: Int) {
+    override fun incrementSalesCount(productId: Long, amount: Int) {
         productStatisticJpaRepository.incrementSalesCount(productId, amount)
     }
 
     @Transactional
-    override fun increaseViewCountBy(productId: Long) {
+    override fun incrementViewCount(productId: Long) {
         productStatisticJpaRepository.incrementViewCount(productId)
-    }
-
-    @Transactional
-    override fun save(productStatistic: ProductStatistic): ProductStatistic {
-        return productStatisticJpaRepository.save(productStatistic)
     }
 }

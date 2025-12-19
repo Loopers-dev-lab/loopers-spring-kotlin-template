@@ -4,9 +4,12 @@ import com.loopers.domain.like.LikeCanceledEventV1
 import com.loopers.domain.like.LikeCreatedEventV1
 import com.loopers.domain.order.OrderCanceledEventV1
 import com.loopers.domain.order.OrderCreatedEventV1
+import com.loopers.domain.order.OrderPaidEventV1
 import com.loopers.domain.payment.PaymentCreatedEventV1
 import com.loopers.domain.payment.PaymentFailedEventV1
 import com.loopers.domain.payment.PaymentPaidEventV1
+import com.loopers.domain.product.ProductViewedEventV1
+import com.loopers.domain.product.StockDepletedEventV1
 import com.loopers.support.event.DomainEvent
 import com.loopers.support.outbox.Outbox
 import com.loopers.support.outbox.OutboxRepository
@@ -37,11 +40,14 @@ class OutboxEventListener(
     private fun extractAggregate(event: DomainEvent): Pair<String, String> = when (event) {
         is OrderCreatedEventV1 -> "Order" to event.orderId.toString()
         is OrderCanceledEventV1 -> "Order" to event.orderId.toString()
+        is OrderPaidEventV1 -> "Order" to event.orderId.toString()
         is PaymentCreatedEventV1 -> "Payment" to event.paymentId.toString()
         is PaymentPaidEventV1 -> "Payment" to event.paymentId.toString()
         is PaymentFailedEventV1 -> "Payment" to event.paymentId.toString()
         is LikeCreatedEventV1 -> "Like" to event.productId.toString()
         is LikeCanceledEventV1 -> "Like" to event.productId.toString()
+        is ProductViewedEventV1 -> "Product" to event.productId.toString()
+        is StockDepletedEventV1 -> "Stock" to event.productId.toString()
         else -> throw IllegalArgumentException("Unknown event type: ${event::class.simpleName}")
     }
 }

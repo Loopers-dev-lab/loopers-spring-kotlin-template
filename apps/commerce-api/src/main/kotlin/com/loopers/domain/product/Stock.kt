@@ -3,10 +3,12 @@ package com.loopers.domain.product
 import com.loopers.domain.BaseEntity
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import com.loopers.support.event.DomainEvent
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import jakarta.persistence.Transient
 
 @Entity
 @Table(
@@ -26,6 +28,22 @@ class Stock(
     @Column(name = "quantity", nullable = false)
     var quantity: Int = quantity
         private set
+
+    @Transient
+    private var domainEvents: MutableList<DomainEvent>? = null
+
+    private fun getDomainEvents(): MutableList<DomainEvent> {
+        if (domainEvents == null) {
+            domainEvents = mutableListOf()
+        }
+        return domainEvents!!
+    }
+
+    fun pollEvents(): List<DomainEvent> {
+        val events = getDomainEvents().toList()
+        getDomainEvents().clear()
+        return events
+    }
 
     init {
         if (quantity < 0) {
@@ -50,6 +68,9 @@ class Stock(
             throw CoreException(ErrorType.BAD_REQUEST, "재고가 부족합니다.")
         }
         this.quantity -= amount
+        if (this.quantity == 0) {
+            getDomainEvents().add(StockDepletedEventV1.from(this))
+        }
     }
 
     fun increase(amount: Int) {

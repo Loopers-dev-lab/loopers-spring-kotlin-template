@@ -6,6 +6,7 @@ import com.loopers.domain.product.ProductSortType
 import com.loopers.interfaces.api.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -36,9 +37,10 @@ class ProductV1Controller(
 
     @GetMapping("/{productId}")
     override fun getProduct(
+        @RequestHeader(value = "X-USER-ID", required = false) userId: Long?,
         @PathVariable productId: Long,
     ): ApiResponse<ProductV1Response.GetProduct> {
-        return productFacade.findProductById(productId)
+        return productFacade.findProductById(productId, userId)
             .let { ProductV1Response.GetProduct.from(it) }
             .let { ApiResponse.success(it) }
     }

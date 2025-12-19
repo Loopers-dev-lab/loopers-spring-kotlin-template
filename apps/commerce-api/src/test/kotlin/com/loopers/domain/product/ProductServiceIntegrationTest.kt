@@ -12,9 +12,12 @@ import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.event.ApplicationEvents
+import org.springframework.test.context.event.RecordApplicationEvents
 import kotlin.test.Test
 
 @SpringBootTest
+@RecordApplicationEvents
 class ProductServiceIntegrationTest @Autowired constructor(
     private val productService: ProductService,
     private val productRepository: ProductRepository,
@@ -23,6 +26,9 @@ class ProductServiceIntegrationTest @Autowired constructor(
     private val brandRepository: BrandRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
+    @Autowired
+    private lateinit var applicationEvents: ApplicationEvents
+
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
@@ -250,6 +256,30 @@ class ProductServiceIntegrationTest @Autowired constructor(
                 { assertThat(unchangedStock1.quantity).isEqualTo(100) },
                 { assertThat(unchangedStock2.quantity).isEqualTo(5) },
             )
+        }
+
+        @DisplayName("재고가 0이 되면 StockDepletedEventV1을 발행한다")
+        @Test
+        fun `publishes StockDepletedEventV1 when stock reaches 0`() {
+            // given
+            val product = createProduct(stockQuantity = 10)
+            val stock = stockRepository.findByProductId(product.id)!!
+
+            // when
+            val command = ProductCommand.DecreaseStocks(
+                units = listOf(
+                    ProductCommand.DecreaseStockUnit(product.id, 10),
+                ),
+            )
+            productService.decreaseStocks(command)
+
+            // then
+            val events = applicationEvents.stream(StockDepletedEventV1::class.java).toList()
+            assertThat(events).hasSize(1)
+
+            val event = events[0]
+            assertThat(event.productId).isEqualTo(product.id)
+            assertThat(event.stockId).isEqualTo(stock.id)
         }
     }
 

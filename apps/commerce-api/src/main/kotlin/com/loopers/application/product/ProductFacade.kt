@@ -3,6 +3,8 @@ package com.loopers.application.product
 import com.fasterxml.jackson.core.type.TypeReference
 import com.loopers.cache.CacheTemplate
 import com.loopers.domain.product.ProductService
+import com.loopers.domain.product.ProductViewedEventV1
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
 import org.springframework.stereotype.Component
@@ -11,13 +13,14 @@ import org.springframework.stereotype.Component
 class ProductFacade(
     private val productService: ProductService,
     private val cacheTemplate: CacheTemplate,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     companion object {
         private val TYPE_CACHED_PRODUCT_DETAIL_V1 = object : TypeReference<CachedProductDetailV1>() {}
         private val TYPE_CACHED_PRODUCT_LIST = object : TypeReference<CachedProductList>() {}
     }
 
-    fun findProductById(id: Long): ProductInfo.FindProductById {
+    fun findProductById(id: Long, userId: Long? = null): ProductInfo.FindProductById {
         val cacheKey = ProductCacheKeys.ProductDetail(productId = id)
 
         val cached = cacheTemplate.get(cacheKey, TYPE_CACHED_PRODUCT_DETAIL_V1)
@@ -29,6 +32,8 @@ class ProductFacade(
             cacheTemplate.put(cacheKey, CachedProductDetailV1.from(view))
             view
         }
+
+        eventPublisher.publishEvent(ProductViewedEventV1.create(id, userId))
 
         return ProductInfo.FindProductById.from(productView)
     }
