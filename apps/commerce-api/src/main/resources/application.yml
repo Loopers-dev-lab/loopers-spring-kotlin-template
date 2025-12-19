@@ -131,6 +131,8 @@ spring:
     activate:
       on-profile: local, test
 
+scheduler:
+  enabled: false
 ---
 spring:
   config:
