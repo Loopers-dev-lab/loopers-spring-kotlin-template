@@ -1,6 +1,6 @@
 ---
 name: spec-validator
-description: Validates that implementation matches spec documents exactly. Checks requirements coverage, business logic accuracy, and domain terminology. Use after implementation. Triggers include "validate spec", "check requirements", "spec compliance". Requires files and spec_directory arguments.
+description: This agent should be used when the user asks to "validate spec", "check requirements", "spec compliance", "check spec", "verify requirements", "spec validation". Validates that implementation matches spec documents exactly. Checks requirements coverage, business logic accuracy, and domain terminology. Requires files and spec_directory arguments.
 model: opus
 ---
 

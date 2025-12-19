@@ -1,7 +1,8 @@
 ---
 name: code-reviewer
-description: Validates code quality including naming, error handling, null safety, encapsulation, and pattern consistency. Use after implementation to verify code craftsmanship. Triggers include "review code", "check quality", "code review". Requires files argument.
+description: This agent should be used when the user asks to "review code", "check quality", "code review", "check code", "validate code", "review implementation". Validates code quality including naming, error handling, null safety, encapsulation, and pattern consistency. Requires files argument.
 model: opus
+skills: agent-council
 ---
 
 <role>

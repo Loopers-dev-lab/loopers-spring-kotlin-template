@@ -1,7 +1,8 @@
 ---
 name: architecture-reviewer
-description: Validates architectural design against Clean Architecture, OOP, and DDD principles. Checks layer separation, dependency direction, domain purity, and responsibility distribution. Use after implementation. Triggers include "architecture review", "check structure", "layer validation". Requires files argument.
+description: This agent should be used when the user asks to "architecture review", "check structure", "layer validation", "check architecture", "validate layers", "dependency review". Validates architectural design against Clean Architecture, OOP, and DDD principles. Checks layer separation, dependency direction, domain purity, and responsibility distribution. Requires files argument.
 model: sonnet
+skills: agent-council
 ---
 
 <role>
