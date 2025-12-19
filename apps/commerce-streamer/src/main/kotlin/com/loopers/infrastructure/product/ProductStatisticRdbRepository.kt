@@ -15,23 +15,15 @@ class ProductStatisticRdbRepository(
         return productStatisticJpaRepository.findByProductId(productId)
     }
 
-    @Transactional
-    override fun incrementLikeCount(productId: Long) {
-        productStatisticJpaRepository.incrementLikeCount(productId)
+    @Transactional(readOnly = true)
+    override fun findAllByProductIds(productIds: List<Long>): List<ProductStatistic> {
+        if (productIds.isEmpty()) return emptyList()
+        return productStatisticJpaRepository.findAllByProductIdIn(productIds)
     }
 
     @Transactional
-    override fun decrementLikeCount(productId: Long) {
-        productStatisticJpaRepository.decrementLikeCount(productId)
-    }
-
-    @Transactional
-    override fun incrementSalesCount(productId: Long, amount: Int) {
-        productStatisticJpaRepository.incrementSalesCount(productId, amount)
-    }
-
-    @Transactional
-    override fun incrementViewCount(productId: Long) {
-        productStatisticJpaRepository.incrementViewCount(productId)
+    override fun saveAll(statistics: List<ProductStatistic>): List<ProductStatistic> {
+        if (statistics.isEmpty()) return emptyList()
+        return productStatisticJpaRepository.saveAll(statistics)
     }
 }

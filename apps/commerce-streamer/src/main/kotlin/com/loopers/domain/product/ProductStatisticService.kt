@@ -2,12 +2,13 @@ package com.loopers.domain.product
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 /**
- * ProductStatisticService - 상품 통계 집계 비즈니스 로직
+ * ProductStatisticService - 상품 통계 배치 집계 비즈니스 로직
  *
- * - 이벤트 처리에 따른 메트릭 집계
- * - Repository 레벨에서 트랜잭션 처리
+ * - Command 기반 배치 처리로 N+1 쿼리 방지
+ * - 트랜잭션 단위로 일괄 조회, 계산, 저장
  */
 @Service
 class ProductStatisticService(
@@ -15,25 +16,63 @@ class ProductStatisticService(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    fun increaseLikeCount(productId: Long) {
-        productStatisticRepository.incrementLikeCount(productId)
-        log.debug("Increased like count for productId={}", productId)
-    }
+    @Transactional
+    fun updateLikeCount(command: UpdateLikeCountCommand) {
+        if (command.items.isEmpty()) return
 
-    fun decreaseLikeCount(productId: Long) {
-        productStatisticRepository.decrementLikeCount(productId)
-        log.debug("Decreased like count for productId={}", productId)
-    }
+        val productIds = command.items.map { it.productId }.distinct()
+        val statistics = productStatisticRepository.findAllByProductIds(productIds)
+            .associateBy { it.productId }
 
-    fun increaseSalesCount(orderItems: List<OrderItemSnapshot>) {
-        orderItems.forEach { item ->
-            productStatisticRepository.incrementSalesCount(item.productId, item.quantity)
-            log.debug("Increased sales count for productId={}, amount={}", item.productId, item.quantity)
+        val typesByProductId = command.items.groupBy(
+            keySelector = { it.productId },
+            valueTransform = { it.type },
+        )
+
+        val updatedStatistics = typesByProductId.mapNotNull { (productId, types) ->
+            statistics[productId]?.apply { applyLikeChanges(types) }
         }
+
+        productStatisticRepository.saveAll(updatedStatistics)
+        log.debug("Updated like count for {} products", updatedStatistics.size)
     }
 
-    fun increaseViewCount(productId: Long) {
-        productStatisticRepository.incrementViewCount(productId)
-        log.debug("Increased view count for productId={}", productId)
+    @Transactional
+    fun updateSalesCount(command: UpdateSalesCountCommand) {
+        if (command.items.isEmpty()) return
+
+        val productIds = command.items.map { it.productId }.distinct()
+        val statistics = productStatisticRepository.findAllByProductIds(productIds)
+            .associateBy { it.productId }
+
+        val quantitiesByProductId = command.items.groupBy(
+            keySelector = { it.productId },
+            valueTransform = { it.quantity },
+        )
+
+        val updatedStatistics = quantitiesByProductId.mapNotNull { (productId, quantities) ->
+            statistics[productId]?.apply { applySalesChanges(quantities) }
+        }
+
+        productStatisticRepository.saveAll(updatedStatistics)
+        log.debug("Updated sales count for {} products", updatedStatistics.size)
+    }
+
+    @Transactional
+    fun updateViewCount(command: UpdateViewCountCommand) {
+        if (command.items.isEmpty()) return
+
+        val productIds = command.items.map { it.productId }.distinct()
+        val statistics = productStatisticRepository.findAllByProductIds(productIds)
+            .associateBy { it.productId }
+
+        val countByProductId = command.items.groupingBy { it.productId }.eachCount()
+
+        val updatedStatistics = countByProductId.mapNotNull { (productId, count) ->
+            statistics[productId]?.apply { applyViewChanges(count) }
+        }
+
+        productStatisticRepository.saveAll(updatedStatistics)
+        log.debug("Updated view count for {} products", updatedStatistics.size)
     }
 }

@@ -115,4 +115,191 @@ class ProductStatisticTest {
             assertThat(productStatistic.viewCount).isEqualTo(viewCount)
         }
     }
+
+    @DisplayName("applyLikeChanges 도메인 메서드 테스트")
+    @Nested
+    inner class ApplyLikeChanges {
+
+        @DisplayName("CREATED 타입만 있으면 likeCount가 증가한다")
+        @Test
+        fun `likeCount increases with CREATED types only`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, likeCount = 10L)
+            val types = listOf(
+                UpdateLikeCountCommand.LikeType.CREATED,
+                UpdateLikeCountCommand.LikeType.CREATED,
+                UpdateLikeCountCommand.LikeType.CREATED,
+            )
+
+            // when
+            productStatistic.applyLikeChanges(types)
+
+            // then
+            assertThat(productStatistic.likeCount).isEqualTo(13L)
+        }
+
+        @DisplayName("CANCELED 타입만 있으면 likeCount가 감소한다")
+        @Test
+        fun `likeCount decreases with CANCELED types only`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, likeCount = 10L)
+            val types = listOf(
+                UpdateLikeCountCommand.LikeType.CANCELED,
+                UpdateLikeCountCommand.LikeType.CANCELED,
+            )
+
+            // when
+            productStatistic.applyLikeChanges(types)
+
+            // then
+            assertThat(productStatistic.likeCount).isEqualTo(8L)
+        }
+
+        @DisplayName("CREATED와 CANCELED가 섞여 있으면 delta가 계산되어 적용된다")
+        @Test
+        fun `likeCount applies delta with mixed CREATED and CANCELED types`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, likeCount = 10L)
+            val types = listOf(
+                UpdateLikeCountCommand.LikeType.CREATED,
+                UpdateLikeCountCommand.LikeType.CREATED,
+                UpdateLikeCountCommand.LikeType.CREATED,
+                UpdateLikeCountCommand.LikeType.CANCELED,
+            )
+
+            // when
+            productStatistic.applyLikeChanges(types)
+
+            // then
+            assertThat(productStatistic.likeCount).isEqualTo(12L) // 10 + 3 - 1 = 12
+        }
+
+        @DisplayName("likeCount가 0 미만으로 내려가지 않는다 (maxOf 보호)")
+        @Test
+        fun `likeCount does not go below zero with maxOf protection`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, likeCount = 2L)
+            val types = listOf(
+                UpdateLikeCountCommand.LikeType.CANCELED,
+                UpdateLikeCountCommand.LikeType.CANCELED,
+                UpdateLikeCountCommand.LikeType.CANCELED,
+                UpdateLikeCountCommand.LikeType.CANCELED,
+                UpdateLikeCountCommand.LikeType.CANCELED,
+            )
+
+            // when
+            productStatistic.applyLikeChanges(types)
+
+            // then
+            assertThat(productStatistic.likeCount).isEqualTo(0L)
+        }
+
+        @DisplayName("빈 리스트가 전달되면 likeCount가 변경되지 않는다")
+        @Test
+        fun `likeCount remains unchanged with empty list`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, likeCount = 10L)
+            val types = emptyList<UpdateLikeCountCommand.LikeType>()
+
+            // when
+            productStatistic.applyLikeChanges(types)
+
+            // then
+            assertThat(productStatistic.likeCount).isEqualTo(10L)
+        }
+    }
+
+    @DisplayName("applySalesChanges 도메인 메서드 테스트")
+    @Nested
+    inner class ApplySalesChanges {
+
+        @DisplayName("여러 수량이 합산되어 salesCount에 더해진다")
+        @Test
+        fun `salesCount increases by sum of all quantities`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, salesCount = 100L)
+            val quantities = listOf(5, 3, 2)
+
+            // when
+            productStatistic.applySalesChanges(quantities)
+
+            // then
+            assertThat(productStatistic.salesCount).isEqualTo(110L) // 100 + 5 + 3 + 2 = 110
+        }
+
+        @DisplayName("단일 수량이 salesCount에 더해진다")
+        @Test
+        fun `salesCount increases by single quantity`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, salesCount = 50L)
+            val quantities = listOf(10)
+
+            // when
+            productStatistic.applySalesChanges(quantities)
+
+            // then
+            assertThat(productStatistic.salesCount).isEqualTo(60L)
+        }
+
+        @DisplayName("빈 리스트가 전달되면 salesCount가 변경되지 않는다")
+        @Test
+        fun `salesCount remains unchanged with empty list`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, salesCount = 50L)
+            val quantities = emptyList<Int>()
+
+            // when
+            productStatistic.applySalesChanges(quantities)
+
+            // then
+            assertThat(productStatistic.salesCount).isEqualTo(50L)
+        }
+    }
+
+    @DisplayName("applyViewChanges 도메인 메서드 테스트")
+    @Nested
+    inner class ApplyViewChanges {
+
+        @DisplayName("count만큼 viewCount가 증가한다")
+        @Test
+        fun `viewCount increases by count`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, viewCount = 1000L)
+            val count = 5
+
+            // when
+            productStatistic.applyViewChanges(count)
+
+            // then
+            assertThat(productStatistic.viewCount).isEqualTo(1005L)
+        }
+
+        @DisplayName("count가 0이면 viewCount가 변경되지 않는다")
+        @Test
+        fun `viewCount remains unchanged when count is zero`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, viewCount = 1000L)
+            val count = 0
+
+            // when
+            productStatistic.applyViewChanges(count)
+
+            // then
+            assertThat(productStatistic.viewCount).isEqualTo(1000L)
+        }
+
+        @DisplayName("count가 1이면 viewCount가 1 증가한다")
+        @Test
+        fun `viewCount increases by one when count is one`() {
+            // given
+            val productStatistic = ProductStatistic(productId = 1L, viewCount = 500L)
+            val count = 1
+
+            // when
+            productStatistic.applyViewChanges(count)
+
+            // then
+            assertThat(productStatistic.viewCount).isEqualTo(501L)
+        }
+    }
 }

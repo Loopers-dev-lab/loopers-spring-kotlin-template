@@ -31,4 +31,22 @@ class ProductStatistic(
 
     @Column(name = "view_count", nullable = false)
     var viewCount: Long = 0,
-)
+) {
+    fun applyLikeChanges(types: List<UpdateLikeCountCommand.LikeType>) {
+        val delta = types.sumOf { type ->
+            when (type) {
+                UpdateLikeCountCommand.LikeType.CREATED -> 1L
+                UpdateLikeCountCommand.LikeType.CANCELED -> -1L
+            }
+        }
+        likeCount = maxOf(0, likeCount + delta)
+    }
+
+    fun applySalesChanges(quantities: List<Int>) {
+        salesCount += quantities.sumOf { it.toLong() }
+    }
+
+    fun applyViewChanges(count: Int) {
+        viewCount += count
+    }
+}
