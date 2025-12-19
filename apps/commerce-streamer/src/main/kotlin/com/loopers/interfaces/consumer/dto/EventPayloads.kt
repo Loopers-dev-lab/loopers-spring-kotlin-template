@@ -2,17 +2,6 @@ package com.loopers.interfaces.consumer.dto
 
 import java.time.Instant
 
-/** CloudEventEnvelope 역직렬화용 */
-data class CloudEventEnvelope(
-    val id: String,
-    val type: String,
-    val source: String,
-    val aggregateType: String,
-    val aggregateId: String,
-    val time: Instant,
-    val payload: String,
-)
-
 /** LikeCreatedEventV1 페이로드 */
 data class LikeCreatedEventPayload(
     val userId: Long,

@@ -15,8 +15,13 @@ spring:
     web-application-type: servlet
   application:
     name: commerce-api
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   task:
     scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: 10s
       pool:
         size: 1  # 동일 @Scheduled 메서드의 동시 실행 방지
   profiles:

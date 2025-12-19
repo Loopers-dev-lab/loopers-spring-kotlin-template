@@ -79,13 +79,9 @@ class OutboxRelayService(
             lastProcessedId = outbox.id
         }
 
-        if (failedMessages.isNotEmpty()) {
-            outboxFailedRepository.saveAll(failedMessages)
-        }
+        outboxFailedRepository.saveAll(failedMessages)
 
-        if (lastProcessedId > cursorId) {
-            outboxCursorRepository.save(OutboxCursor.create(lastProcessedId))
-        }
+        outboxCursorRepository.save(OutboxCursor.create(lastProcessedId))
 
         return RelayResult(
             successCount = successCount,

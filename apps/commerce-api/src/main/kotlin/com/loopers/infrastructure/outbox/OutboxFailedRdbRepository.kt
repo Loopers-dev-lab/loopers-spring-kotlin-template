@@ -16,6 +16,7 @@ class OutboxFailedRdbRepository(
     }
 
     override fun saveAll(failedList: List<OutboxFailed>): List<OutboxFailed> {
+        if (failedList.isEmpty()) return emptyList()
         return outboxFailedJpaRepository.saveAllAndFlush(failedList)
     }
 
