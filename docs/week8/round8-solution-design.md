@@ -82,15 +82,25 @@ Kafka 발행 시 PartitionKey(aggregateId)를 지정하여 동일 엔티티의 �
 
 **2. Kafka Consumers (commerce-streamer)**
 
-Kafka Consumer는 도메인 관점으로 구성한다. ProductEventConsumer는 상품 도메인 관련 이벤트를 처리하며 like-events, order-events, product-view-events, stock-events 토픽을 구독한다. Consumer는 IdempotencyStore를 의존하여 중복 처리를 방지하고, ProductService에 command를 전달한다.
+Kafka Consumer는 이벤트 유형별로 분리하여 구성한다:
+- `ProductLikeEventConsumer`: like-events 토픽을 구독하여 좋아요 집계 처리
+- `ProductOrderEventConsumer`: order-events 토픽을 구독하여 판매량 집계 처리
+- `ProductViewEventConsumer`: product-events 토픽을 구독하여 조회수 집계 처리
+- `ProductStockEventConsumer`: stock-events 토픽을 구독하여 캐시 무효화 처리
+
+각 Consumer는 EventHandledRepository를 의존하여 중복 처리를 방지하고, ProductStatisticService에 command를 전달한다.
 
 **3. 멱등성 보장 시스템 (Consumer 전용)**
 
-IdempotencyStore는 Consumer에서 중복 처리를 방지한다. Producer 측은 Outbox Offset(커서) 방식으로 중복 발행을 방지하므로 별도의 멱등성 체크가 불필요하다. 중복 발행이 발생하더라도 Consumer에서 걸러지므로 At-least-once 발행, Exactly-once 처리가 보장된다. IdempotencyStore 구현체는 테이블, Redis, 스레드로컬 등 상황에 맞게 선택할 수 있다.
+EventHandledRepository는 Consumer에서 중복 처리를 방지한다. Producer 측은 Outbox Offset(커서) 방식으로 중복 발행을 방지하므로 별도의 멱등성 체크가 불필요하다. 중복 발행이 발생하더라도 Consumer에서 걸러지므로 At-least-once 발행, Exactly-once 처리가 보장된다.
 
-멱등성 체크는 eventId가 아닌 aggregateType + aggregateId + action 기준으로 수행한다. 이를 통해 같은 의미의 이벤트가 다른 eventId로 발행되더라도 중복 처리를 방지할 수 있다.
+멱등성 체크는 `idempotency_key` 단일 컬럼으로 수행한다. 키 형식은 `{consumerGroup}:{eventId}`로, Consumer 그룹과 이벤트 ID를 조합하여 고유성을 보장한다.
 
-이벤트별 멱등성 전략은 다음과 같다. 좋아요 등록/취소는 도메인 자체가 멱등하므로(unique 제약) 별도 체크가 불필요하다. 재고 소진 캐시 무효화는 동작 자체가 멱등하므로(여러 번 삭제해도 결과 동일) 별도 체크가 불필요하다. 주문 완료 판매량 집계와 상품 조회 조회수 집계는 중복 이벤트 시 집계가 중복 반영되므로 IdempotencyStore 체크가 필요하다.
+이벤트별 멱등성 전략은 다음과 같다:
+- **좋아요 등록/취소**: 멱등성 체크 없이 바로 적용 (배치 내 중복만 제거)
+- **재고 소진 캐시 무효화**: 동작 자체가 멱등하므로 별도 체크 불필요
+- **주문 완료 판매량 집계**: event_handled 테이블로 중복 체크 필요
+- **상품 조회 조회수 집계**: event_handled 테이블로 중복 체크 필요
 
 **4. 에러 처리 시스템**
 
@@ -161,36 +171,38 @@ sequenceDiagram
 sequenceDiagram
     participant K as Kafka
     participant PEC as ProductEventConsumer
-    participant IS as IdempotencyStore
-    participant PS as ProductService
+    participant EHR as EventHandledRepository
+    participant PSS as ProductStatisticService
     participant DB as Database
     participant DLQ as DLQ Topic
 
     K->>PEC: 이벤트 배치 수신
     activate PEC
-    
+
+    Note over PEC: 1. 파싱 및 필터링
+    Note over PEC: 2. 배치 내 중복 제거 (최신 이벤트만 유지)
+
     loop 각 이벤트에 대해
-        PEC->>IS: 처리 여부 확인 (aggregateType + aggregateId + action)
+        PEC->>EHR: 처리 여부 확인 (idempotency_key)
         alt 이미 처리됨
-            IS-->>PEC: 처리됨
+            EHR-->>PEC: 처리됨
             PEC->>PEC: 스킵
         else 미처리
-            IS-->>PEC: 미처리
-            PEC->>IS: 처리 기록 저장
-            PEC->>PS: command 전달
-            activate PS
-            PS->>DB: product_metrics UPSERT
-            PS-->>PEC: 성공
-            deactivate PS
+            EHR-->>PEC: 미처리
         end
     end
-    
-    alt 모든 이벤트 처리 성공
-        PEC->>K: ACK
-    else 처리 실패 발생
-        PEC->>DLQ: 실패 이벤트 전송
-        PEC->>K: ACK
-    end
+
+    Note over PEC: 3. 미처리 이벤트 일괄 처리
+    PEC->>PSS: command 전달
+    activate PSS
+    PSS->>DB: product_statistics UPSERT
+    PSS-->>PEC: 성공
+    deactivate PSS
+
+    Note over PEC: 4. 멱등성 키 저장
+    PEC->>EHR: 처리 완료 기록 저장
+
+    PEC->>K: ACK
     deactivate PEC
 ```
 
@@ -199,28 +211,25 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant K as Kafka
-    participant PEC as ProductEventConsumer
-    participant PS as ProductService
+    participant PSEC as ProductStockEventConsumer
     participant Redis as Redis
     participant DLQ as DLQ Topic
 
-    K->>PEC: 재고 소진 이벤트 수신
-    activate PEC
-    
-    PEC->>PS: command 전달
-    activate PS
-    PS->>Redis: 상품 캐시 삭제
-    Redis-->>PS: 삭제 완료
-    PS-->>PEC: 성공
-    deactivate PS
-    
+    K->>PSEC: 재고 소진 이벤트 수신
+    activate PSEC
+
+    Note over PSEC: 파싱 및 필터링
+
+    PSEC->>Redis: 상품 캐시 삭제
+    Redis-->>PSEC: 삭제 완료
+
     alt 처리 성공
-        PEC->>K: ACK
+        PSEC->>K: ACK
     else 처리 실패
-        PEC->>DLQ: 실패 이벤트 전송
-        PEC->>K: ACK
+        PSEC->>DLQ: 실패 이벤트 전송
+        PSEC->>K: ACK
     end
-    deactivate PEC
+    deactivate PSEC
 ```
 
 **4. Polling Fallback 흐름 (Producer 백업)**

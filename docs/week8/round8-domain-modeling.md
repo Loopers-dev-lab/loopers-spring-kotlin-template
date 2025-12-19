@@ -13,10 +13,9 @@ classDiagram
         -Long likeCount
         -Long salesCount
         -Long viewCount
-        +increaseLikeCount(amount: Long)
-        +decreaseLikeCount(amount: Long)
-        +increaseSalesCount(amount: Long)
-        +increaseViewCount(amount: Long)
+        +applyLikeChanges(types: List~LikeType~)
+        +applySalesChanges(quantities: List~Int~)
+        +applyViewChanges(count: Int)
     }
 
     class OrderPaidEventV1 {
@@ -60,7 +59,10 @@ classDiagram
 
 **Aggregate: ProductStatistic**
 
-ProductStatistic은 상품별 메트릭(좋아요 수, 판매량, 조회수)을 집계하는 독립 Aggregate이다. Product와 별도 생명주기를 가지며, productId로 간접 참조한다. 배치 처리를 위해 각 메트릭 증감 메서드는 amount 파라미터를 받는다.
+ProductStatistic은 상품별 메트릭(좋아요 수, 판매량, 조회수)을 집계하는 독립 Aggregate이다. Product와 별도 생명주기를 가지며, productId로 간접 참조한다. 배치 처리에 최적화된 메서드 설계를 사용한다:
+- `applyLikeChanges(types)`: 좋아요 등록/취소 타입 리스트를 받아 일괄 적용
+- `applySalesChanges(quantities)`: 주문 상품별 수량 리스트를 받아 일괄 적용
+- `applyViewChanges(count)`: 조회수를 일괄 증가
 
 **Domain Events**
 
@@ -82,41 +84,42 @@ OrderPaidEventV1은 결제 완료 시 발행되며, 판매량 집계를 위해 O
 | salesCount | 0 |
 | viewCount | 0 |
 
-### 2.2 메트릭 증가 규칙
+### 2.2 좋아요 변경 규칙
 
-`increaseLikeCount(amount)`, `increaseSalesCount(amount)`, `increaseViewCount(amount)`는 동일한 규칙을 따른다.
+**applyLikeChanges(types: List\<LikeType\>)**
 
-**사전조건**
-
-- amount > 0
+배치로 수신된 좋아요 이벤트들을 일괄 적용한다.
 
 **동작**
 
-- 해당 메트릭 += amount
+- CREATED 타입은 +1, CANCELED 타입은 -1로 합산
+- `likeCount = maxOf(0, likeCount + delta)`로 음수 방지
 
 **예외**
 
-- amount ≤ 0: "증가량은 0보다 커야 합니다"
+- 없음 (음수 보정으로 안전 처리)
 
-### 2.3 좋아요 감소 규칙
+### 2.3 판매량 변경 규칙
 
-**decreaseLikeCount(amount: Long)**
+**applySalesChanges(quantities: List\<Int\>)**
 
-**사전조건**
-
-- amount > 0
-- likeCount - amount ≥ 0
+주문 완료 시 상품별 판매 수량을 일괄 적용한다.
 
 **동작**
 
-- likeCount -= amount
+- `salesCount += quantities.sumOf { it.toLong() }`
 
-**예외**
+### 2.4 조회수 변경 규칙
 
-- amount ≤ 0: "감소량은 0보다 커야 합니다"
-- likeCount - amount < 0: "좋아요 수는 0 미만이 될 수 없습니다"
+**applyViewChanges(count: Int)**
 
-### 2.4 불변식
+배치로 수신된 조회 이벤트들의 개수만큼 조회수를 증가시킨다.
+
+**동작**
+
+- `viewCount += count`
+
+### 2.5 불변식
 
 ProductStatistic의 모든 메트릭은 항상 0 이상이어야 한다.
 
@@ -154,11 +157,11 @@ ProductStatistic은 별도의 상태 전이가 없고 메트릭 값만 변경되
 
 | 이벤트명 | 소비 주체 | 처리 내용 |
 |----------|-----------|-----------|
-| LikeCreatedEventV1 | ProductMetricsEventConsumer | ProductStatistic.increaseLikeCount() 호출 |
-| LikeCanceledEventV1 | ProductMetricsEventConsumer | ProductStatistic.decreaseLikeCount() 호출 |
-| OrderPaidEventV1 | ProductMetricsEventConsumer | ProductStatistic.increaseSalesCount() 호출 (상품별) |
-| ProductViewedEventV1 | ProductMetricsEventConsumer | ProductStatistic.increaseViewCount() 호출 |
-| StockDepletedEventV1 | ProductCacheEventConsumer | 상품 캐시 무효화 |
+| LikeCreatedEventV1 | ProductLikeEventConsumer | ProductStatistic.applyLikeChanges() 호출 |
+| LikeCanceledEventV1 | ProductLikeEventConsumer | ProductStatistic.applyLikeChanges() 호출 |
+| OrderPaidEventV1 | ProductOrderEventConsumer | ProductStatistic.applySalesChanges() 호출 (상품별) |
+| ProductViewedEventV1 | ProductViewEventConsumer | ProductStatistic.applyViewChanges() 호출 |
+| StockDepletedEventV1 | ProductStockEventConsumer | 상품 캐시 무효화 |
 
 **페이로드**
 

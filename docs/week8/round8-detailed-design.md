@@ -16,11 +16,11 @@
 
 ### 1.2 Domain Event 설계
 
-Domain Event는 "무슨 일이 일어났는가"만 순수하게 표현한다. `eventType`(예: `loopers.order.created.v1`)이나 `topic`(예: `order-events`)은 인프라 관심사이므로 Domain Event가 알 필요가 없다.
+Domain Event는 "무슨 일이 일어났는가"만 순수하게 표현한다. `eventType`(예: `loopers.order.paid.v1`)이나 `topic`(예: `order-events`)은 인프라 관심사이므로 Domain Event가 알 필요가 없다.
 
 ```kotlin
 // support/event/DomainEvent.kt
-sealed interface DomainEvent {
+interface DomainEvent {
     val occurredAt: Instant
 }
 
@@ -55,7 +55,7 @@ data class ProductViewedEventV1(
 ) : DomainEvent
 ```
 
-`sealed interface`를 사용하면 `EventTypeResolver`에서 `when` 표현식 사용 시 새 이벤트 추가를 누락하면 컴파일 에러가 발생하여 안전하다.
+일반 `interface`를 사용하여 도메인 이벤트를 정의한다. 이벤트 타입 매핑은 `CloudEventEnvelopeFactory`의 `when` 표현식에서 처리하며, 지원하지 않는 이벤트는 `null`을 반환하여 Outbox 저장에서 제외된다.
 
 ### 1.3 CloudEventEnvelope 설계
 
@@ -101,31 +101,7 @@ data class CloudEventEnvelope(
 
 ### 1.4 Resolver 및 Factory
 
-`eventType`과 `topic` 결정은 Resolver 클래스에서 담당한다.
-
-#### EventTypeResolver
-
-Domain Event 클래스를 eventType 문자열로 매핑한다. `sealed interface` + `when`으로 새 이벤트 추가 시 컴파일 타임 검증이 가능하다.
-
-```kotlin
-// support/outbox/EventTypeResolver.kt
-object EventTypeResolver {
-    fun resolve(event: DomainEvent): String = when (event) {
-        // Order
-        is OrderCreatedEventV1 -> "loopers.order.created.v1"
-        is OrderCanceledEventV1 -> "loopers.order.canceled.v1"
-        // Payment
-        is PaymentCreatedEventV1 -> "loopers.payment.created.v1"
-        is PaymentPaidEventV1 -> "loopers.payment.paid.v1"
-        is PaymentFailedEventV1 -> "loopers.payment.failed.v1"
-        // Like
-        is LikeCreatedEventV1 -> "loopers.like.created.v1"
-        is LikeCanceledEventV1 -> "loopers.like.canceled.v1"
-        // Product
-        is ProductViewedEventV1 -> "loopers.product.viewed.v1"
-    }
-}
-```
+`eventType`과 `topic` 결정은 Resolver 및 Factory 클래스에서 담당한다.
 
 #### TopicResolver
 
@@ -147,32 +123,65 @@ object TopicResolver {
 #### CloudEventEnvelopeFactory
 
 Domain Event를 CloudEventEnvelope로 변환한다. ObjectMapper 의존성이 있으므로 infrastructure 레이어에 위치한다.
+이벤트 타입 결정(`resolveMetadata`)도 이 클래스 내부에서 처리하여 Kafka 발행 대상 이벤트를 제어한다.
 
 ```kotlin
 // infrastructure/outbox/CloudEventEnvelopeFactory.kt
 @Component
 class CloudEventEnvelopeFactory(
-    @Value("\${spring.application.name}")
-    private val source: String,
     private val objectMapper: ObjectMapper,
 ) {
-    fun create(
-        event: DomainEvent,
-        aggregateType: String,
-        aggregateId: String,
-    ): CloudEventEnvelope {
-        val eventType = EventTypeResolver.resolve(event)
-        
+    companion object {
+        private const val SOURCE = "commerce-api"
+    }
+
+    fun create(event: DomainEvent): CloudEventEnvelope? {
+        val metadata = resolveMetadata(event) ?: return null
         return CloudEventEnvelope(
             id = UUID.randomUUID().toString(),
-            type = eventType,
-            source = source,
-            aggregateType = aggregateType,
-            aggregateId = aggregateId,
+            type = metadata.type,
+            source = SOURCE,
+            aggregateType = metadata.aggregateType,
+            aggregateId = metadata.aggregateId,
             time = event.occurredAt,
             payload = objectMapper.writeValueAsString(event),
         )
     }
+
+    private fun resolveMetadata(event: DomainEvent): EventMetadata? = when (event) {
+        is OrderPaidEventV1 -> EventMetadata(
+            type = "loopers.order.paid.v1",
+            aggregateType = "Order",
+            aggregateId = event.orderId.toString(),
+        )
+        is LikeCreatedEventV1 -> EventMetadata(
+            type = "loopers.like.created.v1",
+            aggregateType = "Like",
+            aggregateId = event.productId.toString(),
+        )
+        is LikeCanceledEventV1 -> EventMetadata(
+            type = "loopers.like.canceled.v1",
+            aggregateType = "Like",
+            aggregateId = event.productId.toString(),
+        )
+        is ProductViewedEventV1 -> EventMetadata(
+            type = "loopers.product.viewed.v1",
+            aggregateType = "Product",
+            aggregateId = event.productId.toString(),
+        )
+        is StockDepletedEventV1 -> EventMetadata(
+            type = "loopers.stock.depleted.v1",
+            aggregateType = "Stock",
+            aggregateId = event.productId.toString(),
+        )
+        else -> null
+    }
+
+    private data class EventMetadata(
+        val type: String,
+        val aggregateType: String,
+        val aggregateId: String,
+    )
 }
 ```
 
@@ -182,7 +191,7 @@ class CloudEventEnvelopeFactory(
 
 ```mermaid
 flowchart TD
-    Start([스케줄러 실행<br/>500ms 간격]) --> CheckCircuit{서킷 상태<br/>확인}
+    Start([스케줄러 실행<br/>1초 간격]) --> CheckCircuit{서킷 상태<br/>확인}
     
     CheckCircuit -->|OPEN| End1([스킵])
     
@@ -426,31 +435,25 @@ CREATE TABLE outbox_failed (
 ```sql
 CREATE TABLE event_handled (
     id BIGSERIAL PRIMARY KEY,
-    aggregate_type VARCHAR(100) NOT NULL,
-    aggregate_id VARCHAR(255) NOT NULL,
-    action VARCHAR(100) NOT NULL,
-    handled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
-    CONSTRAINT uk_event_handled UNIQUE (aggregate_type, aggregate_id, action)
+    idempotency_key VARCHAR(500) NOT NULL UNIQUE,
+    handled_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
 
 **컬럼 설명:**
 
 - `id`: PK
-- `aggregate_type`: 집계 루트 타입 (예: `Order`, `ProductView`)
-- `aggregate_id`: 집계 루트 ID
-- `action`: 처리 액션 (예: `SALES_COUNT_INCREASED`, `VIEW_COUNT_INCREASED`)
+- `idempotency_key`: 멱등성 키 (format: `{consumerGroup}:{eventId}`)
 - `handled_at`: 처리 시각
 
 **멱등성 키 설계:**
 
-| 이벤트 | aggregate_type | aggregate_id | action |
-|-------|---------------|--------------|--------|
-| OrderPaidEventV1 | `Order` | `{orderId}` | `SALES_COUNT_INCREASED` |
-| ProductViewedEventV1 | `ProductView` | `{productId}_{eventId}` | `VIEW_COUNT_INCREASED` |
+| 이벤트 | Consumer Group | idempotency_key 형식 |
+|-------|----------------|---------------------|
+| OrderPaidEventV1 | `product-statistic` | `product-statistic:{eventId}` |
+| ProductViewedEventV1 | `product-statistic` | `product-statistic:{eventId}` |
 
-조회수의 경우 동일 상품을 여러 번 조회하면 각각 카운트되어야 하므로, `eventId`를 포함하여 구분한다.
+Consumer 그룹과 이벤트 ID를 조합하여 고유성을 보장한다. 같은 이벤트라도 다른 Consumer 그룹에서는 별도로 처리될 수 있다.
 
 #### product_statistic 테이블 (컬럼 추가)
 
@@ -696,46 +699,20 @@ class OutboxFailed(
 #### EventHandled Entity
 
 ```kotlin
-// support/outbox/EventHandled.kt
+// support/idempotency/EventHandled.kt
 @Entity
-@Table(
-    name = "event_handled",
-    uniqueConstraints = [
-        UniqueConstraint(
-            name = "uk_event_handled",
-            columnNames = ["aggregate_type", "aggregate_id", "action"],
-        ),
-    ],
-)
+@Table(name = "event_handled")
 class EventHandled(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 
-    @Column(name = "aggregate_type", nullable = false, length = 100)
-    val aggregateType: String,
-
-    @Column(name = "aggregate_id", nullable = false)
-    val aggregateId: String,
-
-    @Column(name = "action", nullable = false, length = 100)
-    val action: String,
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 500)
+    val idempotencyKey: String,
 
     @Column(name = "handled_at", nullable = false, updatable = false)
-    val handledAt: ZonedDateTime = ZonedDateTime.now(),
-) {
-    companion object {
-        fun create(
-            aggregateType: String,
-            aggregateId: String,
-            action: String,
-        ): EventHandled = EventHandled(
-            aggregateType = aggregateType,
-            aggregateId = aggregateId,
-            action = action,
-        )
-    }
-}
+    val handledAt: Instant = Instant.now(),
+)
 ```
 
 ### 5.2 Repository 인터페이스
@@ -763,14 +740,10 @@ interface OutboxFailedRepository {
     fun delete(failed: OutboxFailed)
 }
 
-// support/outbox/EventHandledRepository.kt
+// support/idempotency/EventHandledRepository.kt
 interface EventHandledRepository {
     fun save(eventHandled: EventHandled): EventHandled
-    fun existsByAggregateTypeAndAggregateIdAndAction(
-        aggregateType: String,
-        aggregateId: String,
-        action: String,
-    ): Boolean
+    fun existsByIdempotencyKey(idempotencyKey: String): Boolean
 }
 ```
 
@@ -801,14 +774,10 @@ interface OutboxFailedJpaRepository : JpaRepository<OutboxFailed, Long> {
     ): List<OutboxFailed>
 }
 
-// infrastructure/outbox/EventHandledJpaRepository.kt
+// infrastructure/idempotency/EventHandledJpaRepository.kt
 @Repository
 interface EventHandledJpaRepository : JpaRepository<EventHandled, Long> {
-    fun existsByAggregateTypeAndAggregateIdAndAction(
-        aggregateType: String,
-        aggregateId: String,
-        action: String,
-    ): Boolean
+    fun existsByIdempotencyKey(idempotencyKey: String): Boolean
 }
 ```
 
@@ -889,7 +858,7 @@ class OutboxFailedRdbRepository(
     }
 }
 
-// infrastructure/outbox/EventHandledRdbRepository.kt
+// infrastructure/idempotency/EventHandledRdbRepository.kt
 @Repository
 class EventHandledRdbRepository(
     private val eventHandledJpaRepository: EventHandledJpaRepository,
@@ -901,36 +870,73 @@ class EventHandledRdbRepository(
     }
 
     @Transactional(readOnly = true)
-    override fun existsByAggregateTypeAndAggregateIdAndAction(
-        aggregateType: String,
-        aggregateId: String,
-        action: String,
-    ): Boolean {
-        return eventHandledJpaRepository.existsByAggregateTypeAndAggregateIdAndAction(
-            aggregateType,
-            aggregateId,
-            action,
+    override fun existsByIdempotencyKey(idempotencyKey: String): Boolean {
+        return eventHandledJpaRepository.existsByIdempotencyKey(idempotencyKey)
+    }
+}
+```
+
+### 5.5 Outbox Relay (핵심 로직)
+
+Outbox Relay는 스케줄링 레이어와 비즈니스 로직 레이어로 분리되어 있다.
+
+#### OutboxRelayScheduler
+
+스케줄링과 로깅만 담당하는 얇은 레이어이다.
+
+```kotlin
+// infrastructure/outbox/OutboxRelayScheduler.kt
+@Component
+@ConditionalOnProperty(
+    name = ["scheduler.enabled"],
+    havingValue = "true",
+    matchIfMissing = true,
+)
+class OutboxRelayScheduler(
+    private val outboxRelayService: OutboxRelayService,
+) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    @Scheduled(fixedDelay = 1000)
+    fun relayNewMessages() {
+        log.info("[OutboxRelayScheduler] relayNewMessages started")
+        val result = outboxRelayService.relayNewMessages()
+        log.info(
+            "[OutboxRelayScheduler] relayNewMessages completed: success={}, failed={}, lastOffset={}",
+            result.successCount,
+            result.failedCount,
+            result.lastProcessedId,
+        )
+    }
+
+    @Scheduled(fixedDelay = 5000)
+    fun retryFailedMessages() {
+        log.info("[OutboxRelayScheduler] retryFailedMessages started")
+        val result = outboxRelayService.retryFailedMessages()
+        log.info(
+            "[OutboxRelayScheduler] retryFailedMessages completed: success={}, failed={}",
+            result.successCount,
+            result.failedCount,
         )
     }
 }
 ```
 
-### 5.5 Outbox Relayer (핵심 로직)
+#### OutboxRelayService
 
-OutboxRelayer는 KafkaTemplate, CircuitBreaker 등 인프라 의존성이 있으므로 infrastructure 레이어에 위치한다.
+Kafka 발행 비즈니스 로직을 담당한다.
 
 ```kotlin
-// infrastructure/outbox/OutboxRelayer.kt
-@Component
-class OutboxRelayer(
+// infrastructure/outbox/OutboxRelayService.kt
+@Service
+class OutboxRelayService(
     private val kafkaTemplate: KafkaTemplate<String, String>,
     private val outboxRepository: OutboxRepository,
     private val outboxCursorRepository: OutboxCursorRepository,
     private val outboxFailedRepository: OutboxFailedRepository,
-    private val circuitBreakerRegistry: CircuitBreakerRegistry,
+    circuitBreakerRegistry: CircuitBreakerRegistry,
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
-    private val circuitBreaker = circuitBreakerRegistry.circuitBreaker("outbox-relay")
+    private val circuitBreaker: CircuitBreaker = circuitBreakerRegistry.circuitBreaker("outbox-relay")
 
     companion object {
         private const val BATCH_SIZE = 100
@@ -939,120 +945,107 @@ class OutboxRelayer(
     }
 
     /**
-     * 메인 릴레이: 새 메시지 발행
-     * - 500ms 간격 폴링
-     * - 비동기 배치 처리
-     * - 서킷 열리면 즉시 중단
+     * 새 메시지를 Kafka로 릴레이한다.
+     * - 커서 이후의 메시지를 조회하여 배치 전송
+     * - 실패한 메시지는 OutboxFailed로 이동
+     * - 처리 완료 후 커서 갱신
      */
-    @Scheduled(fixedDelay = 500)
-    @SchedulerLock(name = "outbox-relay-main", lockAtMostFor = "PT30S")
-    fun relayNewMessages() {
-        // 서킷 열려있으면 스킵
-        if (circuitBreaker.state == CircuitBreaker.State.OPEN) return
+    fun relayNewMessages(): RelayResult {
+        if (isCircuitBreakerOpen()) {
+            return RelayResult(successCount = 0, failedCount = 0, lastProcessedId = 0L)
+        }
 
-        val currentCursor = outboxCursorRepository.findLatest()?.lastProcessedId ?: 0L
-        val messages = outboxRepository.findAllByIdGreaterThanOrderByIdAsc(currentCursor, BATCH_SIZE)
-        if (messages.isEmpty()) return
+        val cursor = outboxCursorRepository.findLatest()
+        val cursorId = cursor?.lastProcessedId ?: 0L
+        val outboxMessages = outboxRepository.findAllByIdGreaterThanOrderByIdAsc(cursorId, BATCH_SIZE)
 
-        val failedMessages = ConcurrentLinkedQueue<OutboxFailed>()
-        val futures = mutableListOf<CompletableFuture<SendResult<String, String>>>()
-        var lastAttemptedId: Long? = null
+        if (outboxMessages.isEmpty()) {
+            return RelayResult(successCount = 0, failedCount = 0, lastProcessedId = cursorId)
+        }
 
-        // 메시지 순회하며 비동기 발행
-        for (outbox in messages) {
+        var successCount = 0
+        var failedCount = 0
+        val failedMessages = mutableListOf<OutboxFailed>()
+        var lastProcessedId = cursorId
+
+        for (outbox in outboxMessages) {
+            if (isCircuitBreakerOpen()) break
+
+            val sendResult = sendToKafka(outbox)
+            if (sendResult.isSuccess) {
+                successCount++
+            } else {
+                failedCount++
+                val error = sendResult.exceptionOrNull()?.message ?: "Unknown error"
+                failedMessages.add(OutboxFailed.from(outbox, error))
+            }
+            lastProcessedId = outbox.id
+        }
+
+        outboxFailedRepository.saveAll(failedMessages)
+        outboxCursorRepository.save(OutboxCursor.create(lastProcessedId))
+
+        return RelayResult(
+            successCount = successCount,
+            failedCount = failedCount,
+            lastProcessedId = lastProcessedId,
+        )
+    }
+
+    /**
+     * 실패한 메시지를 재시도한다.
+     * - nextRetryAt이 현재 시각 이전인 메시지를 조회
+     * - 성공 시 삭제, 실패 시 retryCount 증가
+     */
+    fun retryFailedMessages(): RetryResult {
+        if (isCircuitBreakerOpen()) {
+            return RetryResult(successCount = 0, failedCount = 0)
+        }
+
+        val retryableMessages = outboxFailedRepository.findRetryable(RETRY_BATCH_SIZE)
+        if (retryableMessages.isEmpty()) {
+            return RetryResult(successCount = 0, failedCount = 0)
+        }
+
+        var successCount = 0
+        var failedCount = 0
+
+        for (failed in retryableMessages) {
+            if (isCircuitBreakerOpen()) break
+
+            val sendResult = sendFailedToKafka(failed)
+            if (sendResult.isSuccess) {
+                outboxFailedRepository.delete(failed)
+                successCount++
+            } else {
+                val error = sendResult.exceptionOrNull()?.message ?: "Unknown error"
+                failed.incrementRetryCount(error)
+                outboxFailedRepository.save(failed)
+                failedCount++
+            }
+        }
+
+        return RetryResult(successCount = successCount, failedCount = failedCount)
+    }
+
+    private fun sendToKafka(outbox: Outbox): Result<Unit> {
+        return try {
             val topic = TopicResolver.resolve(outbox.eventType)
-            val future = sendWithCircuitBreaker(topic, outbox.aggregateId, outbox.payload)
-
-            // 서킷 열리면 여기서 중단
-            if (future == null) {
-                log.warn("Circuit opened at message id={}, stopping batch", outbox.id)
-                break
+            val future = kafkaTemplate.send(topic, outbox.aggregateId, outbox.payload)
+            val completableFuture = CompletableFuture<Unit>()
+            future.whenComplete { _, ex ->
+                if (ex != null) completableFuture.completeExceptionally(ex)
+                else completableFuture.complete(Unit)
             }
-
-            lastAttemptedId = outbox.id
-            futures.add(
-                future.whenComplete { _, ex ->
-                    if (ex != null) {
-                        failedMessages.add(OutboxFailed.from(outbox, ex.message ?: "Unknown"))
-                    }
-                },
-            )
-        }
-
-        // 시도한 게 없으면 종료
-        if (futures.isEmpty()) return
-
-        // 전체 완료 대기
-        try {
-            CompletableFuture.allOf(*futures.toTypedArray())
-                .orTimeout(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .join()
-        } catch (ex: Exception) {
-            log.warn("Batch send timeout or error", ex)
-        }
-
-        // 실패한 것들 저장
-        if (failedMessages.isNotEmpty()) {
-            outboxFailedRepository.saveAll(failedMessages.toList())
-        }
-
-        // 커서 갱신 (마지막으로 시도한 메시지까지)
-        outboxCursorRepository.save(OutboxCursor.create(lastAttemptedId!!))
-    }
-
-    /**
-     * 실패 재처리: outbox_failed 테이블에서 재시도
-     * - 5초 간격 폴링
-     * - 비동기 처리, callback으로 결과 핸들링
-     */
-    @Scheduled(fixedDelay = 5000)
-    @SchedulerLock(name = "outbox-relay-retry", lockAtMostFor = "PT60S")
-    fun retryFailedMessages() {
-        // 서킷 열려있으면 스킵
-        if (circuitBreaker.state == CircuitBreaker.State.OPEN) return
-
-        val failedList = outboxFailedRepository.findRetryable(RETRY_BATCH_SIZE)
-        if (failedList.isEmpty()) return
-
-        failedList.forEach { failed ->
-            val topic = TopicResolver.resolve(failed.eventType)
-            sendWithCircuitBreaker(topic, failed.aggregateId, failed.payload)?.whenComplete { _, ex ->
-                if (ex != null) {
-                    failed.incrementRetryCount(ex.message ?: "Unknown")
-                    outboxFailedRepository.save(failed)
-                    log.warn("Retry failed: id={}, attempt={}", failed.id, failed.retryCount)
-                } else {
-                    outboxFailedRepository.delete(failed)
-                }
-            }
+            completableFuture.get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
-    /**
-     * 서킷브레이커로 감싼 Kafka send
-     * - tryAcquirePermission으로 서킷 상태 확인
-     * - callback에서 onSuccess/onError로 결과 기록
-     */
-    private fun sendWithCircuitBreaker(
-        topic: String,
-        partitionKey: String,
-        payload: String,
-    ): CompletableFuture<SendResult<String, String>>? {
-        // 서킷 열려있으면 permission 거부
-        if (!circuitBreaker.tryAcquirePermission()) {
-            return null
-        }
-
-        val start = System.nanoTime()
-        return kafkaTemplate.send(topic, partitionKey, payload)
-            .whenComplete { _, ex ->
-                val duration = System.nanoTime() - start
-                if (ex != null) {
-                    circuitBreaker.onError(duration, TimeUnit.NANOSECONDS, ex)
-                } else {
-                    circuitBreaker.onSuccess(duration, TimeUnit.NANOSECONDS)
-                }
-            }
+    private fun isCircuitBreakerOpen(): Boolean {
+        return circuitBreaker.state == CircuitBreaker.State.OPEN
     }
 }
 ```
@@ -1172,8 +1165,8 @@ resilience4j:
 | 설계 결정 | 근거 |
 |----------|------|
 | Two-Envelope 전략 (Domain Event + CloudEventEnvelope 분리) | 도메인은 인프라(Kafka/JSON)를 몰라야 함. 직렬화 포맷 변경 시 도메인 코드 수정 불필요. 테스트 시 무거운 직렬화 객체 없이 간단한 Kotlin 객체로 테스트 가능 |
-| `sealed interface DomainEvent` | `when` 표현식에서 exhaustive check 가능. 새 이벤트 추가 시 EventTypeResolver 매핑 누락하면 컴파일 에러 발생하여 안전 |
-| eventType/topic은 별도 Resolver 클래스에서 결정 | Domain Event와 Entity 모두 인프라 라우팅 로직을 몰라야 함. Resolver로 분리하여 단일 책임 원칙 준수 |
+| 일반 `interface DomainEvent` | 도메인 이벤트는 순수하게 비즈니스 사실만 표현. 지원 이벤트 목록은 CloudEventEnvelopeFactory에서 관리하며, 미지원 이벤트는 null 반환으로 Outbox 저장에서 자연스럽게 제외 |
+| eventType/topic 결정 로직 통합 | CloudEventEnvelopeFactory 내부 `resolveMetadata()`에서 이벤트 타입 결정, TopicResolver에서 topic 도출. Factory가 발행 대상 이벤트를 제어하여 응집도 향상 |
 | topic을 DB에 저장하지 않음 | event_type에서 파생 가능 (`loopers.order.created.v1` → `order-events`). 저장 공간 절약, 컨벤션 기반으로 일관성 유지 |
 | partitionKey로 aggregateId 직접 사용 | 별도 메서드/필드 없이 단순하게. 대부분의 경우 aggregateId가 파티션 키로 적합 |
 | correlationId 제외 (YAGNI) | 현재 필요하지 않음. 비즈니스 플로우 추적이 필요해지면 추가 예정 |
@@ -1192,8 +1185,9 @@ resilience4j:
 | 서킷브레이커 `tryAcquirePermission` 패턴 | 어노테이션 방식은 동기 메서드에 적합. 비동기 `send()`는 수동으로 permission 획득 + 결과 기록 필요 |
 | 서킷 열릴 때 커서 미갱신 | 서킷 열려서 send 안 된 메시지는 "실패"가 아닌 "미시도". 다음 스케줄에 다시 조회되어야 함 |
 | 애플리케이션 레벨 retry 없음 | Kafka Producer 자체에 retries 설정 있음. 그 retry도 실패하면 진짜 문제이므로 outbox_failed로 이동 |
-| 메인/재처리 스케줄러 분리 | 메인(500ms)은 빠른 처리, 재처리(5초)는 느린 주기. 역할 분리로 명확함 |
-| `@SchedulerLock` 사용 | SELECT FOR UPDATE 대신 ShedLock으로 분산 환경 동시성 제어. 더 명시적이고 타임아웃 관리 용이 |
+| 메인/재처리 스케줄러 분리 | 메인(1초)은 빠른 처리, 재처리(5초)는 느린 주기. 역할 분리로 명확함 |
+| Scheduler/Service 레이어 분리 | OutboxRelayScheduler는 스케줄링과 로깅만 담당, OutboxRelayService는 비즈니스 로직 담당. 테스트 용이성과 책임 분리 |
+| `@ConditionalOnProperty`로 스케줄러 제어 | 테스트 환경에서 스케줄러 비활성화 가능. `scheduler.enabled=false`로 설정 |
 
 #### Consumer 및 Kafka 설정
 
@@ -1201,7 +1195,9 @@ resilience4j:
 |----------|------|
 | Consumer 서킷브레이커 제거 | Spring Kafka DefaultErrorHandler가 재시도/DLQ 처리. Kafka 다운 시 애초에 메시지 수신 불가 |
 | `auto.offset.reset=latest` | 오프셋 유실은 7일 이상 미사용 의미. earliest로 대량 재처리 자동 시작은 오히려 위험. 과거 재처리 필요 시 수동 오프셋 조정 |
-| 멱등성 체크 이벤트별 차별화 | 판매량/조회수만 event_handled 사용. 좋아요는 도메인 자체 멱등(unique 제약), 캐시무효화는 동작 자체 멱등 |
+| 멱등성 체크 이벤트별 차별화 | 판매량/조회수만 event_handled 사용. 좋아요는 배치 내 중복 제거만 수행, 캐시무효화는 동작 자체 멱등 |
+| idempotency_key 단일 컬럼 | `{consumerGroup}:{eventId}` 형식으로 단순화. 같은 이벤트라도 다른 Consumer 그룹에서는 별도 처리 가능 |
+| Consumer 이벤트 유형별 분리 | ProductLikeEventConsumer, ProductOrderEventConsumer, ProductViewEventConsumer, ProductStockEventConsumer로 분리. 단일 책임 원칙 준수, 독립적 스케일링 가능 |
 | event_handled 7일 보관 | Kafka retention(7일) 이후 같은 이벤트 재수신 불가. 그 이상 보관은 불필요한 저장 비용 |
 | DLQ 토픽별 분리 | 어떤 이벤트 유형이 실패했는지 명확히 구분. 재처리 시에도 독립적으로 처리 가능 |
 | 토픽 파티션 수 3개 통일 | 초기에는 보수적으로 시작. 파티션은 늘릴 수 있지만 줄일 수 없음. 필요 시 확장 |
