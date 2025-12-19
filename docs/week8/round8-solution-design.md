@@ -137,7 +137,12 @@ Kafka Consumer는 이벤트 유형별로 분리하여 구성한다:
 EventHandledRepository는 Consumer에서 중복 처리를 방지한다. Producer 측은 Outbox Offset(커서) 방식으로 중복 발행을 방지하므로 별도의 멱등성 체크가 불필요하다. 중복
 발행이 발생하더라도 Consumer에서 걸러지므로 At-least-once 발행, Exactly-once 처리가 보장된다.
 
-멱등성 체크는 `idempotency_key` 단일 컬럼으로 수행한다. 키 형식은 `{consumerGroup}:{eventId}`로, Consumer 그룹과 이벤트 ID를 조합하여 고유성을 보장한다.
+멱등성 체크는 `idempotency_key` 단일 컬럼으로 수행하며 이벤트별 차별화된 멱등성 전략을 사용한다.
+
+- 주문 완료: `{group}:{aggregateType}:{aggregateId}:{action}` 키로 DB 기반 멱등성 체크
+- 상품 조회: `{group}:{eventId}` 키로 DB 기반 멱등성 체크
+- 좋아요: `{group}:{eventId}` 키로 DB 기반 멱등성 체크
+- 재고소진: `{group}:{eventId}` 키로 DB 기반 멱등성 체크
 
 이벤트별 멱등성 전략은 다음과 같다:
 
