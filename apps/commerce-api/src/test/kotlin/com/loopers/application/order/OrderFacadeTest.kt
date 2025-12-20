@@ -8,6 +8,7 @@ import com.loopers.domain.order.OrderEvent
 import com.loopers.domain.order.OrderResult
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.outbox.OutboxService
 import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentMethod
@@ -46,7 +47,8 @@ class OrderFacadeTest {
     private val pointService: PointService = mockk()
     private val paymentService: PaymentService = mockk()
     private val applicationEventPublisher: ApplicationEventPublisher = mockk()
-    private val orderFacade = OrderFacade(couponService, orderService, userService, brandService, productService, pointService, paymentService, applicationEventPublisher)
+    private val outboxService: OutboxService = mockk()
+    private val orderFacade = OrderFacade(couponService, orderService, userService, brandService, productService, pointService, paymentService, applicationEventPublisher, outboxService)
 
     private val pageable: Pageable = PageRequest.of(0, 20)
 
@@ -189,6 +191,14 @@ class OrderFacadeTest {
             justRun { productService.deductAllStock(any()) }
             every { orderService.createOrder(any()) } returns orderResult
             justRun { applicationEventPublisher.publishEvent(any<OrderEvent.OrderCreated>()) }
+            justRun {
+                outboxService.save(
+                    aggregateType = any(),
+                    aggregateId = any(),
+                    eventType = any(),
+                    payload = any(),
+                )
+            }
 
             // when
             orderFacade.placeOrder(

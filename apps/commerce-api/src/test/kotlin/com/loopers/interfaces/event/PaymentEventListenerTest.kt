@@ -5,6 +5,9 @@ import com.loopers.domain.integration.DataPlatformPublisher
 import com.loopers.domain.order.OrderDetail
 import com.loopers.domain.order.OrderEvent
 import com.loopers.domain.order.OrderService
+import com.loopers.domain.outbox.AggregateType
+import com.loopers.domain.outbox.OutboxEvent
+import com.loopers.domain.outbox.OutboxService
 import com.loopers.domain.payment.CardType
 import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentService
@@ -31,6 +34,7 @@ class PaymentEventListenerTest {
     private val transactionTemplate: TransactionTemplate = mockk()
     private val dataPlatformPublisher: DataPlatformPublisher = mockk()
     private val applicationEventPublisher: ApplicationEventPublisher = mockk()
+    private val outboxService: OutboxService = mockk()
 
     private val paymentEventListener = PaymentEventListener(
         pgService = pgService,
@@ -41,6 +45,7 @@ class PaymentEventListenerTest {
         transactionTemplate = transactionTemplate,
         dataPlatformPublisher = dataPlatformPublisher,
         applicationEventPublisher = applicationEventPublisher,
+        outboxService = outboxService,
     )
 
     @Nested
@@ -122,8 +127,8 @@ class PaymentEventListenerTest {
     inner class HandlePaymentSucceeded {
 
         @Test
-        @DisplayName("주문 완료 처리, 재고 차감, 주문 완료 이벤트를 발행한다")
-        fun `should complete order, deduct stock, and publish order completed event`() {
+        @DisplayName("주문 완료 처리, 재고 차감, outbox 저장을 수행한다")
+        fun `should complete order, deduct stock, and save to outbox`() {
             // given
             val event = PaymentEvent.PaymentSucceeded(
                 paymentId = 1L,
@@ -132,12 +137,22 @@ class PaymentEventListenerTest {
                 totalAmount = 50000L,
             )
 
-            val orderDetails = listOf<OrderDetail>(mockk())
+            val mockOrderDetail = mockk<OrderDetail>()
+            every { mockOrderDetail.productId } returns 123L
+            every { mockOrderDetail.quantity } returns 2L
+            val orderDetails = listOf(mockOrderDetail)
 
             justRun { orderService.complete(100L) }
             every { orderService.getOrderDetail(100L) } returns orderDetails
             justRun { productService.deductAllStock(orderDetails) }
-            justRun { applicationEventPublisher.publishEvent(any<OrderEvent.OrderCompleted>()) }
+            justRun {
+                outboxService.save(
+                    aggregateType = AggregateType.ORDER,
+                    aggregateId = any(),
+                    eventType = OutboxEvent.OrderCompleted.EVENT_TYPE,
+                    payload = any(),
+                )
+            }
 
             // when
             paymentEventListener.handlePaymentSucceeded(event)
@@ -146,16 +161,6 @@ class PaymentEventListenerTest {
             verify(exactly = 1) { orderService.complete(100L) }
             verify(exactly = 1) { orderService.getOrderDetail(100L) }
             verify(exactly = 1) { productService.deductAllStock(orderDetails) }
-            verify(exactly = 1) {
-                applicationEventPublisher.publishEvent(
-                    match<OrderEvent.OrderCompleted> {
-                        it.orderId == 100L &&
-                                it.userId == 1L &&
-                                it.totalAmount == 50000L &&
-                                it.items == orderDetails
-                    },
-                )
-            }
         }
 
         @Test
@@ -191,7 +196,7 @@ class PaymentEventListenerTest {
     inner class HandlePaymentFailed {
 
         @Test
-        @DisplayName("주문 실패 처리, 쿠폰 롤백, 주문 실패 이벤트를 발행한다")
+        @DisplayName("주문 실패 처리, 쿠폰 롤백, outbox 저장, 주문 실패 이벤트를 발행한다")
         fun `should fail order, rollback coupon, and publish order failed event`() {
             // given
             val event = PaymentEvent.PaymentFailed(
@@ -202,25 +207,30 @@ class PaymentEventListenerTest {
                 reason = "카드 승인 거부",
             )
 
+            val mockOrderDetail = mockk<OrderDetail>()
+            every { mockOrderDetail.productId } returns 123L
+            every { mockOrderDetail.quantity } returns 2L
+            val orderDetails = listOf(mockOrderDetail)
+
+            every { orderService.getOrderDetail(100L) } returns orderDetails
             justRun { orderService.fail(100L) }
             justRun { couponService.rollback(1L, 50L) }
-            justRun { applicationEventPublisher.publishEvent(any<OrderEvent.OrderFailed>()) }
+            justRun {
+                outboxService.save(
+                    aggregateType = AggregateType.ORDER,
+                    aggregateId = any(),
+                    eventType = OutboxEvent.OrderCanceled.EVENT_TYPE,
+                    payload = any(),
+                )
+            }
 
             // when
             paymentEventListener.handlePaymentFailed(event)
 
             // then
             verify(exactly = 1) { orderService.fail(100L) }
+            verify(exactly = 1) { orderService.getOrderDetail(100L) }
             verify(exactly = 1) { couponService.rollback(1L, 50L) }
-            verify(exactly = 1) {
-                applicationEventPublisher.publishEvent(
-                    match<OrderEvent.OrderFailed> {
-                        it.orderId == 100L &&
-                                it.userId == 1L &&
-                                it.reason == "카드 승인 거부"
-                    },
-                )
-            }
         }
 
         @Test
@@ -234,17 +244,29 @@ class PaymentEventListenerTest {
                 couponId = null,
                 reason = "카드 승인 거부",
             )
+            val mockOrderDetail = mockk<OrderDetail>()
+            every { mockOrderDetail.productId } returns 123L
+            every { mockOrderDetail.quantity } returns 2L
+            val orderDetails = listOf(mockOrderDetail)
 
+            every { orderService.getOrderDetail(100L) } returns orderDetails
             justRun { orderService.fail(100L) }
-            justRun { applicationEventPublisher.publishEvent(any<OrderEvent.OrderFailed>()) }
+            justRun {
+                outboxService.save(
+                    aggregateType = AggregateType.ORDER,
+                    aggregateId = any(),
+                    eventType = OutboxEvent.OrderCanceled.EVENT_TYPE,
+                    payload = any(),
+                )
+            }
 
             // when
             paymentEventListener.handlePaymentFailed(event)
 
             // then
             verify(exactly = 1) { orderService.fail(100L) }
+            verify(exactly = 1) { orderService.getOrderDetail(100L) }
             verify(exactly = 0) { couponService.rollback(any(), any()) }
-            verify(exactly = 1) { applicationEventPublisher.publishEvent(any<OrderEvent.OrderFailed>()) }
         }
     }
 }

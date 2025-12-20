@@ -2,7 +2,11 @@ package com.loopers.interfaces.event
 
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.integration.DataPlatformPublisher
+import com.loopers.domain.order.OrderDetail
 import com.loopers.domain.order.OrderService
+import com.loopers.domain.outbox.AggregateType
+import com.loopers.domain.outbox.OutboxEvent
+import com.loopers.domain.outbox.OutboxService
 import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PgService
@@ -42,6 +46,7 @@ class PaymentEventListener(
     private val dataPlatformPublisher: DataPlatformPublisher,
     private val transactionTemplate: TransactionTemplate,
     private val applicationEventPublisher: ApplicationEventPublisher,
+    private val outboxService: OutboxService,
 ) {
     private val log = LoggerFactory.getLogger(PaymentEventListener::class.java)
 
@@ -105,6 +110,14 @@ class PaymentEventListener(
         val orderDetails = orderService.getOrderDetail(event.orderId)
         productService.deductAllStock(orderDetails)
         log.info("재고 차감 완료: orderId=${event.orderId}, items=${orderDetails.size}개")
+
+        // 3. Outbox에 주문 완료 이벤트 저장 (Kafka 발행용)
+        saveOrderCompletedOutbox(
+            orderId = event.orderId,
+            userId = event.userId,
+            totalAmount = event.totalAmount,
+            orderDetails = orderDetails,
+        )
     }
 
     @Async
@@ -160,6 +173,15 @@ class PaymentEventListener(
         } else {
             log.debug("쿠폰 미사용 주문 - 롤백 스킵: orderId=${event.orderId}")
         }
+
+        // 3. Outbox에 주문 취소 이벤트 저장 (Kafka 발행용)
+        val orderDetails = orderService.getOrderDetail(event.orderId)
+        saveOrderCanceledOutbox(
+            orderId = event.orderId,
+            userId = event.userId,
+            reason = event.reason,
+            orderDetails = orderDetails,
+        )
     }
 
     @Async
@@ -186,5 +208,63 @@ class PaymentEventListener(
             ),
         )
         log.debug("사용자 활동 로깅 이벤트 발행 완료: orderId=${event.orderId}")
+    }
+
+    /**
+     * 주문 완료 이벤트를 Outbox에 저장
+     */
+    private fun saveOrderCompletedOutbox(
+        orderId: Long,
+        userId: Long,
+        totalAmount: Long,
+        orderDetails: List<OrderDetail>,
+    ) {
+        val metricEvent = OutboxEvent.OrderCompleted(
+            orderId = orderId,
+            userId = userId,
+            totalAmount = totalAmount,
+            items = orderDetails.map {
+                OutboxEvent.OrderCompleted.OrderItem(
+                    productId = it.productId,
+                    quantity = it.quantity.toInt(),
+                )
+            },
+        )
+
+        outboxService.save(
+            aggregateType = AggregateType.ORDER,
+            aggregateId = orderId.toString(),
+            eventType = OutboxEvent.OrderCompleted.EVENT_TYPE,
+            payload = metricEvent,
+        )
+    }
+
+    /**
+     * 주문 취소 이벤트를 Outbox에 저장
+     */
+    private fun saveOrderCanceledOutbox(
+        orderId: Long,
+        userId: Long,
+        reason: String?,
+        orderDetails: List<OrderDetail>,
+    ) {
+        val metricEvent = OutboxEvent.OrderCanceled(
+            orderId = orderId,
+            userId = userId,
+            reason = reason,
+            items = orderDetails.map {
+                OutboxEvent.OrderCanceled.OrderItem(
+                    productId = it.productId,
+                    quantity = it.quantity.toInt(),
+                )
+            },
+        )
+
+        outboxService.save(
+            aggregateType = AggregateType.ORDER,
+            aggregateId = orderId.toString(),
+            eventType = OutboxEvent.OrderCanceled.EVENT_TYPE,
+            payload = metricEvent,
+        )
     }
 }

@@ -4,6 +4,7 @@ import com.loopers.domain.order.OrderCommand
 import com.loopers.domain.order.OrderDetail
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class ProductService(
     private val productRepository: ProductRepository,
+    private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
 
     @Transactional(readOnly = true)
@@ -99,5 +101,16 @@ class ProductService(
 
                 stock.decrease(totalQuantity)
             }
+
+        productIds.forEach { productId ->
+            val stock = stockMap[productId]
+            if (stock!!.isSoldOut()) {
+                applicationEventPublisher.publishEvent(
+                    ProductEvent.OutOfStock(
+                        productId = productId,
+                    ),
+                )
+            }
+        }
     }
 }

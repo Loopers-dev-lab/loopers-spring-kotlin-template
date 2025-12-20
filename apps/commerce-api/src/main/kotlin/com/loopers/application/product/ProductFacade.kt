@@ -3,12 +3,14 @@ package com.loopers.application.product
 import com.loopers.application.dto.PageResult
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.like.ProductLikeService
+import com.loopers.domain.product.ProductEvent
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductSort
 import com.loopers.domain.user.UserService
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.support.util.TransactionUtils
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -21,6 +23,7 @@ class ProductFacade(
     private val productLikeService: ProductLikeService,
     private val userService: UserService,
     private val productCache: ProductCache,
+    private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional(readOnly = true)
     fun getProducts(brandId: Long?, sort: ProductSort, pageable: Pageable): Page<ProductResult.ListInfo> {
@@ -63,7 +66,11 @@ class ProductFacade(
     @Transactional(readOnly = true)
     fun getProduct(productId: Long, userId: String?): ProductResult.DetailInfo {
         // 캐시 조회
-        productCache.getProductDetail(productId, userId)?.let { return it }
+        productCache.getProductDetail(productId, userId)?.let { cachedResult ->
+            // 캐시 히트여도 조회 이벤트는 발행 (메트릭 수집 목적)
+            publishViewEvent(productId, userId)
+            return cachedResult
+        }
 
         // 1. 상품 조회
         val product =
@@ -94,7 +101,23 @@ class ProductFacade(
             )
         }
 
+        // 상품 조회 이벤트 발행 (메트릭 수집용)
+        publishViewEvent(productId, userId)
+
         return result
+    }
+
+    private fun publishViewEvent(productId: Long, userId: String?) {
+        val userIdLong = userId?.let {
+            runCatching { userService.getMyInfo(it).id }.getOrNull()
+        }
+
+        applicationEventPublisher.publishEvent(
+            ProductEvent.ProductViewed(
+                productId = productId,
+                userId = userIdLong,
+            ),
+        )
     }
 
     @Transactional(readOnly = true)

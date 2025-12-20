@@ -3,10 +3,14 @@ package com.loopers.application.order
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.order.OrderCommand
+import com.loopers.domain.order.OrderDetail
 import com.loopers.domain.order.OrderEvent
 import com.loopers.domain.order.OrderResult
 import com.loopers.domain.order.OrderService
 import com.loopers.domain.order.OrderStatus
+import com.loopers.domain.outbox.AggregateType
+import com.loopers.domain.outbox.OutboxEvent
+import com.loopers.domain.outbox.OutboxService
 import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentMethod
 import com.loopers.domain.payment.PaymentService
@@ -53,6 +57,7 @@ class OrderFacade(
     private val pointService: PointService,
     private val paymentService: PaymentService,
     private val applicationEventPublisher: ApplicationEventPublisher,
+    private val outboxService: OutboxService,
 ) {
 
     private val log = LoggerFactory.getLogger(OrderFacade::class.java)
@@ -151,6 +156,14 @@ class OrderFacade(
                         items = orderResult.orderDetails,
                     ),
                 )
+
+                // 13. Outbox에 주문 완료 이벤트 저장 (Kafka 발행용)
+                saveOrderCompletedOutbox(
+                    orderId = orderResult.order.id,
+                    userId = user.id,
+                    totalAmount = finalAmount,
+                    orderDetails = orderResult.orderDetails,
+                )
                 return
             }
 
@@ -205,5 +218,34 @@ class OrderFacade(
                 return
             }
         }
+    }
+
+    /**
+     * 주문 완료 이벤트를 Outbox에 저장
+     */
+    private fun saveOrderCompletedOutbox(
+        orderId: Long,
+        userId: Long,
+        totalAmount: Long,
+        orderDetails: List<OrderDetail>,
+    ) {
+        val metricEvent = OutboxEvent.OrderCompleted(
+            orderId = orderId,
+            userId = userId,
+            totalAmount = totalAmount,
+            items = orderDetails.map {
+                OutboxEvent.OrderCompleted.OrderItem(
+                    productId = it.productId,
+                    quantity = it.quantity.toInt(),
+                )
+            },
+        )
+
+        outboxService.save(
+            aggregateType = AggregateType.ORDER,
+            aggregateId = orderId.toString(),
+            eventType = OutboxEvent.OrderCompleted.EVENT_TYPE,
+            payload = metricEvent,
+        )
     }
 }

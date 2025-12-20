@@ -93,11 +93,11 @@ class OrderEventListenerTest {
     }
 
     @Nested
-    @DisplayName("주문 생성 후처리 - 데이터 플랫폼 전송 및 사용자 활동 로깅")
+    @DisplayName("주문 생성 후처리 - 사용자 활동 로깅")
     inner class HandleOrderCreatedForUserActivity {
 
         @Test
-        @DisplayName("데이터 플랫폼으로 주문 정보를 전송하고 사용자 활동 이벤트를 발행한다")
+        @DisplayName("사용자 활동 이벤트를 발행한다")
         fun `should send to data platform and publish user activity event`() {
             // given
             val event = OrderEvent.OrderCreated(
@@ -106,14 +106,12 @@ class OrderEventListenerTest {
                 couponId = 100L,
             )
 
-            justRun { dataPlatformPublisher.send(event) }
             justRun { applicationEventPublisher.publishEvent(any<UserActivityEvent.UserActivity>()) }
 
             // when
             orderEventListener.handleOrderCreatedForUserActivity(event)
 
             // then
-            verify(exactly = 1) { dataPlatformPublisher.send(event) }
             verify(exactly = 1) {
                 applicationEventPublisher.publishEvent(
                     match<UserActivityEvent.UserActivity> {
@@ -123,27 +121,6 @@ class OrderEventListenerTest {
                     },
                 )
             }
-        }
-
-        @Test
-        @DisplayName("데이터 플랫폼 전송 실패 시에도 사용자 활동 이벤트는 발행한다")
-        fun `should publish user activity event even when data platform send fails`() {
-            // given
-            val event = OrderEvent.OrderCreated(
-                orderId = 1L,
-                userId = 1L,
-                couponId = 100L,
-            )
-
-            every { dataPlatformPublisher.send(event) } throws RuntimeException("전송 실패")
-            justRun { applicationEventPublisher.publishEvent(any<UserActivityEvent.UserActivity>()) }
-
-            // when
-            orderEventListener.handleOrderCreatedForUserActivity(event)
-
-            // then
-            verify(exactly = 1) { dataPlatformPublisher.send(event) }
-            verify(exactly = 1) { applicationEventPublisher.publishEvent(any<UserActivityEvent.UserActivity>()) }
         }
     }
 
