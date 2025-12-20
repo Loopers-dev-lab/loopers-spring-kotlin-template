@@ -23,6 +23,7 @@ class OutboxFailedRdbRepository(
     override fun findRetryable(limit: Int): List<OutboxFailed> {
         return outboxFailedJpaRepository.findRetryable(
             now = Instant.now(),
+            maxRetryCount = OutboxFailed.MAX_RETRY_COUNT,
             pageable = PageRequest.of(0, limit),
         )
     }

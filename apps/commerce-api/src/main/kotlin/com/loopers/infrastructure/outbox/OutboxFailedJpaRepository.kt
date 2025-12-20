@@ -11,9 +11,17 @@ import java.time.Instant
 @Repository
 interface OutboxFailedJpaRepository : JpaRepository<OutboxFailed, Long> {
 
-    @Query("SELECT f FROM OutboxFailed f WHERE f.nextRetryAt <= :now ORDER BY f.nextRetryAt ASC")
+    @Query(
+        """
+        SELECT f FROM OutboxFailed f
+        WHERE f.nextRetryAt <= :now
+          AND f.retryCount < :maxRetryCount
+        ORDER BY f.nextRetryAt ASC
+        """,
+    )
     fun findRetryable(
         @Param("now") now: Instant,
+        @Param("maxRetryCount") maxRetryCount: Int,
         pageable: Pageable,
     ): List<OutboxFailed>
 }

@@ -75,6 +75,7 @@ class OutboxFailed(
 
     companion object {
         private const val MAX_BACKOFF_SECONDS = 300L // 5 minutes
+        const val MAX_RETRY_COUNT = 10
 
         fun from(outbox: Outbox, error: String): OutboxFailed {
             val now = Instant.now()
