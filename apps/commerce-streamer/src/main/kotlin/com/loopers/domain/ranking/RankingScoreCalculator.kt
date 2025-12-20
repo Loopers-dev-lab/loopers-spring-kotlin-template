@@ -18,6 +18,7 @@ object RankingScoreCalculator {
      * @param weight 가중치 (기본값: 0.1)
      */
     fun fromView(weight: Double = 0.1): RankingScore {
+        validateWeight(weight)
         return RankingScore(weight)
     }
 
@@ -27,6 +28,7 @@ object RankingScoreCalculator {
      * @param weight 가중치 (기본값: 0.2)
      */
     fun fromLike(weight: Double = 0.2): RankingScore {
+        validateWeight(weight)
         return RankingScore(weight)
     }
 
@@ -41,7 +43,10 @@ object RankingScoreCalculator {
      * @param weight 가중치 (기본값: 0.7)
      */
     fun fromOrder(priceAtOrder: Long, quantity: Int, weight: Double = 0.7): RankingScore {
-        val totalAmount = priceAtOrder * quantity
+        validateWeight(weight)
+
+        // Long 곱셈 오버플로우 방지를 위해 Double로 변환 후 계산
+        val totalAmount = priceAtOrder.toDouble() * quantity
 
         // 0 이하의 totalAmount는 안전하게 처리
         if (totalAmount <= 0) {
@@ -49,9 +54,13 @@ object RankingScoreCalculator {
         }
 
         // 최소값을 1로 보장하여 ln(0) 방지
-        val safeAmount = max(1.0, totalAmount.toDouble())
+        val safeAmount = max(1.0, totalAmount)
         // 로그 스케일로 정규화 (1 + ln(x))
         val normalizedScore = 1.0 + ln(safeAmount)
         return RankingScore(weight * normalizedScore)
+    }
+
+    private fun validateWeight(weight: Double) {
+        require(weight >= 0.0) { "가중치는 0 이상이어야 합니다: weight=$weight" }
     }
 }
