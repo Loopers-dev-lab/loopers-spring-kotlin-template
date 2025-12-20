@@ -13,7 +13,7 @@ class RankingScoreTest {
     @DisplayName("조회 이벤트 점수 생성 - 기본 가중치")
     fun `should create view score with default weight`() {
         // when
-        val score = RankingScore.fromView()
+        val score = RankingScoreCalculator.fromView()
 
         // then
         assertThat(score.value).isEqualTo(0.1)
@@ -26,7 +26,7 @@ class RankingScoreTest {
         val customWeight = 0.5
 
         // when
-        val score = RankingScore.fromView(customWeight)
+        val score = RankingScoreCalculator.fromView(customWeight)
 
         // then
         assertThat(score.value).isEqualTo(0.5)
@@ -36,7 +36,7 @@ class RankingScoreTest {
     @DisplayName("좋아요 이벤트 점수 생성 - 기본 가중치")
     fun `should create like score with default weight`() {
         // when
-        val score = RankingScore.fromLike()
+        val score = RankingScoreCalculator.fromLike()
 
         // then
         assertThat(score.value).isEqualTo(0.2)
@@ -49,7 +49,7 @@ class RankingScoreTest {
         val customWeight = 0.3
 
         // when
-        val score = RankingScore.fromLike(customWeight)
+        val score = RankingScoreCalculator.fromLike(customWeight)
 
         // then
         assertThat(score.value).isEqualTo(0.3)
@@ -65,7 +65,7 @@ class RankingScoreTest {
         val expectedScore = 0.7 * (1.0 + ln(totalAmount.toDouble()))
 
         // when
-        val score = RankingScore.fromOrder(priceAtOrder, quantity)
+        val score = RankingScoreCalculator.fromOrder(priceAtOrder, quantity)
 
         // then
         assertThat(score.value).isCloseTo(expectedScore, org.assertj.core.data.Offset.offset(0.0001))
@@ -82,7 +82,7 @@ class RankingScoreTest {
         val expectedScore = customWeight * (1.0 + ln(totalAmount.toDouble()))
 
         // when
-        val score = RankingScore.fromOrder(priceAtOrder, quantity, customWeight)
+        val score = RankingScoreCalculator.fromOrder(priceAtOrder, quantity, customWeight)
 
         // then
         assertThat(score.value).isCloseTo(expectedScore, org.assertj.core.data.Offset.offset(0.0001))
@@ -97,8 +97,8 @@ class RankingScoreTest {
         val quantity = 1
 
         // when
-        val score1 = RankingScore.fromOrder(price1, quantity)
-        val score10 = RankingScore.fromOrder(price10, quantity)
+        val score1 = RankingScoreCalculator.fromOrder(price1, quantity)
+        val score10 = RankingScoreCalculator.fromOrder(price10, quantity)
 
         // then
         // 금액이 10배 차이나도 점수는 10배가 아니라 로그 스케일로 증가

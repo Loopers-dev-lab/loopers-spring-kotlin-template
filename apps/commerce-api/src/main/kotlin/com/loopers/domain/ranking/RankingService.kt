@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 /**
  * 랭킹 서비스
@@ -37,15 +38,26 @@ class RankingService(
         require(page >= 1) { "페이지 번호는 1 이상이어야 합니다: page=$page" }
         require(size > 0) { "페이지 크기는 0보다 커야 합니다: size=$size" }
 
-        val key = when (window) {
-            TimeWindow.DAILY -> {
-                val date = LocalDate.parse(timestamp, DateTimeFormatter.ofPattern("yyyyMMdd"))
-                RankingKey.daily(RankingScope.ALL, date)
+        val key = try {
+            when (window) {
+                TimeWindow.DAILY -> {
+                    val date = LocalDate.parse(timestamp, DateTimeFormatter.ofPattern("yyyyMMdd"))
+                    RankingKey.daily(RankingScope.ALL, date)
+                }
+                TimeWindow.HOURLY -> {
+                    val dateTime = LocalDateTime.parse(timestamp, DateTimeFormatter.ofPattern("yyyyMMddHH"))
+                    RankingKey.hourly(RankingScope.ALL, dateTime)
+                }
             }
-            TimeWindow.HOURLY -> {
-                val dateTime = LocalDateTime.parse(timestamp, DateTimeFormatter.ofPattern("yyyyMMddHH"))
-                RankingKey.hourly(RankingScope.ALL, dateTime)
+        } catch (e: DateTimeParseException) {
+            val expectedFormat = when (window) {
+                TimeWindow.DAILY -> "yyyyMMdd (예: 20250906)"
+                TimeWindow.HOURLY -> "yyyyMMddHH (예: 2025090614)"
             }
+            throw IllegalArgumentException(
+                "잘못된 날짜/시간 형식입니다. 예상 형식: $expectedFormat, 입력값: $timestamp",
+                e,
+            )
         }
 
         // ZSET 인덱스는 0부터 시작

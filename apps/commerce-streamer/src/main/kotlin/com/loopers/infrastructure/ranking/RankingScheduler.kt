@@ -27,9 +27,9 @@ class RankingScheduler(
      * - 내일 0시부터 랭킹 데이터가 존재하도록 보장 (콜드 스타트 방지)
      *
      * Cron: 초 분 시 일 월 요일
-     * "0 50 23 * * *" = 매일 23시 50분
+     * "0 50 23 * * *" = 매일 23시 50분 (Asia/Seoul)
      */
-    @Scheduled(cron = "0 50 23 * * *")
+    @Scheduled(cron = "0 50 23 * * *", zone = "Asia/Seoul")
     fun carryOverDailyRanking() {
         try {
             val today = LocalDate.now()
@@ -70,9 +70,9 @@ class RankingScheduler(
      * 매시간 50분에 실행:
      * - 현재 시간 랭킹 데이터를 10% 가중치로 다음 시간 랭킹에 미리 복사
      *
-     * Cron: "0 50 * * * *" = 매시간 50분
+     * Cron: "0 50 * * * *" = 매시간 50분 (Asia/Seoul)
      */
-    @Scheduled(cron = "0 50 * * * *")
+    @Scheduled(cron = "0 50 * * * *", zone = "Asia/Seoul")
     fun carryOverHourlyRanking() {
         try {
             val now = java.time.LocalDateTime.now()

@@ -13,6 +13,7 @@ import com.loopers.domain.product.ProductMetricsRepository
 import com.loopers.domain.ranking.RankingKey
 import com.loopers.domain.ranking.RankingRepository
 import com.loopers.domain.ranking.RankingScore
+import com.loopers.domain.ranking.RankingScoreCalculator
 import com.loopers.domain.ranking.RankingScope
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
@@ -135,7 +136,7 @@ class KafkaEventConsumer(
         productMetricsRepository.save(metrics)
 
         // 랭킹 점수 업데이트
-        updateRankingScore(event.productId, RankingScore.fromLike(rankingWeightProperties.like))
+        updateRankingScore(event.productId, RankingScoreCalculator.fromLike(rankingWeightProperties.like))
 
         // 처리 완료 기록
         eventHandledRepository.save(
@@ -208,7 +209,7 @@ class KafkaEventConsumer(
             productMetricsRepository.save(metrics)
 
             // 랭킹 점수 업데이트
-            val orderScore = RankingScore.fromOrder(item.priceAtOrder, item.quantity, rankingWeightProperties.order)
+            val orderScore = RankingScoreCalculator.fromOrder(item.priceAtOrder, item.quantity, rankingWeightProperties.order)
             updateRankingScore(item.productId, orderScore)
 
             logger.debug(
@@ -293,7 +294,7 @@ class KafkaEventConsumer(
         productMetricsRepository.save(metrics)
 
         // 랭킹 점수 업데이트
-        updateRankingScore(event.productId, RankingScore.fromView(rankingWeightProperties.view))
+        updateRankingScore(event.productId, RankingScoreCalculator.fromView(rankingWeightProperties.view))
 
         // 처리 완료 기록
         eventHandledRepository.save(

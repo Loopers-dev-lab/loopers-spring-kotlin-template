@@ -32,7 +32,15 @@ class RankingV1Controller(
         @RequestParam(defaultValue = "1") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
     ): ApiResponse<RankingV1Dto.RankingPageResponse> {
-        val timeWindow = TimeWindow.valueOf(window.uppercase())
+        val timeWindow = try {
+            TimeWindow.valueOf(window.uppercase())
+        } catch (e: IllegalArgumentException) {
+            val validValues = TimeWindow.entries.joinToString(", ") { it.name }
+            throw IllegalArgumentException(
+                "잘못된 window 값입니다. 가능한 값: $validValues, 입력값: $window",
+                e,
+            )
+        }
         return RankingV1Dto.RankingPageResponse.from(
             rankingFacade.getRankingPage(timeWindow, date, page, size),
         ).let { ApiResponse.success(it) }
