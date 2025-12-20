@@ -7,6 +7,7 @@ import com.loopers.domain.event.PaymentFailedEvent
 import com.loopers.domain.event.UserActionEvent
 import com.loopers.domain.event.UserActionType
 import com.loopers.domain.order.OrderRepository
+import com.loopers.domain.outbox.OutboxEventPublisher
 import com.loopers.infrastructure.dataplatform.client.DataPlatformClient
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -26,6 +27,7 @@ class OrderEventHandler(
     private val orderRepository: OrderRepository,
     private val eventPublisher: ApplicationEventPublisher,
     private val dataPlatformClient: DataPlatformClient,
+    private val outboxEventPublisher: OutboxEventPublisher,
 ) {
     private val logger = LoggerFactory.getLogger(OrderEventHandler::class.java)
 
@@ -66,6 +68,22 @@ class OrderEventHandler(
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handleOrderCreatedForDataPlatform(event: OrderCreatedEvent) {
+        try {
+            // Outbox 테이블에 이벤트 저장 (Kafka 전송을 위해)
+            outboxEventPublisher.publish(
+                eventType = "OrderCreatedEvent",
+                topic = "order-events",
+                partitionKey = event.orderId.toString(),
+                payload = event,
+                aggregateType = "Order",
+                aggregateId = event.orderId,
+            )
+        } catch (e: Exception) {
+            // Outbox 발행 실패는 재시도 가능하도록 로깅
+            logger.error("Outbox 이벤트 발행 실패: orderId=${event.orderId}", e)
+            throw e
+        }
+
         try {
             logger.info("데이터 플랫폼 전송 시작: orderId=${event.orderId}")
             dataPlatformClient.sendOrderCreated(event)
@@ -121,6 +139,22 @@ class OrderEventHandler(
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handlePaymentCompletedForDataPlatform(event: PaymentCompletedEvent) {
+        try {
+            // Outbox 테이블에 이벤트 저장 (Kafka 전송을 위해)
+            outboxEventPublisher.publish(
+                eventType = "PaymentCompletedEvent",
+                topic = "payment-events",
+                partitionKey = event.paymentId.toString(),
+                payload = event,
+                aggregateType = "Payment",
+                aggregateId = event.paymentId,
+            )
+        } catch (e: Exception) {
+            // Outbox 발행 실패는 재시도 가능하도록 로깅
+            logger.error("Outbox 이벤트 발행 실패: paymentId=${event.paymentId}", e)
+            throw e
+        }
+
         try {
             logger.info("결제 완료 데이터 플랫폼 전송 시작: orderId=${event.orderId}, paymentId=${event.paymentId}")
             dataPlatformClient.sendPaymentCompleted(event)

@@ -3,27 +3,53 @@ package com.loopers.domain.event
 import com.loopers.domain.order.Order
 import com.loopers.domain.payment.Payment
 import java.time.ZonedDateTime
+import java.util.UUID
 
 /**
  * 주문 생성 이벤트
  * 주문이 생성되었을 때 발행
  */
 data class OrderCreatedEvent(
+    val eventId: UUID = UUID.randomUUID(),
     val orderId: Long,
     val userId: Long,
     val amount: Long,
     val couponId: Long?,
+    val items: List<OrderItemInfo>,
     val createdAt: ZonedDateTime,
 ) {
     companion object {
         fun from(order: Order, couponId: Long?): OrderCreatedEvent {
             return OrderCreatedEvent(
+                eventId = UUID.randomUUID(),
                 orderId = requireNotNull(order.id) { "Order id must not be null when creating OrderCreatedEvent" },
                 userId = order.userId,
                 amount = order.totalAmount.amount.toLong(),
                 couponId = couponId,
+                items = order.items.map { OrderItemInfo.from(it) },
                 createdAt = order.createdAt,
             )
+        }
+    }
+
+    /**
+     * 주문 상품 정보
+     */
+    data class OrderItemInfo(
+        val productId: Long,
+        val productName: String,
+        val quantity: Int,
+        val priceAtOrder: Long,
+    ) {
+        companion object {
+            fun from(orderItem: com.loopers.domain.order.OrderItem): OrderItemInfo {
+                return OrderItemInfo(
+                    productId = orderItem.productId,
+                    productName = orderItem.productName,
+                    quantity = orderItem.quantity,
+                    priceAtOrder = orderItem.priceAtOrder.amount.toLong(),
+                )
+            }
         }
     }
 }

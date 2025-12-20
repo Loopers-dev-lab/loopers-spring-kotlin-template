@@ -105,7 +105,7 @@ class OrderCancellationConcurrencyTest {
         }
 
         // 주문 생성 후 재고 확인 (100 - 50 = 50)
-        val stockAfterOrders = stockRepository.findByProductId(product.id)!!
+        val stockAfterOrders = requireNotNull(stockRepository.findByProductId(product.id))
         assertThat(stockAfterOrders.quantity).isEqualTo(50)
 
         val latch = CountDownLatch(numberOfOrders)
@@ -136,12 +136,12 @@ class OrderCancellationConcurrencyTest {
         assertThat(failureCount.get()).isEqualTo(0)
 
         // 최종 재고 확인 (50 + 50 = 100)
-        val finalStock = stockRepository.findByProductId(product.id)!!
+        val finalStock = requireNotNull(stockRepository.findByProductId(product.id))
         assertThat(finalStock.quantity).isEqualTo(100)
 
         // 모든 주문이 CANCELLED 상태인지 확인
         orderIds.forEach { orderId ->
-            val order = orderRepository.findById(orderId)!!
+            val order = requireNotNull(orderRepository.findById(orderId))
             assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
         }
     }
@@ -160,7 +160,7 @@ class OrderCancellationConcurrencyTest {
         val orderId = orderInfo.orderId
 
         // 주문 생성 후 재고 확인 (100 - 10 = 90)
-        val stockAfterOrder = stockRepository.findByProductId(product.id)!!
+        val stockAfterOrder = requireNotNull(stockRepository.findByProductId(product.id))
         assertThat(stockAfterOrder.quantity).isEqualTo(90)
 
         val numberOfAttempts = 10
@@ -200,11 +200,11 @@ class OrderCancellationConcurrencyTest {
         assertThat(failureCount.get()).isEqualTo(numberOfAttempts - 1)
 
         // 재고는 정확히 한 번만 복구되어야 함 (90 + 10 = 100)
-        val finalStock = stockRepository.findByProductId(product.id)!!
+        val finalStock = requireNotNull(stockRepository.findByProductId(product.id))
         assertThat(finalStock.quantity).isEqualTo(100)
 
         // 주문 상태 확인
-        val cancelledOrder = orderRepository.findById(orderId)!!
+        val cancelledOrder = requireNotNull(orderRepository.findById(orderId))
         assertThat(cancelledOrder.status).isEqualTo(OrderStatus.CANCELLED)
     }
 
@@ -224,7 +224,7 @@ class OrderCancellationConcurrencyTest {
         }
 
         // 주문 생성 후 재고: 100 - 50 = 50
-        val stockAfterOrders = stockRepository.findByProductId(product.id)!!
+        val stockAfterOrders = requireNotNull(stockRepository.findByProductId(product.id))
         assertThat(stockAfterOrders.quantity).isEqualTo(50)
 
         // when: 10개 주문을 모두 취소
@@ -233,12 +233,12 @@ class OrderCancellationConcurrencyTest {
         }
 
         // then: 재고가 100으로 복구되어야 함
-        val finalStock = stockRepository.findByProductId(product.id)!!
+        val finalStock = requireNotNull(stockRepository.findByProductId(product.id))
         assertThat(finalStock.quantity).isEqualTo(100)
 
         // 모든 주문이 CANCELLED 상태여야 함
         orderIds.forEach { orderId ->
-            val order = orderRepository.findById(orderId)!!
+            val order = requireNotNull(orderRepository.findById(orderId))
             assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
         }
     }

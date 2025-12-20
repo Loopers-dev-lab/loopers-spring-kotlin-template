@@ -24,6 +24,7 @@ spring:
       - logging.yml
       - monitoring.yml
       - resilience.yml
+      - kafka.yml
 
 springdoc:
   use-fqn: true

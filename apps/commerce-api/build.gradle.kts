@@ -36,6 +36,9 @@ dependencies {
     // feign client
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.3.0")
 
+    // kafka (Producer only - Consumer는 commerce-streamer에서 처리)
+    implementation("org.springframework.kafka:spring-kafka")
+
     // querydsl
     kapt("com.querydsl:querydsl-apt::jakarta")
 

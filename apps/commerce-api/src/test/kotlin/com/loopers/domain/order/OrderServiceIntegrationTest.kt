@@ -118,17 +118,17 @@ class OrderServiceIntegrationTest {
         assertThat(orderInfo.userId).isEqualTo(user.id)
         assertThat(orderInfo.totalAmount).isEqualTo(BigDecimal("250000")) // 200000 + 50000
 
-        val savedOrder = orderRepository.findById(orderInfo.orderId)!!
+        val savedOrder = requireNotNull(orderRepository.findById(orderInfo.orderId))
         assertThat(savedOrder.items).hasSize(2)
 
         // 재고 확인
-        val stock1 = stockRepository.findByProductId(product1.id)!!
-        val stock2 = stockRepository.findByProductId(product2.id)!!
+        val stock1 = requireNotNull(stockRepository.findByProductId(product1.id))
+        val stock2 = requireNotNull(stockRepository.findByProductId(product2.id))
         assertThat(stock1.quantity).isEqualTo(98) // 100 - 2
         assertThat(stock2.quantity).isEqualTo(99) // 100 - 1
 
         // 포인트 확인
-        val point = pointRepository.findByUserId(user.id)!!
+        val point = requireNotNull(pointRepository.findByUserId(user.id))
         assertThat(point.balance.amount).isEqualTo(BigDecimal("750000")) // 1000000 - 250000
     }
 
@@ -142,7 +142,7 @@ class OrderServiceIntegrationTest {
             ),
         )
 
-        val initialPoint = pointRepository.findByUserId(user.id)!!.balance.amount
+        val initialPoint = requireNotNull(pointRepository.findByUserId(user.id)).balance.amount
 
         // when & then
         assertThatThrownBy {
@@ -151,11 +151,11 @@ class OrderServiceIntegrationTest {
             .hasMessageContaining("재고 부족")
 
         // 재고는 차감되지 않아야 함
-        val stock = stockRepository.findByProductId(product1.id)!!
+        val stock = requireNotNull(stockRepository.findByProductId(product1.id))
         assertThat(stock.quantity).isEqualTo(100)
 
         // 포인트도 차감되지 않아야 함
-        val point = pointRepository.findByUserId(user.id)!!
+        val point = requireNotNull(pointRepository.findByUserId(user.id))
         assertThat(point.balance.amount).isEqualTo(initialPoint)
     }
 
@@ -163,7 +163,7 @@ class OrderServiceIntegrationTest {
     fun `포인트가 부족하면 주문이 실패하고 트랜잭션이 롤백된다`() {
         // given
         // 포인트를 적게 설정 (100,000원의 상품을 주문하기엔 부족한 금액)
-        val point = pointRepository.findByUserIdWithLock(user.id)!!
+        val point = requireNotNull(pointRepository.findByUserIdWithLock(user.id))
         point.deduct(Money(BigDecimal("999000"), Currency.KRW)) // 1,000원만 남김
         pointRepository.save(point)
 
@@ -181,7 +181,7 @@ class OrderServiceIntegrationTest {
             .hasMessageContaining("포인트 부족")
 
         // 재고는 차감되지 않아야 함
-        val stock = stockRepository.findByProductId(product1.id)!!
+        val stock = requireNotNull(stockRepository.findByProductId(product1.id))
         assertThat(stock.quantity).isEqualTo(100)
     }
 
@@ -202,7 +202,7 @@ class OrderServiceIntegrationTest {
         productRepository.save(product1)
 
         // then
-        val savedOrder = orderRepository.findById(orderInfo.orderId)!!
+        val savedOrder = requireNotNull(orderRepository.findById(orderInfo.orderId))
         assertThat(savedOrder.items[0].productName).isEqualTo("통합테스트상품1")
         assertThat(savedOrder.items[0].priceAtOrder.amount).isEqualTo(BigDecimal("100000")) // 주문 당시 가격
         assertThat(savedOrder.items[0].brandName).isEqualTo("통합테스트브랜드")
@@ -220,8 +220,8 @@ class OrderServiceIntegrationTest {
         val orderInfo = orderFacade.createOrder(user.id, request)
 
         // 재고 차감 확인
-        val stockAfterOrder1 = stockRepository.findByProductId(product1.id)!!
-        val stockAfterOrder2 = stockRepository.findByProductId(product2.id)!!
+        val stockAfterOrder1 = requireNotNull(stockRepository.findByProductId(product1.id))
+        val stockAfterOrder2 = requireNotNull(stockRepository.findByProductId(product2.id))
         assertThat(stockAfterOrder1.quantity).isEqualTo(98) // 100 - 2
         assertThat(stockAfterOrder2.quantity).isEqualTo(97) // 100 - 3
 
@@ -229,12 +229,12 @@ class OrderServiceIntegrationTest {
         orderService.cancelOrder(orderInfo.orderId, user.id)
 
         // then
-        val cancelledOrder = orderRepository.findById(orderInfo.orderId)!!
+        val cancelledOrder = requireNotNull(orderRepository.findById(orderInfo.orderId))
         assertThat(cancelledOrder.status).isEqualTo(OrderStatus.CANCELLED)
 
         // 재고 복구 확인
-        val stockAfterCancel1 = stockRepository.findByProductId(product1.id)!!
-        val stockAfterCancel2 = stockRepository.findByProductId(product2.id)!!
+        val stockAfterCancel1 = requireNotNull(stockRepository.findByProductId(product1.id))
+        val stockAfterCancel2 = requireNotNull(stockRepository.findByProductId(product2.id))
         assertThat(stockAfterCancel1.quantity).isEqualTo(100) // 98 + 2
         assertThat(stockAfterCancel2.quantity).isEqualTo(100) // 97 + 3
     }
@@ -265,11 +265,11 @@ class OrderServiceIntegrationTest {
             .hasMessageContaining("본인의 주문만 취소할 수 있습니다")
 
         // 주문 상태는 변경되지 않아야 함
-        val order = orderRepository.findById(orderInfo.orderId)!!
+        val order = requireNotNull(orderRepository.findById(orderInfo.orderId))
         assertThat(order.status).isEqualTo(OrderStatus.PENDING)
 
         // 재고도 복구되지 않아야 함
-        val stock = stockRepository.findByProductId(product1.id)!!
+        val stock = requireNotNull(stockRepository.findByProductId(product1.id))
         assertThat(stock.quantity).isEqualTo(99) // 100 - 1 (여전히 차감된 상태)
     }
 
@@ -284,7 +284,7 @@ class OrderServiceIntegrationTest {
         val orderInfo = orderFacade.createOrder(user.id, request)
 
         // 주문 확정
-        val order = orderRepository.findById(orderInfo.orderId)!!
+        val order = requireNotNull(orderRepository.findById(orderInfo.orderId))
         order.confirm()
         orderRepository.save(order)
 
@@ -295,7 +295,7 @@ class OrderServiceIntegrationTest {
             .hasMessageContaining("이미 확정된 주문은 취소할 수 없습니다")
 
         // 재고는 복구되지 않아야 함
-        val stock = stockRepository.findByProductId(product1.id)!!
+        val stock = requireNotNull(stockRepository.findByProductId(product1.id))
         assertThat(stock.quantity).isEqualTo(98) // 100 - 2 (여전히 차감된 상태)
     }
 }

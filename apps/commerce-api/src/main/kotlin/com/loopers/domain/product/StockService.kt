@@ -1,8 +1,10 @@
 package com.loopers.domain.product
 
+import com.loopers.domain.event.StockDepletedEvent
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import jakarta.persistence.PessimisticLockException
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.CannotAcquireLockException
 import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Retryable
@@ -12,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class StockService(
     private val stockRepository: StockRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     fun getStockByProductId(productId: Long): Stock {
         return stockRepository.findByProductId(productId)
@@ -36,8 +39,22 @@ class StockService(
     fun decreaseStock(productId: Long, quantity: Int): Stock {
         val stock = stockRepository.findByProductIdWithLock(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: $productId")
+
+        val previousQuantity = stock.quantity
         stock.decrease(quantity)
-        return stockRepository.save(stock)
+        val updatedStock = stockRepository.save(stock)
+
+        // 재고가 소진되었을 때 이벤트 발행
+        if (updatedStock.quantity == 0 && previousQuantity > 0) {
+            eventPublisher.publishEvent(
+                StockDepletedEvent.create(
+                    productId = productId,
+                    previousQuantity = previousQuantity,
+                ),
+            )
+        }
+
+        return updatedStock
     }
 
     @Transactional(timeout = 5)

@@ -8,7 +8,7 @@ import java.util.UUID
  * 사용자가 상품에 좋아요를 추가했을 때 발행
  */
 data class LikeAddedEvent(
-    val eventId: UUID = UUID.randomUUID(),
+    val eventId: UUID,
     val userId: Long,
     val productId: Long,
     val createdAt: ZonedDateTime = ZonedDateTime.now(),
@@ -19,7 +19,7 @@ data class LikeAddedEvent(
  * 사용자가 상품의 좋아요를 제거했을 때 발행
  */
 data class LikeRemovedEvent(
-    val eventId: UUID = UUID.randomUUID(),
+    val eventId: UUID,
     val userId: Long,
     val productId: Long,
     val createdAt: ZonedDateTime = ZonedDateTime.now(),

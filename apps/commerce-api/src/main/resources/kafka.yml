@@ -1,0 +1,81 @@
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+    # Producer 설정 (commerce-api는 Producer 전용)
+    producer:
+      # At Least Once 보장을 위한 설정
+      acks: all # 모든 ISR replica가 메시지를 받을 때까지 대기
+      retries: 3 # 실패 시 재시도 횟수
+      # 멱등성 보장
+      properties:
+        enable.idempotence: true # 멱등 프로듀서 활성화 (중복 메시지 방지)
+        max.in.flight.requests.per.connection: 5 # 멱등성 보장하면서 허용되는 최대 in-flight 요청 수
+      # 직렬화
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # 배치 설정 (성능 최적화)
+      batch-size: 16384 # 16KB
+      linger-ms: 10 # 10ms 대기 후 배치 전송
+      compression-type: snappy # 압축 타입
+
+# Kafka Topic 설정
+kafka:
+  topics:
+    catalog-events: catalog-events
+    order-events: order-events
+    catalog-events-dlq: catalog-events-dlq
+    order-events-dlq: order-events-dlq
+
+  # Outbox Relay 설정
+  outbox:
+    relay:
+      enabled: true
+      fixed-delay: 5000 # 5초마다 실행
+      initial-delay: 10000 # 시작 10초 후 첫 실행
+      batch-size: 100 # 한 번에 처리할 최대 이벤트 수
+      max-retry-count: 3 # 최대 재시도 횟수
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+kafka:
+  outbox:
+    relay:
+      enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  kafka:
+    # Docker Compose Kafka 사용 (docker/infra-compose.yml)
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
+
+kafka:
+  outbox:
+    relay:
+      # 테스트 환경에서는 스케줄러 비활성화 (수동으로 테스트)
+      enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+---
+spring:
+  config:
+    activate:
+      on-profile: qa
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prd
