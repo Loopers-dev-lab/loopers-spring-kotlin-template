@@ -140,6 +140,7 @@ class PaymentEventListenerTest {
             val mockOrderDetail = mockk<OrderDetail>()
             every { mockOrderDetail.productId } returns 123L
             every { mockOrderDetail.quantity } returns 2L
+            every { mockOrderDetail.price } returns 10000L
             val orderDetails = listOf(mockOrderDetail)
 
             justRun { orderService.complete(100L) }
@@ -210,6 +211,7 @@ class PaymentEventListenerTest {
             val mockOrderDetail = mockk<OrderDetail>()
             every { mockOrderDetail.productId } returns 123L
             every { mockOrderDetail.quantity } returns 2L
+            every { mockOrderDetail.price } returns 10000L
             val orderDetails = listOf(mockOrderDetail)
 
             every { orderService.getOrderDetail(100L) } returns orderDetails
@@ -247,6 +249,7 @@ class PaymentEventListenerTest {
             val mockOrderDetail = mockk<OrderDetail>()
             every { mockOrderDetail.productId } returns 123L
             every { mockOrderDetail.quantity } returns 2L
+            every { mockOrderDetail.price } returns 10000L
             val orderDetails = listOf(mockOrderDetail)
 
             every { orderService.getOrderDetail(100L) } returns orderDetails
