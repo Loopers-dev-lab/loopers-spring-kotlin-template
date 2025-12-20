@@ -5,6 +5,7 @@ import com.loopers.domain.product.ProductDetailData
 import com.loopers.domain.product.ProductQueryService
 import com.loopers.domain.product.SortType
 import com.loopers.domain.product.Stock
+import com.loopers.domain.ranking.RankingService
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestLike
 import com.loopers.fixtures.createTestProduct
@@ -21,10 +22,12 @@ import java.math.BigDecimal
 class ProductFacadeTest {
     private val productQueryService: ProductQueryService = mockk()
     private val likeQueryService: LikeQueryService = mockk()
+    private val rankingService: RankingService = mockk()
 
     private val productFacade = ProductFacade(
         productQueryService,
         likeQueryService,
+        rankingService,
     )
 
     @Test
@@ -60,6 +63,7 @@ class ProductFacadeTest {
 
         val productDetailData = ProductDetailData(product, stock)
         every { productQueryService.getProductDetail(100L) } returns productDetailData
+        every { rankingService.getProductRanking(100L, any()) } returns null
 
         // when
         val result = productFacade.getProductDetail(100L)
@@ -101,6 +105,7 @@ class ProductFacadeTest {
             com.loopers.support.error.ErrorType.NOT_FOUND,
             "상품을 찾을 수 없습니다: 999",
         )
+        every { rankingService.getProductRanking(999L, any()) } returns null
 
         // when & then
         assertThatThrownBy {
@@ -116,6 +121,7 @@ class ProductFacadeTest {
             com.loopers.support.error.ErrorType.NOT_FOUND,
             "재고 정보를 찾을 수 없습니다: 100",
         )
+        every { rankingService.getProductRanking(100L, any()) } returns null
 
         // when & then
         assertThatThrownBy {
