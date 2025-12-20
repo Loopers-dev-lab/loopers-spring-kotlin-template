@@ -2,8 +2,8 @@ package com.loopers.domain.ranking
 
 import com.loopers.domain.event.EventProcessingResult.SHOULD_PROCESS
 import com.loopers.domain.event.EventService
-import com.loopers.domain.event.OutboxEvent
 import com.loopers.domain.ranking.dto.LikeScoreEvent
+import com.loopers.domain.ranking.dto.OrderScoreEvent
 import com.loopers.domain.ranking.dto.ViewScoreEvent
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -168,40 +168,47 @@ class RankingService(
      *
      * 같은 주문의 여러 상품을 Redis Pipeline으로 한 번에 업데이트
      */
-    fun incrementOrderScoreBatch(
-        items: List<OutboxEvent.OrderCompleted.OrderItem>,
-        dateKey: String,
-        eventId: String,
-        eventType: String,
-        eventTimestamp: ZonedDateTime,
-        consumerGroup: String,
-    ) {
-        // 1. 각 상품별로 멱등성 체크 및 점수 계산
-        val productScores = mutableMapOf<Long, Double>()
+    fun incrementOrderScoreBatch(events: List<OrderScoreEvent>, consumerGroup: String) {
+        if (events.isEmpty()) {
+            return
+        }
 
-        items.forEach { item ->
-            val aggregateId = "${item.productId}:$dateKey"
+        val scoresByDate = mutableMapOf<String, MutableMap<Long, Double>>()
 
-            val result = eventService.checkAndPrepareForProcessing(
-                eventId = eventId,
-                eventType = eventType,
-                eventTimestamp = eventTimestamp,
-                consumerGroup = consumerGroup,
-                aggregateId = aggregateId,
-            )
+        events.forEach { event ->
+            val productScores = scoresByDate.getOrPut(event.dateKey) { mutableMapOf() }
 
-            if (result == SHOULD_PROCESS) {
-                val score = RankingScoreCalculator.calculateOrderScore(item.price, item.quantity)
-                productScores[item.productId] = (productScores[item.productId] ?: 0.0) + score
+            event.items.forEach { item ->
+                val aggregateId = "${item.productId}:${event.dateKey}"
 
-                eventService.recordProcessingComplete(eventId, eventType, eventTimestamp, consumerGroup, aggregateId)
+                val result = eventService.checkAndPrepareForProcessing(
+                    eventId = event.eventId,
+                    eventType = event.eventType,
+                    eventTimestamp = event.eventTimestamp,
+                    consumerGroup = consumerGroup,
+                    aggregateId = aggregateId,
+                )
+
+                if (result == SHOULD_PROCESS) {
+                    val score = RankingScoreCalculator.calculateOrderScore(item.price, item.quantity)
+                    productScores[item.productId] = (productScores[item.productId] ?: 0.0) + score
+
+                    eventService.recordProcessingComplete(
+                        event.eventId,
+                        event.eventType,
+                        event.eventTimestamp,
+                        consumerGroup,
+                        aggregateId,
+                    )
+                }
             }
         }
 
-        // 2. Pipeline으로 배치 업데이트
-        if (productScores.isNotEmpty()) {
-            rankingRepository.batchIncrementScores(dateKey, productScores)
-            log.info("랭킹 주문 완료 점수 배치 증가: dateKey={}, {} 건", dateKey, productScores.size)
+        scoresByDate.forEach { (dateKey, productScores) ->
+            if (productScores.isNotEmpty()) {
+                rankingRepository.batchIncrementScores(dateKey, productScores)
+                log.info("랭킹 주문 완료 점수 배치 증가: dateKey={}, {} 건", dateKey, productScores.size)
+            }
         }
     }
 
@@ -210,40 +217,47 @@ class RankingService(
      *
      * 같은 주문의 여러 상품을 Redis Pipeline으로 한 번에 업데이트
      */
-    fun decrementOrderScoreBatch(
-        items: List<OutboxEvent.OrderCanceled.OrderItem>,
-        dateKey: String,
-        eventId: String,
-        eventType: String,
-        eventTimestamp: ZonedDateTime,
-        consumerGroup: String,
-    ) {
-        // 1. 각 상품별로 멱등성 체크 및 점수 계산
-        val productScores = mutableMapOf<Long, Double>()
+    fun decrementOrderScoreBatch(events: List<OrderScoreEvent>, consumerGroup: String) {
+        if (events.isEmpty()) {
+            return
+        }
 
-        items.forEach { item ->
-            val aggregateId = "${item.productId}:$dateKey"
+        val scoresByDate = mutableMapOf<String, MutableMap<Long, Double>>()
 
-            val result = eventService.checkAndPrepareForProcessing(
-                eventId = eventId,
-                eventType = eventType,
-                eventTimestamp = eventTimestamp,
-                consumerGroup = consumerGroup,
-                aggregateId = aggregateId,
-            )
+        events.forEach { event ->
+            val productScores = scoresByDate.getOrPut(event.dateKey) { mutableMapOf() }
 
-            if (result == SHOULD_PROCESS) {
-                val score = RankingScoreCalculator.calculateOrderScore(item.price, item.quantity)
-                productScores[item.productId] = (productScores[item.productId] ?: 0.0) + score
+            event.items.forEach { item ->
+                val aggregateId = "${item.productId}:${event.dateKey}"
 
-                eventService.recordProcessingComplete(eventId, eventType, eventTimestamp, consumerGroup, aggregateId)
+                val result = eventService.checkAndPrepareForProcessing(
+                    eventId = event.eventId,
+                    eventType = event.eventType,
+                    eventTimestamp = event.eventTimestamp,
+                    consumerGroup = consumerGroup,
+                    aggregateId = aggregateId,
+                )
+
+                if (result == SHOULD_PROCESS) {
+                    val score = RankingScoreCalculator.calculateOrderScore(item.price, item.quantity)
+                    productScores[item.productId] = (productScores[item.productId] ?: 0.0) + score
+
+                    eventService.recordProcessingComplete(
+                        event.eventId,
+                        event.eventType,
+                        event.eventTimestamp,
+                        consumerGroup,
+                        aggregateId,
+                    )
+                }
             }
         }
 
-        // 2. Pipeline으로 배치 업데이트
-        if (productScores.isNotEmpty()) {
-            rankingRepository.batchDecrementScores(dateKey, productScores)
-            log.info("랭킹 주문 취소 점수 배치 감소: dateKey={}, {} 건", dateKey, productScores.size)
+        scoresByDate.forEach { (dateKey, productScores) ->
+            if (productScores.isNotEmpty()) {
+                rankingRepository.batchDecrementScores(dateKey, productScores)
+                log.info("랭킹 주문 취소 점수 배치 감소: dateKey={}, {} 건", dateKey, productScores.size)
+            }
         }
     }
 
@@ -251,7 +265,7 @@ class RankingService(
      * 당일 랭킹 점수의 일부를 익일 키에 이월하여 사전 생성합니다.
      */
     fun carryOverDailyScores() {
-        val today = LocalDate.now(KOREA_ZONE_ID)
+        val today = LocalDate.now()
         val tomorrow = today.plusDays(1)
         val sourceDateKey = today.format(DATE_KEY_FORMATTER)
         val targetDateKey = tomorrow.format(DATE_KEY_FORMATTER)

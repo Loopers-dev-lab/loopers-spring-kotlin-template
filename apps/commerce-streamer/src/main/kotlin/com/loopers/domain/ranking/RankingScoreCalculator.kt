@@ -8,7 +8,7 @@ package com.loopers.domain.ranking
  * 점수 계산 공식:
  * - 조회수: 0.1 × 1 = 0.1
  * - 좋아요: 0.2 × 1 = 0.2
- * - 주문: 0.6 × (price × quantity)
+ * - 주문: 0.6 × log10(price × quantity)
  */
 object RankingScoreCalculator {
 

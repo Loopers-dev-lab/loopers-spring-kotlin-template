@@ -84,6 +84,7 @@ object OutboxEvent {
         val orderId: Long,
         val userId: Long,
         val reason: String?,
+        val orderCreatedAt: ZonedDateTime,
         val items: List<OrderItem>,
         val timestamp: ZonedDateTime = ZonedDateTime.now(),
     ) {

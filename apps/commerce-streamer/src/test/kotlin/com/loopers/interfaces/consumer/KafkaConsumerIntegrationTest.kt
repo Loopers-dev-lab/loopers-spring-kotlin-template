@@ -185,6 +185,7 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
             orderId = 5002L,
             userId = 100L,
             reason = "고객 요청",
+            orderCreatedAt = ZonedDateTime.now().minusDays(1),
             items = listOf(
                 OutboxEvent.OrderCanceled.OrderItem(productId = productId, quantity = 5, price = 6000L),
             ),
@@ -384,6 +385,7 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
             orderId = 6002L,
             userId = 100L,
             reason = "고객 요청",
+            orderCreatedAt = ZonedDateTime.now().minusDays(1),
             items = listOf(
                 OutboxEvent.OrderCanceled.OrderItem(productId = 3004L, quantity = 1, price = 50000L),
             ),
