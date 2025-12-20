@@ -130,6 +130,7 @@ class OutboxRelayService(
      *
      * @return RetryResult 성공/실패 카운트
      */
+    @Transactional
     fun retryFailedMessages(): RetryResult {
         val retryableMessages = outboxFailedRepository.findRetryable(RETRY_BATCH_SIZE)
 
