@@ -29,6 +29,12 @@ demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
 
+ranking:
+  weight:
+    view: 0.1 # 조회 이벤트 가중치
+    like: 0.2 # 좋아요 이벤트 가중치
+    order: 0.7 # 주문 이벤트 가중치
+
 ---
 spring:
   config:
