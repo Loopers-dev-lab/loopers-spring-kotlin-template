@@ -1,11 +1,8 @@
 package com.loopers.domain.event
 
 import com.loopers.domain.BaseEntity
-import com.loopers.event.EventType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
 
 @Entity
@@ -15,6 +12,10 @@ class EventHandleModel(
     val eventId: String,
 
     @Column
-    @Enumerated(EnumType.STRING)
-    val eventType: EventType,
-) : BaseEntity()
+    val topic: String,
+) : BaseEntity() {
+
+    companion object {
+        fun create(eventId: String, topic: String): EventHandleModel = EventHandleModel(eventId, topic)
+    }
+}

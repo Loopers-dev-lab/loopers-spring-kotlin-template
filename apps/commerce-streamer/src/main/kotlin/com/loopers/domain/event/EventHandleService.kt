@@ -12,19 +12,17 @@ import org.springframework.stereotype.Component
 @Component
 class EventHandleService(private val eventHandleRepository: EventHandleRepository) {
 
-    private val logger = LoggerFactory.getLogger(EventHandleService::class.java)
+        private val logger = LoggerFactory.getLogger(EventHandleService::class.java)
 
-    fun duplicatedBy(eventId: String): Boolean {
-        val eventType = EventType.LIKE_EVENT.name
-        return eventHandleRepository.findByMessageKeyAndEventType(eventId, eventType) != null
-    }
+        fun duplicatedBy(eventId: String): Boolean =
+                eventHandleRepository.findByEventId(eventId) != null
 
-    fun ensureLikeEvent(eventId: String) {
-        val eventHandle =
-            EventHandleModel(
-                eventId = eventId,
-                eventType = EventType.LIKE_EVENT,
-            )
-        eventHandleRepository.save(eventHandle)
-    }
+        fun ensureCatalogEvent(eventId: String) {
+                val eventHandle =
+                        EventHandleModel(
+                                eventId = eventId,
+                                topic = EventType.CATALOG_EVENT.topic,
+                        )
+                eventHandleRepository.save(eventHandle)
+        }
 }

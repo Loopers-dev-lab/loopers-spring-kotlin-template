@@ -15,7 +15,7 @@ class LikeConsumer(private val productMetricFacade: ProductMetricFacade) {
     private val logger = LoggerFactory.getLogger(LikeConsumer::class.java)
 
     @KafkaListener(
-        topics = [EventType.Topic.LIKE_EVENT],
+        topics = [EventType.Topic.CATALOG_EVENT],
         containerFactory = KafkaConfig.LIKE_METRICS_LISTENER,
     )
     fun listen(
@@ -24,7 +24,12 @@ class LikeConsumer(private val productMetricFacade: ProductMetricFacade) {
     ) {
         logger.info("Received ${messages.size} like events")
 
-        productMetricFacade.updateLikeCount(messages)
+        try {
+            productMetricFacade.updateProductMetrics(messages)
+        } catch (e: Exception) {
+            logger.error(e.message, e)
+            acknowledgment.acknowledge()
+        }
 
         acknowledgment.acknowledge()
     }
