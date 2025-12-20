@@ -10,6 +10,7 @@ import com.loopers.support.outbox.TopicResolver
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
@@ -58,6 +59,7 @@ class OutboxRelayService(
      *
      * @return RelayResult 성공/실패 카운트 및 마지막 처리 ID
      */
+    @Transactional
     fun relayNewMessages(): RelayResult {
         val now = System.currentTimeMillis()
 
