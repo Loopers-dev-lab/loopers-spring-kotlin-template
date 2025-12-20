@@ -60,6 +60,9 @@ interface RankingRepository {
 
     /**
      * TTL 설정
+     * TTL 기간은 RankingKey의 타입(daily/hourly)에 따라 구현체에서 결정됩니다.
+     * - Daily 랭킹: 2일
+     * - Hourly 랭킹: 1일
      *
      * @param key 랭킹 키
      */

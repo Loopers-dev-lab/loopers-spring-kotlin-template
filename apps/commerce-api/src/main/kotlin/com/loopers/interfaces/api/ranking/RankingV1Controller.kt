@@ -3,7 +3,7 @@ package com.loopers.interfaces.api.ranking
 import com.loopers.application.ranking.RankingFacade
 import com.loopers.domain.ranking.TimeWindow
 import com.loopers.interfaces.api.ApiResponse
-import org.slf4j.LoggerFactory
+import org.apache.coyote.BadRequestException
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController
 class RankingV1Controller(
     private val rankingFacade: RankingFacade,
 ) : RankingV1ApiSpec {
-    private val logger = LoggerFactory.getLogger(RankingV1Controller::class.java)
 
     /**
      * 랭킹 페이지 조회
@@ -36,7 +35,7 @@ class RankingV1Controller(
             TimeWindow.valueOf(window.uppercase())
         } catch (e: IllegalArgumentException) {
             val validValues = TimeWindow.entries.joinToString(", ") { it.name }
-            throw IllegalArgumentException(
+            throw BadRequestException(
                 "잘못된 window 값입니다. 가능한 값: $validValues, 입력값: $window",
                 e,
             )

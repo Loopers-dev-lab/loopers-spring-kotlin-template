@@ -2,6 +2,7 @@ package com.loopers.domain.ranking
 
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
@@ -56,15 +57,16 @@ data class RankingKey(
         /**
          * 현재 일간 랭킹 키
          */
-        fun currentDaily(scope: RankingScope): RankingKey {
-            return daily(scope, LocalDate.now())
+        fun currentDaily(scope: RankingScope, zoneId: ZoneId = ZoneId.systemDefault()): RankingKey {
+            return daily(scope, LocalDate.now(zoneId))
         }
+
 
         /**
          * 현재 시간별 랭킹 키
          */
-        fun currentHourly(scope: RankingScope): RankingKey {
-            return hourly(scope, LocalDateTime.now())
+        fun currentHourly(scope: RankingScope, zoneId: ZoneId = ZoneId.systemDefault()): RankingKey {
+            return hourly(scope, LocalDateTime.now(zoneId))
         }
     }
 }

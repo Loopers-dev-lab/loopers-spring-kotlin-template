@@ -23,18 +23,20 @@ data class RankingScore(
     }
 
     companion object {
+        private val ZERO = RankingScore(0.0)
+
         /**
          * 점수 0
          */
         fun zero(): RankingScore {
-            return RankingScore(0.0)
+            return ZERO
         }
 
         /**
          * 여러 점수를 합산
          */
         fun sum(scores: List<RankingScore>): RankingScore {
-            return scores.fold(zero()) { acc, score -> acc + score }
+            return scores.fold(ZERO) { acc, score -> acc + score }
         }
     }
 }

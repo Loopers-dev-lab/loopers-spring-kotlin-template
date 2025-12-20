@@ -18,7 +18,7 @@ object RankingScoreCalculator {
      * @param weight 가중치 (기본값: 0.1)
      */
     fun fromView(weight: Double = 0.1): RankingScore {
-        return RankingScore(weight * 1.0)
+        return RankingScore(weight)
     }
 
     /**
@@ -27,7 +27,7 @@ object RankingScoreCalculator {
      * @param weight 가중치 (기본값: 0.2)
      */
     fun fromLike(weight: Double = 0.2): RankingScore {
-        return RankingScore(weight * 1.0)
+        return RankingScore(weight)
     }
 
     /**
