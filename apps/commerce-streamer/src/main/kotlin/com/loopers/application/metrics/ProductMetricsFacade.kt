@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.domain.event.OutboxEvent
 import com.loopers.domain.metrics.ProductMetricsService
 import com.loopers.support.util.EventIdExtractor
+import com.loopers.support.util.readEvent
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -20,7 +21,7 @@ class ProductMetricsFacade(
      */
     fun handleLikeEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
         records.forEach { record ->
-            val event = objectMapper.readValue(record.value() as String, OutboxEvent.LikeCountChanged::class.java)
+            val event = readEvent<OutboxEvent.LikeCountChanged>(record, objectMapper)
             val eventId = EventIdExtractor.extract(record)
 
             log.debug(
@@ -59,7 +60,7 @@ class ProductMetricsFacade(
      */
     fun handleViewEvents(records: List<ConsumerRecord<Any, Any>>) {
         records.forEach { record ->
-            val event = objectMapper.readValue(record.value() as String, OutboxEvent.ViewCountIncreased::class.java)
+            val event = readEvent<OutboxEvent.ViewCountIncreased>(record, objectMapper)
             val eventId = EventIdExtractor.extract(record)
 
             log.debug("조회수 이벤트 처리: productId={}, eventId={}", event.productId, eventId)
@@ -78,7 +79,7 @@ class ProductMetricsFacade(
      */
     fun handleOrderCompletedEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
         records.forEach { record ->
-            val event = objectMapper.readValue(record.value() as String, OutboxEvent.OrderCompleted::class.java)
+            val event = readEvent<OutboxEvent.OrderCompleted>(record, objectMapper)
             val eventId = EventIdExtractor.extract(record)
 
             log.debug(
@@ -107,7 +108,7 @@ class ProductMetricsFacade(
      */
     fun handleOrderCanceledEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
         records.forEach { record ->
-            val event = objectMapper.readValue(record.value() as String, OutboxEvent.OrderCanceled::class.java)
+            val event = readEvent<OutboxEvent.OrderCanceled>(record, objectMapper)
             val eventId = EventIdExtractor.extract(record)
 
             log.debug(
