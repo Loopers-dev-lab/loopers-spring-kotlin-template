@@ -138,6 +138,7 @@ class OutboxEventPublisherImplTest : IntegrationTest() {
             orderId = 1L,
             userId = 100L,
             reason = "고객 요청",
+            orderCreatedAt = ZonedDateTime.now(),
             items = listOf(
                 OutboxEvent.OrderCanceled.OrderItem(
                     productId = 1L,

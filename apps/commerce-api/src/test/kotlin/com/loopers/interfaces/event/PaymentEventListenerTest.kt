@@ -2,6 +2,7 @@ package com.loopers.interfaces.event
 
 import com.loopers.domain.coupon.CouponService
 import com.loopers.domain.integration.DataPlatformPublisher
+import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderDetail
 import com.loopers.domain.order.OrderEvent
 import com.loopers.domain.order.OrderService
@@ -13,10 +14,12 @@ import com.loopers.domain.payment.PaymentEvent
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.PgService
 import com.loopers.domain.product.ProductService
+import com.loopers.support.fixtures.withCreatedAt
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
+import java.time.ZonedDateTime
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -213,8 +216,10 @@ class PaymentEventListenerTest {
             every { mockOrderDetail.quantity } returns 2L
             every { mockOrderDetail.price } returns 10000L
             val orderDetails = listOf(mockOrderDetail)
+            val order = Order.create(totalAmount = 20000L, userId = 1L).withCreatedAt(ZonedDateTime.now())
 
             every { orderService.getOrderDetail(100L) } returns orderDetails
+            every { orderService.getById(100L) } returns order
             justRun { orderService.fail(100L) }
             justRun { couponService.rollback(1L, 50L) }
             justRun {
@@ -251,8 +256,10 @@ class PaymentEventListenerTest {
             every { mockOrderDetail.quantity } returns 2L
             every { mockOrderDetail.price } returns 10000L
             val orderDetails = listOf(mockOrderDetail)
+            val order = Order.create(totalAmount = 20000L, userId = 1L).withCreatedAt(ZonedDateTime.now())
 
             every { orderService.getOrderDetail(100L) } returns orderDetails
+            every { orderService.getById(100L) } returns order
             justRun { orderService.fail(100L) }
             justRun {
                 outboxService.save(
