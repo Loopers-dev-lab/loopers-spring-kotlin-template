@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -42,7 +43,18 @@ class Outbox(
 
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant,
+
+    @Column(name = "next_retry_at")
+    var nextRetryAt: Instant? = null,
 ) {
+    fun markForRetry(interval: Duration, now: Instant = Instant.now()) {
+        nextRetryAt = now.plus(interval)
+    }
+
+    fun isExpired(maxAge: Duration, now: Instant = Instant.now()): Boolean {
+        return Duration.between(createdAt, now) > maxAge
+    }
+
     companion object {
         fun from(envelope: CloudEventEnvelope): Outbox {
             return Outbox(
@@ -53,6 +65,7 @@ class Outbox(
                 aggregateId = envelope.aggregateId,
                 payload = envelope.payload,
                 createdAt = envelope.time,
+                nextRetryAt = null,
             )
         }
     }

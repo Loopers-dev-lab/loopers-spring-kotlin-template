@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.SendResult
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
@@ -42,16 +43,24 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
 ) {
     private lateinit var mockKafkaTemplate: KafkaTemplate<String, String>
     private lateinit var outboxRelayService: OutboxRelayService
+    private lateinit var properties: OutboxRelayProperties
 
     @BeforeEach
     fun setUp() {
         mockKafkaTemplate = mockk(relaxed = true)
+        properties = OutboxRelayProperties(
+            batchSize = 100,
+            sendTimeoutSeconds = 5,
+            retryIntervalSeconds = 10,
+            maxAgeMinutes = 5,
+        )
 
         outboxRelayService = OutboxRelayService(
             kafkaTemplate = mockKafkaTemplate,
             outboxRepository = outboxRepository,
             outboxCursorRepository = outboxCursorRepository,
             outboxFailedRepository = outboxFailedRepository,
+            properties = properties,
         )
 
         clearMocks(mockKafkaTemplate)
@@ -63,8 +72,8 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("relayNewMessages()")
-    inner class RelayNewMessages {
+    @DisplayName("relay()")
+    inner class Relay {
 
         @Test
         @DisplayName("대기 중인 메시지를 Kafka에 전송하고 성공 결과를 반환한다")
@@ -75,7 +84,7 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             mockKafkaSendSuccess()
 
             // when
-            val result = outboxRelayService.relayNewMessages()
+            val result = outboxRelayService.relay()
 
             // then
             assertThat(result.successCount).isEqualTo(2)
@@ -95,7 +104,7 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             mockKafkaSendSuccess()
 
             // when
-            outboxRelayService.relayNewMessages()
+            outboxRelayService.relay()
 
             // then
             val topicSlot = slot<String>()
@@ -115,7 +124,7 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             mockKafkaSendSuccess()
 
             // when
-            outboxRelayService.relayNewMessages()
+            outboxRelayService.relay()
 
             // then
             val cursor = outboxCursorRepository.findLatest()
@@ -124,62 +133,34 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("부분 실패 시 실패한 메시지를 OutboxFailed로 이동한다")
-        fun `saves failed messages to OutboxFailed on partial failure`() {
+        @DisplayName("첫 번째 메시지 실패 시 재시도 예약 후 처리를 중단한다")
+        fun `marks failed message for retry and stops processing`() {
             // given
-            saveOutbox(aggregateId = "1")
-            val outbox2 = saveOutbox(aggregateId = "2")
-
-            // outbox1: success, outbox2: fail
-            var callCount = 0
-            every { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) } answers {
-                callCount++
-                if (callCount == 2) {
-                    createFailedFuture(RuntimeException("Kafka send failed"))
-                } else {
-                    createSuccessFuture()
-                }
-            }
-
-            // when
-            val result = outboxRelayService.relayNewMessages()
-
-            // then
-            assertThat(result.successCount).isEqualTo(1)
-            assertThat(result.failedCount).isEqualTo(1)
-            assertThat(result.lastProcessedId).isEqualTo(outbox2.id)
-
-            val failedMessages = findAllOutboxFailed()
-            assertThat(failedMessages).hasSize(1)
-            assertThat(failedMessages[0].aggregateId).isEqualTo("2")
-            assertThat(failedMessages[0].lastError).contains("Kafka send failed")
-        }
-
-        @Test
-        @DisplayName("전부 실패 시 커서를 이동하지 않고 OutboxFailed에 저장하지 않는다")
-        fun `does not update cursor and does not save to OutboxFailed when all messages fail`() {
-            // given
-            saveOutbox(aggregateId = "1")
+            val outbox1 = saveOutbox(aggregateId = "1")
             saveOutbox(aggregateId = "2")
-            mockKafkaSendFailure(RuntimeException("Kafka is down"))
-
-            // 초기 커서 없음 → lastProcessedId = 0L
+            mockKafkaSendFailure(RuntimeException("Kafka send failed"))
 
             // when
-            val result = outboxRelayService.relayNewMessages()
+            val result = outboxRelayService.relay()
 
             // then
             assertThat(result.successCount).isEqualTo(0)
-            assertThat(result.failedCount).isEqualTo(2)
+            assertThat(result.failedCount).isEqualTo(0)
             assertThat(result.lastProcessedId).isEqualTo(0L)
 
             // 커서가 생성되지 않았는지 확인
             val cursor = outboxCursorRepository.findLatest()
             assertThat(cursor).isNull()
 
-            // OutboxFailed에 저장되지 않았는지 확인
+            // OutboxFailed에 저장되지 않았는지 확인 (아직 만료되지 않음)
             val failedMessages = findAllOutboxFailed()
             assertThat(failedMessages).isEmpty()
+
+            // 메시지에 nextRetryAt이 설정되었는지 확인
+            entityManager.clear()
+            val updatedOutbox = outboxRepository.findAllByIdGreaterThanOrderByIdAsc(0L, 10).first()
+            assertThat(updatedOutbox.id).isEqualTo(outbox1.id)
+            assertThat(updatedOutbox.nextRetryAt).isNotNull()
         }
 
         @Test
@@ -189,7 +170,7 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             mockKafkaSendSuccess()
 
             // when
-            val result = outboxRelayService.relayNewMessages()
+            val result = outboxRelayService.relay()
 
             // then
             assertThat(result.successCount).isEqualTo(0)
@@ -208,7 +189,7 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             mockKafkaSendSuccess()
 
             // when
-            val result = outboxRelayService.relayNewMessages()
+            val result = outboxRelayService.relay()
 
             // then
             assertThat(result.successCount).isEqualTo(1)
@@ -220,14 +201,71 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("부분 성공 시 정확한 결과를 반환한다")
-        fun `returns correct counts on partial success`() {
+        @DisplayName("nextRetryAt이 미래인 첫 번째 메시지에서 처리를 중단한다")
+        fun `stops at first message with nextRetryAt in future`() {
             // given
-            saveOutbox(aggregateId = "1")
+            val outbox1 = saveOutbox(aggregateId = "1")
+            // nextRetryAt을 미래로 설정
+            outbox1.nextRetryAt = Instant.now().plusSeconds(60)
+            outboxRepository.save(outbox1)
             saveOutbox(aggregateId = "2")
-            val outbox3 = saveOutbox(aggregateId = "3")
+            mockKafkaSendSuccess()
 
-            // outbox1: success, outbox2: fail, outbox3: success
+            // when
+            val result = outboxRelayService.relay()
+
+            // then
+            assertThat(result.successCount).isEqualTo(0)
+            assertThat(result.failedCount).isEqualTo(0)
+            assertThat(result.lastProcessedId).isEqualTo(0L)
+
+            // Kafka 전송이 호출되지 않았는지 확인
+            verify(exactly = 0) { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) }
+        }
+
+        @Test
+        @DisplayName("만료된 실패 메시지를 OutboxFailed로 이동하고 계속 진행한다")
+        fun `moves expired failed message to OutboxFailed and continues`() {
+            // given - 만료 시간(5분)보다 오래된 메시지
+            val expiredTime = Instant.now().minus(Duration.ofMinutes(10))
+            val outbox1 = saveOutbox(aggregateId = "1", createdAt = expiredTime)
+            val outbox2 = saveOutbox(aggregateId = "2")
+
+            // 첫 번째 메시지만 실패
+            var callCount = 0
+            every { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) } answers {
+                callCount++
+                if (callCount == 1) {
+                    createFailedFuture(RuntimeException("Kafka send failed"))
+                } else {
+                    createSuccessFuture()
+                }
+            }
+
+            // when
+            val result = outboxRelayService.relay()
+
+            // then
+            assertThat(result.successCount).isEqualTo(1)
+            assertThat(result.failedCount).isEqualTo(1)
+            assertThat(result.lastProcessedId).isEqualTo(outbox2.id)
+
+            // OutboxFailed에 저장되었는지 확인
+            val failedMessages = findAllOutboxFailed()
+            assertThat(failedMessages).hasSize(1)
+            assertThat(failedMessages[0].aggregateId).isEqualTo("1")
+            assertThat(failedMessages[0].errorMessage).contains("Kafka send failed")
+        }
+
+        @Test
+        @DisplayName("중간 메시지 실패 시 앞 메시지는 성공 처리하고 실패 지점에서 중단한다")
+        fun `processes messages until failure and stops at failed message`() {
+            // given
+            val outbox1 = saveOutbox(aggregateId = "1")
+            val outbox2 = saveOutbox(aggregateId = "2")
+            saveOutbox(aggregateId = "3")
+
+            // outbox1: success, outbox2: fail, outbox3: not processed
             var callCount = 0
             every { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) } answers {
                 callCount++
@@ -239,111 +277,45 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             }
 
             // when
-            val result = outboxRelayService.relayNewMessages()
-
-            // then
-            assertThat(result.successCount).isEqualTo(2)
-            assertThat(result.failedCount).isEqualTo(1)
-            assertThat(result.lastProcessedId).isEqualTo(outbox3.id)
-
-            val failedMessages = findAllOutboxFailed()
-            assertThat(failedMessages).hasSize(1)
-            assertThat(failedMessages[0].aggregateId).isEqualTo("2")
-        }
-    }
-
-    @Nested
-    @DisplayName("retryFailedMessages()")
-    inner class RetryFailedMessages {
-
-        @Test
-        @DisplayName("재시도 가능한 메시지를 재전송하고 성공 결과를 반환한다")
-        fun `returns correct RetryResult on success`() {
-            // given
-            saveOutboxFailed(aggregateId = "1")
-            saveOutboxFailed(aggregateId = "2")
-            mockKafkaSendSuccess()
-
-            // when
-            val result = outboxRelayService.retryFailedMessages()
-
-            // then
-            assertThat(result.successCount).isEqualTo(2)
-            assertThat(result.failedCount).isEqualTo(0)
-        }
-
-        @Test
-        @DisplayName("재전송 성공 시 OutboxFailed에서 삭제한다")
-        fun `deletes successfully sent messages from OutboxFailed`() {
-            // given
-            saveOutboxFailed(aggregateId = "123")
-            mockKafkaSendSuccess()
-
-            // when
-            val result = outboxRelayService.retryFailedMessages()
+            val result = outboxRelayService.relay()
 
             // then
             assertThat(result.successCount).isEqualTo(1)
-            val remainingFailed = outboxFailedRepository.findRetryable(100)
-            assertThat(remainingFailed).isEmpty()
-        }
-
-        @Test
-        @DisplayName("재전송 실패 시 retryCount를 증가시킨다")
-        fun `increments retryCount on failure`() {
-            // given
-            val failed = saveOutboxFailed(aggregateId = "123")
-            val initialRetryCount = failed.retryCount
-            mockKafkaSendFailure(RuntimeException("Retry failed"))
-
-            // when
-            val result = outboxRelayService.retryFailedMessages()
-
-            // then
-            assertThat(result.successCount).isEqualTo(0)
-            assertThat(result.failedCount).isEqualTo(1)
-
-            val allFailed = findAllOutboxFailed()
-            assertThat(allFailed).hasSize(1)
-            assertThat(allFailed[0].retryCount).isEqualTo(initialRetryCount + 1)
-            assertThat(allFailed[0].lastError).contains("Retry failed")
-        }
-
-        @Test
-        @DisplayName("재시도 가능한 메시지가 없으면 카운트 0을 반환한다")
-        fun `returns zero counts when no retryable messages exist`() {
-            // given - no failed messages
-            mockKafkaSendSuccess()
-
-            // when
-            val result = outboxRelayService.retryFailedMessages()
-
-            // then
-            assertThat(result.successCount).isEqualTo(0)
             assertThat(result.failedCount).isEqualTo(0)
-            verify(exactly = 0) { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) }
+            assertThat(result.lastProcessedId).isEqualTo(outbox1.id)
+
+            // OutboxFailed에 저장되지 않음 (만료되지 않음)
+            val failedMessages = findAllOutboxFailed()
+            assertThat(failedMessages).isEmpty()
+
+            // outbox2에 nextRetryAt이 설정되었는지 확인
+            entityManager.clear()
+            val messages = outboxRepository.findAllByIdGreaterThanOrderByIdAsc(outbox1.id, 10)
+            val updatedOutbox2 = messages.find { it.id == outbox2.id }
+            assertThat(updatedOutbox2).isNotNull
+            assertThat(updatedOutbox2!!.nextRetryAt).isNotNull()
         }
 
         @Test
-        @DisplayName("올바른 topic과 key로 Kafka에 재전송한다")
-        fun `sends messages to Kafka with correct topic and key`() {
+        @DisplayName("nextRetryAt이 과거이면 재시도하여 전송한다")
+        fun `retries message when nextRetryAt is in the past`() {
             // given
-            saveOutboxFailed(
-                eventType = "loopers.payment.paid.v1",
-                aggregateId = "456",
-            )
+            val outbox1 = saveOutbox(aggregateId = "1")
+            // nextRetryAt을 과거로 설정
+            outbox1.nextRetryAt = Instant.now().minusSeconds(60)
+            outboxRepository.save(outbox1)
             mockKafkaSendSuccess()
 
             // when
-            outboxRelayService.retryFailedMessages()
+            val result = outboxRelayService.relay()
 
             // then
-            val topicSlot = slot<String>()
-            val keySlot = slot<String>()
-            verify { mockKafkaTemplate.send(capture(topicSlot), capture(keySlot), any()) }
+            assertThat(result.successCount).isEqualTo(1)
+            assertThat(result.failedCount).isEqualTo(0)
+            assertThat(result.lastProcessedId).isEqualTo(outbox1.id)
 
-            assertThat(topicSlot.captured).isEqualTo("payment-events")
-            assertThat(keySlot.captured).isEqualTo("456")
+            // Kafka 전송이 호출되었는지 확인
+            verify(exactly = 1) { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) }
         }
     }
 
@@ -355,6 +327,7 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
         eventType: String = "loopers.order.created.v1",
         aggregateType: String = "Order",
         aggregateId: String = UUID.randomUUID().toString(),
+        createdAt: Instant = Instant.now(),
     ): Outbox {
         val envelope = CloudEventEnvelope(
             id = UUID.randomUUID().toString(),
@@ -362,30 +335,10 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             source = "commerce-api",
             aggregateType = aggregateType,
             aggregateId = aggregateId,
-            time = Instant.now(),
+            time = createdAt,
             payload = """{"test": "data"}""",
         )
         return outboxRepository.save(Outbox.from(envelope))
-    }
-
-    private fun saveOutboxFailed(
-        eventType: String = "loopers.order.created.v1",
-        aggregateType: String = "Order",
-        aggregateId: String = UUID.randomUUID().toString(),
-    ): OutboxFailed {
-        val outbox = Outbox(
-            id = 0,
-            eventId = UUID.randomUUID().toString(),
-            eventType = eventType,
-            source = "commerce-api",
-            aggregateType = aggregateType,
-            aggregateId = aggregateId,
-            payload = """{"test": "data"}""",
-            createdAt = Instant.now(),
-        )
-        val failed = OutboxFailed.from(outbox, "Initial error")
-        failed.nextRetryAt = Instant.now().minusSeconds(60)
-        return outboxFailedRepository.save(failed)
     }
 
     private fun mockKafkaSendSuccess() {

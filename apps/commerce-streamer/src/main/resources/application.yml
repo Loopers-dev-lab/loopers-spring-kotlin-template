@@ -29,11 +29,6 @@ app:
   kafka:
     consumer:
       max-poll-records: 500
-      fetch-min-bytes: 1048576
-      fetch-max-wait-ms: 5000
-      session-timeout-ms: 60000
-      heartbeat-interval-ms: 20000
-      max-poll-interval-ms: 120000
 
 demo-kafka:
   test:

@@ -8,6 +8,10 @@ import org.springframework.stereotype.Component
 /**
  * OutboxRelayScheduler - Outbox 메시지 릴레이 스케줄링 레이어
  *
+ * 순서 보장 전략:
+ * - 단일 relay() 스케줄러로 통합
+ * - 실패한 메시지는 Outbox에서 재시도 (HOL blocking)
+ * - 만료된 메시지만 OutboxFailed로 이동
  */
 @Component
 @ConditionalOnProperty(
@@ -21,25 +25,15 @@ class OutboxRelayScheduler(
     private val log = LoggerFactory.getLogger(javaClass)
 
     @Scheduled(fixedDelay = 1000)
-    fun relayNewMessages() {
-        log.info("[OutboxRelayScheduler] relayNewMessages started")
-        val result = outboxRelayService.relayNewMessages()
-        log.info(
-            "[OutboxRelayScheduler] relayNewMessages completed: success={}, failed={}, lastOffset={}",
-            result.successCount,
-            result.failedCount,
-            result.lastProcessedId,
-        )
-    }
-
-    @Scheduled(fixedDelay = 5000)
-    fun retryFailedMessages() {
-        log.info("[OutboxRelayScheduler] retryFailedMessages started")
-        val result = outboxRelayService.retryFailedMessages()
-        log.info(
-            "[OutboxRelayScheduler] retryFailedMessages completed: success={}, failed={}",
-            result.successCount,
-            result.failedCount,
-        )
+    fun relay() {
+        val result = outboxRelayService.relay()
+        if (result.hasActivity()) {
+            log.info(
+                "[OutboxRelayScheduler] relay completed: success={}, failed={}, lastOffset={}",
+                result.successCount,
+                result.failedCount,
+                result.lastProcessedId,
+            )
+        }
     }
 }
