@@ -9,7 +9,7 @@ import jakarta.persistence.Table
 import java.time.ZonedDateTime
 
 @Entity
-@Table(name = "outboxs")
+@Table(name = "outboxes")
 class OutBoxModel(
     @Column
     val eventId: String,
