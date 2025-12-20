@@ -35,7 +35,7 @@ import java.time.Instant
  */
 @SpringBootTest
 @DisplayName("PaymentScheduler 통합 테스트")
-@TestPropertySource(properties = ["scheduler.enabled=true"])
+@TestPropertySource(properties = ["scheduler.payment.enabled=true"])
 class PaymentSchedulerIntegrationTest @Autowired constructor(
     private val paymentScheduler: PaymentScheduler,
     private val paymentRepository: PaymentRepository,

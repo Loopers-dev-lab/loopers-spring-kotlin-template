@@ -128,7 +128,10 @@ spring:
       on-profile: local, test
 
 scheduler:
-  enabled: false
+  payment:
+    enabled: false
+  outbox:
+    enabled: false
 ---
 spring:
   config:

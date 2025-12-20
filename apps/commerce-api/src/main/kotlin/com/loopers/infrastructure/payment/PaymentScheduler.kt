@@ -22,7 +22,7 @@ import java.time.ZonedDateTime
  */
 @Component
 @ConditionalOnProperty(
-    name = ["scheduler.enabled"],
+    name = ["scheduler.payment.enabled"],
     havingValue = "true",
     matchIfMissing = true,
 )

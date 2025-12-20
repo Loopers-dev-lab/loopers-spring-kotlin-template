@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component
  */
 @Component
 @ConditionalOnProperty(
-    name = ["scheduler.enabled"],
+    name = ["scheduler.outbox.enabled"],
     havingValue = "true",
     matchIfMissing = true,
 )
