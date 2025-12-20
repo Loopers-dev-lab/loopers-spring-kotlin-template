@@ -30,14 +30,4 @@ class OutBoxService(private val outBoxRepository: OutBoxRepository, private val 
         outbox.markAsFailed()
         outBoxRepository.save(outbox)
     }
-
-    fun findAllPending(): List<OutBoxModel> {
-        // TODO: 구현 필요
-        return outBoxRepository.findAllPending()
-    }
-
-    fun findByStatus(status: OutboxStatus): List<OutBoxModel> {
-        // TODO: 구현 필요
-        return outBoxRepository.findByStatus(status)
-    }
 }

@@ -5,8 +5,9 @@ import com.loopers.domain.like.LikedEvent
 import com.loopers.domain.like.UnlikedEvent
 import com.loopers.domain.outbox.OutBoxService
 import com.loopers.domain.product.signal.ProductTotalSignalService
+import com.loopers.event.CatalogEventPayload
+import com.loopers.event.CatalogType
 import com.loopers.event.EventType
-import com.loopers.event.LikeEventPayload
 import org.apache.kafka.common.KafkaException
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
@@ -28,12 +29,13 @@ class LikeEventHandler(
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     fun handleLikedBefore(event: LikeEvent) {
-        val payload = LikeEventPayload(
+        val payload = CatalogEventPayload(
+            eventId = event.eventId,
             productId = event.productId,
             userId = event.userId,
-            type = LikeEventPayload.LikeType.LIKED,
+            type = CatalogType.LIKED,
         )
-        outboxService.enqueue(event.eventId, EventType.Topic.LIKE_EVENT, payload)
+        outboxService.enqueue(event.eventId, EventType.Topic.CATALOG_EVENT, payload)
     }
 
     @Async
@@ -41,14 +43,15 @@ class LikeEventHandler(
     fun handleLiked(event: LikedEvent) {
         productTotalSignalService.incrementLikeCount(event.productId)
 
-        val payload = LikeEventPayload(
+        val payload = CatalogEventPayload(
+            eventId = event.eventId,
             productId = event.productId,
             userId = event.userId,
-            type = LikeEventPayload.LikeType.LIKED,
+            type = CatalogType.LIKED,
         )
 
         try {
-            kafkaTemplate.send(EventType.Topic.LIKE_EVENT, payload)
+            kafkaTemplate.send(EventType.Topic.CATALOG_EVENT, payload)
         } catch (e: KafkaException) {
             logger.error("Error sending like event", e)
             outboxService.markAsFailed(event.eventId)
@@ -58,12 +61,13 @@ class LikeEventHandler(
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     fun handleUnLikedBefore(event: UnlikedEvent) {
-        val payload = LikeEventPayload(
+        val payload = CatalogEventPayload(
+            eventId = event.eventId,
             productId = event.productId,
             userId = event.userId,
-            type = LikeEventPayload.LikeType.UNLIKED,
+            type = CatalogType.UNLIKED,
         )
-        outboxService.enqueue(event.eventId, EventType.Topic.LIKE_EVENT, payload)
+        outboxService.enqueue(event.eventId, EventType.Topic.CATALOG_EVENT, payload)
     }
 
     @Async
@@ -71,14 +75,15 @@ class LikeEventHandler(
     fun handleUnliked(event: UnlikedEvent) {
         productTotalSignalService.decrementLikeCount(event.productId)
 
-        val payload = LikeEventPayload(
+        val payload = CatalogEventPayload(
+            eventId = event.eventId,
             productId = event.productId,
             userId = event.userId,
-            type = LikeEventPayload.LikeType.UNLIKED,
+            type = CatalogType.UNLIKED,
         )
 
         try {
-            kafkaTemplate.send(EventType.Topic.LIKE_EVENT, payload)
+            kafkaTemplate.send(EventType.Topic.CATALOG_EVENT, payload)
         } catch (e: KafkaException) {
             logger.error("Error sending like event", e)
             outboxService.markAsFailed(event.eventId)

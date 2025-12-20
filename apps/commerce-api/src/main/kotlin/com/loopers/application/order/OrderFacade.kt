@@ -8,16 +8,20 @@ import com.loopers.domain.order.OrderSuccessEvent
 import com.loopers.domain.payment.PaymentService
 import com.loopers.domain.payment.dto.PaymentDto
 import com.loopers.domain.product.ProductService
+import com.loopers.domain.userAction.UserActionService
+import com.loopers.infrastructure.dataplatform.DataPlatformClient
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
 class OrderFacade(
-        private val orderService: OrderService,
-        private val orderPublisher: OrderEventPublisher,
-        private val productService: ProductService,
-        private val couponService: CouponService,
-        private val paymentService: PaymentService,
+    private val orderService: OrderService,
+    private val orderPublisher: OrderEventPublisher,
+    private val productService: ProductService,
+    private val couponService: CouponService,
+    private val paymentService: PaymentService,
+    private val userActionService: UserActionService,
+    private val dataPlatformClient: DataPlatformClient,
 ) {
 
     @Transactional
@@ -26,10 +30,10 @@ class OrderFacade(
         val totalPrice = command.orderItems.sumOf { it.productPrice * it.quantity.toBigDecimal() }
 
         val discountPrice =
-                command.couponId?.let {
-                    couponService.calculateDiscountPrice(it, userId, totalPrice)
-                }
-                        ?: totalPrice
+            command.couponId?.let {
+                couponService.calculateDiscountPrice(it, userId, totalPrice)
+            }
+                ?: totalPrice
 
         // 2. 재고 차감
         productService.occupyStocks(command)
@@ -38,19 +42,21 @@ class OrderFacade(
         val order = orderService.prepare(userId, command)
 
         // 4. 결제 요청
-        return when (paymentService.pay(
-                        PaymentDto.Request.from(
-                                order.orderKey,
-                                command.cardType,
-                                command.cardNo,
-                                discountPrice
-                        ),
-                )
+        return when (
+            paymentService.pay(
+            PaymentDto.Request.from(
+                order.orderKey,
+                command.cardType,
+                command.cardNo,
+                discountPrice,
+            ),
+        )
         ) {
             is PaymentDto.Result.Success -> {
                 orderPublisher.publish(OrderSuccessEvent.from(order, command.couponId))
                 return orderService.requestPayment(order)
             }
+
             is PaymentDto.Result.Failed -> {
                 order
             }
