@@ -109,17 +109,22 @@ INSERT하고, Debezium Connector가 WAL 변경을 감지하여 즉시 Kafka로 �
 Outbox 시스템은 도메인 이벤트를 안전하게 저장하고 Kafka로 릴레이하는 역할을 담당한다.
 
 - **OutboxAppender**: BEFORE_COMMIT 시점에 도메인 이벤트를 Outbox 테이블에 저장
-- **OutboxRelayTrigger**: AFTER_COMMIT 시점에 Relayer에게 트리거 신호 전송
-- **OutboxRelayer**: 트리거 신호 또는 Polling으로 동작하여 미발행 이벤트를 Kafka로 발행
-- **Outbox Offset**: 상태 컬럼 없이 마지막 처리 위치(last_processed_id)만 추적하여 append-only 구조 유지
+- **OutboxRelayService**: 스케줄러에 의해 주기적으로 실행되어 미발행 이벤트를 Kafka로 발행
+- **OutboxRelayScheduler**: 1초 간격으로 `OutboxRelayService.relay()`를 호출
+- **OutboxRelayProperties**: Relay 관련 설정값 (@ConfigurationProperties)
+- **Outbox Cursor**: 상태 컬럼 없이 마지막 처리 위치(last_processed_id)만 추적하여 append-only 구조 유지
+
+**순서 보장 메커니즘 (Debezium 스타일):**
+
+- 실패한 메시지는 Outbox 테이블에서 `nextRetryAt`을 설정하여 직접 재시도
+- 실패 메시지 이후의 메시지는 해당 메시지가 성공하거나 만료될 때까지 발행되지 않음 (HOL blocking)
+- 설정된 시간(maxAge, 기본 5분) 경과 후 OutboxFailed로 이동하여 후속 메시지가 진행될 수 있게 함
 
 Kafka 발행 시 PartitionKey(aggregateId)를 지정하여 동일 엔티티의 이벤트가 동일 파티션으로 전송되도록 한다.
 
 > **⚠️ 싱글 인스턴스 기준 설계**
 >
-> 현재 설계는 싱글 인스턴스 환경을 기준으로 한다. 멀티 인스턴스 환경에서는 여러 Relayer가 동시에 실행될 수 있으므로, 다음과 같은 추가적인 동시성 처리가 필요하다:
-> - outbox_offset 테이블에 대한 분산 락 (Redis Lock)
-> - 또는 Relayer를 단일 인스턴스에서만 실행하도록 리더 선출 메커니즘 적용
+> 현재 설계는 싱글 인스턴스 환경을 기준으로 한다. 멀티 인스턴스 환경에서는 @SchedulerLock으로 단일 인스턴스만 실행되도록 한다.
 
 **2. Kafka Consumers (commerce-streamer)**
 
@@ -165,9 +170,6 @@ sequenceDiagram
     participant DS as 도메인 서비스
     participant OA as OutboxAppender
     participant DB as Database
-    participant OT as OutboxRelayTrigger
-    participant OR as OutboxRelayer
-    participant K as Kafka
     C ->> DS: 비즈니스 요청
     activate DS
     DS ->> DS: 비즈니스 로직 처리
@@ -175,40 +177,55 @@ sequenceDiagram
     Note over OA: BEFORE_COMMIT
     DS ->> OA: 도메인 이벤트 전달
     activate OA
-    OA ->> DB: Outbox INSERT
+    OA ->> DB: Outbox INSERT (nextRetryAt = null)
     OA -->> DS: 저장 완료
     deactivate OA
     DS ->> DB: 트랜잭션 COMMIT
     DS -->> C: 응답
     deactivate DS
-    Note over OT: AFTER_COMMIT
-    OT ->> OR: 트리거 신호
-    activate OR
-    OR ->> DB: outbox_offset 락 획득 시도 (SELECT FOR UPDATE)
-    alt 락 획득 실패
-        DB -->> OR: 이미 락 잡힘
-        OR ->> OR: 즉시 종료 (다른 Relayer가 처리 중)
-    else 락 획득 성공
-        DB -->> OR: 락 획득 완료
-        OR ->> DB: last_processed_id 조회
-        OR ->> DB: id > last_processed_id 이벤트 조회 (outbox)
-
-        loop 각 이벤트에 대해
-            OR ->> K: Kafka 발행 (PartitionKey: aggregateId)
-            alt 발행 성공
-                K -->> OR: ACK
-            else 발행 실패
-                K -->> OR: 실패
-                OR ->> OR: 로깅 (다음 시도에서 재시도)
-            end
-        end
-
-        OR ->> DB: last_processed_id 업데이트 (outbox_offset)
-    end
-    deactivate OR
 ```
 
-**2. 판매량/조회수 집계 흐름 (Consumer - 멱등성 체크 필요)**
+**2. Relay 흐름 (스케줄러 기반)**
+
+```mermaid
+sequenceDiagram
+    participant S as Scheduler (1초 간격)
+    participant RS as OutboxRelayService
+    participant DB as Database
+    participant K as Kafka
+    participant OF as OutboxFailed
+
+    S ->> RS: relay() 호출
+    activate RS
+    RS ->> DB: 커서 조회 (없으면 0)
+    RS ->> DB: 커서 이후 메시지 조회 (batchSize개)
+
+    Note over RS: takeWhile(canSendNow)<br/>대기 중인 메시지 이전까지
+
+    loop 발행 가능한 메시지들
+        RS ->> K: 비동기 Kafka 발행
+    end
+
+    Note over RS: 순차 확인 시작
+
+    loop 순차 확인
+        alt 발행 성공
+            RS ->> RS: newCursor = message.id
+        else 발행 실패 + 만료됨
+            RS ->> OF: OutboxFailed 저장
+            RS ->> RS: newCursor = message.id
+        else 발행 실패 + 만료 안됨
+            RS ->> DB: markForRetry(nextRetryAt 설정)
+            Note over RS: 순회 중단 (순서 보장)
+        end
+    end
+
+    RS ->> DB: 커서 갱신 (newCursor > cursorId면)
+    RS -->> S: RelayResult 반환
+    deactivate RS
+```
+
+**3. 판매량/조회수 집계 흐름 (Consumer - 멱등성 체크 필요)**
 
 ```mermaid
 sequenceDiagram
@@ -245,7 +262,7 @@ sequenceDiagram
     deactivate PEC
 ```
 
-**3. 캐시 무효화 흐름 (Consumer - 멱등성 체크 불필요)**
+**4. 캐시 무효화 흐름 (Consumer - 멱등성 체크 불필요)**
 
 ```mermaid
 sequenceDiagram
@@ -268,40 +285,3 @@ sequenceDiagram
     deactivate PSEC
 ```
 
-**4. Polling Fallback 흐름 (Producer 백업)**
-
-```mermaid
-sequenceDiagram
-    participant Scheduler as Polling Scheduler
-    participant OR as OutboxRelayer
-    participant DB as Database
-    participant K as Kafka
-    Note over Scheduler: 주기적 실행 (예: 10초)
-    Scheduler ->> OR: 폴링 트리거
-    activate OR
-    OR ->> DB: outbox_offset 락 획득 시도 (SELECT FOR UPDATE)
-    alt 락 획득 실패
-        DB -->> OR: 이미 락 잡힘
-        OR ->> OR: 즉시 종료 (다른 Relayer가 처리 중)
-    else 락 획득 성공
-        DB -->> OR: 락 획득 완료
-        OR ->> DB: last_processed_id 조회
-        OR ->> DB: id > last_processed_id 이벤트 조회 (outbox)
-
-        alt 미발행 이벤트 존재
-            loop 각 이벤트에 대해
-                OR ->> K: Kafka 발행 (PartitionKey: aggregateId)
-                alt 발행 성공
-                    K -->> OR: ACK
-                else 발행 실패
-                    K -->> OR: 실패
-                    OR ->> OR: 로깅 (다음 폴링에서 재시도)
-                end
-            end
-            OR ->> DB: last_processed_id 업데이트 (outbox_offset)
-        else 미발행 이벤트 없음
-            OR ->> OR: 대기
-        end
-    end
-    deactivate OR
-```

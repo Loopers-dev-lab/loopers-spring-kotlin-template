@@ -82,71 +82,54 @@ loopers.product.viewed.v1 → product-events
 
 ## 2. 시스템 플로우차트
 
-### 2.1 Producer: 메인 릴레이 플로우
+### 2.1 Producer: 순서 보장 Relay 플로우
+
+> **핵심 원칙**: 실패한 메시지 이후의 메시지는 해당 메시지가 성공하거나 만료될 때까지 발행되지 않음 (HOL blocking)
 
 ```mermaid
 flowchart TD
-    Start([스케줄러 실행<br/>1초 간격]) --> CheckCircuit{서킷 상태<br/>확인}
-    CheckCircuit -->|OPEN| End1([스킵])
-    CheckCircuit -->|CLOSED/HALF_OPEN| FetchMessages[커서 이후<br/>메시지 조회<br/>LIMIT 100]
+    Start([스케줄러 실행<br/>1초 간격]) --> FetchCursor[커서 조회<br/>없으면 0]
+    FetchCursor --> FetchMessages[커서 이후<br/>메시지 조회<br/>LIMIT batchSize]
     FetchMessages --> HasMessages{메시지<br/>존재?}
-    HasMessages -->|없음| End2([종료])
-    HasMessages -->|있음| LoopStart[메시지 순회 시작]
-    LoopStart --> TryPermission{tryAcquirePermission}
-    TryPermission -->|거부<br/>서킷 열림| BreakLoop[순회 중단]
-    BreakLoop --> WaitFutures
-    TryPermission -->|허용| SendAsync[비동기 발행]
-    SendAsync --> RegisterCallback[callback 등록]
-    RegisterCallback --> UpdateLastId[lastAttemptedId 갱신]
-    UpdateLastId --> NextMessage{다음 메시지?}
-    NextMessage -->|있음| TryPermission
-    NextMessage -->|없음| WaitFutures[전체 완료 대기]
-    WaitFutures --> HasFailed{실패 메시지<br/>존재?}
-    HasFailed -->|있음| InsertFailed[outbox_failed<br/>테이블 INSERT]
-    InsertFailed --> UpdateCursor
-    HasFailed -->|없음| UpdateCursor[커서 갱신<br/>lastAttemptedId]
-    UpdateCursor --> End3([종료])
+    HasMessages -->|없음| End1([종료])
+    HasMessages -->|있음| TakeWhile[takeWhile canSendNow<br/>대기 중인 메시지 이전까지]
+    TakeWhile --> HasSendable{발행 가능<br/>메시지 존재?}
+    HasSendable -->|없음| End2([종료<br/>첫 메시지가 대기 중])
+    HasSendable -->|있음| BatchSend[비동기 배치 전송]
+    BatchSend --> SequentialCheck[순차 확인 시작]
+
+    SequentialCheck --> CheckResult{발행 결과}
+    CheckResult -->|성공| UpdateCursor1[newCursor = message.id]
+    UpdateCursor1 --> NextMessage
+
+    CheckResult -->|실패| CheckExpired{isExpired?<br/>maxAge 초과?}
+    CheckExpired -->|만료됨| SaveFailed[OutboxFailed 저장]
+    SaveFailed --> UpdateCursor2[newCursor = message.id]
+    UpdateCursor2 --> NextMessage
+
+    CheckExpired -->|만료 안됨| MarkRetry[markForRetry<br/>nextRetryAt 설정]
+    MarkRetry --> SaveOutbox[Outbox 저장]
+    SaveOutbox --> Break[순회 중단]
+
+    NextMessage{다음 메시지?}
+    NextMessage -->|있음| CheckResult
+    NextMessage -->|없음| UpdateFinalCursor
+    Break --> UpdateFinalCursor[커서 갱신<br/>newCursor > cursorId면]
+    UpdateFinalCursor --> End3([종료])
 ```
 
-### 2.2 Producer: Callback 처리 플로우
+### 2.2 canSendNow 판단 로직
 
 ```mermaid
 flowchart TD
-    Start([whenComplete 호출]) --> CheckResult{발행 결과}
-    CheckResult -->|성공| RecordSuccess[circuitBreaker.onSuccess]
-    RecordSuccess --> End1([완료])
-    CheckResult -->|실패| RecordFailure[circuitBreaker.onError]
-    RecordFailure --> AddToFailed[실패 목록에 추가]
-    AddToFailed --> End2([완료])
+    Start([canSendNow 호출]) --> CheckNextRetry{nextRetryAt<br/>값 확인}
+    CheckNextRetry -->|null| ReturnTrue([true<br/>즉시 발행 가능])
+    CheckNextRetry -->|값 있음| CompareTime{nextRetryAt ≤ now?}
+    CompareTime -->|예| ReturnTrue2([true<br/>대기 시간 경과])
+    CompareTime -->|아니오| ReturnFalse([false<br/>아직 대기 중])
 ```
 
-### 2.3 Producer: 재시도 플로우
-
-```mermaid
-flowchart TD
-    Start([재시도 스케줄러<br/>5초 간격]) --> CheckCircuit{서킷 상태}
-    CheckCircuit -->|OPEN| End1([스킵])
-    CheckCircuit -->|CLOSED/HALF_OPEN| FetchRetryable[재시도 대상 조회<br/>nextRetryAt ≤ now]
-
-FetchRetryable --> HasRetryable{대상 존재?}
-HasRetryable -->|없음|End2([종료])
-
-HasRetryable -->|있음|LoopStart[메시지 순회]
-
-LoopStart --> SendKafka[Kafka 발행 시도]
-SendKafka --> CheckResult{결과}
-
-CheckResult -->|성공|DeleteRecord[레코드 삭제]
-DeleteRecord --> NextMessage
-
-CheckResult -->|실패|IncrementRetry[retryCount 증가<br/>nextRetryAt 갱신]
-IncrementRetry --> NextMessage{다음 메시지?}
-
-NextMessage -->|있음|SendKafka
-NextMessage -->|없음|End3([종료])
-```
-
-### 2.4 Consumer: 이벤트 처리 플로우
+### 2.3 Consumer: 이벤트 처리 플로우
 
 ```mermaid
 flowchart TD
@@ -175,15 +158,17 @@ flowchart TD
 
 #### outbox 테이블 (Append-only)
 
-| 컬럼             | 타입           | 설명                                  |
-|----------------|--------------|-------------------------------------|
-| id             | BIGSERIAL    | PK, 발행 순서 보장용                       |
-| event_id       | VARCHAR(36)  | CloudEvent ID (UUID)                |
-| event_type     | VARCHAR(100) | 이벤트 타입 (예: `loopers.order.paid.v1`) |
-| aggregate_type | VARCHAR(50)  | Aggregate 타입 (예: `Order`)           |
-| aggregate_id   | VARCHAR(50)  | Aggregate ID (Kafka 파티션 키)          |
-| payload        | TEXT         | JSON 직렬화된 이벤트 데이터                   |
-| created_at     | TIMESTAMPTZ  | 생성 시각                               |
+| 컬럼             | 타입           | 설명                                         |
+|----------------|--------------|---------------------------------------------|
+| id             | BIGSERIAL    | PK, 발행 순서 보장용                               |
+| event_id       | VARCHAR(36)  | CloudEvent ID (UUID)                        |
+| event_type     | VARCHAR(100) | 이벤트 타입 (예: `loopers.order.paid.v1`)        |
+| source         | VARCHAR(50)  | 발행 서비스명 (예: `commerce-api`)                |
+| aggregate_type | VARCHAR(50)  | Aggregate 타입 (예: `Order`)                   |
+| aggregate_id   | VARCHAR(50)  | Aggregate ID (Kafka 파티션 키)                  |
+| payload        | TEXT         | JSON 직렬화된 이벤트 데이터                          |
+| next_retry_at  | TIMESTAMPTZ  | null이면 즉시 발행 가능, 값이 있으면 해당 시각 이후 발행 |
+| created_at     | TIMESTAMPTZ  | 생성 시각                                      |
 
 #### outbox_cursor 테이블
 
@@ -193,21 +178,21 @@ flowchart TD
 | last_processed_id | BIGINT      | 마지막 처리된 outbox.id |
 | updated_at        | TIMESTAMPTZ | 갱신 시각             |
 
-#### outbox_failed 테이블
+#### outbox_failed 테이블 (영구 실패 기록용)
 
-| 컬럼             | 타입           | 설명             |
-|----------------|--------------|----------------|
-| id             | BIGSERIAL    | PK             |
-| outbox_id      | BIGINT       | 원본 outbox.id   |
-| event_id       | VARCHAR(36)  | CloudEvent ID  |
-| event_type     | VARCHAR(100) | 이벤트 타입         |
-| aggregate_type | VARCHAR(50)  | Aggregate 타입   |
-| aggregate_id   | VARCHAR(50)  | Aggregate ID   |
-| payload        | TEXT         | JSON 페이로드      |
-| error_message  | TEXT         | 마지막 에러 메시지     |
-| retry_count    | INT          | 재시도 횟수 (최대 10) |
-| next_retry_at  | TIMESTAMPTZ  | 다음 재시도 시각      |
-| created_at     | TIMESTAMPTZ  | 최초 실패 시각       |
+> **역할 변경**: 재시도 대상이 아닌 영구 보관용으로 변경. 모니터링/알림 용도로 사용.
+
+| 컬럼             | 타입           | 설명              |
+|----------------|--------------|-----------------|
+| id             | BIGSERIAL    | PK              |
+| event_id       | VARCHAR(36)  | CloudEvent ID   |
+| event_type     | VARCHAR(100) | 이벤트 타입          |
+| source         | VARCHAR(50)  | 발행 서비스명         |
+| aggregate_type | VARCHAR(50)  | Aggregate 타입    |
+| aggregate_id   | VARCHAR(50)  | Aggregate ID    |
+| payload        | TEXT         | JSON 페이로드       |
+| error_message  | TEXT         | 마지막 에러 메시지      |
+| failed_at      | TIMESTAMPTZ  | 실패 시각           |
 
 #### event_handled 테이블 (멱등성 보장)
 
@@ -219,12 +204,12 @@ flowchart TD
 
 ### 3.2 인덱스 전략
 
-| 테이블           | 인덱스                                      | 용도        |
-|---------------|------------------------------------------|-----------|
-| outbox_failed | `(next_retry_at)` WHERE retry_count < 10 | 재시도 대상 조회 |
-| event_handled | UNIQUE `(idempotency_key)`               | 중복 처리 방지  |
+| 테이블           | 인덱스                        | 용도       |
+|---------------|----------------------------|----------|
+| event_handled | UNIQUE `(idempotency_key)` | 중복 처리 방지 |
 
-> PK, UNIQUE 제약조건의 자동 생성 인덱스는 별도 명시하지 않음
+> - PK, UNIQUE 제약조건의 자동 생성 인덱스는 별도 명시하지 않음
+> - outbox_failed는 재시도 대상이 아니므로 별도 인덱스 불필요
 
 ---
 
@@ -260,25 +245,33 @@ flowchart TD
 
 ### 5.1 로깅 전략
 
-| 상황         | 레벨    | 로그 포맷                                              |
-|------------|-------|----------------------------------------------------|
-| 서킷 상태 전환   | WARN  | `[outbox-relay CB] 상태 전환: {} → {}`                 |
-| 실패율 임계치 초과 | ERROR | `[outbox-relay CB] 실패율 임계치 초과: {}%`                |
-| 배치 중 서킷 열림 | WARN  | `Circuit opened at message id={}, stopping batch`  |
-| 재시도 실패     | WARN  | `Retry failed: id={}, attempt={}`                  |
-| 멱등성 스킵     | DEBUG | `Event already handled: type={}, id={}, action={}` |
-| DLQ 전송     | WARN  | `Sending to DLQ: topic={}, error={}`               |
+| 상황           | 레벨    | 로그 포맷                                              |
+|--------------|-------|----------------------------------------------------|
+| 릴레이 완료       | INFO  | `[OutboxRelayScheduler] relay completed: success={}, failed={}, lastOffset={}` |
+| 메시지 만료       | WARN  | `Message expired: id={}, createdAt={}, moving to failed` |
+| 재시도 예약       | INFO  | `Message marked for retry: id={}, nextRetryAt={}`  |
+| 멱등성 스킵       | DEBUG | `Event already handled: type={}, id={}, action={}` |
+| DLQ 전송       | WARN  | `Sending to DLQ: topic={}, error={}`               |
 
-> 평상시 INFO 로그는 남기지 않음. 재시도 실패 또는 서킷 상태 변경 시에만 WARN/ERROR 레벨로 기록.
+> 평상시 활동이 있을 때만 INFO 로그 기록. 만료 시 WARN 레벨로 알림.
 
-### 5.2 서킷브레이커 설정
+### 5.2 OutboxRelayProperties 설정
 
-| 설정                           | 값   | 설명                  |
-|------------------------------|-----|---------------------|
-| sliding-window-size          | 10  | 최근 10건 기준           |
-| failure-rate-threshold       | 50% | 실패율 50% 초과 시 OPEN   |
-| wait-duration-in-open-state  | 30초 | OPEN 상태 유지 시간       |
-| permitted-calls-in-half-open | 3   | HALF_OPEN에서 허용 호출 수 |
+```yaml
+outbox:
+  relay:
+    batch-size: 100              # 한 번에 조회할 메시지 수
+    send-timeout-seconds: 5      # Kafka 전송 타임아웃
+    retry-interval-seconds: 10   # 실패 시 재시도 대기 시간
+    max-age-minutes: 5           # 메시지 만료 시간 (이후 OutboxFailed로 이동)
+```
+
+| 설정                     | 기본값  | 설명                                |
+|------------------------|------|-----------------------------------|
+| batch-size             | 100  | 한 번에 조회할 메시지 수                    |
+| send-timeout-seconds   | 5    | Kafka 전송 타임아웃 (초)                 |
+| retry-interval-seconds | 10   | 실패 시 재시도 대기 시간 (초)                |
+| max-age-minutes        | 5    | 메시지 만료 시간 (분), 이후 OutboxFailed로 이동 |
 
 ### 5.3 Kafka 설정 요약
 
@@ -300,15 +293,15 @@ flowchart TD
 
 ### 5.4 주요 실패 시나리오 및 대응 계획
 
-| 실패 시나리오            | 대응 방안                                                     | 기대 효과                   |
-|--------------------|-----------------------------------------------------------|-------------------------|
-| Kafka 브로커 일시 장애    | 서킷브레이커 OPEN → 30초 대기 → HALF_OPEN에서 재시도                    | 장애 중 불필요한 요청 차단, 자동 복구  |
-| 개별 메시지 발행 실패       | outbox_failed 테이블에 저장 → 별도 스케줄러가 exponential backoff로 재시도 | 실패 메시지 유실 방지, 모니터링 용이   |
-| 메시지 크기 초과 등 영구 실패  | retry_count ≥ 10 도달 시 재시도 중단, 테이블에 보존                     | 수동 확인 후 조치 가능           |
-| 릴레이 중 서킷 열림        | 현재 메시지에서 중단, 커서는 마지막 시도 지점까지만 갱신                          | 미시도 메시지 유실 방지           |
-| 분산 환경 동시 실행        | @SchedulerLock으로 단일 인스턴스만 실행                              | 중복 발행 방지                |
-| Consumer 처리 실패     | DefaultErrorHandler 재시도 후 DLQ 토픽 전송                       | 정상 메시지 처리 지속, 실패 메시지 격리 |
-| Consumer 멱등성 체크 실패 | 예외 발생 → 재시도 → DLQ                                         | 데이터 정합성 보호              |
+| 실패 시나리오            | 대응 방안                                                           | 기대 효과                     |
+|--------------------|----------------------------------------------------------------|---------------------------|
+| Kafka 브로커 일시 장애    | 메시지에 nextRetryAt 설정 (10초 후) → 다음 스케줄에서 재시도                       | 순서 보장하며 자동 복구             |
+| 개별 메시지 발행 실패       | nextRetryAt 설정 → Outbox 테이블에서 직접 재시도                            | 실패 메시지 유실 방지, 순서 보장       |
+| 5분 경과 후에도 실패       | OutboxFailed로 이동 → 커서 진행 → 후속 메시지 처리 재개                         | HOL blocking 해소, 모니터링 용이  |
+| 순서 보장 필요 (HOL)     | 실패 메시지 이후 메시지는 대기 → 성공 또는 만료 시 처리                               | 동일 aggregate 이벤트 순서 보장    |
+| 분산 환경 동시 실행        | @SchedulerLock으로 단일 인스턴스만 실행                                    | 중복 발행 방지                  |
+| Consumer 처리 실패     | DefaultErrorHandler 재시도 후 DLQ 토픽 전송                             | 정상 메시지 처리 지속, 실패 메시지 격리   |
+| Consumer 멱등성 체크 실패 | 예외 발생 → 재시도 → DLQ                                               | 데이터 정합성 보호                |
 
 ---
 
@@ -326,14 +319,16 @@ flowchart TD
 
 ### 6.2 Outbox 패턴 결정
 
-| 설계 결정                  | 근거                                                        |
-|------------------------|-----------------------------------------------------------|
-| 비동기 배치 처리 (callback)   | 순차 대기 시 첫 번째가 느리면 전체 지연. callback으로 각 메시지 완료 즉시 처리        |
-| 커서 기반 추적 + Append-only | 상태 컬럼 방식 대비 단순. UPDATE 불필요, 락 경합 제거                       |
-| outbox_failed 테이블 분리   | Kafka 장애 시 Kafka DLQ 불가. DB 테이블로 모니터링/재처리 용이              |
-| 서킷 열릴 때 커서 미갱신         | send 안 된 메시지는 "미시도". 다음 스케줄에 다시 조회되어야 함                   |
-| 애플리케이션 레벨 retry 없음     | Kafka Producer 자체에 retries 있음. 그것도 실패하면 outbox_failed로 이동 |
-| 메인/재처리 스케줄러 분리         | 메인(1초)은 빠른 처리, 재처리(5초)는 느린 주기. 역할 분리 명확                   |
+| 설계 결정                  | 근거                                                                |
+|------------------------|-------------------------------------------------------------------|
+| 순서 보장 (HOL blocking)   | Debezium 스타일. 실패 메시지 이후 메시지는 대기 → 동일 aggregate 이벤트 순서 보장         |
+| 시간 기반 만료 (maxAge)      | 5분 경과 시 OutboxFailed로 이동 → HOL blocking 해소, 후속 메시지 처리 재개         |
+| Outbox에서 직접 재시도        | 실패 시 nextRetryAt 설정 → OutboxFailed 분리 없이 간단한 재시도 로직             |
+| 단일 스케줄러 (1초 간격)        | 2개 스케줄러 → 1개로 통합. 복잡도 감소, 순서 보장 로직 단순화                          |
+| 비동기 배치 전송 + 순차 확인      | 병렬 전송으로 성능 확보, 순차 확인으로 순서 보장 양립                                 |
+| 커서 기반 추적 + Append-only | 상태 컬럼 방식 대비 단순. UPDATE 최소화 (nextRetryAt만), 락 경합 감소              |
+| OutboxFailed 영구 보관     | 재시도 대상 아님. 모니터링/알림 용도로만 사용, 수동 개입 필요 시 활용                       |
+| @ConfigurationProperties | 시간 관련 값 외부화 → 환경별 설정 변경 용이, 테스트에서 짧은 값 사용 가능                   |
 
 ### 6.3 Consumer 결정
 
