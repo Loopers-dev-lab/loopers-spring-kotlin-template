@@ -42,14 +42,20 @@ class OrderServiceTest(
                 quantity = 3,
                 productPrice = BigDecimal.valueOf(500),
             )
-            val orderCommand = OrderCommand(listOf(orderItemCommand1, orderItemCommand2))
+            val orderCommand = OrderCommand(
+                orderItems = listOf(orderItemCommand1, orderItemCommand2),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
+            )
 
             // act
-            val savedOrder = orderService.order(userId, orderCommand)
+            val createdOrder = OrderModel.order(userId, orderCommand)
+            val savedOrder = orderRepository.save(createdOrder)
 
             // assert
             assertAll(
-                { assertThat(savedOrder.id).isNotNull() },
+                { assertThat(savedOrder.id).isNotNull },
                 { assertThat(savedOrder.refUserId).isEqualTo(userId) },
                 { assertThat(savedOrder.orderItems).hasSize(2) },
                 { assertThat(savedOrder.totalPrice.amount).isEqualByComparingTo(BigDecimal.valueOf(3500)) },
@@ -66,10 +72,16 @@ class OrderServiceTest(
                 quantity = 5,
                 productPrice = BigDecimal.valueOf(2000),
             )
-            val orderCommand = OrderCommand(listOf(orderItemCommand))
+            val orderCommand = OrderCommand(
+                orderItems = listOf(orderItemCommand),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
+            )
 
             // act
-            val savedOrder = orderService.order(userId, orderCommand)
+            val createdOrder = OrderModel.order(userId, orderCommand)
+            val savedOrder = orderRepository.save(createdOrder)
 
             // assert
             val orderItem = savedOrder.orderItems.first()
@@ -86,15 +98,19 @@ class OrderServiceTest(
             // arrange
             val userId = 1L
             val orderCommand = OrderCommand(
-                listOf(
+                orderItems = listOf(
                     OrderItemCommand(productId = 1L, quantity = 1, productPrice = BigDecimal.valueOf(100)),
                     OrderItemCommand(productId = 2L, quantity = 2, productPrice = BigDecimal.valueOf(200)),
                     OrderItemCommand(productId = 3L, quantity = 3, productPrice = BigDecimal.valueOf(300)),
                 ),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
             )
 
             // act
-            val savedOrder = orderService.order(userId, orderCommand)
+            val createdOrder = OrderModel.order(userId, orderCommand)
+            val savedOrder = orderRepository.save(createdOrder)
 
             // assert
             // (1 * 100) + (2 * 200) + (3 * 300) = 100 + 400 + 900 = 1400
@@ -106,10 +122,16 @@ class OrderServiceTest(
         fun totalPriceIsZero_whenNoOrderItems() {
             // arrange
             val userId = 1L
-            val orderCommand = OrderCommand(emptyList())
+            val orderCommand = OrderCommand(
+                orderItems = emptyList(),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
+            )
 
             // act
-            val savedOrder = orderService.order(userId, orderCommand)
+            val createdOrder = OrderModel.order(userId, orderCommand)
+            val savedOrder = orderRepository.save(createdOrder)
 
             // assert
             assertAll(

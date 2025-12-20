@@ -21,4 +21,19 @@ class ProductMetricService(private val productMetricRepository: ProductMetricRep
             )
         }
     }
+
+    fun updateViewCount(viewCountGroupBy: Map<Long, Long>) {
+        viewCountGroupBy.forEach { (productId, delta) ->
+            val productMetric =
+                    productMetricRepository.findByRefProductId(productId)
+                            ?: ProductMetricModel(refProductId = productId)
+
+            productMetric.updateViewCount(delta)
+            productMetricRepository.save(productMetric)
+
+            logger.debug(
+                    "Updated view count for productId: $productId, delta: $delta, new count: ${productMetric.viewCount}"
+            )
+        }
+    }
 }

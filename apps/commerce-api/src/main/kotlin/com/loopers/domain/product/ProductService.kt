@@ -9,12 +9,16 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class ProductService(private val productRepository: ProductRepository, private val stockRepository: StockRepository) {
+class ProductService(
+        private val productRepository: ProductRepository,
+        private val stockRepository: StockRepository
+) {
 
-    fun getProducts(pageable: Pageable, brandId: Long?): Page<ProductInfo> = productRepository.findAllProductInfos(
-        pageable,
-        brandId,
-    )
+    fun getProducts(pageable: Pageable, brandId: Long?): Page<ProductInfo> =
+            productRepository.findAllProductInfos(
+                    pageable,
+                    brandId,
+            )
 
     @Transactional
     fun occupyStocks(command: OrderCommand) {
