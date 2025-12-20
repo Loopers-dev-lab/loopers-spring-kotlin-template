@@ -3,6 +3,8 @@ package com.loopers.application.product
 import com.loopers.domain.like.LikeQueryService
 import com.loopers.domain.product.ProductQueryService
 import com.loopers.domain.product.SortType
+import com.loopers.domain.ranking.RankingService
+import com.loopers.domain.ranking.TimeWindow
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Component
 class ProductFacade(
     private val productQueryService: ProductQueryService,
     private val likeQueryService: LikeQueryService,
+    private val rankingService: RankingService,
 ) {
     fun getProducts(brandId: Long?, sort: String, pageable: Pageable): Page<ProductListInfo> {
         val sortType = SortType.from(sort)
@@ -23,7 +26,14 @@ class ProductFacade(
 
     fun getProductDetail(productId: Long): ProductDetailInfo {
         val productDetail = productQueryService.getProductDetail(productId)
-        return ProductDetailInfo.from(productDetail.product, productDetail.stock, productDetail.product.likeCount)
+        val dailyRanking = rankingService.getProductRanking(productId, TimeWindow.DAILY)
+
+        return ProductDetailInfo.from(
+            productDetail.product,
+            productDetail.stock,
+            productDetail.product.likeCount,
+            dailyRanking,
+        )
     }
 
     fun getLikedProducts(userId: Long, pageable: Pageable): Page<LikedProductInfo> {
