@@ -130,8 +130,8 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
             userId = 100L,
             totalAmount = 50000L,
             items = listOf(
-                OutboxEvent.OrderCompleted.OrderItem(productId = productId1, quantity = 2),
-                OutboxEvent.OrderCompleted.OrderItem(productId = productId2, quantity = 3),
+                OutboxEvent.OrderCompleted.OrderItem(productId = productId1, quantity = 2, price = 15000L),
+                OutboxEvent.OrderCompleted.OrderItem(productId = productId2, quantity = 3, price = 10000L),
             ),
             timestamp = ZonedDateTime.now(),
         )
@@ -166,7 +166,7 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
             userId = 100L,
             totalAmount = 30000L,
             items = listOf(
-                OutboxEvent.OrderCompleted.OrderItem(productId = productId, quantity = 5),
+                OutboxEvent.OrderCompleted.OrderItem(productId = productId, quantity = 5, price = 6000L),
             ),
             timestamp = ZonedDateTime.now(),
         )
@@ -186,7 +186,7 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
             userId = 100L,
             reason = "고객 요청",
             items = listOf(
-                OutboxEvent.OrderCanceled.OrderItem(productId = productId, quantity = 5),
+                OutboxEvent.OrderCanceled.OrderItem(productId = productId, quantity = 5, price = 6000L),
             ),
             timestamp = ZonedDateTime.now().plusSeconds(1),
         )
@@ -361,7 +361,7 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
             userId = 100L,
             totalAmount = 50000L,
             items = listOf(
-                OutboxEvent.OrderCompleted.OrderItem(productId = 3003L, quantity = 2),
+                OutboxEvent.OrderCompleted.OrderItem(productId = 3003L, quantity = 2, price = 25000L),
             ),
             timestamp = ZonedDateTime.now(),
         )
@@ -385,7 +385,7 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
             userId = 100L,
             reason = "고객 요청",
             items = listOf(
-                OutboxEvent.OrderCanceled.OrderItem(productId = 3004L, quantity = 1),
+                OutboxEvent.OrderCanceled.OrderItem(productId = 3004L, quantity = 1, price = 50000L),
             ),
             timestamp = ZonedDateTime.now(),
         )

@@ -227,6 +227,7 @@ class PaymentEventListener(
                 OutboxEvent.OrderCompleted.OrderItem(
                     productId = it.productId,
                     quantity = it.quantity.toInt(),
+                    price = it.price,
                 )
             },
         )
@@ -256,6 +257,7 @@ class PaymentEventListener(
                 OutboxEvent.OrderCanceled.OrderItem(
                     productId = it.productId,
                     quantity = it.quantity.toInt(),
+                    price = it.price,
                 )
             },
         )

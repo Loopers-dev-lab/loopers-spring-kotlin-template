@@ -80,6 +80,7 @@ object OutboxEvent {
         data class OrderItem(
             val productId: Long,
             val quantity: Int,
+            val price: Long,
         )
 
         companion object {
@@ -102,6 +103,7 @@ object OutboxEvent {
         data class OrderItem(
             val productId: Long,
             val quantity: Int,
+            val price: Long,
         )
 
         companion object {
