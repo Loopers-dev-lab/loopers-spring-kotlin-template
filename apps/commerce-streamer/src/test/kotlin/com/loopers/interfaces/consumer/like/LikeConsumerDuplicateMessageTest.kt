@@ -23,11 +23,11 @@ import org.springframework.test.context.TestConstructor
 @Import(MySqlTestContainersConfig::class)
 @DisplayName("LikeConsumer 중복 메시지 재전송 테스트")
 class LikeConsumerDuplicateMessageTest(
-        private val productMetricFacade: ProductMetricFacade,
-        private val productMetricJpaRepository: ProductMetricJpaRepository,
-        private val eventHandleJpaRepository: EventHandleJpaRepository,
-        private val objectMapper: ObjectMapper,
-        private val databaseCleanUp: DatabaseCleanUp,
+    private val productMetricFacade: ProductMetricFacade,
+    private val productMetricJpaRepository: ProductMetricJpaRepository,
+    private val eventHandleJpaRepository: EventHandleJpaRepository,
+    private val objectMapper: ObjectMapper,
+    private val databaseCleanUp: DatabaseCleanUp,
 ) {
 
     @AfterEach
@@ -44,32 +44,32 @@ class LikeConsumerDuplicateMessageTest(
         val eventId = "test-event-id-123"
 
         val payload =
-                CatalogEventPayload(
-                        eventId = eventId,
-                        productId = productId,
-                        userId = userId,
-                        type = CatalogType.LIKED,
-                )
+            CatalogEventPayload(
+                eventId = eventId,
+                productId = productId,
+                userId = userId,
+                type = CatalogType.LIKED,
+            )
 
         val payloadJson = objectMapper.writeValueAsString(payload)
 
         val firstMessage =
-                ConsumerRecord(
-                        EventType.CATALOG_EVENT.topic,
-                        0,
-                        0L,
-                        "key",
-                        payloadJson,
-                )
+            ConsumerRecord(
+                EventType.CATALOG_EVENT.topic,
+                0,
+                0L,
+                "key",
+                payloadJson,
+            )
 
         val secondMessage =
-                ConsumerRecord(
-                        EventType.CATALOG_EVENT.topic,
-                        0,
-                        1L,
-                        "key",
-                        payloadJson,
-                )
+            ConsumerRecord(
+                EventType.CATALOG_EVENT.topic,
+                0,
+                1L,
+                "key",
+                payloadJson,
+            )
 
         // act - 첫 번째 메시지 처리
         productMetricFacade.updateProductMetrics(listOf(firstMessage))
@@ -105,42 +105,42 @@ class LikeConsumerDuplicateMessageTest(
         val eventId = "test-event-id-456"
 
         val payload =
-                CatalogEventPayload(
-                        eventId = eventId,
-                        productId = productId,
-                        userId = userId,
-                        type = CatalogType.LIKED,
-                )
+            CatalogEventPayload(
+                eventId = eventId,
+                productId = productId,
+                userId = userId,
+                type = CatalogType.LIKED,
+            )
 
         val payloadJson = objectMapper.writeValueAsString(payload)
 
         // 같은 eventId를 가진 메시지 3개 생성
         val message1 =
-                ConsumerRecord(
-                        EventType.CATALOG_EVENT.topic,
-                        0,
-                        0L,
-                        "key",
-                        payloadJson,
-                )
+            ConsumerRecord(
+                EventType.CATALOG_EVENT.topic,
+                0,
+                0L,
+                "key",
+                payloadJson,
+            )
 
         val message2 =
-                ConsumerRecord(
-                        EventType.CATALOG_EVENT.topic,
-                        0,
-                        1L,
-                        "key",
-                        payloadJson,
-                )
+            ConsumerRecord(
+                EventType.CATALOG_EVENT.topic,
+                0,
+                1L,
+                "key",
+                payloadJson,
+            )
 
         val message3 =
-                ConsumerRecord<String, String>(
-                        "CATALOG_EVENT",
-                        0,
-                        2L,
-                        "key",
-                        payloadJson,
-                )
+            ConsumerRecord<String, String>(
+                "CATALOG_EVENT",
+                0,
+                2L,
+                "key",
+                payloadJson,
+            )
 
         // act - 같은 배치에 중복 메시지가 포함된 경우
         productMetricFacade.updateProductMetrics(listOf(message1, message2, message3))
@@ -161,55 +161,55 @@ class LikeConsumerDuplicateMessageTest(
         val userId = 3L
 
         val payload1 =
-                CatalogEventPayload(
-                        eventId = "event-id-1",
-                        productId = productId,
-                        userId = userId,
-                        type = CatalogType.LIKED,
-                )
+            CatalogEventPayload(
+                eventId = "event-id-1",
+                productId = productId,
+                userId = userId,
+                type = CatalogType.LIKED,
+            )
 
         val payload2 =
-                CatalogEventPayload(
-                        eventId = "event-id-2",
-                        productId = productId,
-                        userId = userId,
-                        type = CatalogType.LIKED,
-                )
+            CatalogEventPayload(
+                eventId = "event-id-2",
+                productId = productId,
+                userId = userId,
+                type = CatalogType.LIKED,
+            )
 
         val payload3 =
-                CatalogEventPayload(
-                        eventId = "event-id-3",
-                        productId = productId,
-                        userId = userId,
-                        type = CatalogType.LIKED,
-                )
+            CatalogEventPayload(
+                eventId = "event-id-3",
+                productId = productId,
+                userId = userId,
+                type = CatalogType.LIKED,
+            )
 
         val message1 =
-                ConsumerRecord<String, String>(
-                        "CATALOG_EVENT",
-                        0,
-                        0L,
-                        "key",
-                        objectMapper.writeValueAsString(payload1),
-                )
+            ConsumerRecord<String, String>(
+                "CATALOG_EVENT",
+                0,
+                0L,
+                "key",
+                objectMapper.writeValueAsString(payload1),
+            )
 
         val message2 =
-                ConsumerRecord<String, String>(
-                        "CATALOG_EVENT",
-                        0,
-                        1L,
-                        "key",
-                        objectMapper.writeValueAsString(payload2),
-                )
+            ConsumerRecord<String, String>(
+                "CATALOG_EVENT",
+                0,
+                1L,
+                "key",
+                objectMapper.writeValueAsString(payload2),
+            )
 
         val message3 =
-                ConsumerRecord<String, String>(
-                        "CATALOG_EVENT",
-                        0,
-                        2L,
-                        "key",
-                        objectMapper.writeValueAsString(payload3),
-                )
+            ConsumerRecord<String, String>(
+                "CATALOG_EVENT",
+                0,
+                2L,
+                "key",
+                objectMapper.writeValueAsString(payload3),
+            )
 
         // act
         productMetricFacade.updateProductMetrics(listOf(message1, message2, message3))
@@ -220,22 +220,5 @@ class LikeConsumerDuplicateMessageTest(
 
         val eventHandles = eventHandleJpaRepository.findAll()
         assertThat(eventHandles).hasSize(3)
-    }
-}
-        // act
-        productMetricFacade.updateProductMetrics(listOf(message1, message2, message3))
-        
-        // assert - 모든 메시지가 처리되어야 함
-        val productMetric = productMetricJpaRepository.findByRefProductId(productId)
-        assertThat(productMetric).isNotNull
-        assertThat(productMetric!!.likeCount)
-            .`as`("서로 다른 eventId를 가진 메시지들은 모두 처리되어야 함")
-            .isEqualTo(3L)
-        
-        // assert - EventHandle도 3개 생성되어야 함
-        val eventHandles = eventHandleJpaRepository.findAll()
-        assertThat(eventHandles)
-            .`as`("서로 다른 eventId에 대한 EventHandle은 각각 생성되어야 함")
-            .hasSize(3)
     }
 }

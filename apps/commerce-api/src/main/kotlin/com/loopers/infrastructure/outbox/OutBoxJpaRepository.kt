@@ -7,5 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface OutBoxJpaRepository : JpaRepository<OutBoxModel, Long> {
     fun findAllByStatus(status: OutboxStatus): List<OutBoxModel>
 
+    fun findAllByStatusIn(statuses: List<OutboxStatus>): List<OutBoxModel>
+
     fun findByEventId(eventId: String): OutBoxModel?
 }

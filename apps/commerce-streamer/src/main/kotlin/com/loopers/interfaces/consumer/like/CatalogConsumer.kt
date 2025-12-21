@@ -10,13 +10,13 @@ import org.springframework.kafka.support.Acknowledgment
 import org.springframework.stereotype.Component
 
 @Component
-class LikeConsumer(private val productMetricFacade: ProductMetricFacade) {
+class CatalogConsumer(private val productMetricFacade: ProductMetricFacade) {
 
-    private val logger = LoggerFactory.getLogger(LikeConsumer::class.java)
+    private val logger = LoggerFactory.getLogger(CatalogConsumer::class.java)
 
     @KafkaListener(
         topics = [EventType.Topic.CATALOG_EVENT],
-        containerFactory = KafkaConfig.CATOLOG_BATCH_LISTENER,
+        containerFactory = KafkaConfig.CATALOG_BATCH_LISTENER,
     )
     fun listen(
         messages: List<ConsumerRecord<String, String>>,

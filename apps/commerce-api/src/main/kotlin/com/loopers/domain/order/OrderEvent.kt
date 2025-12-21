@@ -6,6 +6,7 @@ import java.util.UUID
 sealed interface OrderEvent {
     val eventId: String
     val orderId: Long
+    val userId: Long
     val orderItems: List<OrderItemSnapshot>
     val couponId: Long?
 }
@@ -13,6 +14,7 @@ sealed interface OrderEvent {
 data class OrderSuccessEvent(
     override val eventId: String,
     override val orderId: Long,
+    override val userId: Long,
     override val orderItems: List<OrderItemSnapshot>,
     override val couponId: Long?,
 ) : OrderEvent {
@@ -24,7 +26,7 @@ data class OrderSuccessEvent(
                     quantity = orderItem.quantity,
                 )
             }
-            return OrderSuccessEvent(eventId = UUID.randomUUID().toString(), order.id, orderItems, couponId)
+            return OrderSuccessEvent(eventId = UUID.randomUUID().toString(), order.id, order.refUserId, orderItems, couponId)
         }
     }
 }

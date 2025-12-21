@@ -22,7 +22,7 @@ import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
 class KafkaConfig {
     companion object {
         const val BATCH_LISTENER = "BATCH_LISTENER_DEFAULT"
-        const val LIKE_METRICS_LISTENER = "LIKE_METRICS_LISTENER"
+        const val CATALOG_BATCH_LISTENER = "CATALOG_METRICS_LISTENER"
 
         private const val MAX_POLLING_SIZE = 3000 // read 3000 msg
         private const val FETCH_MIN_BYTES = (1024 * 1024) // 1mb
@@ -89,7 +89,7 @@ class KafkaConfig {
         }
     }
 
-    @Bean(LIKE_METRICS_LISTENER)
+    @Bean(CATALOG_BATCH_LISTENER)
     fun likeMetricsKafkaListenerContainerFactory(
         jsonConverter: ByteArrayJsonMessageConverter,
         kafkaTemplate: KafkaTemplate<Any, Any>,
@@ -110,15 +110,10 @@ class KafkaConfig {
         val factory = ConcurrentKafkaListenerContainerFactory<Any, Any>().apply {
             this.consumerFactory = DefaultKafkaConsumerFactory(propMap)
 
-            // 파티션 수에 맞춰 병렬 처리(예: 3 파티션 가정)
-            // - 이유: 병렬로 배치를 처리해 처리량/지연을 동시에 잡는다.
             setConcurrency(3)
 
-            // 배치 리스너로 동작
-            // - 이유: 여러 레코드를 모아 한 번에 DB에 반영 → 트랜잭션/커넥션 비용 절감
             isBatchListener = true
 
-            // 컨테이너 동작 세부
             containerProperties.apply {
                 pollTimeout = 1000 // 1초마다 poll → 실시간성 유지(대기 과도 방지)
                 ackMode = ContainerProperties.AckMode.MANUAL // 수동 커밋 → 처리 성공 후에만 커밋(멱등성/재처리 제어)
