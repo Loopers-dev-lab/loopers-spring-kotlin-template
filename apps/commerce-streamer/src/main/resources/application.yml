@@ -25,11 +25,6 @@ spring:
       - logging.yml
       - monitoring.yml
 
-app:
-  kafka:
-    consumer:
-      max-poll-records: 500
-
 demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
