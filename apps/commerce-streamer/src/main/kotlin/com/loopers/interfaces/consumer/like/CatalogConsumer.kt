@@ -16,7 +16,7 @@ class LikeConsumer(private val productMetricFacade: ProductMetricFacade) {
 
     @KafkaListener(
         topics = [EventType.Topic.CATALOG_EVENT],
-        containerFactory = KafkaConfig.LIKE_METRICS_LISTENER,
+        containerFactory = KafkaConfig.CATOLOG_BATCH_LISTENER,
     )
     fun listen(
         messages: List<ConsumerRecord<String, String>>,
@@ -26,11 +26,10 @@ class LikeConsumer(private val productMetricFacade: ProductMetricFacade) {
 
         try {
             productMetricFacade.updateProductMetrics(messages)
+            acknowledgment.acknowledge()
         } catch (e: Exception) {
             logger.error(e.message, e)
             acknowledgment.acknowledge()
         }
-
-        acknowledgment.acknowledge()
     }
 }
