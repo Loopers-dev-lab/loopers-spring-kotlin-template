@@ -49,7 +49,6 @@ class OutboxCursorTest {
         fun `sets createdAt to current time on each call`() {
             // when
             val cursor1 = OutboxCursor.create(1L)
-            Thread.sleep(10) // 시간차 보장
             val cursor2 = OutboxCursor.create(2L)
 
             // then

@@ -197,7 +197,6 @@ class OrderFacadeConcurrencyTest @Autowired constructor(
 
         latch.await()
         executorService.shutdown()
-        Thread.sleep(5000)
 
         // then
         assertThat(successCount.get()).isEqualTo(initialStock)

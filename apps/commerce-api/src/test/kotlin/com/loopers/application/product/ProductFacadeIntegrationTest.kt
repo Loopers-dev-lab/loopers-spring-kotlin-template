@@ -340,9 +340,7 @@ class ProductFacadeIntegrationTest @Autowired constructor(
         fun `maintain product order when list cache hits with partial detail cache`() {
             // given - 상품 3개 생성 (최신순)
             val product1 = createProduct(name = "첫번째")
-            Thread.sleep(10)
             val product2 = createProduct(name = "두번째")
-            Thread.sleep(10)
             val product3 = createProduct(name = "세번째")
 
             val criteria = ProductCriteria.FindProducts(

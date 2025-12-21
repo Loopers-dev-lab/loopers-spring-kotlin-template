@@ -73,9 +73,7 @@ class OutboxCursorRdbRepositoryIntegrationTest @Autowired constructor(
         fun `returns most recent cursor by createdAt`() {
             // given
             outboxCursorRepository.save(OutboxCursor.create(lastProcessedId = 10L))
-            Thread.sleep(10) // 시간차 보장
             outboxCursorRepository.save(OutboxCursor.create(lastProcessedId = 20L))
-            Thread.sleep(10)
             val lastCursor = outboxCursorRepository.save(OutboxCursor.create(lastProcessedId = 30L))
 
             // when
