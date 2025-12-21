@@ -408,6 +408,9 @@ class ProductServiceTest(
                         productPrice = BigDecimal.valueOf(10000),
                     ),
                 ),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
             )
 
             // act
@@ -446,6 +449,9 @@ class ProductServiceTest(
                     OrderItemCommand(productId = product1.id, quantity = 10, productPrice = BigDecimal.valueOf(10000)),
                     OrderItemCommand(productId = product2.id, quantity = 5, productPrice = BigDecimal.valueOf(20000)),
                 ),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
             )
 
             // act
@@ -479,6 +485,9 @@ class ProductServiceTest(
                 orderItems = listOf(
                     OrderItemCommand(productId = product.id, quantity = 10, productPrice = BigDecimal.valueOf(10000)),
                 ),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
             )
 
             // act, assert
@@ -497,6 +506,9 @@ class ProductServiceTest(
                 orderItems = listOf(
                     OrderItemCommand(productId = notExistProductId, quantity = 1, productPrice = BigDecimal.valueOf(10000)),
                 ),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
             )
 
             // act, assert
@@ -527,6 +539,9 @@ class ProductServiceTest(
                 orderItems = listOf(
                     OrderItemCommand(productId = product.id, quantity = 0, productPrice = BigDecimal.valueOf(10000)),
                 ),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
             )
 
             // act, assert

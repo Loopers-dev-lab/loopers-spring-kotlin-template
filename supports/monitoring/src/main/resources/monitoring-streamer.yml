@@ -1,0 +1,40 @@
+management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      application:
+        ${spring.application.name}
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          show-components: always
+          include:
+            - livenessState
+        readiness:
+          show-components: always
+    prometheus:
+      access: read_only
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  server:
+    port: 8082
+  observations:
+    annotations:
+      enabled: true
+    key-values:
+      application:
+        ${spring.application.name}

@@ -1,0 +1,19 @@
+### 좋아요 등록
+PUT {{commerce-api}}/api/v1/likes/like
+Content-Type: application/json
+
+{
+  "userId": 2,
+  "productId": 13
+}
+
+### 좋아요 취소
+PUT {{commerce-api}}/api/v1/likes/unlike
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "productId": 1
+}
+
+

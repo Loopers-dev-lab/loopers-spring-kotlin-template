@@ -13,11 +13,11 @@ import org.springframework.transaction.annotation.Transactional
 
 @Component
 class OrderFacade(
-        private val orderService: OrderService,
-        private val orderPublisher: OrderEventPublisher,
-        private val productService: ProductService,
-        private val couponService: CouponService,
-        private val paymentService: PaymentService,
+    private val orderService: OrderService,
+    private val orderPublisher: OrderEventPublisher,
+    private val productService: ProductService,
+    private val couponService: CouponService,
+    private val paymentService: PaymentService,
 ) {
 
     @Transactional
@@ -26,10 +26,10 @@ class OrderFacade(
         val totalPrice = command.orderItems.sumOf { it.productPrice * it.quantity.toBigDecimal() }
 
         val discountPrice =
-                command.couponId?.let {
-                    couponService.calculateDiscountPrice(it, userId, totalPrice)
-                }
-                        ?: totalPrice
+            command.couponId?.let {
+                couponService.calculateDiscountPrice(it, userId, totalPrice)
+            }
+                ?: totalPrice
 
         // 2. 재고 차감
         productService.occupyStocks(command)
@@ -38,19 +38,21 @@ class OrderFacade(
         val order = orderService.prepare(userId, command)
 
         // 4. 결제 요청
-        return when (paymentService.pay(
-                        PaymentDto.Request.from(
-                                order.orderKey,
-                                command.cardType,
-                                command.cardNo,
-                                discountPrice
-                        ),
-                )
+        return when (
+            paymentService.pay(
+                PaymentDto.Request.from(
+                    order.orderKey,
+                    command.cardType,
+                    command.cardNo,
+                    discountPrice,
+                ),
+            )
         ) {
             is PaymentDto.Result.Success -> {
                 orderPublisher.publish(OrderSuccessEvent.from(order, command.couponId))
                 return orderService.requestPayment(order)
             }
+
             is PaymentDto.Result.Failed -> {
                 order
             }

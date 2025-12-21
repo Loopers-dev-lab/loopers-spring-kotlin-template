@@ -69,10 +69,15 @@ class OrderFacadeTest(
             val testStock = StockModel.create(testProduct.id, 1000L)
             stockRepository.save(testStock)
 
-            val command = OrderCommand(listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(500L))))
+            val command = OrderCommand(
+                orderItems = listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(500L))),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = null
+            )
 
             // act & assert
-            orderFacade.order(user.id, null, command)
+            orderFacade.order(user.id, command)
 
             val orders = orderRepository.findAll()
             val point = pointRepository.findById(testPoint.id).get()
@@ -109,11 +114,16 @@ class OrderFacadeTest(
             stockRepository.save(testStock)
 
             val nonExistentCouponId = 999L
-            val command = OrderCommand(listOf(OrderItemCommand(testProduct.id, 1L, BigDecimal.valueOf(10000L))))
+            val command = OrderCommand(
+                orderItems = listOf(OrderItemCommand(testProduct.id, 1L, BigDecimal.valueOf(10000L))),
+                cardType = "CREDIT",
+                cardNo = "1234-5678-9012-3456",
+                couponId = nonExistentCouponId
+            )
 
             // act & assert
             val exception = assertThrows<CoreException> {
-                orderFacade.order(user.id, nonExistentCouponId, command)
+                orderFacade.order(user.id, command)
             }
 
             val orders = orderRepository.findAll()
@@ -151,10 +161,12 @@ class OrderFacadeTest(
             val exception = assertThrows<CoreException> {
                 orderFacade.order(
                     user.id,
-                    null,
                     OrderCommand(
-                        listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(500L))),
-                    ),
+                        orderItems = listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(500L))),
+                        cardType = "CREDIT",
+                        cardNo = "1234-5678-9012-3456",
+                        couponId = null
+                    )
                 )
             }
             val orders = orderRepository.findAll()
@@ -196,10 +208,12 @@ class OrderFacadeTest(
             val exception = assertThrows<CoreException> {
                 orderFacade.order(
                     user.id,
-                    null,
                     OrderCommand(
-                        listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(500L))),
-                    ),
+                        orderItems = listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(500L))),
+                        cardType = "CREDIT",
+                        cardNo = "1234-5678-9012-3456",
+                        couponId = null
+                    )
                 )
             }
             val orders = orderRepository.findAll()
@@ -245,9 +259,12 @@ class OrderFacadeTest(
             val futures = products.map { product ->
                 CompletableFuture.supplyAsync {
                     val command = OrderCommand(
-                        listOf(OrderItemCommand(product.id, 1L, BigDecimal.valueOf(5000L))),
+                        orderItems = listOf(OrderItemCommand(product.id, 1L, BigDecimal.valueOf(5000L))),
+                        cardType = "CREDIT",
+                        cardNo = "1234-5678-9012-3456",
+                        couponId = null
                     )
-                    orderFacade.order(user.id, null, command)
+                    orderFacade.order(user.id, command)
                 }
             }
 
@@ -294,9 +311,12 @@ class OrderFacadeTest(
             val futures = users.map { user ->
                 CompletableFuture.supplyAsync {
                     val command = OrderCommand(
-                        listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(1000L))),
+                        orderItems = listOf(OrderItemCommand(testProduct.id, 10L, BigDecimal.valueOf(1000L))),
+                        cardType = "CREDIT",
+                        cardNo = "1234-5678-9012-3456",
+                        couponId = null
                     )
-                    orderFacade.order(user.id, null, command)
+                    orderFacade.order(user.id, command)
                 }
             }
 
@@ -352,9 +372,12 @@ class OrderFacadeTest(
                 CompletableFuture.supplyAsync {
                     try {
                         val command = OrderCommand(
-                            listOf(OrderItemCommand(testProduct.id, 1L, BigDecimal.valueOf(5000L))),
+                            orderItems = listOf(OrderItemCommand(testProduct.id, 1L, BigDecimal.valueOf(5000L))),
+                            cardType = "CREDIT",
+                            cardNo = "1234-5678-9012-3456",
+                            couponId = testCoupon.id
                         )
-                        orderFacade.order(user.id, testCoupon.id, command)
+                        orderFacade.order(user.id, command)
                         true // 성공
                     } catch (e: Exception) {
                         false // 실패

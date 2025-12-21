@@ -2,6 +2,7 @@ package com.loopers.config.kafka
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.producer.ProducerConfig
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -15,13 +16,13 @@ import org.springframework.kafka.core.ProducerFactory
 import org.springframework.kafka.listener.ContainerProperties
 import org.springframework.kafka.support.converter.BatchMessagingMessageConverter
 import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
-import java.util.HashMap
 
 @EnableKafka
 @Configuration
 class KafkaConfig {
     companion object {
         const val BATCH_LISTENER = "BATCH_LISTENER_DEFAULT"
+        const val CATALOG_BATCH_LISTENER = "CATALOG_METRICS_LISTENER"
 
         private const val MAX_POLLING_SIZE = 3000 // read 3000 msg
         private const val FETCH_MIN_BYTES = (1024 * 1024) // 1mb
@@ -31,11 +32,20 @@ class KafkaConfig {
         private const val MAX_POLL_INTERVAL_MS = 2 * 60 * 1000 // max poll interval = 2m
     }
 
+    /**
+     *  ACKS_CONFIG 설정 -> 모든 in-sync replica가 메시지를 받을 때까지 대기
+     *  ( The number of acknowledgments the producer requires the leader to have received before considering a request complete )
+     *  idempotence config 설정 -> 중복 전송 방지
+     *  ( When set to 'true', the producer will ensure that exactly one copy of each message is written in the stream )
+     */
     @Bean
     fun producerFactory(
         kafkaProperties: KafkaProperties,
     ): ProducerFactory<Any, Any> {
-        val props: Map<String, Any> = HashMap(kafkaProperties.buildProducerProperties())
+        val props: Map<String, Any> = HashMap(kafkaProperties.buildProducerProperties()).apply {
+            put(ProducerConfig.ACKS_CONFIG, "all")
+            put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true)
+        }
         return DefaultKafkaProducerFactory(props)
     }
 
@@ -48,14 +58,12 @@ class KafkaConfig {
     }
 
     @Bean
-    fun kafkaTemplate(producerFactory: ProducerFactory<Any, Any>): KafkaTemplate<Any, Any> {
-        return KafkaTemplate(producerFactory)
-    }
+    fun kafkaTemplate(producerFactory: ProducerFactory<Any, Any>): KafkaTemplate<Any, Any> = KafkaTemplate(producerFactory)
 
     @Bean
-    fun jsonMessageConverter(objectMapper: ObjectMapper): ByteArrayJsonMessageConverter {
-        return ByteArrayJsonMessageConverter(objectMapper)
-    }
+    fun jsonMessageConverter(
+        objectMapper: ObjectMapper,
+    ): ByteArrayJsonMessageConverter = ByteArrayJsonMessageConverter(objectMapper)
 
     @Bean(BATCH_LISTENER)
     fun defaultBatchListenerContainerFactory(
@@ -79,5 +87,42 @@ class KafkaConfig {
             setConcurrency(3)
             isBatchListener = true
         }
+    }
+
+    @Bean(CATALOG_BATCH_LISTENER)
+    fun likeMetricsKafkaListenerContainerFactory(
+        jsonConverter: ByteArrayJsonMessageConverter,
+        kafkaTemplate: KafkaTemplate<Any, Any>,
+        consumerFactory: ConsumerFactory<Any, Any>,
+        kafkaProperties: KafkaProperties,
+    ): ConcurrentKafkaListenerContainerFactory<Any, Any> {
+        // 기본 Consumer 설정 복사 + 오버라이드
+        val propMap = HashMap(kafkaProperties.buildConsumerProperties()).apply {
+            put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest") // ✅ 과거 이벤트부터 모두 소비 (정확한 집계 보장)
+            put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, MAX_POLLING_SIZE)
+            put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, FETCH_MIN_BYTES)
+            put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, FETCH_MAX_WAIT_MS)
+            put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, SESSION_TIMEOUT_MS)
+            put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, HEARTBEAT_INTERVAL_MS)
+            put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, MAX_POLL_INTERVAL_MS)
+        }
+
+        val factory = ConcurrentKafkaListenerContainerFactory<Any, Any>().apply {
+            this.consumerFactory = DefaultKafkaConsumerFactory(propMap)
+
+            setConcurrency(3)
+
+            isBatchListener = true
+
+            containerProperties.apply {
+                pollTimeout = 1000 // 1초마다 poll → 실시간성 유지(대기 과도 방지)
+                ackMode = ContainerProperties.AckMode.MANUAL // 수동 커밋 → 처리 성공 후에만 커밋(멱등성/재처리 제어)
+                isSyncCommits = true // 커밋 응답 대기 → 중복 소비/유실 리스크 감소
+                isObservationEnabled = true // Micrometer 관측(메트릭/트레이싱)
+                isDeliveryAttemptHeader = true // 재시도 횟수 헤더 노출 → 운영 관측성 향상
+            }
+        }
+
+        return factory
     }
 }
