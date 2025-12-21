@@ -10,6 +10,7 @@ import com.loopers.domain.product.Stock
 import com.loopers.domain.shared.Email
 import com.loopers.domain.shared.Money
 import com.loopers.infrastructure.brand.BrandJpaRepository
+import com.loopers.infrastructure.event.EventOutboxJpaRepository
 import com.loopers.infrastructure.like.LikeJpaRepository
 import com.loopers.infrastructure.member.MemberJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
@@ -20,17 +21,25 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.data.domain.PageRequest
+import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.test.context.TestPropertySource
 
 @SpringBootTest
+@TestPropertySource(properties = ["spring.task.scheduling.enabled=false"])
 class LikeFacadeIntegrationTest @Autowired constructor(
     private val likeFacade: LikeFacade,
     private val likeJpaRepository: LikeJpaRepository,
     private val memberJpaRepository: MemberJpaRepository,
     private val productJpaRepository: ProductJpaRepository,
     private val brandJpaRepository: BrandJpaRepository,
+    private val eventOutboxRepository: EventOutboxJpaRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
+
+    @MockBean
+    private lateinit var kafkaTemplate: KafkaTemplate<String, String>
 
     @AfterEach
     fun tearDown() {
@@ -45,7 +54,7 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand.id!!)
         )
 
         val result = likeFacade.addLike(member.memberId.value, product.id!!)
@@ -54,17 +63,19 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         assertThat(result.memberId).isEqualTo(member.memberId.value)
         assertThat(result.product.id).isEqualTo(product.id)
 
-        // 비동기 이벤트 처리 대기 (최대 3초)
+        // EventOutbox에 저장되었는지 확인 (Kafka 발행은 별도 프로세스)
         var retryCount = 0
-        var updatedProduct = productJpaRepository.findById(product.id!!).get()
-        while (updatedProduct.likesCount != 1 && retryCount < 30) {
+        var outboxEvents = eventOutboxRepository.findAll()
+        while (outboxEvents.isEmpty() && retryCount < 30) {
             Thread.sleep(100)
-            updatedProduct = productJpaRepository.findById(product.id!!).get()
+            outboxEvents = eventOutboxRepository.findAll()
             retryCount++
         }
 
-        // 좋아요 수 증가 확인
-        assertThat(updatedProduct.likesCount).isEqualTo(1)
+        // EventOutbox에 ProductLikedEvent가 저장되었는지 확인
+        assertThat(outboxEvents).hasSize(1)
+        assertThat(outboxEvents[0].eventType).isEqualTo("PRODUCT_LIKED")
+        assertThat(outboxEvents[0].aggregateId).isEqualTo(product.id)
     }
 
     @DisplayName("이미 좋아요가 있을 경우 중복 추가되지 않는다")
@@ -75,7 +86,7 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand.id!!)
         )
 
         // 첫 번째 좋아요
@@ -89,17 +100,18 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         val likes = likeJpaRepository.findAll()
         assertThat(likes).hasSize(1)
 
-        // 비동기 이벤트 처리 대기 (최대 3초)
+        // EventOutbox에 저장되었는지 확인 (중복 이벤트는 무시되어야 함)
         var retryCount = 0
-        var updatedProduct = productJpaRepository.findById(product.id!!).get()
-        while (updatedProduct.likesCount != 1 && retryCount < 30) {
+        var outboxEvents = eventOutboxRepository.findAll()
+        while (outboxEvents.size < 1 && retryCount < 30) {
             Thread.sleep(100)
-            updatedProduct = productJpaRepository.findById(product.id!!).get()
+            outboxEvents = eventOutboxRepository.findAll()
             retryCount++
         }
 
-        // 좋아요 수가 중복 증가하지 않았는지 확인
-        assertThat(updatedProduct.likesCount).isEqualTo(1)
+        // EventOutbox에 1개만 저장되었는지 확인 (중복 이벤트는 무시됨)
+        assertThat(outboxEvents).hasSize(1)
+        assertThat(outboxEvents[0].eventType).isEqualTo("PRODUCT_LIKED")
     }
 
     @DisplayName("좋아요를 취소할 수 있다")
@@ -110,20 +122,22 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand.id!!)
         )
 
         // 좋아요 추가
         likeFacade.addLike(member.memberId.value, product.id!!)
 
-        // 비동기 이벤트 처리 대기 (좋아요 추가)
+        // EventOutbox에 ProductLikedEvent 저장 확인
         var retryCount = 0
-        var updatedProduct = productJpaRepository.findById(product.id!!).get()
-        while (updatedProduct.likesCount != 1 && retryCount < 30) {
+        var outboxEvents = eventOutboxRepository.findAll()
+        while (outboxEvents.isEmpty() && retryCount < 30) {
             Thread.sleep(100)
-            updatedProduct = productJpaRepository.findById(product.id!!).get()
+            outboxEvents = eventOutboxRepository.findAll()
             retryCount++
         }
+        assertThat(outboxEvents).hasSize(1)
+        assertThat(outboxEvents[0].eventType).isEqualTo("PRODUCT_LIKED")
 
         // 좋아요 취소
         likeFacade.cancelLike(member.memberId.value, product.id!!)
@@ -132,17 +146,19 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         val likes = likeJpaRepository.findAll()
         assertThat(likes).isEmpty()
 
-        // 비동기 이벤트 처리 대기 (좋아요 취소)
+        // EventOutbox에 ProductUnlikedEvent도 저장되었는지 확인
         retryCount = 0
-        updatedProduct = productJpaRepository.findById(product.id!!).get()
-        while (updatedProduct.likesCount != 0 && retryCount < 30) {
+        outboxEvents = eventOutboxRepository.findAll()
+        while (outboxEvents.size < 2 && retryCount < 30) {
             Thread.sleep(100)
-            updatedProduct = productJpaRepository.findById(product.id!!).get()
+            outboxEvents = eventOutboxRepository.findAll()
             retryCount++
         }
 
-        // 좋아요 수 감소 확인
-        assertThat(updatedProduct.likesCount).isEqualTo(0)
+        // EventOutbox에 두 이벤트가 모두 저장되었는지 확인
+        assertThat(outboxEvents).hasSize(2)
+        val eventTypes = outboxEvents.map { it.eventType }
+        assertThat(eventTypes).containsExactlyInAnyOrder("PRODUCT_LIKED", "PRODUCT_UNLIKED")
     }
 
     @DisplayName("좋아요가 없을 경우 취소해도 에러가 발생하지 않는다")
@@ -153,7 +169,7 @@ class LikeFacadeIntegrationTest @Autowired constructor(
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
         val product = productJpaRepository.save(
-            Product("상품1", "설명", Money.of(10000L), Stock.of(100), 1L)
+            Product("상품1", "설명", Money.of(10000L), Stock.of(100), brand.id!!)
         )
 
         // 좋아요 없이 취소 시도
@@ -171,9 +187,9 @@ class LikeFacadeIntegrationTest @Autowired constructor(
             Member(MemberId("member1"), Email("test@example.com"), BirthDate.from("1990-05-15"), Gender.MALE)
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
-        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), 1L))
-        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), 1L))
-        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), 1L))
+        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), brand.id!!))
+        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand.id!!))
+        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand.id!!))
 
         // 좋아요 추가
         likeFacade.addLike(member.memberId.value, product1.id!!)
@@ -194,9 +210,9 @@ class LikeFacadeIntegrationTest @Autowired constructor(
             Member(MemberId("member1"), Email("test@example.com"), BirthDate.from("1990-05-15"), Gender.MALE)
         )
         val brand = brandJpaRepository.save(Brand("브랜드1", "설명"))
-        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), 1L))
-        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), 1L))
-        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), 1L))
+        val product1 = productJpaRepository.save(Product("상품1", "설명1", Money.of(10000L), Stock.of(100), brand.id!!))
+        val product2 = productJpaRepository.save(Product("상품2", "설명2", Money.of(20000L), Stock.of(50), brand.id!!))
+        val product3 = productJpaRepository.save(Product("상품3", "설명3", Money.of(15000L), Stock.of(30), brand.id!!))
 
         likeFacade.addLike(member.memberId.value, product1.id!!)
         likeFacade.addLike(member.memberId.value, product2.id!!)

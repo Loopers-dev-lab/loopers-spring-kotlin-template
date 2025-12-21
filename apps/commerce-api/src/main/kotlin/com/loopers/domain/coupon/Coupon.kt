@@ -1,10 +1,7 @@
 package com.loopers.domain.coupon
 
-import ch.qos.logback.core.model.conditional.IfModel
 import com.loopers.domain.BaseEntity
 import com.loopers.domain.shared.Money
-import com.loopers.support.error.CoreException
-import com.loopers.support.error.ErrorType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType

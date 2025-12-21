@@ -96,6 +96,18 @@ class Order(
         status = OrderStatus.CANCELLED
     }
 
+    /**
+     * 포인트 사용 가능 여부 검증
+     */
+    fun validatePointUsage(usePoint: Long) {
+        if (usePoint > finalAmount.amount) {
+            throw CoreException(
+                ErrorType.BAD_REQUEST,
+                "포인트를 너무 많이 사용했습니다. 최종 금액: ${finalAmount.amount}, 사용 포인트: $usePoint"
+            )
+        }
+    }
+
     companion object {
         fun create(
             memberId: String,

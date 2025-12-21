@@ -48,6 +48,7 @@ class LikeService(
                     memberId = member.memberId.value,
                     productId = productId,
                     likedAt = Instant.now(),
+                    aggregateId = productId
                 ),
             )
 
@@ -78,7 +79,8 @@ class LikeService(
             ProductUnlikedEvent(
                 productId = productId,
                 memberId = member.memberId.value,
-                unlikedAt = Instant.now()
+                unlikedAt = Instant.now(),
+                aggregateId = productId
             )
         )
     }

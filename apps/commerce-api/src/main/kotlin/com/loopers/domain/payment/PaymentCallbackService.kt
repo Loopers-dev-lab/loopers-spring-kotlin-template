@@ -47,6 +47,7 @@ class PaymentCallbackService(
         // 이벤트 발행 (주문 완료 처리는 이벤트 핸들러에서)
         eventPublisher.publishEvent(
             PaymentCompletedEvent(
+                aggregateId = payment.orderId,
                 paymentId = requireNotNull(payment.id) { "Payment ID는 null일 수 없습니다" },
                 orderId = payment.orderId,
                 memberId = order.memberId,
@@ -63,6 +64,7 @@ class PaymentCallbackService(
         // 이벤트 발행
         eventPublisher.publishEvent(
             PaymentFailedEvent(
+                aggregateId = payment.orderId,
                 paymentId = requireNotNull(payment.id) { "Payment ID는 null일 수 없습니다" },
                 orderId = payment.orderId,
                 reason = callback.reason ?: "결제 실패",

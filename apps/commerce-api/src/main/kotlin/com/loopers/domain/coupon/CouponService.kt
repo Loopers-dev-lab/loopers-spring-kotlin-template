@@ -1,7 +1,5 @@
 package com.loopers.domain.coupon
 
-import com.loopers.domain.order.OrderItemCommand
-import com.loopers.domain.product.Product
 import com.loopers.domain.shared.Money
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
@@ -31,41 +29,6 @@ class CouponService(
             )
     }
 
-    /**
-     * 주문에 대한 쿠폰 할인 계산 및 사용 처리
-     * 쿠폰이 없으면 할인 없음(zero), 있으면 할인 계산 후 쿠폰 사용 처리
-     */
-    @Transactional
-    fun applyAndUseCouponForOrder(
-        memberId: String,
-        couponId: Long?,
-        orderItems: List<OrderItemCommand>,
-        productMap: Map<Long, Product>
-    ): Money {
-        // 쿠폰이 없으면 할인 없음
-        if (couponId == null) {
-            return Money.zero()
-        }
-
-        // 쿠폰 조회 및 검증 (비관적 락 적용 - 쿠폰 동시성 제어)
-        val memberCoupon = getMemberCoupon(memberId, couponId)
-            ?: throw IllegalArgumentException("쿠폰을 찾을 수 없습니다")
-
-        // 총 주문 금액 계산
-        val totalAmount = orderItems.sumOf { item ->
-            val product = productMap[item.productId]
-                ?: throw IllegalArgumentException("상품을 찾을 수 없습니다: ${item.productId}")
-            product.price.amount * item.quantity
-        }.let { Money(it) }
-
-        // 할인 금액 계산
-        val discountAmount = calculateDiscount(memberCoupon, totalAmount)
-
-        // 쿠폰 사용 처리
-        memberCoupon.use()
-
-        return discountAmount
-    }
 
     /**
      * 쿠폰 할인 금액 계산

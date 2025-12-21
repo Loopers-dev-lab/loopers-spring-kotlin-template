@@ -14,16 +14,34 @@ spring:
   main:
     web-application-type: servlet
   application:
-    name: commerce-api
+    name: commerce-streamer
   profiles:
     active: local
   config:
     import:
       - jpa.yml
-      - redis.yml
-      - kafka.yml
-      - logging.yml
-      - monitoring.yml
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/commerce_streamer}
+
+  kafka:
+    consumer:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      group-id: metrics-consumer-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+      # 필수 설정: Manual ACK
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+
+      properties:
+        session.timeout.ms: 30000
+        max.poll.records: 100
+
+logging:
+  level:
+    com.loopers: INFO
+    org.springframework.kafka: INFO
 
 demo-kafka:
   test:

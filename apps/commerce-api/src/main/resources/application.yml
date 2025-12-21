@@ -24,6 +24,28 @@ spring:
       - logging.yml
       - monitoring.yml
 
+  kafka:
+    producer:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      # At Least Once 보장
+      acks: all  # 모든 replica가 받았음을 확인
+
+      properties:
+        enable.idempotence: true  # 멱등 프로듀서
+        max.in.flight.requests.per.connection: 5
+        retries: 3
+
+    # 토픽 설정
+    topics:
+      catalog-events: catalog-events
+      order-events: order-events
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s  # 종료 대기 시간
+
 springdoc:
   use-fqn: true
   swagger-ui:

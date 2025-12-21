@@ -21,13 +21,20 @@ import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
+import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.test.context.TestPropertySource
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = ["spring.task.scheduling.enabled=false"])
 class Point1V1ApiE2ETest @Autowired constructor(
     private val testRestTemplate: TestRestTemplate,
     private val memberJpaRepository: MemberJpaRepository,
     private val databaseCleanUp: DatabaseCleanUp
 ) {
+
+    @MockBean
+    private lateinit var kafkaTemplate: KafkaTemplate<String, String>
 
     @AfterEach
     fun tearDown() {

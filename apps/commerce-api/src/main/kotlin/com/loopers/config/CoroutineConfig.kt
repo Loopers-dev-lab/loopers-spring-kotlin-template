@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -17,10 +18,6 @@ class CoroutineConfig {
     private val logger = LoggerFactory.getLogger(javaClass)
     private lateinit var scope: CoroutineScope
 
-    /**
-     * 이벤트 처리용 코루틴 디스패처
-     * Dispatchers.IO: I/O 작업에 최적화 (DB 쿼리, HTTP 호출 등)
-     */
     @Bean("eventDispatcher")
     fun eventDispatcher(): CoroutineDispatcher {
         return Dispatchers.IO.limitedParallelism(50)
@@ -49,6 +46,10 @@ class CoroutineConfig {
         logger.info("이벤트 코루틴 스코프 종료 중...")
         if (::scope.isInitialized) {
             scope.cancel()
+            runBlocking {
+                logger.info("진행 중인 이벤트 처리 완료 대기 중...")
+            }
         }
+        logger.info("이벤트 코루틴 스코프 종료 완료")
     }
 }
