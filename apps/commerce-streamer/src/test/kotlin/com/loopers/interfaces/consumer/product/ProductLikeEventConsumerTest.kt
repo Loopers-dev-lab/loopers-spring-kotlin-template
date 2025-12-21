@@ -8,7 +8,7 @@ import com.loopers.domain.product.ProductStatisticService
 import com.loopers.domain.product.UpdateLikeCountCommand
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.interfaces.consumer.product.event.LikeEventPayload
-import com.loopers.support.idempotency.EventHandledRepository
+import com.loopers.support.idempotency.EventHandledService
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -19,17 +19,15 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
-import org.springframework.kafka.listener.BatchListenerFailedException
 import org.springframework.kafka.support.Acknowledgment
 import java.time.Instant
 
-@DisplayName("ProductLikeEventConsumer 배치 처리 단위 테스트")
+@DisplayName("ProductLikeEventConsumer 순차 처리 단위 테스트")
 class ProductLikeEventConsumerTest {
 
     private lateinit var productStatisticService: ProductStatisticService
     private lateinit var productEventMapper: ProductEventMapper
-    private lateinit var eventHandledRepository: EventHandledRepository
+    private lateinit var eventHandledService: EventHandledService
     private lateinit var objectMapper: ObjectMapper
     private lateinit var acknowledgment: Acknowledgment
     private lateinit var productLikeEventConsumer: ProductLikeEventConsumer
@@ -37,7 +35,7 @@ class ProductLikeEventConsumerTest {
     @BeforeEach
     fun setUp() {
         productStatisticService = mockk()
-        eventHandledRepository = mockk()
+        eventHandledService = mockk()
         objectMapper = ObjectMapper()
             .registerKotlinModule()
             .registerModule(JavaTimeModule())
@@ -48,7 +46,7 @@ class ProductLikeEventConsumerTest {
         productLikeEventConsumer = ProductLikeEventConsumer(
             productStatisticService,
             productEventMapper,
-            eventHandledRepository,
+            eventHandledService,
             objectMapper,
         )
     }
@@ -57,9 +55,9 @@ class ProductLikeEventConsumerTest {
     @Nested
     inner class HandleLikeEvents {
 
-        @DisplayName("Like 이벤트 배치를 updateLikeCount() 명령으로 변환하여 호출한다")
+        @DisplayName("Like 이벤트를 레코드 단위로 처리하여 updateLikeCount()를 각각 호출한다")
         @Test
-        fun `calls updateLikeCount with command for like events`() {
+        fun `calls updateLikeCount per record for like events`() {
             // given
             val likeCreatedPayload = LikeEventPayload(productId = 1L, userId = 1L)
             val likeCreatedEnvelope = createEnvelope(
@@ -84,8 +82,8 @@ class ProductLikeEventConsumerTest {
                 createConsumerRecord("like-events", likeCanceledEnvelope),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { productStatisticService.updateLikeCount(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
@@ -93,14 +91,22 @@ class ProductLikeEventConsumerTest {
             productLikeEventConsumer.consume(records, acknowledgment)
 
             // then
+            verify(exactly = 2) { productStatisticService.updateLikeCount(any()) }
             verify(exactly = 1) {
                 productStatisticService.updateLikeCount(
                     match { command ->
-                        command.items.size == 2 &&
+                        command.items.size == 1 &&
                             command.items[0].productId == 1L &&
-                            command.items[0].type == UpdateLikeCountCommand.LikeType.CREATED &&
-                            command.items[1].productId == 2L &&
-                            command.items[1].type == UpdateLikeCountCommand.LikeType.CANCELED
+                            command.items[0].type == UpdateLikeCountCommand.LikeType.CREATED
+                    },
+                )
+            }
+            verify(exactly = 1) {
+                productStatisticService.updateLikeCount(
+                    match { command ->
+                        command.items.size == 1 &&
+                            command.items[0].productId == 2L &&
+                            command.items[0].type == UpdateLikeCountCommand.LikeType.CANCELED
                     },
                 )
             }
@@ -143,7 +149,7 @@ class ProductLikeEventConsumerTest {
 
             val records = listOf(createConsumerRecord("like-events", likeEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns setOf("product-statistic:already-processed-event")
+            every { eventHandledService.isAlreadyHandled("product-statistic:already-processed-event") } returns true
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -151,50 +157,7 @@ class ProductLikeEventConsumerTest {
 
             // then
             verify(exactly = 0) { productStatisticService.updateLikeCount(any()) }
-            verify(exactly = 0) { eventHandledRepository.saveAll(any()) }
-            verify(exactly = 1) { acknowledgment.acknowledge() }
-        }
-
-        @DisplayName("배치 내 중복 이벤트 ID는 하나만 처리한다")
-        @Test
-        fun `processes only one event when batch contains duplicate event IDs`() {
-            // given
-            val likePayload = LikeEventPayload(productId = 1L, userId = 1L)
-            val duplicateEnvelope1 = createEnvelope(
-                id = "duplicate-event-id",
-                type = "loopers.like.created.v1",
-                aggregateType = "Like",
-                aggregateId = "1",
-                payload = objectMapper.writeValueAsString(likePayload),
-            )
-            val duplicateEnvelope2 = createEnvelope(
-                id = "duplicate-event-id",
-                type = "loopers.like.created.v1",
-                aggregateType = "Like",
-                aggregateId = "1",
-                payload = objectMapper.writeValueAsString(likePayload),
-            )
-
-            val records = listOf(
-                createConsumerRecord("like-events", duplicateEnvelope1),
-                createConsumerRecord("like-events", duplicateEnvelope2),
-            )
-
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
-            every { productStatisticService.updateLikeCount(any()) } just runs
-            every { acknowledgment.acknowledge() } just runs
-
-            // when
-            productLikeEventConsumer.consume(records, acknowledgment)
-
-            // then
-            verify(exactly = 1) {
-                productStatisticService.updateLikeCount(
-                    match { command -> command.items.size == 1 },
-                )
-            }
-            verify(exactly = 1) { eventHandledRepository.saveAll(any()) }
+            verify(exactly = 0) { eventHandledService.markAsHandled(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -225,8 +188,9 @@ class ProductLikeEventConsumerTest {
                 createConsumerRecord("like-events", processedEnvelope),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns setOf("product-statistic:processed-event")
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.isAlreadyHandled("product-statistic:new-event") } returns false
+            every { eventHandledService.isAlreadyHandled("product-statistic:processed-event") } returns true
+            every { eventHandledService.markAsHandled("product-statistic:new-event") } just runs
             every { productStatisticService.updateLikeCount(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
@@ -241,8 +205,35 @@ class ProductLikeEventConsumerTest {
                     },
                 )
             }
-            verify(exactly = 1) { eventHandledRepository.saveAll(any()) }
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-statistic:new-event") }
             verify(exactly = 1) { acknowledgment.acknowledge() }
+        }
+
+        @DisplayName("처리 성공 후 멱등성 키를 저장한다")
+        @Test
+        fun `marks event as handled after successful processing`() {
+            // given
+            val likePayload = LikeEventPayload(productId = 1L, userId = 1L)
+            val likeEnvelope = createEnvelope(
+                id = "event-1",
+                type = "loopers.like.created.v1",
+                aggregateType = "Like",
+                aggregateId = "1",
+                payload = objectMapper.writeValueAsString(likePayload),
+            )
+
+            val records = listOf(createConsumerRecord("like-events", likeEnvelope))
+
+            every { eventHandledService.isAlreadyHandled("product-statistic:event-1") } returns false
+            every { eventHandledService.markAsHandled("product-statistic:event-1") } just runs
+            every { productStatisticService.updateLikeCount(any()) } just runs
+            every { acknowledgment.acknowledge() } just runs
+
+            // when
+            productLikeEventConsumer.consume(records, acknowledgment)
+
+            // then
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-statistic:event-1") }
         }
     }
 
@@ -271,6 +262,7 @@ class ProductLikeEventConsumerTest {
 
             // then
             verify(exactly = 0) { productStatisticService.updateLikeCount(any()) }
+            verify(exactly = 0) { eventHandledService.isAlreadyHandled(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -300,8 +292,8 @@ class ProductLikeEventConsumerTest {
                 createConsumerRecord("like-events", unsupportedEnvelope),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { productStatisticService.updateLikeCount(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
@@ -318,62 +310,6 @@ class ProductLikeEventConsumerTest {
                 )
             }
             verify(exactly = 1) { acknowledgment.acknowledge() }
-        }
-    }
-
-    @DisplayName("파싱 실패 처리")
-    @Nested
-    inner class HandleParsingFailure {
-
-        @DisplayName("파싱 실패한 메시지는 BatchListenerFailedException을 발생시킨다")
-        @Test
-        fun `throws BatchListenerFailedException for malformed message`() {
-            // given
-            val malformedRecord = ConsumerRecord(
-                "like-events",
-                0,
-                0L,
-                "key",
-                "not a valid json",
-            )
-
-            val records = listOf(malformedRecord)
-
-            // when & then
-            assertThrows<BatchListenerFailedException> {
-                productLikeEventConsumer.consume(records, acknowledgment)
-            }
-        }
-
-        @DisplayName("첫 번째 메시지가 파싱 실패하면 나머지 메시지는 처리되지 않는다")
-        @Test
-        fun `does not process remaining messages when first message fails`() {
-            // given
-            val malformedRecord = ConsumerRecord(
-                "like-events",
-                0,
-                0L,
-                "key",
-                "not a valid json",
-            )
-
-            val likePayload = LikeEventPayload(productId = 1L, userId = 1L)
-            val validEnvelope = createEnvelope(
-                id = "valid-event",
-                type = "loopers.like.created.v1",
-                aggregateType = "Like",
-                aggregateId = "1",
-                payload = objectMapper.writeValueAsString(likePayload),
-            )
-            val validRecord = createConsumerRecord("like-events", validEnvelope)
-
-            val records = listOf(malformedRecord, validRecord)
-
-            // when & then
-            assertThrows<BatchListenerFailedException> {
-                productLikeEventConsumer.consume(records, acknowledgment)
-            }
-            verify(exactly = 0) { productStatisticService.updateLikeCount(any()) }
         }
     }
 

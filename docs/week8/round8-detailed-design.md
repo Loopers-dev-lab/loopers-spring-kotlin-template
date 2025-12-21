@@ -131,23 +131,45 @@ flowchart TD
 
 ### 2.3 Consumer: 이벤트 처리 플로우
 
+#### Sequential Processing (Stock/Like/Order Consumer)
+
 ```mermaid
 flowchart TD
-    Start([메시지 수신]) --> Parse[CloudEventEnvelope 파싱]
-    Parse --> CheckIdempotency{멱등성 체크<br/>필요?}
-    CheckIdempotency -->|필요| CheckHandled{event_handled<br/>존재?}
-    CheckHandled -->|존재| Skip[처리 스킵]
-    Skip --> Ack
-    CheckHandled -->|미존재| Process[비즈니스 로직 처리]
-    CheckIdempotency -->|불필요| Process
+    Start([배치 메시지 수신]) --> Loop{for each record}
+    Loop -->|다음 레코드| Parse[CloudEventEnvelope 파싱]
+    Parse --> CheckType{지원하는<br/>이벤트 타입?}
+    CheckType -->|아니오| Loop
+    CheckType -->|예| CheckHandled{EventHandledService<br/>isAlreadyHandled?}
+    CheckHandled -->|처리됨| Loop
+    CheckHandled -->|미처리| Process[비즈니스 로직 처리]
     Process --> Success{성공?}
-    Success -->|예| SaveHandled[event_handled 저장<br/>필요시]
-    SaveHandled --> Ack[오프셋 커밋]
+    Success -->|예| MarkHandled[markAsHandled<br/>예외 비전파]
+    MarkHandled --> Loop
+    Success -->|아니오| Throw[BatchListenerFailedException]
+    Throw --> ErrorHandler[DefaultErrorHandler]
+    ErrorHandler --> Retry{1회 재시도<br/>1초 후}
+    Retry -->|재시도| Parse
+    Retry -->|실패| DLT[DLT 토픽 전송]
+    DLT --> NextPoll[다음 poll에서<br/>이후 레코드 처리]
+    Loop -->|완료| Ack[acknowledge]
     Ack --> End1([완료])
-    Success -->|아니오| Retry{재시도<br/>횟수 초과?}
-    Retry -->|아니오| Process
-    Retry -->|예| DLQ[DLQ 토픽 전송]
-    DLQ --> Ack
+```
+
+#### Batch Processing (ProductView Consumer)
+
+```mermaid
+flowchart TD
+    Start([배치 메시지 수신]) --> ParseAll[전체 파싱 + 필터링]
+    ParseAll --> CheckEmpty1{처리할<br/>메시지 있음?}
+    CheckEmpty1 -->|없음| Ack
+    CheckEmpty1 -->|있음| BatchCheck[findAllExistingKeys<br/>배치 멱등성 체크]
+    BatchCheck --> Filter[이미 처리된 키 제외]
+    Filter --> CheckEmpty2{신규<br/>메시지 있음?}
+    CheckEmpty2 -->|없음| Ack
+    CheckEmpty2 -->|있음| BatchProcess[배치 비즈니스 로직 처리]
+    BatchProcess --> BatchSave[markAllAsHandled<br/>예외 비전파]
+    BatchSave --> Ack[acknowledge]
+    Ack --> End1([완료])
 ```
 
 ---
@@ -233,11 +255,71 @@ flowchart TD
 | ProductLikeEventConsumer  | 배치 내 중복 제거만       | DB UPSERT로 최종 상태 보장 |
 | ProductStockEventConsumer | 없음                | 캐시 무효화는 동작 자체가 멱등   |
 
+**스펙 리팩토링 변경 사항**:
+
+| Consumer                  | 멱등성 방식             | 처리 방식    | 이유                       |
+|---------------------------|---------------------|-----------|--------------------------|
+| ProductOrderEventConsumer | EventHandledService | Sequential | 판매량 중복 집계 방지             |
+| ProductViewEventConsumer  | EventHandledService | Batch     | 고빈도 이벤트, 배치 최적화 유지       |
+| ProductLikeEventConsumer  | EventHandledService | Sequential | 좋아요 중복 처리 방지             |
+| ProductStockEventConsumer | EventHandledService | Sequential | 캐시 무효화 중복 방지             |
+
+**처리 방식 구분:**
+- **Sequential**: record-by-record 순차 처리. 저빈도 이벤트에 적합, Spring Kafka 표준 패턴 준수
+- **Batch**: 배치 단위 일괄 처리. 고빈도 이벤트(ProductView)에 대한 성능 최적화
+
 ### 4.3 에러 처리
 
-- **재시도**: DefaultErrorHandler로 최대 3회 재시도 (1초 간격)
-- **DLQ**: 재시도 실패 시 `{원본토픽}.DLT` 토픽으로 전송
-- **DLQ 토픽**: `order-events.DLT`, `like-events.DLT`, `product-events.DLT`, `stock-events.DLT`
+- **재시도**: DefaultErrorHandler로 1회 재시도 (1초 간격, `FixedBackOff(1000L, 1L)`)
+- **RetryListener**: 재시도 실패/복구 시 로깅 (failedDelivery, recovered)
+- **Not-retryable 예외**: 별도 지정 없음 (단순성 유지)
+- **DLT**: 재시도 실패 시 `{원본토픽}.DLT` 토픽으로 전송
+- **DLT 토픽**: `order-events.DLT`, `like-events.DLT`, `product-events.DLT`, `stock-events.DLT`
+
+**에러 처리 흐름:**
+1. Consumer에서 예외 발생 → `BatchListenerFailedException` throw
+2. DefaultErrorHandler가 1초 후 해당 레코드부터 재시도
+3. 재시도 실패 시 `RetryListener.recovered()` 로깅 후 DLT 전송
+4. 이후 레코드는 다음 poll에서 재처리
+
+### 4.4 Sequential Processing 패턴
+
+**적용 대상**: ProductStockEventConsumer, ProductLikeEventConsumer, ProductOrderEventConsumer
+
+**핵심 구조**:
+```kotlin
+@KafkaListener(topics = ["topic"], containerFactory = KafkaConfig.BATCH_LISTENER)
+fun consume(messages: List<ConsumerRecord<String, String>>, ack: Acknowledgment) {
+    for ((index, record) in messages.withIndex()) {
+        try {
+            processRecord(record)
+        } catch (e: Exception) {
+            throw BatchListenerFailedException("Failed to process", e, index)
+        }
+    }
+    ack.acknowledge()
+}
+
+private fun processRecord(record: ConsumerRecord<String, String>) {
+    val envelope = objectMapper.readValue(record.value(), CloudEventEnvelope::class.java)
+    if (envelope.type !in SUPPORTED_TYPES) return
+
+    val idempotencyKey = idempotencyKeyExtractor(envelope)
+    if (eventHandledService.isAlreadyHandled(idempotencyKey)) return
+
+    // 비즈니스 로직 처리
+
+    eventHandledService.markAsHandled(idempotencyKey)
+}
+```
+
+**Idempotency Key 전략**:
+
+| Consumer                  | Key 형식                                        | 설명              |
+|---------------------------|-----------------------------------------------|-----------------|
+| ProductStockEventConsumer | `{consumerGroup}:{eventId}`                   | 이벤트 단위 멱등성     |
+| ProductLikeEventConsumer  | `{consumerGroup}:{eventId}`                   | 이벤트 단위 멱등성     |
+| ProductOrderEventConsumer | `{consumerGroup}:{aggregateType}:{aggregateId}:{eventType}` | 주문 단위 이벤트 타입별 멱등성 |
 
 ---
 
@@ -343,3 +425,14 @@ outbox:
 | DLQ 토픽별 분리               | 실패 이벤트 유형 명확 구분, 독립적 재처리 가능                             |
 | 토픽 파티션 수 3개              | 보수적 시작. 파티션은 늘릴 수 있지만 줄일 수 없음                           |
 | min.insync.replicas=2    | acks=all과 함께 최소 2개 replica 보장. 1개 브로커 장애까지 허용           |
+
+**스펙 리팩토링 추가 결정 사항**:
+
+| 설계 결정                    | 근거                                                      |
+|--------------------------|---------------------------------------------------------|
+| ProductView만 배치 최적화 유지 | 고빈도 이벤트, 배치 처리 성능 이점. 나머지는 저빈도라 Sequential Processing 적합 |
+| 나머지 Consumer Sequential | 저빈도 이벤트, Spring Kafka 표준 패턴 준수, N+1 쿼리 허용 가능         |
+| 배치 내 deduplicate 제거   | DB 기반 멱등성 체크가 이미 중복 처리, 불필요한 복잡도 제거                   |
+| EventHandledService 계층 | Consumer-Repository 분리, 예외 비전파 정책 캡슐화                 |
+| markAsHandled 예외 비전파  | 비즈니스 로직 성공 후 멱등성 기록 실패로 전체 실패 방지. 재처리 시 멱등성으로 안전     |
+| 1회 재시도 (1초 간격)       | FixedBackOff(1000L, 1L). 단순성 유지, transient failure 대응   |

@@ -130,16 +130,18 @@ Kafka 발행 시 PartitionKey(aggregateId)를 지정하여 동일 엔티티의 �
 
 Kafka Consumer는 이벤트 유형별로 분리하여 구성한다:
 
-- `ProductLikeEventConsumer`: like-events 토픽을 구독하여 좋아요 집계 처리
-- `ProductOrderEventConsumer`: order-events 토픽을 구독하여 판매량 집계 처리
-- `ProductViewEventConsumer`: product-events 토픽을 구독하여 조회수 집계 처리
-- `ProductStockEventConsumer`: stock-events 토픽을 구독하여 캐시 무효화 처리
+| Consumer | 토픽 | 처리 방식 | 역할 |
+|----------|-----|---------|------|
+| `ProductLikeEventConsumer` | like-events | Sequential | 좋아요 집계 처리 |
+| `ProductOrderEventConsumer` | order-events | Sequential | 판매량 집계 처리 |
+| `ProductViewEventConsumer` | product-events | **Batch** | 조회수 집계 처리 (고빈도) |
+| `ProductStockEventConsumer` | stock-events | Sequential | 캐시 무효화 처리 |
 
-각 Consumer는 EventHandledRepository를 의존하여 중복 처리를 방지하고, ProductStatisticService에 command를 전달한다.
+각 Consumer는 `EventHandledService`를 통해 멱등성을 보장하고, 비즈니스 서비스에 command를 전달한다.
 
 **3. 멱등성 보장 시스템 (Consumer 전용)**
 
-EventHandledRepository는 Consumer에서 중복 처리를 방지한다. Producer 측은 Outbox Offset(커서) 방식으로 중복 발행을 방지하므로 별도의 멱등성 체크가 불필요하다. 중복
+`EventHandledService`는 Consumer에서 중복 처리를 방지한다. Producer 측은 Outbox Offset(커서) 방식으로 중복 발행을 방지하므로 별도의 멱등성 체크가 불필요하다. 중복
 발행이 발생하더라도 Consumer에서 걸러지므로 At-least-once 발행, Exactly-once 처리가 보장된다.
 
 멱등성 체크는 `idempotency_key` 단일 컬럼으로 수행하며 이벤트별 차별화된 멱등성 전략을 사용한다.
@@ -156,9 +158,16 @@ EventHandledRepository는 Consumer에서 중복 처리를 방지한다. Producer
 - **주문 완료 판매량 집계**: event_handled 테이블로 중복 체크 필요
 - **상품 조회 조회수 집계**: event_handled 테이블로 중복 체크 필요
 
+**스펙 리팩토링 변경 사항**:
+- **Sequential Processing** (Stock/Like/Order): record-by-record 순차 처리, Spring Kafka 표준 패턴 준수
+- **Batch Processing** (ProductView): 배치 단위 일괄 처리, 고빈도 이벤트 최적화 (배치 내 deduplicate 로직 제거됨)
+- 모든 Consumer가 `EventHandledService`를 통해 멱등성을 보장
+
 **4. 에러 처리 시스템**
 
-처리 실패 메시지는 DLQ(Dead Letter Queue) 토픽으로 전송한다.
+- **재시도**: DefaultErrorHandler로 1회 재시도 (1초 간격, `FixedBackOff(1000L, 1L)`)
+- **RetryListener**: 재시도 실패/복구 시 로깅
+- **DLT 전송**: 재시도 실패 시 `{원본토픽}.DLT` 토픽으로 전송
 
 #### 데이터 흐름
 
@@ -225,63 +234,102 @@ sequenceDiagram
     deactivate RS
 ```
 
-**3. 판매량/조회수 집계 흐름 (Consumer - 멱등성 체크 필요)**
+**3. Sequential Processing 흐름 (Stock/Like/Order Consumer)**
 
 ```mermaid
 sequenceDiagram
     participant K as Kafka
-    participant PEC as ProductEventConsumer
-    participant EHR as EventHandledRepository
-    participant PSS as ProductStatisticService
+    participant C as Consumer
+    participant EHS as EventHandledService
+    participant SVC as BusinessService
     participant DB as Database
-    participant DLQ as DLQ Topic
-    K ->> PEC: 이벤트 배치 수신
-    activate PEC
-    Note over PEC: 1. 파싱 및 필터링
-    Note over PEC: 2. 배치 내 중복 제거 (최신 이벤트만 유지)
+    participant DLT as DLT Topic
 
-    loop 각 이벤트에 대해
-        PEC ->> EHR: 처리 여부 확인 (idempotency_key)
+    K ->> C: 배치 메시지 수신
+    activate C
+
+    loop for each record
+        C ->> C: CloudEventEnvelope 파싱
+        C ->> C: 이벤트 타입 필터링
+        C ->> EHS: isAlreadyHandled(key)
         alt 이미 처리됨
-            EHR -->> PEC: 처리됨
-            PEC ->> PEC: 스킵
+            EHS -->> C: true
+            C ->> C: continue (스킵)
         else 미처리
-            EHR -->> PEC: 미처리
+            EHS -->> C: false
+            C ->> SVC: 비즈니스 로직 처리
+            activate SVC
+            SVC ->> DB: 데이터 처리
+            SVC -->> C: 완료
+            deactivate SVC
+            C ->> EHS: markAsHandled(key)
+            Note over EHS: 예외 비전파 (로깅만)
         end
     end
 
-    Note over PEC: 3. 미처리 이벤트 일괄 처리
-    PEC ->> PSS: command 전달
-    activate PSS
-    PSS ->> DB: product_statistics UPSERT
-    PSS -->> PEC: 성공
-    deactivate PSS
-    Note over PEC: 4. 멱등성 키 저장
-    PEC ->> EHR: 처리 완료 기록 저장
-    PEC ->> K: ACK
-    deactivate PEC
+    C ->> K: acknowledge()
+    deactivate C
+
+    Note over C,DLT: 실패 시 BatchListenerFailedException<br/>→ 1회 재시도 → DLT 전송
 ```
 
-**4. 캐시 무효화 흐름 (Consumer - 멱등성 체크 불필요)**
+**4. Batch Processing 흐름 (ProductView Consumer)**
+
+```mermaid
+sequenceDiagram
+    participant K as Kafka
+    participant PVC as ProductViewEventConsumer
+    participant EHS as EventHandledService
+    participant PSS as ProductStatisticService
+    participant DB as Database
+
+    K ->> PVC: 배치 메시지 수신
+    activate PVC
+    Note over PVC: 1. 전체 파싱 + 필터링
+
+    PVC ->> EHS: findAllExistingKeys(allKeys)
+    EHS -->> PVC: existingKeys
+    Note over PVC: 2. 이미 처리된 키 제외
+
+    alt 신규 메시지 있음
+        PVC ->> PSS: toViewCommand() + updateViewCount()
+        activate PSS
+        PSS ->> DB: 배치 UPSERT
+        PSS -->> PVC: 완료
+        deactivate PSS
+
+        PVC ->> EHS: markAllAsHandled(newKeys)
+        Note over EHS: 예외 비전파 (로깅만)
+    end
+
+    PVC ->> K: acknowledge()
+    deactivate PVC
+```
+
+**5. 캐시 무효화 흐름 (ProductStock Consumer - Sequential)**
 
 ```mermaid
 sequenceDiagram
     participant K as Kafka
     participant PSEC as ProductStockEventConsumer
+    participant EHS as EventHandledService
+    participant PCS as ProductCacheService
     participant Redis as Redis
-    participant DLQ as DLQ Topic
-    K ->> PSEC: 재고 소진 이벤트 수신
-    activate PSEC
-    Note over PSEC: 파싱 및 필터링
-    PSEC ->> Redis: 상품 캐시 삭제
-    Redis -->> PSEC: 삭제 완료
 
-    alt 처리 성공
-        PSEC ->> K: ACK
-    else 처리 실패
-        PSEC ->> DLQ: 실패 이벤트 전송
-        PSEC ->> K: ACK
+    K ->> PSEC: 배치 메시지 수신
+    activate PSEC
+
+    loop for each record
+        PSEC ->> PSEC: CloudEventEnvelope 파싱
+        PSEC ->> EHS: isAlreadyHandled(key)
+        alt 미처리
+            PSEC ->> PCS: evictStockDepletedProducts()
+            PCS ->> Redis: 캐시 삭제
+            PSEC ->> EHS: markAsHandled(key)
+        end
     end
+
+    PSEC ->> K: acknowledge()
     deactivate PSEC
 ```
 

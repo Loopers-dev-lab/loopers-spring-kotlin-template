@@ -76,8 +76,44 @@ class ProductEventMapper(
      * @return productId 목록 - 캐시 무효화 대상
      */
     fun toStockDepletedProductIds(envelopes: List<CloudEventEnvelope>): List<Long> =
-        envelopes.map { envelope ->
-            val payload = objectMapper.readValue(envelope.payload, StockDepletedEventPayload::class.java)
-            payload.productId
+        envelopes.map { envelope -> toStockDepletedProductId(envelope) }
+
+    /**
+     * 단일 Stock Depleted 이벤트에서 productId 추출
+     *
+     * @param envelope Stock Depleted 이벤트 envelope
+     * @return productId - 캐시 무효화 대상
+     */
+    fun toStockDepletedProductId(envelope: CloudEventEnvelope): Long {
+        val payload = objectMapper.readValue(envelope.payload, StockDepletedEventPayload::class.java)
+        return payload.productId
+    }
+
+    /**
+     * 단일 Like 이벤트를 UpdateLikeCountCommand.Item으로 변환
+     *
+     * @param envelope Like 관련 이벤트 envelope (created/canceled)
+     * @return UpdateLikeCountCommand.Item - productId와 LikeType 정보 포함
+     * @throws IllegalArgumentException 알 수 없는 like 이벤트 타입인 경우
+     */
+    fun toLikeItem(envelope: CloudEventEnvelope): UpdateLikeCountCommand.Item {
+        val payload = objectMapper.readValue(envelope.payload, LikeEventPayload::class.java)
+        val type = when (envelope.type) {
+            "loopers.like.created.v1" -> UpdateLikeCountCommand.LikeType.CREATED
+            "loopers.like.canceled.v1" -> UpdateLikeCountCommand.LikeType.CANCELED
+            else -> throw IllegalArgumentException("Unknown like event type: ${envelope.type}")
         }
+        return UpdateLikeCountCommand.Item(payload.productId, type)
+    }
+
+    /**
+     * 단일 Order Paid 이벤트를 UpdateSalesCountCommand.Item 목록으로 변환
+     *
+     * @param envelope Order Paid 이벤트 envelope
+     * @return UpdateSalesCountCommand.Item 목록 - 해당 주문의 orderItems 정보 포함
+     */
+    fun toSalesItems(envelope: CloudEventEnvelope): List<UpdateSalesCountCommand.Item> {
+        val payload = objectMapper.readValue(envelope.payload, OrderPaidEventPayload::class.java)
+        return payload.orderItems.map { UpdateSalesCountCommand.Item(it.productId, it.quantity) }
+    }
 }

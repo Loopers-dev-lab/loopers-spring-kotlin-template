@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.config.kafka.KafkaConfig
 import com.loopers.domain.product.ProductStatisticService
 import com.loopers.eventschema.CloudEventEnvelope
-import com.loopers.support.idempotency.EventHandled
-import com.loopers.support.idempotency.EventHandledRepository
+import com.loopers.support.idempotency.EventHandledService
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.listener.BatchListenerFailedException
 import org.springframework.kafka.support.Acknowledgment
@@ -20,17 +18,14 @@ import org.springframework.stereotype.Component
  * - Supported events: loopers.product.viewed.v1
  * - Idempotency: DB-based (idempotencyKey: {consumerGroup}:{eventId})
  * - Error handling: BatchListenerFailedException for DLT routing
- * - Batch deduplication: Keeps only the latest event by time for the same eventId
  */
 @Component
 class ProductViewEventConsumer(
     private val productStatisticService: ProductStatisticService,
     private val productEventMapper: ProductEventMapper,
-    private val eventHandledRepository: EventHandledRepository,
+    private val eventHandledService: EventHandledService,
     private val objectMapper: ObjectMapper,
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
-
     companion object {
         private const val CONSUMER_GROUP = "product-statistic"
     }
@@ -66,36 +61,23 @@ class ProductViewEventConsumer(
             return
         }
 
-        // 2. Deduplicate within batch (keep latest by time)
-        val deduplicatedEnvelopes = parsedEnvelopes
-            .groupBy { (_, idempotencyKey) -> idempotencyKey }
-            .map { (_, envelopes) ->
-                envelopes.maxBy { (envelope, _) -> envelope.time }
-            }
-
-        // 3. Check DB idempotency (batch)
-        val allKeys = deduplicatedEnvelopes.map { (_, key) -> key }.toSet()
-        val existingKeys = eventHandledRepository.findAllExistingKeys(allKeys)
-        val newEnvelopes = deduplicatedEnvelopes.filter { (_, key) -> key !in existingKeys }
+        // 2. Check DB idempotency (batch)
+        val allKeys = parsedEnvelopes.map { (_, key) -> key }.toSet()
+        val existingKeys = eventHandledService.findAllExistingKeys(allKeys)
+        val newEnvelopes = parsedEnvelopes.filter { (_, key) -> key !in existingKeys }
 
         if (newEnvelopes.isEmpty()) {
             ack.acknowledge()
             return
         }
 
-        // 4. Process business logic
+        // 3. Process business logic
         val envelopesToProcess = newEnvelopes.map { (envelope, _) -> envelope }
         val command = productEventMapper.toViewCommand(envelopesToProcess)
         productStatisticService.updateViewCount(command)
 
-        // 5. Save idempotency keys (batch, ignore errors)
-        runCatching {
-            eventHandledRepository.saveAll(
-                newEnvelopes.map { (_, key) -> EventHandled(idempotencyKey = key) },
-            )
-        }.onFailure { e ->
-            log.warn("Failed to save idempotency keys, duplicates may occur on retry", e)
-        }
+        // 4. Save idempotency keys (batch)
+        eventHandledService.markAllAsHandled(newEnvelopes.map { (_, key) -> key })
 
         ack.acknowledge()
     }

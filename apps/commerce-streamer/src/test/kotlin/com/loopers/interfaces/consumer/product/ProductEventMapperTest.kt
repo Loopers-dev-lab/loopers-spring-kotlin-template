@@ -309,6 +309,124 @@ class ProductEventMapperTest {
         }
     }
 
+    @Nested
+    @DisplayName("toStockDepletedProductId")
+    inner class ToStockDepletedProductIdTest {
+        @Test
+        @DisplayName("extracts productId from envelope")
+        fun `extracts productId from envelope`() {
+            // given
+            val envelope = createEnvelope(
+                type = "loopers.stock.depleted.v1",
+                aggregateId = "100",
+                payload = """{"productId": 100}""",
+            )
+
+            // when
+            val productId = productEventMapper.toStockDepletedProductId(envelope)
+
+            // then
+            assertThat(productId).isEqualTo(100L)
+        }
+    }
+
+    @Nested
+    @DisplayName("toLikeItem")
+    inner class ToLikeItemTest {
+        @Test
+        @DisplayName("extracts Item with CREATED type for like.created event")
+        fun `extracts Item with CREATED type for like created event`() {
+            // given
+            val envelope = createEnvelope(
+                type = "loopers.like.created.v1",
+                aggregateId = "100",
+                payload = """{"productId": 100, "userId": 1}""",
+            )
+
+            // when
+            val item = productEventMapper.toLikeItem(envelope)
+
+            // then
+            assertThat(item.productId).isEqualTo(100L)
+            assertThat(item.type).isEqualTo(UpdateLikeCountCommand.LikeType.CREATED)
+        }
+
+        @Test
+        @DisplayName("extracts Item with CANCELED type for like.canceled event")
+        fun `extracts Item with CANCELED type for like canceled event`() {
+            // given
+            val envelope = createEnvelope(
+                type = "loopers.like.canceled.v1",
+                aggregateId = "200",
+                payload = """{"productId": 200, "userId": 2}""",
+            )
+
+            // when
+            val item = productEventMapper.toLikeItem(envelope)
+
+            // then
+            assertThat(item.productId).isEqualTo(200L)
+            assertThat(item.type).isEqualTo(UpdateLikeCountCommand.LikeType.CANCELED)
+        }
+
+        @Test
+        @DisplayName("throws on unknown like event type")
+        fun `throws on unknown like event type`() {
+            // given
+            val envelope = createEnvelope(
+                type = "loopers.like.unknown.v1",
+                aggregateId = "100",
+                payload = """{"productId": 100, "userId": 1}""",
+            )
+
+            // when & then
+            assertThatThrownBy { productEventMapper.toLikeItem(envelope) }
+                .isInstanceOf(IllegalArgumentException::class.java)
+                .hasMessageContaining("Unknown like event type")
+                .hasMessageContaining("loopers.like.unknown.v1")
+        }
+    }
+
+    @Nested
+    @DisplayName("toSalesItems")
+    inner class ToSalesItemsTest {
+        @Test
+        @DisplayName("extracts list of Items from order paid event with multiple orderItems")
+        fun `extracts list of Items from order paid event with multiple orderItems`() {
+            // given
+            val envelope = createEnvelope(
+                type = "loopers.order.paid.v1",
+                aggregateId = "order-1",
+                payload = """{"orderId": 1, "orderItems": [{"productId": 100, "quantity": 2}, {"productId": 200, "quantity": 3}]}""",
+            )
+
+            // when
+            val items = productEventMapper.toSalesItems(envelope)
+
+            // then
+            assertThat(items).hasSize(2)
+            assertThat(items[0]).isEqualTo(UpdateSalesCountCommand.Item(100L, 2))
+            assertThat(items[1]).isEqualTo(UpdateSalesCountCommand.Item(200L, 3))
+        }
+
+        @Test
+        @DisplayName("returns empty list for order with no items")
+        fun `returns empty list for order with no items`() {
+            // given
+            val envelope = createEnvelope(
+                type = "loopers.order.paid.v1",
+                aggregateId = "order-1",
+                payload = """{"orderId": 1, "orderItems": []}""",
+            )
+
+            // when
+            val items = productEventMapper.toSalesItems(envelope)
+
+            // then
+            assertThat(items).isEmpty()
+        }
+    }
+
     private fun createEnvelope(
         id: String = "evt-${System.nanoTime()}",
         type: String,

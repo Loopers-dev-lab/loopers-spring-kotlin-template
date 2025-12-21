@@ -3,13 +3,11 @@ package com.loopers.interfaces.consumer.product
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.config.kafka.KafkaConfig
 import com.loopers.domain.product.ProductStatisticService
+import com.loopers.domain.product.UpdateLikeCountCommand
 import com.loopers.eventschema.CloudEventEnvelope
-import com.loopers.support.idempotency.EventHandled
-import com.loopers.support.idempotency.EventHandledRepository
+import com.loopers.support.idempotency.EventHandledService
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
-import org.springframework.kafka.listener.BatchListenerFailedException
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.stereotype.Component
 
@@ -19,78 +17,42 @@ import org.springframework.stereotype.Component
  * - 구독 토픽: like-events
  * - 지원 이벤트: loopers.like.created.v1, loopers.like.canceled.v1
  * - 멱등성: DB 기반 (idempotencyKey: {consumerGroup}:{eventId})
- * - 에러 처리: BatchListenerFailedException으로 DLT 전송
- * - 배치 내 중복 제거: 동일 eventId에 대해 하나만 처리
+ * - 처리 방식: 레코드 단위 순차 처리
  */
 @Component
 class ProductLikeEventConsumer(
     private val productStatisticService: ProductStatisticService,
     private val productEventMapper: ProductEventMapper,
-    private val eventHandledRepository: EventHandledRepository,
+    private val eventHandledService: EventHandledService,
     private val objectMapper: ObjectMapper,
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
-
     companion object {
         private const val CONSUMER_GROUP = "product-statistic"
+        private val SUPPORTED_TYPES = setOf(
+            "loopers.like.created.v1",
+            "loopers.like.canceled.v1",
+        )
     }
 
-    private val supportedTypes = setOf(
-        "loopers.like.created.v1",
-        "loopers.like.canceled.v1",
-    )
+    private val idempotencyKeyExtractor: (CloudEventEnvelope) -> String = { envelope ->
+        "$CONSUMER_GROUP:${envelope.id}"
+    }
 
     @KafkaListener(topics = ["like-events"], containerFactory = KafkaConfig.BATCH_LISTENER)
     fun consume(messages: List<ConsumerRecord<String, String>>, ack: Acknowledgment) {
-        // 1. Parse + Filter
-        val parsedEnvelopes = mutableListOf<Pair<CloudEventEnvelope, String>>()
-
         for (record in messages) {
-            val envelope = try {
-                objectMapper.readValue(record.value(), CloudEventEnvelope::class.java)
-            } catch (e: Exception) {
-                throw BatchListenerFailedException("Failed to parse", e, record)
-            }
-
-            if (envelope.type !in supportedTypes) continue
-
-            val idempotencyKey = "$CONSUMER_GROUP:${envelope.id}"
-            parsedEnvelopes.add(envelope to idempotencyKey)
+            processRecord(record)
         }
-
-        if (parsedEnvelopes.isEmpty()) {
-            ack.acknowledge()
-            return
-        }
-
-        // 2. Deduplicate within batch by event ID
-        val deduplicatedEnvelopes = parsedEnvelopes
-            .distinctBy { (envelope, _) -> envelope.id }
-
-        // 3. Check DB idempotency (batch)
-        val allKeys = deduplicatedEnvelopes.map { (_, key) -> key }.toSet()
-        val existingKeys = eventHandledRepository.findAllExistingKeys(allKeys)
-        val newEnvelopes = deduplicatedEnvelopes.filter { (_, key) -> key !in existingKeys }
-
-        if (newEnvelopes.isEmpty()) {
-            ack.acknowledge()
-            return
-        }
-
-        // 4. Process business logic
-        val envelopesToProcess = newEnvelopes.map { (envelope, _) -> envelope }
-        val command = productEventMapper.toLikeCommand(envelopesToProcess)
-        productStatisticService.updateLikeCount(command)
-
-        // 5. Save idempotency keys (batch, ignore errors)
-        runCatching {
-            eventHandledRepository.saveAll(
-                newEnvelopes.map { (_, key) -> EventHandled(idempotencyKey = key) },
-            )
-        }.onFailure { e ->
-            log.warn("Failed to save idempotency keys, duplicates may occur on retry", e)
-        }
-
         ack.acknowledge()
+    }
+
+    private fun processRecord(record: ConsumerRecord<String, String>) {
+        val envelope = objectMapper.readValue(record.value(), CloudEventEnvelope::class.java)
+        if (envelope.type !in SUPPORTED_TYPES) return
+        val idempotencyKey = idempotencyKeyExtractor(envelope)
+        if (eventHandledService.isAlreadyHandled(idempotencyKey)) return
+        val item = productEventMapper.toLikeItem(envelope)
+        productStatisticService.updateLikeCount(UpdateLikeCountCommand(listOf(item)))
+        eventHandledService.markAsHandled(idempotencyKey)
     }
 }

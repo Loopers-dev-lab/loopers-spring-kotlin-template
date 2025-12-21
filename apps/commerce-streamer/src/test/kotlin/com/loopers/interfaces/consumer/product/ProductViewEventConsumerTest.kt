@@ -7,7 +7,7 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.loopers.domain.product.ProductStatisticService
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.interfaces.consumer.product.event.ProductViewedEventPayload
-import com.loopers.support.idempotency.EventHandledRepository
+import com.loopers.support.idempotency.EventHandledService
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -28,7 +28,7 @@ class ProductViewEventConsumerTest {
 
     private lateinit var productStatisticService: ProductStatisticService
     private lateinit var productEventMapper: ProductEventMapper
-    private lateinit var eventHandledRepository: EventHandledRepository
+    private lateinit var eventHandledService: EventHandledService
     private lateinit var objectMapper: ObjectMapper
     private lateinit var acknowledgment: Acknowledgment
     private lateinit var productViewEventConsumer: ProductViewEventConsumer
@@ -36,7 +36,7 @@ class ProductViewEventConsumerTest {
     @BeforeEach
     fun setUp() {
         productStatisticService = mockk()
-        eventHandledRepository = mockk()
+        eventHandledService = mockk()
         objectMapper = ObjectMapper()
             .registerKotlinModule()
             .registerModule(JavaTimeModule())
@@ -47,7 +47,7 @@ class ProductViewEventConsumerTest {
         productViewEventConsumer = ProductViewEventConsumer(
             productStatisticService,
             productEventMapper,
-            eventHandledRepository,
+            eventHandledService,
             objectMapper,
         )
     }
@@ -74,9 +74,9 @@ class ProductViewEventConsumerTest {
 
             val records = listOf(createConsumerRecord("product-events", viewedEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAllAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -121,9 +121,9 @@ class ProductViewEventConsumerTest {
                 createConsumerRecord("product-events", viewedEnvelope2),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAllAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -210,9 +210,9 @@ class ProductViewEventConsumerTest {
                 createConsumerRecord("product-events", unsupportedEnvelope),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAllAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -228,106 +228,6 @@ class ProductViewEventConsumerTest {
                 )
             }
             verify(exactly = 1) { acknowledgment.acknowledge() }
-        }
-    }
-
-    @DisplayName("Batch deduplication")
-    @Nested
-    inner class BatchDeduplication {
-
-        @DisplayName("Keeps only latest event by time for same event id")
-        @Test
-        fun `keeps only latest event by time for same event id`() {
-            // given
-            val olderPayload = ProductViewedEventPayload(productId = 100L, userId = 1L)
-            val olderEnvelope = createEnvelope(
-                id = "same-event-id",
-                type = "loopers.product.viewed.v1",
-                aggregateType = "Product",
-                aggregateId = "100",
-                payload = objectMapper.writeValueAsString(olderPayload),
-                time = Instant.parse("2024-01-01T10:00:00Z"),
-            )
-
-            val newerPayload = ProductViewedEventPayload(productId = 200L, userId = 2L)
-            val newerEnvelope = createEnvelope(
-                id = "same-event-id",
-                type = "loopers.product.viewed.v1",
-                aggregateType = "Product",
-                aggregateId = "200",
-                payload = objectMapper.writeValueAsString(newerPayload),
-                time = Instant.parse("2024-01-01T12:00:00Z"),
-            )
-
-            val records = listOf(
-                createConsumerRecord("product-events", olderEnvelope),
-                createConsumerRecord("product-events", newerEnvelope),
-            )
-
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
-            every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
-            every { acknowledgment.acknowledge() } just runs
-
-            // when
-            productViewEventConsumer.consume(records, acknowledgment)
-
-            // then
-            verify(exactly = 1) {
-                productStatisticService.updateViewCount(
-                    match { command ->
-                        command.items.size == 1 &&
-                            command.items[0].productId == 200L
-                    },
-                )
-            }
-        }
-
-        @DisplayName("Processes all events with different event ids")
-        @Test
-        fun `processes all events with different event ids`() {
-            // given
-            val payload1 = ProductViewedEventPayload(productId = 100L, userId = 1L)
-            val envelope1 = createEnvelope(
-                id = "event-1",
-                type = "loopers.product.viewed.v1",
-                aggregateType = "Product",
-                aggregateId = "100",
-                payload = objectMapper.writeValueAsString(payload1),
-            )
-
-            val payload2 = ProductViewedEventPayload(productId = 200L, userId = 2L)
-            val envelope2 = createEnvelope(
-                id = "event-2",
-                type = "loopers.product.viewed.v1",
-                aggregateType = "Product",
-                aggregateId = "200",
-                payload = objectMapper.writeValueAsString(payload2),
-            )
-
-            val records = listOf(
-                createConsumerRecord("product-events", envelope1),
-                createConsumerRecord("product-events", envelope2),
-            )
-
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
-            every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
-            every { acknowledgment.acknowledge() } just runs
-
-            // when
-            productViewEventConsumer.consume(records, acknowledgment)
-
-            // then
-            verify(exactly = 1) {
-                productStatisticService.updateViewCount(
-                    match { command ->
-                        command.items.size == 2 &&
-                            command.items.any { it.productId == 100L } &&
-                            command.items.any { it.productId == 200L }
-                    },
-                )
-            }
         }
     }
 
@@ -350,7 +250,7 @@ class ProductViewEventConsumerTest {
 
             val records = listOf(createConsumerRecord("product-events", viewedEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } answers { firstArg() }
+            every { eventHandledService.findAllExistingKeys(any()) } answers { firstArg() }
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -358,7 +258,7 @@ class ProductViewEventConsumerTest {
 
             // then
             verify(exactly = 0) { productStatisticService.updateViewCount(any()) }
-            verify(exactly = 0) { eventHandledRepository.saveAll(any()) }
+            verify(exactly = 0) { eventHandledService.markAllAsHandled(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -389,9 +289,9 @@ class ProductViewEventConsumerTest {
                 createConsumerRecord("product-events", newEnvelope),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns setOf("product-statistic:event-1")
+            every { eventHandledService.findAllExistingKeys(any()) } returns setOf("product-statistic:event-1")
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAllAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -407,10 +307,10 @@ class ProductViewEventConsumerTest {
                 )
             }
             verify(exactly = 1) {
-                eventHandledRepository.saveAll(
+                eventHandledService.markAllAsHandled(
                     match { list ->
                         list.size == 1 &&
-                            list[0].idempotencyKey == "product-statistic:event-2"
+                            list[0] == "product-statistic:event-2"
                     },
                 )
             }
@@ -431,9 +331,9 @@ class ProductViewEventConsumerTest {
 
             val records = listOf(createConsumerRecord("product-events", viewedEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAllAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -441,10 +341,10 @@ class ProductViewEventConsumerTest {
 
             // then
             verify(exactly = 1) {
-                eventHandledRepository.saveAll(
+                eventHandledService.markAllAsHandled(
                     match { list ->
                         list.size == 1 &&
-                            list[0].idempotencyKey == "product-statistic:event-abc-123"
+                            list[0] == "product-statistic:event-abc-123"
                     },
                 )
             }
@@ -470,9 +370,9 @@ class ProductViewEventConsumerTest {
 
             val records = listOf(createConsumerRecord("product-events", viewedEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.findAllExistingKeys(any()) } returns emptySet()
             every { productStatisticService.updateViewCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAllAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -480,10 +380,10 @@ class ProductViewEventConsumerTest {
 
             // then
             verify(exactly = 1) {
-                eventHandledRepository.saveAll(
+                eventHandledService.markAllAsHandled(
                     match { list ->
                         list.size == 1 &&
-                            list[0].idempotencyKey == "product-statistic:unique-event-uuid"
+                            list[0] == "product-statistic:unique-event-uuid"
                     },
                 )
             }

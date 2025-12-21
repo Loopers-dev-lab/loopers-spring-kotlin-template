@@ -8,7 +8,7 @@ import com.loopers.domain.product.EvictStockDepletedCommand
 import com.loopers.domain.product.ProductCacheService
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.interfaces.consumer.product.event.StockDepletedEventPayload
-import com.loopers.support.idempotency.EventHandledRepository
+import com.loopers.support.idempotency.EventHandledService
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -24,12 +24,12 @@ import org.springframework.kafka.listener.BatchListenerFailedException
 import org.springframework.kafka.support.Acknowledgment
 import java.time.Instant
 
-@DisplayName("ProductStockEventConsumer 배치 처리 단위 테스트")
+@DisplayName("ProductStockEventConsumer 순차 처리 단위 테스트")
 class ProductStockEventConsumerTest {
 
     private lateinit var productCacheService: ProductCacheService
     private lateinit var productEventMapper: ProductEventMapper
-    private lateinit var eventHandledRepository: EventHandledRepository
+    private lateinit var eventHandledService: EventHandledService
     private lateinit var objectMapper: ObjectMapper
     private lateinit var acknowledgment: Acknowledgment
     private lateinit var productStockEventConsumer: ProductStockEventConsumer
@@ -37,7 +37,7 @@ class ProductStockEventConsumerTest {
     @BeforeEach
     fun setUp() {
         productCacheService = mockk()
-        eventHandledRepository = mockk()
+        eventHandledService = mockk()
         objectMapper = ObjectMapper()
             .registerKotlinModule()
             .registerModule(JavaTimeModule())
@@ -48,7 +48,7 @@ class ProductStockEventConsumerTest {
         productStockEventConsumer = ProductStockEventConsumer(
             productCacheService,
             productEventMapper,
-            eventHandledRepository,
+            eventHandledService,
             objectMapper,
         )
     }
@@ -57,9 +57,9 @@ class ProductStockEventConsumerTest {
     @Nested
     inner class HandleStockDepletedEvents {
 
-        @DisplayName("Stock Depleted 이벤트 배치로 해당 상품 캐시를 무효화한다")
+        @DisplayName("Stock Depleted 이벤트를 순차적으로 처리하여 각 상품 캐시를 무효화한다")
         @Test
-        fun `evicts product cache for stock depleted events`() {
+        fun `evicts product cache for each stock depleted event sequentially`() {
             // given
             val stockDepletedPayload1 = StockDepletedEventPayload(productId = 1L)
             val stockDepletedEnvelope1 = createEnvelope(
@@ -84,9 +84,9 @@ class ProductStockEventConsumerTest {
                 createConsumerRecord("stock-events", stockDepletedEnvelope2),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
             every { productCacheService.evictStockDepletedProducts(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -96,16 +96,19 @@ class ProductStockEventConsumerTest {
             verify(exactly = 1) {
                 productCacheService.evictStockDepletedProducts(
                     match<EvictStockDepletedCommand> { command ->
-                        command.productIds.size == 2 &&
-                            command.productIds.containsAll(listOf(1L, 2L))
+                        command.productIds.size == 1 && command.productIds[0] == 1L
                     },
                 )
             }
             verify(exactly = 1) {
-                eventHandledRepository.saveAll(
-                    match { list -> list.size == 2 },
+                productCacheService.evictStockDepletedProducts(
+                    match<EvictStockDepletedCommand> { command ->
+                        command.productIds.size == 1 && command.productIds[0] == 2L
+                    },
                 )
             }
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-cache:event-1") }
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-cache:event-2") }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -145,7 +148,7 @@ class ProductStockEventConsumerTest {
 
             val records = listOf(createConsumerRecord("stock-events", stockEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns setOf("product-cache:event-1")
+            every { eventHandledService.isAlreadyHandled("product-cache:event-1") } returns true
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -153,56 +156,30 @@ class ProductStockEventConsumerTest {
 
             // then
             verify(exactly = 0) { productCacheService.evictStockDepletedProducts(any()) }
-            verify(exactly = 0) { eventHandledRepository.saveAll(any()) }
+            verify(exactly = 0) { eventHandledService.markAsHandled(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
-        @DisplayName("멱등성 키 저장 실패해도 ack는 호출된다")
+        @DisplayName("처리된 이벤트와 미처리 이벤트가 섞인 경우 미처리 이벤트만 처리한다")
         @Test
-        fun `acknowledges even when idempotency key save fails`() {
+        fun `processes only unhandled events when mixed`() {
             // given
-            val stockPayload = StockDepletedEventPayload(productId = 1L)
-            val stockEnvelope = createEnvelope(
+            val stockPayload1 = StockDepletedEventPayload(productId = 1L)
+            val stockEnvelope1 = createEnvelope(
                 id = "event-1",
                 type = "loopers.stock.depleted.v1",
                 aggregateType = "Stock",
                 aggregateId = "1",
-                payload = objectMapper.writeValueAsString(stockPayload),
+                payload = objectMapper.writeValueAsString(stockPayload1),
             )
 
-            val records = listOf(createConsumerRecord("stock-events", stockEnvelope))
-
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
-            every { productCacheService.evictStockDepletedProducts(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } throws RuntimeException("DB error")
-            every { acknowledgment.acknowledge() } just runs
-
-            // when
-            productStockEventConsumer.consume(records, acknowledgment)
-
-            // then
-            verify(exactly = 1) { productCacheService.evictStockDepletedProducts(any()) }
-            verify(exactly = 1) { acknowledgment.acknowledge() }
-        }
-
-        @DisplayName("배치 내 중복 이벤트는 하나만 처리한다")
-        @Test
-        fun `deduplicates events within batch by event id`() {
-            // given
-            val stockPayload = StockDepletedEventPayload(productId = 1L)
-            val stockEnvelope1 = createEnvelope(
-                id = "same-event-id",
-                type = "loopers.stock.depleted.v1",
-                aggregateType = "Stock",
-                aggregateId = "1",
-                payload = objectMapper.writeValueAsString(stockPayload),
-            )
+            val stockPayload2 = StockDepletedEventPayload(productId = 2L)
             val stockEnvelope2 = createEnvelope(
-                id = "same-event-id",
+                id = "event-2",
                 type = "loopers.stock.depleted.v1",
                 aggregateType = "Stock",
-                aggregateId = "1",
-                payload = objectMapper.writeValueAsString(stockPayload),
+                aggregateId = "2",
+                payload = objectMapper.writeValueAsString(stockPayload2),
             )
 
             val records = listOf(
@@ -210,27 +187,33 @@ class ProductStockEventConsumerTest {
                 createConsumerRecord("stock-events", stockEnvelope2),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.isAlreadyHandled("product-cache:event-1") } returns true
+            every { eventHandledService.isAlreadyHandled("product-cache:event-2") } returns false
             every { productCacheService.evictStockDepletedProducts(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
             productStockEventConsumer.consume(records, acknowledgment)
 
             // then
-            verify(exactly = 1) {
+            verify(exactly = 0) {
                 productCacheService.evictStockDepletedProducts(
                     match<EvictStockDepletedCommand> { command ->
-                        command.productIds.size == 1 && command.productIds[0] == 1L
+                        command.productIds[0] == 1L
                     },
                 )
             }
             verify(exactly = 1) {
-                eventHandledRepository.saveAll(
-                    match { list -> list.size == 1 },
+                productCacheService.evictStockDepletedProducts(
+                    match<EvictStockDepletedCommand> { command ->
+                        command.productIds.size == 1 && command.productIds[0] == 2L
+                    },
                 )
             }
+            verify(exactly = 0) { eventHandledService.markAsHandled("product-cache:event-1") }
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-cache:event-2") }
+            verify(exactly = 1) { acknowledgment.acknowledge() }
         }
     }
 
@@ -258,6 +241,7 @@ class ProductStockEventConsumerTest {
 
             // then
             verify(exactly = 0) { productCacheService.evictStockDepletedProducts(any()) }
+            verify(exactly = 0) { eventHandledService.isAlreadyHandled(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -286,9 +270,9 @@ class ProductStockEventConsumerTest {
                 createConsumerRecord("stock-events", unsupportedEnvelope),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
             every { productCacheService.evictStockDepletedProducts(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -302,6 +286,7 @@ class ProductStockEventConsumerTest {
                     },
                 )
             }
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-cache:event-1") }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
     }
@@ -358,6 +343,48 @@ class ProductStockEventConsumerTest {
                 productStockEventConsumer.consume(records, acknowledgment)
             }
             verify(exactly = 0) { productCacheService.evictStockDepletedProducts(any()) }
+        }
+
+        @DisplayName("두 번째 메시지가 실패하면 첫 번째 메시지는 이미 처리된 상태다")
+        @Test
+        fun `first message is already processed when second message fails`() {
+            // given
+            val stockPayload = StockDepletedEventPayload(productId = 1L)
+            val validEnvelope = createEnvelope(
+                id = "event-1",
+                type = "loopers.stock.depleted.v1",
+                aggregateType = "Stock",
+                aggregateId = "1",
+                payload = objectMapper.writeValueAsString(stockPayload),
+            )
+            val validRecord = createConsumerRecord("stock-events", validEnvelope)
+
+            val malformedRecord = ConsumerRecord(
+                "stock-events",
+                0,
+                0L,
+                "key",
+                "not a valid json",
+            )
+
+            val records = listOf(validRecord, malformedRecord)
+
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { productCacheService.evictStockDepletedProducts(any()) } just runs
+            every { eventHandledService.markAsHandled(any()) } just runs
+
+            // when & then
+            assertThrows<BatchListenerFailedException> {
+                productStockEventConsumer.consume(records, acknowledgment)
+            }
+            verify(exactly = 1) {
+                productCacheService.evictStockDepletedProducts(
+                    match<EvictStockDepletedCommand> { command ->
+                        command.productIds.size == 1 && command.productIds[0] == 1L
+                    },
+                )
+            }
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-cache:event-1") }
         }
     }
 

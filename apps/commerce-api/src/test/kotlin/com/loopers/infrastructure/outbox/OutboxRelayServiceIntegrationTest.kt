@@ -4,7 +4,6 @@ import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.support.outbox.Outbox
 import com.loopers.support.outbox.OutboxCursor
 import com.loopers.support.outbox.OutboxCursorRepository
-import com.loopers.support.outbox.OutboxFailed
 import com.loopers.support.outbox.OutboxFailedRepository
 import com.loopers.support.outbox.OutboxRepository
 import com.loopers.utils.DatabaseCleanUp
@@ -153,7 +152,7 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             assertThat(cursor).isNull()
 
             // OutboxFailed에 저장되지 않았는지 확인 (아직 만료되지 않음)
-            val failedMessages = findAllOutboxFailed()
+            val failedMessages = outboxFailedRepository.findAll()
             assertThat(failedMessages).isEmpty()
 
             // 메시지에 nextRetryAt이 설정되었는지 확인
@@ -251,7 +250,7 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             assertThat(result.lastProcessedId).isEqualTo(outbox2.id)
 
             // OutboxFailed에 저장되었는지 확인
-            val failedMessages = findAllOutboxFailed()
+            val failedMessages = outboxFailedRepository.findAll()
             assertThat(failedMessages).hasSize(1)
             assertThat(failedMessages[0].aggregateId).isEqualTo("1")
             assertThat(failedMessages[0].errorMessage).contains("Kafka send failed")
@@ -285,7 +284,7 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             assertThat(result.lastProcessedId).isEqualTo(outbox1.id)
 
             // OutboxFailed에 저장되지 않음 (만료되지 않음)
-            val failedMessages = findAllOutboxFailed()
+            val failedMessages = outboxFailedRepository.findAll()
             assertThat(failedMessages).isEmpty()
 
             // outbox2에 nextRetryAt이 설정되었는지 확인
@@ -361,12 +360,5 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
         val future = CompletableFuture<SendResult<String, String>>()
         future.completeExceptionally(exception)
         return future
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun findAllOutboxFailed(): List<OutboxFailed> {
-        return entityManager
-            .createQuery("SELECT f FROM OutboxFailed f ORDER BY f.id")
-            .resultList as List<OutboxFailed>
     }
 }

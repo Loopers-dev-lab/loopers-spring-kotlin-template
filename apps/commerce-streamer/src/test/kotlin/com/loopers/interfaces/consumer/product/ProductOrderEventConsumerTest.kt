@@ -7,7 +7,7 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.loopers.domain.product.ProductStatisticService
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.interfaces.consumer.product.event.OrderPaidEventPayload
-import com.loopers.support.idempotency.EventHandledRepository
+import com.loopers.support.idempotency.EventHandledService
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -23,12 +23,12 @@ import org.springframework.kafka.listener.BatchListenerFailedException
 import org.springframework.kafka.support.Acknowledgment
 import java.time.Instant
 
-@DisplayName("ProductOrderEventConsumer 배치 처리 단위 테스트")
+@DisplayName("ProductOrderEventConsumer 순차 처리 단위 테스트")
 class ProductOrderEventConsumerTest {
 
     private lateinit var productStatisticService: ProductStatisticService
     private lateinit var productEventMapper: ProductEventMapper
-    private lateinit var eventHandledRepository: EventHandledRepository
+    private lateinit var eventHandledService: EventHandledService
     private lateinit var objectMapper: ObjectMapper
     private lateinit var acknowledgment: Acknowledgment
     private lateinit var productOrderEventConsumer: ProductOrderEventConsumer
@@ -36,7 +36,7 @@ class ProductOrderEventConsumerTest {
     @BeforeEach
     fun setUp() {
         productStatisticService = mockk()
-        eventHandledRepository = mockk()
+        eventHandledService = mockk()
         objectMapper = ObjectMapper()
             .registerKotlinModule()
             .registerModule(JavaTimeModule())
@@ -47,7 +47,7 @@ class ProductOrderEventConsumerTest {
         productOrderEventConsumer = ProductOrderEventConsumer(
             productStatisticService,
             productEventMapper,
-            eventHandledRepository,
+            eventHandledService,
             objectMapper,
         )
     }
@@ -56,9 +56,9 @@ class ProductOrderEventConsumerTest {
     @Nested
     inner class HandleOrderPaidEvents {
 
-        @DisplayName("Order Paid 이벤트 배치를 updateSalesCount() 명령으로 변환하여 호출한다")
+        @DisplayName("Order Paid 이벤트를 레코드별로 updateSalesCount() 호출한다")
         @Test
-        fun `calls updateSalesCount with command for order paid events`() {
+        fun `calls updateSalesCount per record for order paid events`() {
             // given
             val orderPaidPayload = OrderPaidEventPayload(
                 orderId = 1L,
@@ -77,9 +77,9 @@ class ProductOrderEventConsumerTest {
 
             val records = listOf(createConsumerRecord("order-events", orderPaidEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
             every { productStatisticService.updateSalesCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -113,6 +113,52 @@ class ProductOrderEventConsumerTest {
 
             // then
             verify(exactly = 0) { productStatisticService.updateSalesCount(any()) }
+            verify(exactly = 1) { acknowledgment.acknowledge() }
+        }
+
+        @DisplayName("여러 레코드가 있을 경우 레코드별로 updateSalesCount()를 호출한다")
+        @Test
+        fun `calls updateSalesCount per record for multiple records`() {
+            // given
+            val payload1 = OrderPaidEventPayload(
+                orderId = 1L,
+                orderItems = listOf(OrderPaidEventPayload.OrderItem(productId = 100L, quantity = 1)),
+            )
+            val envelope1 = createEnvelope(
+                id = "event-1",
+                type = "loopers.order.paid.v1",
+                aggregateType = "Order",
+                aggregateId = "1",
+                payload = objectMapper.writeValueAsString(payload1),
+            )
+
+            val payload2 = OrderPaidEventPayload(
+                orderId = 2L,
+                orderItems = listOf(OrderPaidEventPayload.OrderItem(productId = 200L, quantity = 2)),
+            )
+            val envelope2 = createEnvelope(
+                id = "event-2",
+                type = "loopers.order.paid.v1",
+                aggregateType = "Order",
+                aggregateId = "2",
+                payload = objectMapper.writeValueAsString(payload2),
+            )
+
+            val records = listOf(
+                createConsumerRecord("order-events", envelope1),
+                createConsumerRecord("order-events", envelope2),
+            )
+
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { productStatisticService.updateSalesCount(any()) } just runs
+            every { eventHandledService.markAsHandled(any()) } just runs
+            every { acknowledgment.acknowledge() } just runs
+
+            // when
+            productOrderEventConsumer.consume(records, acknowledgment)
+
+            // then
+            verify(exactly = 2) { productStatisticService.updateSalesCount(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
     }
@@ -172,9 +218,9 @@ class ProductOrderEventConsumerTest {
                 createConsumerRecord("order-events", unsupportedEnvelope),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
             every { productStatisticService.updateSalesCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -190,119 +236,6 @@ class ProductOrderEventConsumerTest {
                 )
             }
             verify(exactly = 1) { acknowledgment.acknowledge() }
-        }
-    }
-
-    @DisplayName("배치 내 중복 제거")
-    @Nested
-    inner class BatchDeduplication {
-
-        @DisplayName("같은 aggregateId의 이벤트가 배치 내에서 중복될 경우 최신 시간의 이벤트만 처리한다")
-        @Test
-        fun `keeps only latest event by time for same aggregate`() {
-            // given
-            val olderPayload = OrderPaidEventPayload(
-                orderId = 1L,
-                orderItems = listOf(OrderPaidEventPayload.OrderItem(productId = 100L, quantity = 1)),
-            )
-            val olderEnvelope = createEnvelope(
-                id = "event-old",
-                type = "loopers.order.paid.v1",
-                aggregateType = "Order",
-                aggregateId = "1",
-                payload = objectMapper.writeValueAsString(olderPayload),
-                time = Instant.parse("2024-01-01T10:00:00Z"),
-            )
-
-            val newerPayload = OrderPaidEventPayload(
-                orderId = 1L,
-                orderItems = listOf(OrderPaidEventPayload.OrderItem(productId = 200L, quantity = 5)),
-            )
-            val newerEnvelope = createEnvelope(
-                id = "event-new",
-                type = "loopers.order.paid.v1",
-                aggregateType = "Order",
-                aggregateId = "1",
-                payload = objectMapper.writeValueAsString(newerPayload),
-                time = Instant.parse("2024-01-01T12:00:00Z"),
-            )
-
-            val records = listOf(
-                createConsumerRecord("order-events", olderEnvelope),
-                createConsumerRecord("order-events", newerEnvelope),
-            )
-
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
-            every { productStatisticService.updateSalesCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
-            every { acknowledgment.acknowledge() } just runs
-
-            // when
-            productOrderEventConsumer.consume(records, acknowledgment)
-
-            // then
-            verify(exactly = 1) {
-                productStatisticService.updateSalesCount(
-                    match { command ->
-                        command.items.size == 1 &&
-                            command.items[0].productId == 200L &&
-                            command.items[0].quantity == 5
-                    },
-                )
-            }
-        }
-
-        @DisplayName("서로 다른 aggregateId의 이벤트는 모두 처리한다")
-        @Test
-        fun `processes all events with different aggregate ids`() {
-            // given
-            val payload1 = OrderPaidEventPayload(
-                orderId = 1L,
-                orderItems = listOf(OrderPaidEventPayload.OrderItem(productId = 100L, quantity = 1)),
-            )
-            val envelope1 = createEnvelope(
-                id = "event-1",
-                type = "loopers.order.paid.v1",
-                aggregateType = "Order",
-                aggregateId = "1",
-                payload = objectMapper.writeValueAsString(payload1),
-            )
-
-            val payload2 = OrderPaidEventPayload(
-                orderId = 2L,
-                orderItems = listOf(OrderPaidEventPayload.OrderItem(productId = 200L, quantity = 2)),
-            )
-            val envelope2 = createEnvelope(
-                id = "event-2",
-                type = "loopers.order.paid.v1",
-                aggregateType = "Order",
-                aggregateId = "2",
-                payload = objectMapper.writeValueAsString(payload2),
-            )
-
-            val records = listOf(
-                createConsumerRecord("order-events", envelope1),
-                createConsumerRecord("order-events", envelope2),
-            )
-
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
-            every { productStatisticService.updateSalesCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
-            every { acknowledgment.acknowledge() } just runs
-
-            // when
-            productOrderEventConsumer.consume(records, acknowledgment)
-
-            // then
-            verify(exactly = 1) {
-                productStatisticService.updateSalesCount(
-                    match { command ->
-                        command.items.size == 2 &&
-                            command.items.any { it.productId == 100L } &&
-                            command.items.any { it.productId == 200L }
-                    },
-                )
-            }
         }
     }
 
@@ -328,7 +261,7 @@ class ProductOrderEventConsumerTest {
 
             val records = listOf(createConsumerRecord("order-events", orderEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } answers { firstArg() }
+            every { eventHandledService.isAlreadyHandled(any()) } returns true
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -336,7 +269,7 @@ class ProductOrderEventConsumerTest {
 
             // then
             verify(exactly = 0) { productStatisticService.updateSalesCount(any()) }
-            verify(exactly = 0) { eventHandledRepository.saveAll(any()) }
+            verify(exactly = 0) { eventHandledService.markAsHandled(any()) }
             verify(exactly = 1) { acknowledgment.acknowledge() }
         }
 
@@ -373,9 +306,10 @@ class ProductOrderEventConsumerTest {
                 createConsumerRecord("order-events", newEnvelope),
             )
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns setOf("product-statistic:Order:1:paid")
+            every { eventHandledService.isAlreadyHandled("product-statistic:Order:1:paid") } returns true
+            every { eventHandledService.isAlreadyHandled("product-statistic:Order:2:paid") } returns false
             every { productStatisticService.updateSalesCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
@@ -390,12 +324,12 @@ class ProductOrderEventConsumerTest {
                     },
                 )
             }
-            verify(exactly = 1) { eventHandledRepository.saveAll(any()) }
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-statistic:Order:2:paid") }
         }
 
         @DisplayName("처리 후 멱등성 키를 저장한다")
         @Test
-        fun `saves idempotency keys after processing`() {
+        fun `saves idempotency key after processing each record`() {
             // given
             val orderPayload = OrderPaidEventPayload(
                 orderId = 1L,
@@ -411,22 +345,16 @@ class ProductOrderEventConsumerTest {
 
             val records = listOf(createConsumerRecord("order-events", orderEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
             every { productStatisticService.updateSalesCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
             productOrderEventConsumer.consume(records, acknowledgment)
 
             // then
-            verify(exactly = 1) {
-                eventHandledRepository.saveAll(
-                    match { list ->
-                        list.size == 1 && list[0].idempotencyKey == "product-statistic:Order:1:paid"
-                    },
-                )
-            }
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-statistic:Order:1:paid") }
         }
     }
 
@@ -452,22 +380,16 @@ class ProductOrderEventConsumerTest {
 
             val records = listOf(createConsumerRecord("order-events", orderEnvelope))
 
-            every { eventHandledRepository.findAllExistingKeys(any()) } returns emptySet()
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
             every { productStatisticService.updateSalesCount(any()) } just runs
-            every { eventHandledRepository.saveAll(any()) } returns emptyList()
+            every { eventHandledService.markAsHandled(any()) } just runs
             every { acknowledgment.acknowledge() } just runs
 
             // when
             productOrderEventConsumer.consume(records, acknowledgment)
 
             // then
-            verify(exactly = 1) {
-                eventHandledRepository.saveAll(
-                    match { list ->
-                        list.size == 1 && list[0].idempotencyKey == "product-statistic:Order:123:paid"
-                    },
-                )
-            }
+            verify(exactly = 1) { eventHandledService.markAsHandled("product-statistic:Order:123:paid") }
         }
     }
 

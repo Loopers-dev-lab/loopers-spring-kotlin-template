@@ -9,4 +9,5 @@ package com.loopers.support.outbox
 interface OutboxFailedRepository {
     fun save(failed: OutboxFailed): OutboxFailed
     fun saveAll(failedList: List<OutboxFailed>): List<OutboxFailed>
+    fun findAll(): List<OutboxFailed>
 }

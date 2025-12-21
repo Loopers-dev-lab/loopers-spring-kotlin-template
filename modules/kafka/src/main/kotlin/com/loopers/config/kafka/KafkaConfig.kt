@@ -1,9 +1,11 @@
 package com.loopers.config.kafka
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringSerializer
+import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -18,6 +20,7 @@ import org.springframework.kafka.listener.CommonErrorHandler
 import org.springframework.kafka.listener.ContainerProperties
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
 import org.springframework.kafka.listener.DefaultErrorHandler
+import org.springframework.kafka.listener.RetryListener
 import org.springframework.kafka.support.converter.BatchMessagingMessageConverter
 import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
 import org.springframework.util.backoff.FixedBackOff
@@ -28,6 +31,7 @@ import java.util.HashMap
 class KafkaConfig {
     companion object {
         const val BATCH_LISTENER = "BATCH_LISTENER_DEFAULT"
+        private val logger = LoggerFactory.getLogger(KafkaConfig::class.java)
     }
 
     @Bean
@@ -69,7 +73,25 @@ class KafkaConfig {
         val recoverer = DeadLetterPublishingRecoverer(kafkaTemplate) { record, _ ->
             TopicPartition("${record.topic()}.DLT", record.partition())
         }
-        return DefaultErrorHandler(recoverer, FixedBackOff(0L, 0L))
+        val retryListener = object : RetryListener {
+            override fun failedDelivery(
+                record: ConsumerRecord<*, *>,
+                exception: Exception,
+                deliveryAttempt: Int,
+            ) {
+                logger.warn(
+                    "Kafka retry attempt {} failed for topic={}, partition={}, offset={}",
+                    deliveryAttempt,
+                    record.topic(),
+                    record.partition(),
+                    record.offset(),
+                    exception,
+                )
+            }
+        }
+        return DefaultErrorHandler(recoverer, FixedBackOff(1000L, 1L)).apply {
+            setRetryListeners(retryListener)
+        }
     }
 
     @Bean(BATCH_LISTENER)
