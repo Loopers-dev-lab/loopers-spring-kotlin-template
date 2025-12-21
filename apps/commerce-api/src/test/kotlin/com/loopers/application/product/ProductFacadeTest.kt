@@ -1,6 +1,7 @@
 package com.loopers.application.product
 
 import com.loopers.application.dto.PageResult
+import com.loopers.application.ranking.RankingFacade
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.like.ProductLikeService
 import com.loopers.domain.product.Product
@@ -41,7 +42,17 @@ class ProductFacadeTest {
     private val userService: UserService = mockk()
     private val productCache: ProductCache = mockk()
     private val applicationEventPublisher: ApplicationEventPublisher = mockk()
-    private val productFacade = ProductFacade(brandService, productService, productLikeService, userService, productCache, applicationEventPublisher)
+    private val rankingFacade: RankingFacade = mockk()
+    private val productFacade =
+        ProductFacade(
+            brandService,
+            productService,
+            productLikeService,
+            userService,
+            productCache,
+            applicationEventPublisher,
+            rankingFacade,
+        )
 
     private val pageable: Pageable = PageRequest.of(0, 20)
 
@@ -202,9 +213,12 @@ class ProductFacadeTest {
                 brandName = "브랜드A",
                 likeCount = 10L,
                 likedByMe = true,
+                rank = null,
+                score = null,
             )
 
             every { productCache.getProductDetail(productId, userId) } returns cachedResult
+            every { rankingFacade.getProductRank(productId) } returns null
             justRun { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
 
             // when
@@ -241,6 +255,7 @@ class ProductFacadeTest {
             every { productLikeService.getCountBy(productId) } returns productLikeCount
             every { userService.getMyInfo(userId) } returns user
             every { productLikeService.getBy(productId, userIdLong) } returns productLike
+            every { rankingFacade.getProductRank(productId) } returns null
             justRun { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
             justRun { productCache.setProductDetail(productId, userId, any()) }
 
@@ -295,6 +310,7 @@ class ProductFacadeTest {
             every { productService.getProduct(productId) } returns product
             every { brandService.getBrand(brandId) } returns brand
             every { productLikeService.getCountBy(productId) } returns productLikeCount
+            every { rankingFacade.getProductRank(productId) } returns null
             justRun { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
             justRun { productCache.setProductDetail(productId, null, any()) }
 
@@ -330,6 +346,7 @@ class ProductFacadeTest {
             every { productLikeService.getCountBy(productId) } returns productLikeCount
             every { userService.getMyInfo(userId) } returns user
             every { productLikeService.getBy(productId, userIdLong) } returns null
+            every { rankingFacade.getProductRank(productId) } returns null
             justRun { applicationEventPublisher.publishEvent(any<ProductEvent.ProductViewed>()) }
             justRun { productCache.setProductDetail(productId, userId, any()) }
 

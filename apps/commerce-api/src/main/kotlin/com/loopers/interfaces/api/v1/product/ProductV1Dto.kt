@@ -56,6 +56,10 @@ class ProductV1Dto {
         val likeCount: Long,
         @Schema(description = "내가 좋아요 했는지 여부")
         val likedByMe: Boolean,
+        @Schema(description = "랭킹 순위 (랭킹에 없으면 null)")
+        val rank: Long?,
+        @Schema(description = "랭킹 점수 (랭킹에 없으면 null)")
+        val score: Double?,
     ) {
         companion object {
             fun from(info: ProductResult.DetailInfo): ProductDetailResponse = ProductDetailResponse(
@@ -65,6 +69,8 @@ class ProductV1Dto {
                 brandName = info.brandName,
                 likeCount = info.likeCount,
                 likedByMe = info.likedByMe,
+                rank = info.rank,
+                score = info.score,
             )
         }
     }
