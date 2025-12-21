@@ -27,11 +27,12 @@ class RankingRedisRepository(
     companion object {
         private const val KEY_PREFIX = "ranking:all"
         private const val TTL_DAYS = 2L
+        private const val MEMBER_PAD_LENGTH = 15
     }
 
     override fun getScore(dateKey: String, productId: Long): Double? {
         val key = buildKey(dateKey)
-        val member = productId.toString()
+        val member = toMember(productId)
 
         return try {
             // ZSET에서 특정 멤버의 점수를 조회한다. (없으면 null)
@@ -67,8 +68,7 @@ class RankingRedisRepository(
         try {
             redisTemplate.executePipelined { connection ->
                 productScores.forEach { (productId, score) ->
-                    val member = productId.toString()
-                    // ZINCRBY로 점수를 누적한다.
+                    val member = toMember(productId)
                     connection.zIncrBy(key.toByteArray(), score, member.toByteArray())
                 }
                 null
@@ -111,7 +111,7 @@ class RankingRedisRepository(
             // 1. Lua로 감소 + 음수 보정까지 원자 처리
             redisTemplate.executePipelined { connection ->
                 productScores.forEach { (productId, score) ->
-                    val member = productId.toString()
+                    val member = toMember(productId)
                     // KEYS[1]=key, ARGV[1]=score, ARGV[2]=productId
                     connection.eval(
                         script,
@@ -207,5 +207,9 @@ class RankingRedisRepository(
             log.error("TTL 설정 실패: key={}", key, e)
             // TTL 설정 실패는 치명적이지 않으므로 예외를 던지지 않음
         }
+    }
+
+    private fun toMember(productId: Long): String {
+        return productId.toString().padStart(MEMBER_PAD_LENGTH, '0')
     }
 }

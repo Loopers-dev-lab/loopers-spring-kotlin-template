@@ -1,7 +1,6 @@
 package com.loopers.domain.ranking
 
 import com.loopers.IntegrationTest
-import com.loopers.domain.event.EventHandledRepository
 import com.loopers.domain.ranking.dto.LikeScoreEvent
 import com.loopers.domain.ranking.dto.ViewScoreEvent
 import org.assertj.core.api.Assertions.assertThat
@@ -19,12 +18,8 @@ class RankingServiceIdempotencyTest : IntegrationTest() {
     @Autowired
     private lateinit var rankingRepository: RankingRepository
 
-    @Autowired
-    private lateinit var eventHandledRepository: EventHandledRepository
-
     companion object {
         private const val RANKING_LIKE_CONSUMER_GROUP = "ranking-like-consumer"
-        private const val RANKING_ORDER_CONSUMER_GROUP = "ranking-order-consumer"
     }
 
     @Test
