@@ -24,7 +24,6 @@ import org.springframework.kafka.listener.RetryListener
 import org.springframework.kafka.support.converter.BatchMessagingMessageConverter
 import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
 import org.springframework.util.backoff.FixedBackOff
-import java.util.HashMap
 
 @EnableKafka
 @Configuration
@@ -71,7 +70,7 @@ class KafkaConfig {
     @Bean
     fun commonErrorHandler(kafkaTemplate: KafkaTemplate<String, String>): CommonErrorHandler {
         val recoverer = DeadLetterPublishingRecoverer(kafkaTemplate) { record, _ ->
-            TopicPartition("${record.topic()}.DLT", record.partition())
+            TopicPartition("${record.topic()}.DLT", -1)
         }
         val retryListener = object : RetryListener {
             override fun failedDelivery(
