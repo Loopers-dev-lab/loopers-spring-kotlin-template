@@ -14,7 +14,7 @@ object RankingScoreCalculator {
 
     private const val VIEW_WEIGHT = 0.1
     private const val LIKE_WEIGHT = 0.2
-    private const val ORDER_WEIGHT = 0.6
+    private const val ORDER_WEIGHT = 0.7
 
     /**
      * 조회수 점수 계산
