@@ -67,8 +67,9 @@ class RankingRedisRepository(
         try {
             redisTemplate.executePipelined { connection ->
                 productScores.forEach { (productId, score) ->
+                    val member = productId.toString()
                     // ZINCRBY로 점수를 누적한다.
-                    connection.zIncrBy(key.toByteArray(), score, productId.toString().toByteArray())
+                    connection.zIncrBy(key.toByteArray(), score, member.toByteArray())
                 }
                 null
             }
@@ -98,7 +99,7 @@ class RankingRedisRepository(
         // Lua 실행에 사용할 키/스크립트는 바이트 배열로 변환한다.
         val keyBytes = key.toByteArray(StandardCharsets.UTF_8)
         val script = """
-            local newScore = redis.call('ZINCRBY', KEYS[1], -tonumber(ARGV[1]), ARGV[2])
+            local newScore = tonumber(redis.call('ZINCRBY', KEYS[1], -tonumber(ARGV[1]), ARGV[2]))
             if newScore < 0 then
                 redis.call('ZADD', KEYS[1], 0, ARGV[2])
                 return 0
@@ -110,14 +111,15 @@ class RankingRedisRepository(
             // 1. Lua로 감소 + 음수 보정까지 원자 처리
             redisTemplate.executePipelined { connection ->
                 productScores.forEach { (productId, score) ->
+                    val member = productId.toString()
                     // KEYS[1]=key, ARGV[1]=score, ARGV[2]=productId
                     connection.eval(
                         script,
-                        ReturnType.VALUE,
+                        ReturnType.INTEGER,
                         1,
                         keyBytes,
                         score.toString().toByteArray(StandardCharsets.UTF_8),
-                        productId.toString().toByteArray(StandardCharsets.UTF_8),
+                        member.toByteArray(StandardCharsets.UTF_8),
                     )
                 }
                 null
@@ -145,7 +147,6 @@ class RankingRedisRepository(
 
         try {
             redisTemplate.execute { connection ->
-                //
                 /**
                  * ZUNIONSTORE targetKey 2 targetKey sourceKey WEIGHTS 1 weight
                  *
