@@ -33,18 +33,6 @@ spring:
       - kafka.yml
       - logging.yml
       - monitoring.yml
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      acks: all
-      retries: 3
-      properties:
-        retry.backoff.ms: 1000
-        delivery.timeout.ms: 120000
-        request.timeout.ms: 30000
-        enable.idempotence: true
-        max.in.flight.requests.per.connection: 5
-        linger.ms: 5
   cloud:
     openfeign:
       client:

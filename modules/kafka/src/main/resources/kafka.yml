@@ -17,7 +17,7 @@ spring:
       retries: 3
       acks: all
       enable.idempotence: true
-      max.in.flight.requests.per.connection:
+      max.in.flight.requests.per.connection: 5
     consumer:
       group-id: loopers-default-consumer
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
