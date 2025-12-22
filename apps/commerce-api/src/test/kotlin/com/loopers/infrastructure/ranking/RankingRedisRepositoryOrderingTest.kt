@@ -18,7 +18,8 @@ class RankingRedisRepositoryOrderingTest : IntegrationTest() {
     private lateinit var redisTemplate: RedisTemplate<String, String>
 
     @Test
-    fun testOrderingWhenScoresTiedAcrossPageBoundaryThenProductIdAsc() {
+    @DisplayName("동일 점수 상품이 페이지 경계에 걸쳐있을 때 상품 ID 내림차순으로 정렬된다")
+    fun testOrderingWhenScoresTiedAcrossPageBoundaryThenProductIdDesc() {
         // given
         val dateKey = "20250102"
         val key = "ranking:all:$dateKey"
@@ -38,7 +39,8 @@ class RankingRedisRepositoryOrderingTest : IntegrationTest() {
     }
 
     @Test
-    fun testReverseRankWhenScoresTiedThenProductIdAsc() {
+    @DisplayName("동일 점수일 때 랭크 조회 시 상품 ID 내림차순으로 순위가 매겨진다")
+    fun testReverseRankWhenScoresTiedThenProductIdDesc() {
         // given
         val dateKey = "20250103"
         val key = "ranking:all:$dateKey"
