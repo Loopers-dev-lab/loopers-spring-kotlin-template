@@ -7,9 +7,6 @@ class RankingInfo {
     data class CacheRanking(
         val rank: Int,
         val productId: Long,
-        val likeCount: Long,
-        val viewCount: Long,
-        val orderCount: Long,
     )
 
     data class RankingItem(
