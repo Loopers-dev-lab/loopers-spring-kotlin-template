@@ -2,6 +2,7 @@ package com.loopers.support.cache
 
 import org.springframework.data.domain.Pageable
 import java.time.Duration
+import java.time.LocalDateTime
 
 sealed class CacheKeys(override val ttl: Duration) : CacheKey {
     abstract override val key: String
@@ -17,6 +18,12 @@ sealed class CacheKeys(override val ttl: Duration) : CacheKey {
         override val key: String = buildKey(
             "product-view-model-page-v1:page=${pageable.pageNumber}:size=${pageable.pageSize}:sort=${pageable.sort}:brandId=${brandId}",
         )
+    }
+
+    data class Ranking(
+        private val date: LocalDateTime,
+    ) : CacheKeys(ttl = Duration.ofMinutes(1)) {
+        override val key: String = buildKey("raking-v1:$date")
     }
 
     companion object {
