@@ -3,7 +3,7 @@ package com.loopers.domain.product
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
-import kotlin.test.Test
+import org.junit.jupiter.api.Test
 
 class ProductStatisticTest {
     @DisplayName("ProductStatistic 생성 테스트")
