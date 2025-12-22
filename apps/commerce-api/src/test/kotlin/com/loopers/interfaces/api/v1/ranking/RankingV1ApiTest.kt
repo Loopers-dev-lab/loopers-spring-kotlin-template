@@ -14,8 +14,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.ParameterizedTypeReference
-import org.springframework.http.HttpMethod
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.http.HttpMethod
 
 @DisplayName("Ranking V1 API 테스트")
 class RankingV1ApiTest(
@@ -40,8 +40,8 @@ class RankingV1ApiTest(
 
         val dateKey = "20250102"
         val key = "ranking:all:$dateKey"
-        redisTemplate.opsForZSet().add(key, product1.id.toString(), 10.0)
-        redisTemplate.opsForZSet().add(key, product2.id.toString(), 9.0)
+        redisTemplate.opsForZSet().add(key, product1.id.toString().padStart(15, '0'), 10.0)
+        redisTemplate.opsForZSet().add(key, product2.id.toString().padStart(15, '0'), 9.0)
 
         val responseType = object :
             ParameterizedTypeReference<ApiResponse<PageResponse<RankingV1Dto.RankingListResponse>>>() {}
