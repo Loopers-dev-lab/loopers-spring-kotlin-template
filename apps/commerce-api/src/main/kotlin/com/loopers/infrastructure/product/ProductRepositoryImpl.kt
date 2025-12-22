@@ -1,7 +1,6 @@
 package com.loopers.infrastructure.product
 
 import com.loopers.application.product.ProductInfo
-import com.loopers.application.ranking.ProductWithBrand
 import com.loopers.domain.brand.QBrandModel
 import com.loopers.domain.product.ProductModel
 import com.loopers.domain.product.ProductRepository
@@ -100,26 +99,4 @@ class ProductRepositoryImpl(
 
     override fun getProductBy(productId: Long): ProductModel =
         productJpaRepository.findByIdOrNull(productId) ?: throw CoreException(ErrorType.BAD_REQUEST, "존재하지 않는 상품입니다.")
-
-    override fun findByIdsIn(productIds: List<Long>): List<ProductModel> = productJpaRepository.findAllById(productIds)
-
-    override fun findByIdsInWithBrand(productIds: List<Long>): List<ProductWithBrand> {
-        if (productIds.isEmpty()) return emptyList()
-
-        val product = QProductModel.productModel
-        val brand = QBrandModel.brandModel
-
-        return productJpaQueryFactory
-            .select(
-                Projections.constructor(
-                    ProductWithBrand::class.java,
-                    product,
-                    brand,
-                ),
-            )
-            .from(product)
-            .innerJoin(brand).on(brand.id.eq(product.refBrandId))
-            .where(product.id.`in`(productIds))
-            .fetch()
-    }
 }
