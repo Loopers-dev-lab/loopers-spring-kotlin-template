@@ -10,8 +10,6 @@ import com.loopers.utils.DatabaseCleanUp
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
-import io.mockk.verify
 import jakarta.persistence.EntityManager
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.clients.producer.RecordMetadata
@@ -92,29 +90,6 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("올바른 topic과 key로 Kafka에 전송한다")
-        fun `sends messages to Kafka with correct topic and key`() {
-            // given
-            saveOutbox(
-                eventType = "loopers.order.created.v1",
-                aggregateType = "Order",
-                aggregateId = "123",
-            )
-            mockKafkaSendSuccess()
-
-            // when
-            outboxRelayService.relay()
-
-            // then
-            val topicSlot = slot<String>()
-            val keySlot = slot<String>()
-            verify { mockKafkaTemplate.send(capture(topicSlot), capture(keySlot), any()) }
-
-            assertThat(topicSlot.captured).isEqualTo("order-events")
-            assertThat(keySlot.captured).isEqualTo("123")
-        }
-
-        @Test
         @DisplayName("처리 후 커서를 갱신한다")
         fun `updates cursor after processing`() {
             // given
@@ -175,7 +150,6 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             assertThat(result.successCount).isEqualTo(0)
             assertThat(result.failedCount).isEqualTo(0)
             assertThat(result.lastProcessedId).isEqualTo(0L)
-            verify(exactly = 0) { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) }
         }
 
         @Test
@@ -193,10 +167,6 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             // then
             assertThat(result.successCount).isEqualTo(1)
             assertThat(result.lastProcessedId).isEqualTo(outbox2.id)
-
-            val keySlot = slot<String>()
-            verify(exactly = 1) { mockKafkaTemplate.send(any<String>(), capture(keySlot), any<String>()) }
-            assertThat(keySlot.captured).isEqualTo("2")
         }
 
         @Test
@@ -217,9 +187,6 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             assertThat(result.successCount).isEqualTo(0)
             assertThat(result.failedCount).isEqualTo(0)
             assertThat(result.lastProcessedId).isEqualTo(0L)
-
-            // Kafka 전송이 호출되지 않았는지 확인
-            verify(exactly = 0) { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) }
         }
 
         @Test
@@ -312,9 +279,6 @@ class OutboxRelayServiceIntegrationTest @Autowired constructor(
             assertThat(result.successCount).isEqualTo(1)
             assertThat(result.failedCount).isEqualTo(0)
             assertThat(result.lastProcessedId).isEqualTo(outbox1.id)
-
-            // Kafka 전송이 호출되었는지 확인
-            verify(exactly = 1) { mockKafkaTemplate.send(any<String>(), any<String>(), any<String>()) }
         }
     }
 

@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.time.Instant
 
-@DisplayName("ProductEventMapper")
+@DisplayName("ProductEventMapper 테스트")
 class ProductEventMapperTest {
     private lateinit var objectMapper: ObjectMapper
     private lateinit var productEventMapper: ProductEventMapper
@@ -31,10 +31,10 @@ class ProductEventMapperTest {
     }
 
     @Nested
-    @DisplayName("toLikeCommand")
+    @DisplayName("toLikeCommand 테스트")
     inner class ToLikeCommandTest {
         @Test
-        @DisplayName("maps like created events to CREATED type")
+        @DisplayName("like.created 이벤트를 CREATED 타입으로 매핑한다")
         fun `maps like created events to CREATED type`() {
             // given
             val envelopes = listOf(
@@ -62,7 +62,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("maps like canceled events to CANCELED type")
+        @DisplayName("like.canceled 이벤트를 CANCELED 타입으로 매핑한다")
         fun `maps like canceled events to CANCELED type`() {
             // given
             val envelopes = listOf(
@@ -83,7 +83,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("maps mixed like events correctly")
+        @DisplayName("혼합된 like 이벤트를 올바르게 매핑한다")
         fun `maps mixed like events correctly`() {
             // given
             val envelopes = listOf(
@@ -115,7 +115,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("throws on unknown like event type")
+        @DisplayName("알 수 없는 like 이벤트 타입에서 예외가 발생한다")
         fun `throws on unknown like event type`() {
             // given
             val envelopes = listOf(
@@ -134,7 +134,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("returns empty command for empty envelopes")
+        @DisplayName("빈 envelope 리스트에 대해 빈 커맨드를 반환한다")
         fun `returns empty command for empty envelopes`() {
             // given
             val envelopes = emptyList<CloudEventEnvelope>()
@@ -148,10 +148,10 @@ class ProductEventMapperTest {
     }
 
     @Nested
-    @DisplayName("toSalesCommand")
+    @DisplayName("toSalesCommand 테스트")
     inner class ToSalesCommandTest {
         @Test
-        @DisplayName("flattens orderItems from multiple envelopes")
+        @DisplayName("여러 envelope의 orderItems를 평탄화한다")
         fun `flattens orderItems from multiple envelopes`() {
             // given
             val envelopes = listOf(
@@ -178,7 +178,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("returns empty command for empty envelopes")
+        @DisplayName("빈 envelope 리스트에 대해 빈 커맨드를 반환한다")
         fun `returns empty command for empty envelopes`() {
             // given
             val envelopes = emptyList<CloudEventEnvelope>()
@@ -191,7 +191,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("handles single order with multiple items")
+        @DisplayName("단일 주문의 여러 상품을 처리한다")
         fun `handles single order with multiple items`() {
             // given
             val envelopes = listOf(
@@ -215,10 +215,10 @@ class ProductEventMapperTest {
     }
 
     @Nested
-    @DisplayName("toViewCommand")
+    @DisplayName("toViewCommand 테스트")
     inner class ToViewCommandTest {
         @Test
-        @DisplayName("maps each envelope to item")
+        @DisplayName("각 envelope을 item으로 매핑한다")
         fun `maps each envelope to item`() {
             // given
             val envelopes = listOf(
@@ -250,7 +250,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("returns empty command for empty envelopes")
+        @DisplayName("빈 envelope 리스트에 대해 빈 커맨드를 반환한다")
         fun `returns empty command for empty envelopes`() {
             // given
             val envelopes = emptyList<CloudEventEnvelope>()
@@ -264,10 +264,10 @@ class ProductEventMapperTest {
     }
 
     @Nested
-    @DisplayName("toStockDepletedProductIds")
+    @DisplayName("toStockDepletedProductIds 테스트")
     inner class ToStockDepletedProductIdsTest {
         @Test
-        @DisplayName("extracts productIds from envelopes")
+        @DisplayName("envelope들에서 productId를 추출한다")
         fun `extracts productIds from envelopes`() {
             // given
             val envelopes = listOf(
@@ -296,7 +296,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("returns empty list for empty envelopes")
+        @DisplayName("빈 envelope 리스트에 대해 빈 리스트를 반환한다")
         fun `returns empty list for empty envelopes`() {
             // given
             val envelopes = emptyList<CloudEventEnvelope>()
@@ -310,10 +310,10 @@ class ProductEventMapperTest {
     }
 
     @Nested
-    @DisplayName("toStockDepletedProductId")
+    @DisplayName("toStockDepletedProductId 테스트")
     inner class ToStockDepletedProductIdTest {
         @Test
-        @DisplayName("extracts productId from envelope")
+        @DisplayName("envelope에서 productId를 추출한다")
         fun `extracts productId from envelope`() {
             // given
             val envelope = createEnvelope(
@@ -331,10 +331,10 @@ class ProductEventMapperTest {
     }
 
     @Nested
-    @DisplayName("toLikeItem")
+    @DisplayName("toLikeItem 테스트")
     inner class ToLikeItemTest {
         @Test
-        @DisplayName("extracts Item with CREATED type for like.created event")
+        @DisplayName("like.created 이벤트에서 CREATED 타입의 Item을 추출한다")
         fun `extracts Item with CREATED type for like created event`() {
             // given
             val envelope = createEnvelope(
@@ -352,7 +352,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("extracts Item with CANCELED type for like.canceled event")
+        @DisplayName("like.canceled 이벤트에서 CANCELED 타입의 Item을 추출한다")
         fun `extracts Item with CANCELED type for like canceled event`() {
             // given
             val envelope = createEnvelope(
@@ -370,7 +370,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("throws on unknown like event type")
+        @DisplayName("알 수 없는 like 이벤트 타입에서 예외가 발생한다")
         fun `throws on unknown like event type`() {
             // given
             val envelope = createEnvelope(
@@ -388,10 +388,10 @@ class ProductEventMapperTest {
     }
 
     @Nested
-    @DisplayName("toSalesItems")
+    @DisplayName("toSalesItems 테스트")
     inner class ToSalesItemsTest {
         @Test
-        @DisplayName("extracts list of Items from order paid event with multiple orderItems")
+        @DisplayName("여러 orderItems가 있는 주문 결제 이벤트에서 Item 리스트를 추출한다")
         fun `extracts list of Items from order paid event with multiple orderItems`() {
             // given
             val envelope = createEnvelope(
@@ -410,7 +410,7 @@ class ProductEventMapperTest {
         }
 
         @Test
-        @DisplayName("returns empty list for order with no items")
+        @DisplayName("상품이 없는 주문에 대해 빈 리스트를 반환한다")
         fun `returns empty list for order with no items`() {
             // given
             val envelope = createEnvelope(
