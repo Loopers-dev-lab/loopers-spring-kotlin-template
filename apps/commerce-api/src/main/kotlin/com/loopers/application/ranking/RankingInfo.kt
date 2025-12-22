@@ -16,9 +16,6 @@ class RankingInfo {
         val brandId: Long,
         val brandName: String,
         val price: Money,
-        val likeCount: Long,
-        val viewCount: Long,
-        val orderCount: Long,
     ) {
         companion object {
             fun from(
@@ -31,9 +28,6 @@ class RankingInfo {
                 brandId = productWithBrand.brand.id,
                 brandName = productWithBrand.brand.name,
                 price = productWithBrand.product.price,
-                likeCount = cacheRanking.likeCount,
-                viewCount = cacheRanking.viewCount,
-                orderCount = cacheRanking.orderCount,
             )
         }
     }

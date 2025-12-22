@@ -2,21 +2,22 @@ package com.loopers.infrastructure.outbox
 
 import com.loopers.domain.outbox.OutBoxModel
 import com.loopers.domain.outbox.OutBoxRepository
+import com.loopers.domain.outbox.OutboxStatus
 import org.springframework.stereotype.Component
 
 @Component
 class OutBoxRepositoryImpl(private val outBoxJpaRepository: OutBoxJpaRepository) :
-        OutBoxRepository {
+    OutBoxRepository {
 
-        override fun save(outbox: OutBoxModel): OutBoxModel =
-                outBoxJpaRepository.saveAndFlush(outbox)
+    override fun save(outbox: OutBoxModel): OutBoxModel =
+        outBoxJpaRepository.saveAndFlush(outbox)
 
-        override fun findByEventId(eventId: String): OutBoxModel? =
-                outBoxJpaRepository.findByEventId(eventId)
+    override fun findByEventId(eventId: String): OutBoxModel? =
+        outBoxJpaRepository.findByEventId(eventId)
 
-        override fun findAllByStatus(status: OutboxStatus): List<OutBoxModel> =
-                outBoxJpaRepository.findAllByStatus(status)
+    override fun findAllByStatus(status: OutboxStatus): List<OutBoxModel> =
+        outBoxJpaRepository.findAllByStatus(status)
 
-        override fun findAllByStatusIn(statuses: List<OutboxStatus>): List<OutBoxModel> =
-                outBoxJpaRepository.findAllByStatusIn(statuses)
+    override fun findAllByStatusIn(statuses: List<OutboxStatus>): List<OutBoxModel> =
+        outBoxJpaRepository.findAllByStatusIn(statuses)
 }

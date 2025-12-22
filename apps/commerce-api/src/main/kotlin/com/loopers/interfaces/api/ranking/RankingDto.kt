@@ -12,9 +12,6 @@ sealed class RankingDto {
         val brandId: Long,
         val brandName: String,
         val price: Money,
-        val likeCount: Long,
-        val viewCount: Long,
-        val orderCount: Long,
     ) {
         companion object {
             fun from(item: RankingInfo.RankingItem): RankingItemResponse = RankingItemResponse(
@@ -24,9 +21,6 @@ sealed class RankingDto {
                 brandId = item.brandId,
                 brandName = item.brandName,
                 price = item.price,
-                likeCount = item.likeCount,
-                viewCount = item.viewCount,
-                orderCount = item.orderCount,
             )
         }
     }
