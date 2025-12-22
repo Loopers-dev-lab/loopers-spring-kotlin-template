@@ -7,6 +7,7 @@ import com.loopers.domain.ranking.dto.OrderScoreEvent
 import com.loopers.domain.ranking.dto.ViewScoreEvent
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -17,6 +18,7 @@ import java.time.format.DateTimeFormatter
  * Redis ZSET에 이벤트별 랭킹 점수를 반영하고, 멱등성 및 순서 보장을 처리합니다.
  */
 @Service
+@Transactional
 class RankingService(
     private val rankingRepository: RankingRepository,
     private val eventService: EventService,
@@ -46,13 +48,13 @@ class RankingService(
             val aggregateId = "${event.productId}:${event.dateKey}"
 
             // 배치 내 중복 체크 (같은 배치에서 동일 eventId+aggregateId 조합은 1번만 처리)
-            val eventKey = "$event.eventId:$aggregateId"
+            val eventKey = "${event.eventId}:$aggregateId"
             if (processedEventIds.contains(eventKey)) {
                 log.debug("배치 내 중복 랭킹 조회수 이벤트: eventId={}, aggregateId={}", event.eventId, aggregateId)
                 return@forEach
             }
 
-            val shouldProcess = transactionTemplate.execute<Boolean> {
+            val shouldProcess = transactionTemplate.execute {
                 // DB 멱등성 체크
                 if (eventService.isAlreadyHandled(event.eventId, aggregateId)) {
                     log.debug("이미 처리된 랭킹 조회수 이벤트: eventId={}, aggregateId={}", event.eventId, aggregateId)
@@ -117,21 +119,19 @@ class RankingService(
             val aggregateId = "${event.productId}:${event.dateKey}"
 
             // 배치 내 중복 체크
-            val eventKey = "$event.eventId:$aggregateId"
+            val eventKey = "${event.eventId}:$aggregateId"
             if (processedEventKeys.contains(eventKey)) {
                 log.debug("배치 내 중복 랭킹 좋아요 이벤트: eventId={}, aggregateId={}", event.eventId, aggregateId)
                 return@forEach
             }
 
-            val result = transactionTemplate.execute {
-                eventService.checkAndPrepareForProcessing(
-                    eventId = event.eventId,
-                    eventType = event.eventType,
-                    eventTimestamp = event.eventTimestamp,
-                    consumerGroup = consumerGroup,
-                    aggregateId = aggregateId,
-                )
-            }
+            val result = eventService.checkAndPrepareForProcessing(
+                eventId = event.eventId,
+                eventType = event.eventType,
+                eventTimestamp = event.eventTimestamp,
+                consumerGroup = consumerGroup,
+                aggregateId = aggregateId,
+            )
 
             if (result != SHOULD_PROCESS) {
                 return@forEach
@@ -142,17 +142,14 @@ class RankingService(
             productScores[event.productId] = (productScores[event.productId] ?: 0.0) + score
 
             processedEventKeys.add(eventKey)
-
-            transactionTemplate.execute {
-                // 즉시 처리 완료 기록 (배치 내 중복 방지)
-                eventService.recordProcessingComplete(
-                    event.eventId,
-                    event.eventType,
-                    event.eventTimestamp,
-                    consumerGroup,
-                    aggregateId,
-                )
-            }
+            // 즉시 처리 완료 기록 (배치 내 중복 방지)
+            eventService.recordProcessingComplete(
+                event.eventId,
+                event.eventType,
+                event.eventTimestamp,
+                consumerGroup,
+                aggregateId,
+            )
         }
 
         // Redis 작업 수행
@@ -205,21 +202,19 @@ class RankingService(
                 val aggregateId = "${item.productId}:${event.dateKey}"
 
                 // 배치 내 중복 체크
-                val eventKey = "$event.eventId:$aggregateId"
+                val eventKey = "${event.eventId}:$aggregateId"
                 if (processedEventKeys.contains(eventKey)) {
                     log.debug("배치 내 중복 랭킹 주문 이벤트: eventId={}, aggregateId={}", event.eventId, aggregateId)
                     return@forEach
                 }
 
-                val result = transactionTemplate.execute {
-                    eventService.checkAndPrepareForProcessing(
-                        eventId = event.eventId,
-                        eventType = event.eventType,
-                        eventTimestamp = event.eventTimestamp,
-                        consumerGroup = consumerGroup,
-                        aggregateId = aggregateId,
-                    )
-                }
+                val result = eventService.checkAndPrepareForProcessing(
+                    eventId = event.eventId,
+                    eventType = event.eventType,
+                    eventTimestamp = event.eventTimestamp,
+                    consumerGroup = consumerGroup,
+                    aggregateId = aggregateId,
+                )
 
                 if (result == SHOULD_PROCESS) {
                     val score = RankingScoreCalculator.calculateOrderScore(item.price, item.quantity)
@@ -227,16 +222,14 @@ class RankingService(
 
                     processedEventKeys.add(eventKey)
 
-                    transactionTemplate.execute {
-                        // 즉시 처리 완료 기록 (배치 내 중복 방지)
-                        eventService.recordProcessingComplete(
-                            event.eventId,
-                            event.eventType,
-                            event.eventTimestamp,
-                            consumerGroup,
-                            aggregateId,
-                        )
-                    }
+                    // 즉시 처리 완료 기록 (배치 내 중복 방지)
+                    eventService.recordProcessingComplete(
+                        event.eventId,
+                        event.eventType,
+                        event.eventTimestamp,
+                        consumerGroup,
+                        aggregateId,
+                    )
                 }
             }
         }
