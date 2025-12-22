@@ -28,7 +28,7 @@ class RankingScoreCalculatorTest {
     }
 
     @Test
-    @DisplayName("주문 점수는 0.6 × log10(price × quantity)로 계산된다")
+    @DisplayName("주문 점수는 0.7 × log10(price × quantity)로 계산된다")
     fun testCalculateOrderScoreWhenCalledThenReturnsWeightedScore() {
         // given
         val price = 10000L
@@ -39,8 +39,8 @@ class RankingScoreCalculatorTest {
 
         // then
         // log10(10000 × 3) = log10(30000) ≈ 4.477
-        // 0.6 × 4.477 ≈ 2.686
-        assertThat(score).isCloseTo(0.6 * kotlin.math.log10(30000.0), org.assertj.core.data.Offset.offset(0.001))
+        // 0.7 × 4.477 ≈ 2.686
+        assertThat(score).isCloseTo(0.7 * kotlin.math.log10(30000.0), org.assertj.core.data.Offset.offset(0.001))
     }
 
     @Test
