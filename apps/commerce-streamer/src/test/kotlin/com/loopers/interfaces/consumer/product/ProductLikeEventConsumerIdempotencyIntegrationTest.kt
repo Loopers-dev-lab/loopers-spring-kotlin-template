@@ -79,7 +79,7 @@ class ProductLikeEventConsumerIdempotencyIntegrationTest @Autowired constructor(
         }
 
         // then - 추가 시간 동안 값 변경 없음 확인 (멱등성 검증)
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(5)).untilAsserted {
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted {
             val result = productStatisticJpaRepository.findByProductId(productId)
             assertThat(result!!.likeCount).isEqualTo(expectedCount)
         }
@@ -109,7 +109,7 @@ class ProductLikeEventConsumerIdempotencyIntegrationTest @Autowired constructor(
         kafkaTemplate.send(TOPIC, "like-1", objectMapper.writeValueAsString(envelope)).get()
 
         // then
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(5)).untilAsserted {
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted {
             val result = productStatisticJpaRepository.findByProductId(productId)
             assertThat(result!!.likeCount).isEqualTo(initialLikeCount)
         }

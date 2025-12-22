@@ -29,6 +29,9 @@ import java.util.UUID
  * - 메시지 수신 → 처리 → 캐시 무효화
  * - 지원하지 않는 이벤트 타입 필터링
  * - 실패 시 캐시 상태 유지
+ *
+ * Note: DLT 발행은 Consumer의 책임이 아닙니다.
+ * Consumer는 실패 시 예외를 던지고, DLT 라우팅은 KafkaConfig의 ErrorHandler가 담당합니다.
  */
 @SpringBootTest
 @DisplayName("ProductStockEventConsumer 통합 테스트")
@@ -144,7 +147,7 @@ class ProductStockEventConsumerIntegrationTest @Autowired constructor(
         kafkaTemplate.send(TOPIC, "order-1", objectMapper.writeValueAsString(unsupportedEnvelope)).get()
 
         // then
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(5)).untilAsserted {
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted {
             val cacheAfterConsume = cacheTemplate.get(cacheKey, object : TypeReference<Map<String, Any>>() {})
             assertThat(cacheAfterConsume).isNotNull
         }
@@ -165,7 +168,7 @@ class ProductStockEventConsumerIntegrationTest @Autowired constructor(
         kafkaTemplate.send(TOPIC, "key-1", malformedJson).get()
 
         // then
-        await().during(Duration.ofSeconds(5)).atMost(Duration.ofSeconds(7)).untilAsserted {
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted {
             val cacheAfterConsume = cacheTemplate.get(cacheKey, object : TypeReference<Map<String, Any>>() {})
             assertThat(cacheAfterConsume).isNotNull
         }

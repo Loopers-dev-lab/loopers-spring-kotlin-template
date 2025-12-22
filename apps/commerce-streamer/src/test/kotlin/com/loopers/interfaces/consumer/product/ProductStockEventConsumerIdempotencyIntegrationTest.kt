@@ -76,7 +76,7 @@ class ProductStockEventConsumerIdempotencyIntegrationTest @Autowired constructor
         kafkaTemplate.send(TOPIC, "stock-1", objectMapper.writeValueAsString(envelope)).get()
 
         // then - 캐시가 유지됨
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(5)).untilAsserted {
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted {
             val cacheAfterConsume = cacheTemplate.get(cacheKey, object : TypeReference<Map<String, Any>>() {})
             assertThat(cacheAfterConsume).isNotNull
         }
@@ -135,7 +135,7 @@ class ProductStockEventConsumerIdempotencyIntegrationTest @Autowired constructor
         }
 
         // then - 추가 시간 동안 에러 없이 안정적으로 처리됨
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(5)).untilAsserted {
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted {
             val exists = eventHandledRepository.existsByIdempotencyKey(expectedIdempotencyKey)
             assertThat(exists).isTrue()
         }
