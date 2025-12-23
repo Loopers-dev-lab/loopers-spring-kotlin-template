@@ -1,10 +1,10 @@
 package com.loopers.application.ranking
 
 import com.loopers.domain.product.ProductService
+import com.loopers.support.cache.CacheKeys
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ZSetOperations
 import org.springframework.stereotype.Component
-import java.time.format.DateTimeFormatter
 
 @Component
 class RankingFacade(
@@ -16,10 +16,8 @@ class RankingFacade(
 
     fun getRanking(command: RankingCommand.GetRankings): RankingInfo.Page {
         val pageable = command.pageable
-
-        val date = command.date.toLocalDate().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
-        val key = "ranking:all:$date"
-
+        val key = CacheKeys.Ranking(command.date).key
+        
         // 전체 랭킹 수 조회
         val totalElements = zSetOps.size(key) ?: 0L
 

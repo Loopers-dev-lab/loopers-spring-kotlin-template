@@ -3,6 +3,7 @@ package com.loopers.support.cache
 import org.springframework.data.domain.Pageable
 import java.time.Duration
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 sealed class CacheKeys(override val ttl: Duration) : CacheKey {
     abstract override val key: String
@@ -23,7 +24,11 @@ sealed class CacheKeys(override val ttl: Duration) : CacheKey {
     data class Ranking(
         private val date: LocalDateTime,
     ) : CacheKeys(ttl = Duration.ofMinutes(1)) {
-        override val key: String = buildKey("raking-v1:$date")
+        override val key: String = buildKey("raking-v1:$date.format(${DATE_FORMATTER})")
+
+        companion object {
+            private val DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd")
+        }
     }
 
     companion object {
