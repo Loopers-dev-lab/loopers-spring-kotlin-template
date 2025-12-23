@@ -82,7 +82,7 @@ class RankingConsumer(
      */
     @KafkaListener(
         topics = [OutboxEvent.OrderCompleted.TOPIC],
-        groupId = "ranking-order-consumer",
+        groupId = "ranking-order-completed-consumer",
         containerFactory = KafkaConfig.BATCH_LISTENER,
     )
     fun consumeOrderCompletedEvents(
@@ -105,7 +105,7 @@ class RankingConsumer(
      */
     @KafkaListener(
         topics = [OutboxEvent.OrderCanceled.TOPIC],
-        groupId = "ranking-order-consumer",
+        groupId = "ranking-order-canceled-consumer",
         containerFactory = KafkaConfig.BATCH_LISTENER,
     )
     fun consumeOrderCanceledEvents(
