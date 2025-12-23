@@ -68,7 +68,7 @@ class RankingConsumer(
     ) {
         log.info("랭킹 좋아요 이벤트 배치 수신: {} 건", records.size)
         try {
-            rankingFacade.handleLikeEvents(records, "ranking-like-consumer")
+            rankingFacade.handleLikeEvents(records)
             acknowledgment.acknowledge()
             log.info("랭킹 좋아요 이벤트 배치 처리 완료: {} 건", records.size)
         } catch (e: Exception) {
@@ -91,7 +91,7 @@ class RankingConsumer(
     ) {
         log.info("랭킹 주문 완료 이벤트 배치 수신: {} 건", records.size)
         try {
-            rankingFacade.handleOrderCompletedEvents(records, "ranking-order-consumer")
+            rankingFacade.handleOrderCompletedEvents(records)
             acknowledgment.acknowledge()
             log.info("랭킹 주문 완료 이벤트 배치 처리 완료: {} 건", records.size)
         } catch (e: Exception) {
@@ -114,7 +114,7 @@ class RankingConsumer(
     ) {
         log.info("랭킹 주문 취소 이벤트 배치 수신: {} 건", records.size)
         try {
-            rankingFacade.handleOrderCanceledEvents(records, "ranking-order-consumer")
+            rankingFacade.handleOrderCanceledEvents(records)
             acknowledgment.acknowledge()
             log.info("랭킹 주문 취소 이벤트 배치 처리 완료: {} 건", records.size)
         } catch (e: Exception) {

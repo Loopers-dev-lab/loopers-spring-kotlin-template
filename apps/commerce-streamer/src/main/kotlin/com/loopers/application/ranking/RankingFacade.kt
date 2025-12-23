@@ -56,7 +56,7 @@ class RankingFacade(
     /**
      * 좋아요 이벤트 배치 처리
      */
-    fun handleLikeEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
+    fun handleLikeEvents(records: List<ConsumerRecord<Any, Any>>) {
         log.info("랭킹 좋아요 이벤트 배치 처리 시작: {} 건", records.size)
 
         val dateKey = currentDateKey()
@@ -86,17 +86,17 @@ class RankingFacade(
         }
 
         if (likedEvents.isNotEmpty()) {
-            rankingService.incrementLikeScoreBatch(likedEvents, consumerGroup)
+            rankingService.incrementLikeScoreBatch(likedEvents)
         }
         if (unlikedEvents.isNotEmpty()) {
-            rankingService.decrementLikeScoreBatch(unlikedEvents, consumerGroup)
+            rankingService.decrementLikeScoreBatch(unlikedEvents)
         }
     }
 
     /**
      * 주문 완료 이벤트 배치 처리
      */
-    fun handleOrderCompletedEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
+    fun handleOrderCompletedEvents(records: List<ConsumerRecord<Any, Any>>) {
         log.info("랭킹 주문 완료 이벤트 배치 처리 시작: {} 건", records.size)
 
         val dateKey = currentDateKey()
@@ -119,13 +119,13 @@ class RankingFacade(
             )
         }
 
-        rankingService.incrementOrderScoreBatch(events, consumerGroup)
+        rankingService.incrementOrderScoreBatch(events)
     }
 
     /**
      * 주문 취소 이벤트 배치 처리
      */
-    fun handleOrderCanceledEvents(records: List<ConsumerRecord<Any, Any>>, consumerGroup: String) {
+    fun handleOrderCanceledEvents(records: List<ConsumerRecord<Any, Any>>) {
         log.info("랭킹 주문 취소 이벤트 배치 처리 시작: {} 건", records.size)
 
         val currentDateKey = currentDateKey()
@@ -158,7 +158,7 @@ class RankingFacade(
             )
         }
 
-        rankingService.decrementOrderScoreBatch(events, consumerGroup)
+        rankingService.decrementOrderScoreBatch(events)
     }
 
     /**

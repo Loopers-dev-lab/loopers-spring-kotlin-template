@@ -18,10 +18,6 @@ class RankingServiceIdempotencyTest : IntegrationTest() {
     @Autowired
     private lateinit var rankingRepository: RankingRepository
 
-    companion object {
-        private const val RANKING_LIKE_CONSUMER_GROUP = "ranking-like-consumer"
-    }
-
     @Test
     @DisplayName("조회수 배치에서 동일 이벤트가 중복되어도 1번만 반영된다")
     fun testDuplicateViewEventsBatchWhenProcessedThenIdempotent() {
@@ -60,7 +56,7 @@ class RankingServiceIdempotencyTest : IntegrationTest() {
         )
 
         // when
-        rankingService.incrementLikeScoreBatch(events, RANKING_LIKE_CONSUMER_GROUP)
+        rankingService.incrementLikeScoreBatch(events)
 
         // then
         val score = rankingRepository.getScore(dateKey, productId)

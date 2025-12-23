@@ -53,8 +53,8 @@ class RankingServiceTest : IntegrationTest() {
         )
 
         // when
-        rankingService.incrementLikeScoreBatch(likedEvents, "ranking-like-consumer")
-        rankingService.decrementLikeScoreBatch(unlikedEvents, "ranking-like-consumer")
+        rankingService.incrementLikeScoreBatch(likedEvents)
+        rankingService.decrementLikeScoreBatch(unlikedEvents)
 
         // then
         assertThat(rankingRepository.getScore(dateKey, productId)).isEqualTo(0.0)
