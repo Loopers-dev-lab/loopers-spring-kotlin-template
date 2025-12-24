@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 
 @Component
 class ProductFacade(
@@ -18,15 +19,17 @@ class ProductFacade(
 ) {
 
     @Transactional(readOnly = true)
-    fun getProductDetail(productId: Long, userId: Long): ProductDetailResult {
-        val detail = productDetailService.getProductDetailBy(productId)
+    fun getProductDetail(productId: Long, userId: Long?): ProductDetailResult {
+        val userId = userId ?: -999L
+        val now = LocalDateTime.now()
+
+        val detail = productDetailService.getProductDetailBy(productId, now)
 
         productEventPublisher.publish(ProductViewedEvent(productId, userId))
-        
+
         return detail
     }
 
-    fun getProductDetail(productId: Long) = productDetailService.getProductDetailBy(productId)
 
     fun getProducts(pageable: Pageable, brandId: Long?): Page<ProductInfo> =
         productService.getProducts(

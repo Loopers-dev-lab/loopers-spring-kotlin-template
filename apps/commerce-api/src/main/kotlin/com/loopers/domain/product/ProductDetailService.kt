@@ -3,6 +3,7 @@ package com.loopers.domain.product
 import com.fasterxml.jackson.core.type.TypeReference
 import com.loopers.domain.brand.BrandModel
 import com.loopers.domain.brand.BrandRepository
+import com.loopers.domain.common.vo.Money
 import com.loopers.domain.product.signal.ProductTotalSignalRepository
 import com.loopers.domain.product.stock.StockRepository
 import com.loopers.support.cache.CacheKeys
@@ -46,7 +47,7 @@ class ProductDetailService(
         val stock = stockRepository.findByRefProductId(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "해당 상품의 재고가 존재하지 않습니다.")
 
-        val rank = zset.reverseRank(CacheKeys.Ranking(date).key, productId) ?: -999L
+        val rank = zset.reverseRank(CacheKeys.Ranking(date).key, productId)
 
         ProductDetailResult.from(product, brand, productTotalSignal.likeCount, stock.amount, rank)
     }
@@ -56,10 +57,11 @@ data class ProductDetailResult(
     val id: Long,
     val name: String,
     val stock: Long,
+    val price: Money,
     val likeCount: Long,
     val brandId: Long,
     val brandName: String,
-    val rank: Long,
+    val rank: Long?,
 ) {
     companion object {
         fun from(
@@ -67,12 +69,13 @@ data class ProductDetailResult(
             brand: BrandModel,
             likeCount: Long,
             stockQuantity: Long,
-            rank: Long,
+            rank: Long?,
         ): ProductDetailResult =
             ProductDetailResult(
                 product.id,
                 product.name,
                 stockQuantity,
+                product.price,
                 likeCount,
                 brand.id,
                 brand.name,

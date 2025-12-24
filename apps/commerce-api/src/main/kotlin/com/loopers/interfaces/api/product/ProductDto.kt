@@ -1,11 +1,37 @@
 package com.loopers.interfaces.api.product
 
 import com.loopers.application.product.ProductInfo
+import com.loopers.domain.common.vo.Money
+import com.loopers.domain.product.ProductDetailResult
 import com.loopers.domain.product.viewModel.ProductViewModel
 import org.springframework.data.domain.Page
 import java.math.BigDecimal
 
 sealed class ProductDto {
+
+    data class GetProduct(
+        val id: Long,
+        val brandId: Long,
+        val brandName: String,
+        val price: Money,
+        val stockAmount: Long,
+        val likeCount: Long,
+        val rank: Long?,
+    ) {
+        companion object {
+            fun from(result: ProductDetailResult): GetProduct {
+                return GetProduct(
+                    id = result.id,
+                    brandId = result.brandId,
+                    brandName = result.brandName,
+                    price = result.price,
+                    stockAmount = result.stock,
+                    likeCount = result.likeCount,
+                    rank = result.rank,
+                )
+            }
+        }
+    }
 
     data class ProductViewModelResponse(
         val id: Long,
