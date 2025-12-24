@@ -15,7 +15,6 @@ import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
-import org.assertj.core.api.Assertions.assertThatCode
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -105,14 +104,13 @@ class OrderDataPlatformEventListenerIntegrationTest @Autowired constructor(
             throw RuntimeException("External service error")
         }
 
-        // when & then - 예외가 전파되지 않아야 함
-        assertThatCode {
-            transactionTemplate.execute {
-                applicationEventPublisher.publishEvent(event)
-            }
-        }.doesNotThrowAnyException()
+        // when - AFTER_COMMIT 이벤트이므로 트랜잭션 내에서 발행해야 함
+        transactionTemplate.execute {
+            applicationEventPublisher.publishEvent(event)
+        }
 
-        // then - 비동기 처리 완료 대기 및 호출 여부 상태 검증
+        // then - 예외 발생에도 리스너가 실행됨을 상태로 검증
+        // (리스너 내부에서 try-catch로 예외를 처리하므로 호출 완료됨)
         await().atMost(Duration.ofSeconds(5)).untilTrue(wasCalled)
     }
 
