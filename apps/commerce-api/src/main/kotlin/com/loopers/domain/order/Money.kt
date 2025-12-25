@@ -9,6 +9,7 @@ import jakarta.persistence.Enumerated
 import java.math.BigDecimal
 
 @Embeddable
+@ConsistentCopyVisibility
 data class Money private constructor(
     val amount: BigDecimal,
     @Enumerated(EnumType.STRING)

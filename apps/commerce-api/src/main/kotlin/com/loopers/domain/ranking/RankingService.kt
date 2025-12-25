@@ -104,6 +104,6 @@ class RankingService(private val rankingRepository: RankingRepository, private v
      */
     fun findProductsByIds(productIds: List<Long>): Map<Long, com.loopers.domain.product.Product> {
         val products = productRepository.findAllById(productIds)
-        return products.associateBy { it.id!! }
+        return products.associateBy { it.id }
     }
 }

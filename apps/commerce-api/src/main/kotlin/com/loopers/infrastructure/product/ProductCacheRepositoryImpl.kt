@@ -82,7 +82,7 @@ class ProductCacheRepositoryImpl(private val redisTemplate: RedisTemplate<String
                 .count(100)
                 .build()
 
-            connection.scan(scanOptions).use { cursor ->
+            connection.keyCommands().scan(scanOptions).use { cursor ->
                 while (cursor.hasNext()) {
                     keys.add(String(cursor.next()))
                 }
