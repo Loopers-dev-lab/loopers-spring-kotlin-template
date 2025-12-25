@@ -23,8 +23,8 @@ sealed class CacheKeys(override val ttl: Duration) : CacheKey {
 
     data class Ranking(
         private val date: LocalDateTime,
-    ) : CacheKeys(ttl = Duration.ofMinutes(1)) {
-        override val key: String = buildKey("raking-v1:$date.format(${DATE_FORMATTER})")
+    ) : CacheKeys(ttl = Duration.ofDays(2)) {
+        override val key: String = buildKey("ranking-v1:${date.toLocalDate().format(DATE_FORMATTER)}")
 
         companion object {
             private val DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd")

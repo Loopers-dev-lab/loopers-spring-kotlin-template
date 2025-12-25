@@ -26,17 +26,23 @@ class ProductMetricFacade(
     private val logger = LoggerFactory.getLogger(ProductMetricService::class.java)
 
     @Transactional
-    fun updateProductMetrics(messages: List<ConsumerRecord<String, String>>) {
+    fun updateProductMetrics(messages: List<ConsumerRecord<String, String>>): Set<Long> {
         val commands = buildCommands(messages)
         val likeCountCommand = commands.first
         val viewCountCommand = commands.second
 
+        val updatedProductIds = mutableSetOf<Long>()
+
         if (likeCountCommand.likeCountGroupBy.isNotEmpty()) {
             productMetricService.updateLikeCount(likeCountCommand.likeCountGroupBy)
+            updatedProductIds.addAll(likeCountCommand.likeCountGroupBy.keys)
         }
         if (viewCountCommand.viewCountGroupBy.isNotEmpty()) {
             productMetricService.updateViewCount(viewCountCommand.viewCountGroupBy)
+            updatedProductIds.addAll(viewCountCommand.viewCountGroupBy.keys)
         }
+
+        return updatedProductIds
     }
 
     private fun buildCommands(
@@ -85,54 +91,57 @@ class ProductMetricFacade(
         )
     }
 
-    @Transactional(readOnly = true)
-    fun updateRanking() {
-        val date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
-        val key = "ranking:all:$date"
+    /** 변경된 상품들에 대해 즉시 랭킹 업데이트 */
+    fun updateRankingForProducts(productIds: Set<Long>) {
+        val dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+        val formattedDate = LocalDate.now().format(dateFormatter)
+        val key = "LOOPERS::ranking-v1:$formattedDate"
 
-        logger.info("Starting ranking update for date: $date")
+        logger.debug("Updating ranking for ${productIds.size} products on date: $formattedDate")
 
-        val metrics = productMetricService.getAllMetrics()
+        val metrics = productMetricService.getMetricsByProductIds(productIds)
 
         if (metrics.isEmpty()) {
-            logger.warn("No metrics found in database")
+            logger.warn("No metrics found for productIds: $productIds")
             return
         }
 
-        val scoreUpdates = metrics.associate { metric ->
-            val score = calculateRankingScore(
-                viewCount = metric.viewCount,
-                likeCount = metric.likeCount,
-                salesCount = metric.salesCount,
-            )
+        metrics.forEach { metric ->
+            // 전 시간의 랭킹 점수 가져오기 (없으면 0)
+            val previousScore = zSetOps.score(key, metric.refProductId.toString()) ?: 0.0
 
-            metric.refProductId to score
-        }
+            val score =
+                calculateRankingScore(
+                    viewCount = metric.viewCount,
+                    likeCount = metric.likeCount,
+                    salesCount = metric.salesCount,
+                    previousHourScore = previousScore,
+                )
 
-        scoreUpdates.forEach { (productId, score) ->
-            zSetOps.incrementScore(key, productId.toString(), score)
+            // 기존 점수를 새로운 점수로 설정 (incrementScore가 아닌 add 사용)
+            zSetOps.add(key, metric.refProductId.toString(), score)
         }
 
         redisTemplate.expire(key, Duration.ofDays(2))
 
-        logger.info("Ranking update completed. Updated ${scoreUpdates.size} products")
+        logger.debug("Ranking update completed for ${metrics.size} products")
     }
 
     /**
-     * 랭킹 점수 계산
-     * 조회: Weight = 0.1, Score = viewCount
-     * 좋아요: Weight = 0.2, Score = likeCount
-     * 주문: Weight = 0.6, Score = salesCount
+     * 랭킹 점수 계산: 조회: Weight = 0.1, Score = viewCount 좋아요: Weight = 0.2, Score = likeCount 주문: Weight
+     * = 0.6, Score = salesCount 전 시간: Weight = 0.1, Score = previousHourScore
      */
     private fun calculateRankingScore(
         viewCount: Long,
         likeCount: Long,
         salesCount: Long,
+        previousHourScore: Double = 0.0,
     ): Double {
         val viewScore = 0.1 * viewCount
         val likeScore = 0.2 * likeCount
         val orderScore = 0.6 * salesCount
+        val previousScore = 0.1 * previousHourScore
 
-        return viewScore + likeScore + orderScore
+        return viewScore + likeScore + orderScore + previousScore
     }
 }

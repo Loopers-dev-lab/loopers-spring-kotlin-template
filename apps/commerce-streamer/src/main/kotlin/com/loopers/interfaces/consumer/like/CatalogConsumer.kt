@@ -25,7 +25,11 @@ class CatalogConsumer(private val productMetricFacade: ProductMetricFacade) {
         logger.info("Received ${messages.size} like events")
 
         try {
-            productMetricFacade.updateProductMetrics(messages)
+            val updatedProductIds = productMetricFacade.updateProductMetrics(messages)
+            // 변경된 상품들에 대해 즉시 랭킹 업데이트
+            if (updatedProductIds.isNotEmpty()) {
+                productMetricFacade.updateRankingForProducts(updatedProductIds)
+            }
             acknowledgment.acknowledge()
         } catch (e: Exception) {
             logger.error(e.message, e)
