@@ -12,12 +12,7 @@ import java.time.LocalDate
 
 @Entity
 @Table(name = "users")
-class User(
-    name: String,
-    email: String,
-    gender: Gender,
-    birthDate: LocalDate,
-) : BaseEntity() {
+class User(name: String, email: String, gender: Gender, birthDate: LocalDate) : BaseEntity() {
     @Column(nullable = false, length = 100)
     var name: String = name
         protected set

@@ -92,44 +92,32 @@ class TestFixtures(
     /**
      * 테스트용 브랜드를 저장합니다.
      */
-    fun saveBrand(brand: Brand): Brand {
-        return brandRepository.save(brand)
-    }
+    fun saveBrand(brand: Brand): Brand = brandRepository.save(brand)
 
     /**
      * 테스트용 상품을 저장합니다.
      */
-    fun saveProduct(product: Product): Product {
-        return productRepository.save(product)
-    }
+    fun saveProduct(product: Product): Product = productRepository.save(product)
 
     /**
      * 테스트용 재고를 저장합니다.
      */
-    fun saveStock(stock: Stock): Stock {
-        return stockRepository.save(stock)
-    }
+    fun saveStock(stock: Stock): Stock = stockRepository.save(stock)
 
     /**
      * 테스트용 포인트를 저장합니다.
      */
-    fun savePoint(point: Point): Point {
-        return pointRepository.save(point)
-    }
+    fun savePoint(point: Point): Point = pointRepository.save(point)
 
     /**
      * 테스트용 쿠폰을 저장합니다.
      */
-    fun saveCoupon(coupon: Coupon): Coupon {
-        return couponRepository.save(coupon)
-    }
+    fun saveCoupon(coupon: Coupon): Coupon = couponRepository.save(coupon)
 
     /**
      * 테스트용 사용자 쿠폰을 저장합니다.
      */
-    fun saveUserCoupon(userCoupon: UserCoupon): UserCoupon {
-        return userCouponRepository.save(userCoupon)
-    }
+    fun saveUserCoupon(userCoupon: UserCoupon): UserCoupon = userCouponRepository.save(userCoupon)
 }
 
 /**

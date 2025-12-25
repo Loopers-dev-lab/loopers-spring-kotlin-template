@@ -112,8 +112,6 @@ class ProductMetrics(
         /**
          * 새로운 메트릭 생성
          */
-        fun create(productId: Long): ProductMetrics {
-            return ProductMetrics(productId = productId)
-        }
+        fun create(productId: Long): ProductMetrics = ProductMetrics(productId = productId)
     }
 }

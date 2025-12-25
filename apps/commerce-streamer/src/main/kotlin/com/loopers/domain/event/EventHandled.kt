@@ -76,14 +76,12 @@ class EventHandled(
             aggregateType: String,
             aggregateId: Long,
             handledBy: String = "commerce-streamer",
-        ): EventHandled {
-            return EventHandled(
+        ): EventHandled = EventHandled(
                 eventId = eventId.toString(),
                 eventType = eventType,
                 aggregateType = aggregateType,
                 aggregateId = aggregateId,
                 handledBy = handledBy,
             )
-        }
     }
 }

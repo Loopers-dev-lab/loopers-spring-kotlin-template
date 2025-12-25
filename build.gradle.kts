@@ -22,13 +22,13 @@ plugins {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
 kotlin {
     compilerOptions {
-        jvmToolchain(21)
+        jvmToolchain(25)
         freeCompilerArgs.addAll("-Xjsr305=strict")
     }
 }
@@ -80,7 +80,7 @@ subprojects {
         // Testcontainers
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
         testImplementation("org.testcontainers:testcontainers")
-        testImplementation("org.testcontainers:junit-jupiter")
+        testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     }
 
     tasks.withType(Jar::class) { enabled = true }

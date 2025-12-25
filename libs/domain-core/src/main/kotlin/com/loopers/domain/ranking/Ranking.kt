@@ -27,12 +27,10 @@ data class Ranking(
         /**
          * Redis ZSET 항목으로부터 Ranking 생성
          */
-        fun from(productId: Long, score: Double, rank: Int): Ranking {
-            return Ranking(
+        fun from(productId: Long, score: Double, rank: Int): Ranking = Ranking(
                 productId = productId,
                 score = RankingScore(score),
                 rank = rank,
             )
-        }
     }
 }

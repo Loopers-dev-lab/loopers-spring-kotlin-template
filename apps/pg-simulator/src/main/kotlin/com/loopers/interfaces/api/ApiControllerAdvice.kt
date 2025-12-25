@@ -100,9 +100,9 @@ class ApiControllerAdvice {
     }
 
     @ExceptionHandler
-    fun handleNotFound(e: NoResourceFoundException): ResponseEntity<ApiResponse<*>> {
-        return failureResponse(errorType = ErrorType.NOT_FOUND)
-    }
+    fun handleNotFound(
+        e: NoResourceFoundException,
+    ): ResponseEntity<ApiResponse<*>> = failureResponse(errorType = ErrorType.NOT_FOUND)
 
     @ExceptionHandler
     fun handle(e: Throwable): ResponseEntity<ApiResponse<*>> {

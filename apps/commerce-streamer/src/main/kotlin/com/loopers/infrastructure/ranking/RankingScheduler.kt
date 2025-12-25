@@ -14,9 +14,7 @@ import java.time.LocalDate
  * 콜드 스타트 방지를 위한 Score Carry-Over 처리
  */
 @Component
-class RankingScheduler(
-    private val rankingRepository: RankingRepository,
-) {
+class RankingScheduler(private val rankingRepository: RankingRepository) {
     private val logger = LoggerFactory.getLogger(RankingScheduler::class.java)
 
     /**

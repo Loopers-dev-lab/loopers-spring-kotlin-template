@@ -96,8 +96,7 @@ class OutboxEventTest {
         assertThat(outboxEvent.retryCount).isEqualTo(4)
     }
 
-    private fun createOutboxEvent(): OutboxEvent {
-        return OutboxEvent.create(
+    private fun createOutboxEvent(): OutboxEvent = OutboxEvent.create(
             eventType = "LikeAddedEvent",
             topic = "catalog-events",
             partitionKey = "100",
@@ -105,5 +104,4 @@ class OutboxEventTest {
             aggregateType = "Product",
             aggregateId = 100L,
         )
-    }
 }

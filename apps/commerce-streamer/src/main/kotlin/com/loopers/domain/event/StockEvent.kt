@@ -7,12 +7,7 @@ import java.util.UUID
  * 재고 소진 이벤트
  * 상품의 재고가 0이 되었을 때 발행
  */
-data class StockDepletedEvent(
-    val eventId: UUID,
-    val productId: Long,
-    val previousQuantity: Int,
-    val createdAt: ZonedDateTime,
-)
+data class StockDepletedEvent(val eventId: UUID, val productId: Long, val previousQuantity: Int, val createdAt: ZonedDateTime)
 
 /**
  * 재고 부족 이벤트

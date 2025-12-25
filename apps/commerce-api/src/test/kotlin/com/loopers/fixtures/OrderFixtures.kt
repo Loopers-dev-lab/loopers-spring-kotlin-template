@@ -33,9 +33,7 @@ fun createTestOrder(
     ),
     createdAt: ZonedDateTime = ZonedDateTime.now(),
     updatedAt: ZonedDateTime = ZonedDateTime.now(),
-): Order {
-    return Order(
+): Order = Order(
         userId = userId,
         items = items,
     ).withId(id, createdAt, updatedAt)
-}

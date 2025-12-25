@@ -9,17 +9,11 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.ZonedDateTime
 
 @Repository
-class OutboxEventRepositoryImpl(
-    private val jpaRepository: OutboxEventJpaRepository,
-) : OutboxEventRepository {
+class OutboxEventRepositoryImpl(private val jpaRepository: OutboxEventJpaRepository) : OutboxEventRepository {
 
-    override fun save(outboxEvent: OutboxEvent): OutboxEvent {
-        return jpaRepository.save(outboxEvent)
-    }
+    override fun save(outboxEvent: OutboxEvent): OutboxEvent = jpaRepository.save(outboxEvent)
 
-    override fun findById(id: Long): OutboxEvent? {
-        return jpaRepository.findById(id).orElse(null)
-    }
+    override fun findById(id: Long): OutboxEvent? = jpaRepository.findById(id).orElse(null)
 
     @Transactional
     override fun findPendingEvents(limit: Int): List<OutboxEvent> {
@@ -39,11 +33,17 @@ class OutboxEventRepositoryImpl(
         return events
     }
 
-    override fun findFailedEventsOlderThan(createdBefore: ZonedDateTime): List<OutboxEvent> {
-        return jpaRepository.findByStatusAndCreatedAtBefore(OutboxEventStatus.FAILED, createdBefore)
-    }
+    override fun findFailedEventsOlderThan(
+        createdBefore: ZonedDateTime,
+    ): List<OutboxEvent> = jpaRepository.findByStatusAndCreatedAtBefore(
+        OutboxEventStatus.FAILED,
+        createdBefore,
+    )
 
-    override fun deletePublishedEventsBefore(publishedBefore: ZonedDateTime): Int {
-        return jpaRepository.deleteByStatusAndPublishedAtBefore(OutboxEventStatus.PUBLISHED, publishedBefore)
-    }
+    override fun deletePublishedEventsBefore(
+        publishedBefore: ZonedDateTime,
+    ): Int = jpaRepository.deleteByStatusAndPublishedAtBefore(
+        OutboxEventStatus.PUBLISHED,
+        publishedBefore,
+    )
 }

@@ -70,8 +70,5 @@ class ProductLikeCountSyncScheduler(
         )
     }
 
-    private data class SyncResult(
-        val successCount: Int,
-        val failCount: Int,
-    )
+    private data class SyncResult(val successCount: Int, val failCount: Int)
 }

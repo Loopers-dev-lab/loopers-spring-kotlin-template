@@ -5,9 +5,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class UserFacade(
-    private val userService: UserService,
-) {
+class UserFacade(private val userService: UserService) {
     @Transactional
     fun registerUser(request: UserRegisterRequest): UserInfo {
         val user = userService.registerUser(

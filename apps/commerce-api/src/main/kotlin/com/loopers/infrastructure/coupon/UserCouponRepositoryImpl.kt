@@ -5,9 +5,7 @@ import com.loopers.domain.coupon.UserCouponRepository
 import org.springframework.stereotype.Repository
 
 @Repository
-class UserCouponRepositoryImpl(
-    private val userCouponJpaRepository: UserCouponJpaRepository,
-) : UserCouponRepository {
+class UserCouponRepositoryImpl(private val userCouponJpaRepository: UserCouponJpaRepository) : UserCouponRepository {
     override fun findById(id: Long): UserCoupon? =
         userCouponJpaRepository.findById(id).orElse(null)
 

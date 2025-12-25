@@ -34,6 +34,7 @@ dependencies {
     // web
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
     // retry & resilience
@@ -41,7 +42,7 @@ dependencies {
     implementation("org.springframework:spring-aspects")
     implementation("io.github.resilience4j:resilience4j-spring-boot3:2.3.0")
     implementation("io.github.resilience4j:resilience4j-rxjava3:2.3.0")
-    implementation("org.springframework.boot:spring-boot-starter-aop")
+    implementation("org.springframework.boot:spring-boot-starter-aspectj")
 
     // feign client
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.3.0")
@@ -51,6 +52,9 @@ dependencies {
 
     // querydsl
     ksp("io.github.openfeign.querydsl:querydsl-ksp-codegen:$queryDslVersion")
+
+    // Spring Boot 4.0 rest test client
+    testImplementation("org.springframework.boot:spring-boot-resttestclient")
 
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))

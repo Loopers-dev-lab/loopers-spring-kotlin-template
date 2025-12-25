@@ -30,23 +30,13 @@ import java.util.concurrent.atomic.AtomicInteger
 @SpringBootTest
 @ActiveProfiles("test")
 @DisplayName("주문 취소 동시성 테스트")
-class OrderCancellationConcurrencyTest {
-
-    @Autowired
-    private lateinit var orderService: OrderService
-
-    @Autowired
-    private lateinit var orderFacade: OrderFacade
-
-    @Autowired
-    private lateinit var orderRepository: OrderRepository
-
-    @Autowired
-    private lateinit var stockRepository: StockRepository
-
-    @Autowired
-    private lateinit var testFixtures: TestFixtures
-
+class OrderCancellationConcurrencyTest @Autowired constructor(
+    private val orderService: OrderService,
+    private val orderFacade: OrderFacade,
+    private val orderRepository: OrderRepository,
+    private val stockRepository: StockRepository,
+    private val testFixtures: TestFixtures,
+) {
     private lateinit var user: User
     private lateinit var brand: Brand
     private lateinit var product: Product

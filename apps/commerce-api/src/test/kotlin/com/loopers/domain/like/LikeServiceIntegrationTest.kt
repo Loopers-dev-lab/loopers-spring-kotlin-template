@@ -23,22 +23,13 @@ import java.time.LocalDate
 @SpringBootTest
 @ContextConfiguration(initializers = [RedisTestContainersConfig::class])
 @Transactional
-class LikeServiceIntegrationTest {
-    @Autowired
-    private lateinit var likeService: LikeService
-
-    @Autowired
-    private lateinit var likeRepository: LikeRepository
-
-    @Autowired
-    private lateinit var userRepository: UserRepository
-
-    @Autowired
-    private lateinit var brandRepository: BrandRepository
-
-    @Autowired
-    private lateinit var productRepository: ProductRepository
-
+class LikeServiceIntegrationTest @Autowired constructor(
+    private val likeService: LikeService,
+    private val likeRepository: LikeRepository,
+    private val userRepository: UserRepository,
+    private val brandRepository: BrandRepository,
+    private val productRepository: ProductRepository,
+) {
     private lateinit var user: User
     private lateinit var product: Product
 

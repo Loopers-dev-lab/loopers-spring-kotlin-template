@@ -29,31 +29,16 @@ import java.time.LocalDate
 
 @SpringBootTest
 @Transactional
-class OrderServiceIntegrationTest {
-    @Autowired
-    private lateinit var orderFacade: OrderFacade
-
-    @Autowired
-    private lateinit var userRepository: UserRepository
-
-    @Autowired
-    private lateinit var brandRepository: BrandRepository
-
-    @Autowired
-    private lateinit var productRepository: ProductRepository
-
-    @Autowired
-    private lateinit var stockRepository: StockRepository
-
-    @Autowired
-    private lateinit var pointRepository: PointRepository
-
-    @Autowired
-    private lateinit var orderRepository: OrderRepository
-
-    @Autowired
-    private lateinit var orderService: OrderService
-
+class OrderServiceIntegrationTest @Autowired constructor(
+    private val orderFacade: OrderFacade,
+    private val userRepository: UserRepository,
+    private val brandRepository: BrandRepository,
+    private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
+    private val pointRepository: PointRepository,
+    private val orderRepository: OrderRepository,
+    private val orderService: OrderService,
+) {
     private lateinit var user: User
     private lateinit var brand: Brand
     private lateinit var product1: Product

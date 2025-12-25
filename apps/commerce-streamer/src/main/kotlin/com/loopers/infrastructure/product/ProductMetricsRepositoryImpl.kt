@@ -6,23 +6,15 @@ import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 
 @Repository
-class ProductMetricsRepositoryImpl(
-    private val jpaRepository: ProductMetricsJpaRepository,
-) : ProductMetricsRepository {
+class ProductMetricsRepositoryImpl(private val jpaRepository: ProductMetricsJpaRepository) : ProductMetricsRepository {
 
-    override fun save(productMetrics: ProductMetrics): ProductMetrics {
-        return jpaRepository.save(productMetrics)
-    }
+    override fun save(productMetrics: ProductMetrics): ProductMetrics = jpaRepository.save(productMetrics)
 
-    override fun findByProductId(productId: Long): ProductMetrics? {
-        return jpaRepository.findByProductId(productId)
-    }
+    override fun findByProductId(productId: Long): ProductMetrics? = jpaRepository.findByProductId(productId)
 
-    override fun findOrCreateByProductId(productId: Long): ProductMetrics {
-        return findByProductId(productId) ?: run {
+    override fun findOrCreateByProductId(productId: Long): ProductMetrics = findByProductId(productId) ?: run {
             jpaRepository.save(ProductMetrics.create(productId))
         }
-    }
 
     @Transactional
     override fun findOrCreateByProductIdWithLock(productId: Long): ProductMetrics {

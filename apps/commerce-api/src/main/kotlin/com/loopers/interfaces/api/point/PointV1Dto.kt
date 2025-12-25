@@ -7,33 +7,21 @@ import java.math.BigDecimal
 import java.time.ZonedDateTime
 
 class PointV1Dto {
-    data class ChargeRequest(
-        val amount: BigDecimal,
-        val currency: Currency = Currency.KRW,
-    ) {
-        fun toCommand(): PointChargeRequest {
-            return PointChargeRequest(
+    data class ChargeRequest(val amount: BigDecimal, val currency: Currency = Currency.KRW) {
+        fun toCommand(): PointChargeRequest = PointChargeRequest(
                 amount = amount,
                 currency = currency,
             )
-        }
     }
 
-    data class PointResponse(
-        val userId: Long,
-        val balance: BigDecimal,
-        val currency: String,
-        val updatedAt: ZonedDateTime,
-    ) {
+    data class PointResponse(val userId: Long, val balance: BigDecimal, val currency: String, val updatedAt: ZonedDateTime) {
         companion object {
-            fun from(info: PointInfo): PointResponse {
-                return PointResponse(
+            fun from(info: PointInfo): PointResponse = PointResponse(
                     userId = info.userId,
                     balance = info.balance,
                     currency = info.currency,
                     updatedAt = info.updatedAt,
                 )
-            }
         }
     }
 }

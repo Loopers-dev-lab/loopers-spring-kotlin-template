@@ -41,11 +41,7 @@ data class PgPaymentRequest(
     val callbackUrl: String,
 )
 
-data class PgTransactionResponse(
-    val transactionKey: String,
-    val status: TransactionStatusDto,
-    val reason: String?,
-)
+data class PgTransactionResponse(val transactionKey: String, val status: TransactionStatusDto, val reason: String?)
 
 data class PgTransactionDetailResponse(
     val transactionKey: String,
@@ -57,21 +53,11 @@ data class PgTransactionDetailResponse(
     val reason: String?,
 )
 
-data class PgOrderResponse(
-    val orderId: String,
-    val transactions: List<PgTransactionResponse>,
-)
+data class PgOrderResponse(val orderId: String, val transactions: List<PgTransactionResponse>)
 
-data class PgApiResponse<T>(
-    val success: Boolean,
-    val data: T?,
-    val error: PgErrorResponse?,
-)
+data class PgApiResponse<T>(val success: Boolean, val data: T?, val error: PgErrorResponse?)
 
-data class PgErrorResponse(
-    val message: String,
-    val code: String?,
-)
+data class PgErrorResponse(val message: String, val code: String?)
 
 enum class CardTypeDto {
     SAMSUNG,

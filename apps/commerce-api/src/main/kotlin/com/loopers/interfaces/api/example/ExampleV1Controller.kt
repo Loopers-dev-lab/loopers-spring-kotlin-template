@@ -9,15 +9,11 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1/examples")
-class ExampleV1Controller(
-    private val exampleFacade: ExampleFacade,
-) : ExampleV1ApiSpec {
+class ExampleV1Controller(private val exampleFacade: ExampleFacade) : ExampleV1ApiSpec {
     @GetMapping("/{exampleId}")
     override fun getExample(
         @PathVariable(value = "exampleId") exampleId: Long,
-    ): ApiResponse<ExampleV1Dto.ExampleResponse> {
-        return exampleFacade.getExample(exampleId)
+    ): ApiResponse<ExampleV1Dto.ExampleResponse> = exampleFacade.getExample(exampleId)
             .let { ExampleV1Dto.ExampleResponse.from(it) }
             .let { ApiResponse.success(it) }
-    }
 }

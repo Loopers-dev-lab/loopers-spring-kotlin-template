@@ -69,9 +69,13 @@ class KafkaEventConsumer(
             // 이벤트 타입에 따라 분기 처리
             when (eventType) {
                 "LikeAddedEvent" -> handleLikeAdded(message, acknowledgment)
+
                 "LikeRemovedEvent" -> handleLikeRemoved(message, acknowledgment)
+
                 "ProductViewEvent" -> handleProductView(message, acknowledgment)
+
                 "StockDepletedEvent" -> handleStockDepleted(message, acknowledgment)
+
                 else -> {
                     logger.warn("알 수 없는 이벤트 타입: $eventType")
                     acknowledgeAfterCommit(acknowledgment)
@@ -105,6 +109,7 @@ class KafkaEventConsumer(
 
             when (eventType) {
                 "OrderCreatedEvent" -> handleOrderCreated(message, acknowledgment)
+
                 else -> {
                     logger.warn("알 수 없는 이벤트 타입: $eventType")
                     acknowledgeAfterCommit(acknowledgment)
@@ -315,9 +320,7 @@ class KafkaEventConsumer(
     /**
      * 이미 처리된 이벤트인지 확인 (멱등성 보장)
      */
-    private fun isAlreadyHandled(eventId: UUID): Boolean {
-        return eventHandledRepository.existsByEventId(eventId)
-    }
+    private fun isAlreadyHandled(eventId: UUID): Boolean = eventHandledRepository.existsByEventId(eventId)
 
     /**
      * 랭킹 점수 업데이트

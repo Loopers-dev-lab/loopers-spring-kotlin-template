@@ -108,9 +108,9 @@ class ApiControllerAdvice {
     }
 
     @ExceptionHandler
-    fun handleNotFound(e: NoResourceFoundException): ResponseEntity<ApiResponse<*>> {
-        return failureResponse(errorType = ErrorType.NOT_FOUND)
-    }
+    fun handleNotFound(
+        e: NoResourceFoundException,
+    ): ResponseEntity<ApiResponse<*>> = failureResponse(errorType = ErrorType.NOT_FOUND)
 
     @ExceptionHandler
     fun handleLockAcquisitionFailure(e: jakarta.persistence.PessimisticLockException): ResponseEntity<ApiResponse<*>> {

@@ -7,19 +7,13 @@ import java.time.ZonedDateTime
 import java.util.UUID
 
 @Repository
-class EventHandledRepositoryImpl(
-    private val jpaRepository: EventHandledJpaRepository,
-) : EventHandledRepository {
+class EventHandledRepositoryImpl(private val jpaRepository: EventHandledJpaRepository) : EventHandledRepository {
 
-    override fun save(eventHandled: EventHandled): EventHandled {
-        return jpaRepository.save(eventHandled)
-    }
+    override fun save(eventHandled: EventHandled): EventHandled = jpaRepository.save(eventHandled)
 
-    override fun existsByEventId(eventId: UUID): Boolean {
-        return jpaRepository.existsByEventId(eventId.toString())
-    }
+    override fun existsByEventId(eventId: UUID): Boolean = jpaRepository.existsByEventId(eventId.toString())
 
-    override fun deleteHandledEventsBefore(handledBefore: ZonedDateTime): Int {
-        return jpaRepository.deleteByHandledAtBefore(handledBefore)
-    }
+    override fun deleteHandledEventsBefore(handledBefore: ZonedDateTime): Int = jpaRepository.deleteByHandledAtBefore(
+        handledBefore,
+    )
 }

@@ -54,7 +54,9 @@ import java.util.concurrent.TimeUnit
  */
 @SpringBootTest
 @ActiveProfiles("test")
-class KafkaConsumerE2ETest {
+class KafkaConsumerE2ETest @Autowired constructor(
+    private val objectMapper: ObjectMapper,
+) {
 
     companion object {
         private const val KAFKA_SEND_TIMEOUT_SECONDS = 5L
@@ -87,9 +89,6 @@ class KafkaConsumerE2ETest {
 
     @Autowired(required = false)
     private var eventHandledJpaRepository: EventHandledJpaRepository? = null
-
-    @Autowired
-    private lateinit var objectMapper: ObjectMapper
 
     @Value("\${spring.kafka.bootstrap-servers}")
     private lateinit var bootstrapServers: String

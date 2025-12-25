@@ -1,8 +1,8 @@
 package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.RankingKey
-import com.loopers.domain.ranking.RankingScore
 import com.loopers.domain.ranking.RankingScope
+import com.loopers.domain.ranking.RankingScore
 import com.loopers.testcontainers.RedisTestContainersConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -19,14 +19,10 @@ import java.time.LocalDateTime
 @SpringBootTest
 @ContextConfiguration(initializers = [RedisTestContainersConfig::class])
 @DisplayName("RankingRedisRepository 통합 테스트")
-class RankingRedisRepositoryIntegrationTest {
-
-    @Autowired
-    private lateinit var rankingRepository: RankingRedisRepository
-
-    @Autowired
-    private lateinit var redisTemplate: RedisTemplate<String, String>
-
+class RankingRedisRepositoryIntegrationTest @Autowired constructor(
+    private val rankingRepository: RankingRedisRepository,
+    private val redisTemplate: RedisTemplate<String, String>,
+) {
     private lateinit var dailyKey: RankingKey
     private lateinit var hourlyKey: RankingKey
 

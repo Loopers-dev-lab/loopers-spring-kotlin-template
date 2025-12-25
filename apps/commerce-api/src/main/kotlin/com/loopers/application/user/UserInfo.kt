@@ -13,8 +13,7 @@ data class UserInfo(
     val createdAt: ZonedDateTime,
 ) {
     companion object {
-        fun from(user: User): UserInfo {
-            return UserInfo(
+        fun from(user: User): UserInfo = UserInfo(
                 id = user.id,
                 name = user.name,
                 email = user.email,
@@ -22,6 +21,5 @@ data class UserInfo(
                 birthDate = user.birthDate,
                 createdAt = user.createdAt,
             )
-        }
     }
 }

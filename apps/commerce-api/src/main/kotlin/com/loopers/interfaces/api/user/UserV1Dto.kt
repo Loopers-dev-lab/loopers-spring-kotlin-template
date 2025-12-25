@@ -7,20 +7,13 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 
 class UserV1Dto {
-    data class RegisterRequest(
-        val name: String,
-        val email: String,
-        val gender: Gender,
-        val birthDate: LocalDate,
-    ) {
-        fun toCommand(): UserRegisterRequest {
-            return UserRegisterRequest(
+    data class RegisterRequest(val name: String, val email: String, val gender: Gender, val birthDate: LocalDate) {
+        fun toCommand(): UserRegisterRequest = UserRegisterRequest(
                 name = name,
                 email = email,
                 gender = gender,
                 birthDate = birthDate,
             )
-        }
     }
 
     data class UserResponse(
@@ -32,8 +25,7 @@ class UserV1Dto {
         val createdAt: ZonedDateTime,
     ) {
         companion object {
-            fun from(info: UserInfo): UserResponse {
-                return UserResponse(
+            fun from(info: UserInfo): UserResponse = UserResponse(
                     id = info.id,
                     name = info.name,
                     email = info.email,
@@ -41,7 +33,6 @@ class UserV1Dto {
                     birthDate = info.birthDate,
                     createdAt = info.createdAt,
                 )
-            }
         }
     }
 }

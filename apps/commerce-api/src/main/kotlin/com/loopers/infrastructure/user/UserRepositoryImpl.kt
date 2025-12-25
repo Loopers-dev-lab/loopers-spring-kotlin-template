@@ -6,9 +6,7 @@ import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Repository
 
 @Repository
-class UserRepositoryImpl(
-    private val userJpaRepository: UserJpaRepository,
-) : UserRepository {
+class UserRepositoryImpl(private val userJpaRepository: UserJpaRepository) : UserRepository {
     override fun findById(id: Long): User? = userJpaRepository.findByIdOrNull(id)
 
     override fun save(user: User): User = userJpaRepository.save(user)

@@ -10,10 +10,7 @@ import org.springframework.transaction.annotation.Transactional
  * 도메인 이벤트를 Outbox 테이블에 저장
  */
 @Service
-class OutboxEventPublisher(
-    private val outboxEventRepository: OutboxEventRepository,
-    private val objectMapper: ObjectMapper,
-) {
+class OutboxEventPublisher(private val outboxEventRepository: OutboxEventRepository, private val objectMapper: ObjectMapper) {
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
 
     /**

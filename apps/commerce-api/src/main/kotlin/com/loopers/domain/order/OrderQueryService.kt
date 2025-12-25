@@ -7,12 +7,8 @@ import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 
 @Service
-class OrderQueryService(
-    private val orderRepository: OrderRepository,
-) {
-    fun getOrders(userId: Long, pageable: Pageable): Page<Order> {
-        return orderRepository.findByUserId(userId, pageable)
-    }
+class OrderQueryService(private val orderRepository: OrderRepository) {
+    fun getOrders(userId: Long, pageable: Pageable): Page<Order> = orderRepository.findByUserId(userId, pageable)
 
     fun getOrderDetail(userId: Long, orderId: Long): Order {
         val order = orderRepository.findById(orderId)
