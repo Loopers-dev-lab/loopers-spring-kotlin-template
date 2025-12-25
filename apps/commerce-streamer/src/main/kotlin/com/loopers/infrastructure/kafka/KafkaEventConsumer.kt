@@ -7,8 +7,14 @@ import com.loopers.domain.event.EventHandledRepository
 import com.loopers.domain.event.LikeAddedEvent
 import com.loopers.domain.event.LikeRemovedEvent
 import com.loopers.domain.event.OrderCreatedEvent
+import com.loopers.domain.event.ProductViewEvent
 import com.loopers.domain.event.StockDepletedEvent
 import com.loopers.domain.product.ProductMetricsRepository
+import com.loopers.domain.ranking.RankingKey
+import com.loopers.domain.ranking.RankingRepository
+import com.loopers.domain.ranking.RankingScore
+import com.loopers.domain.ranking.RankingScoreCalculator
+import com.loopers.domain.ranking.RankingScope
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.kafka.annotation.KafkaListener
@@ -21,10 +27,14 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.util.UUID
 
 /**
  * Kafka 이벤트 Consumer
  * catalog-events, order-events 토픽에서 메시지를 소비하여 집계 처리
+ *
+ * 배치 리스너를 사용하여 여러 메시지를 한 번에 처리하고,
+ * Redis ZSET에 랭킹 점수를 실시간으로 반영
  */
 @Component
 @ConditionalOnBean(KafkaTemplate::class)
@@ -32,6 +42,8 @@ class KafkaEventConsumer(
     private val objectMapper: ObjectMapper,
     private val eventHandledRepository: EventHandledRepository,
     private val productMetricsRepository: ProductMetricsRepository,
+    private val rankingRepository: RankingRepository,
+    private val rankingWeightProperties: com.loopers.config.RankingWeightProperties,
 ) {
     private val logger = LoggerFactory.getLogger(KafkaEventConsumer::class.java)
 
@@ -58,6 +70,7 @@ class KafkaEventConsumer(
             when (eventType) {
                 "LikeAddedEvent" -> handleLikeAdded(message, acknowledgment)
                 "LikeRemovedEvent" -> handleLikeRemoved(message, acknowledgment)
+                "ProductViewEvent" -> handleProductView(message, acknowledgment)
                 "StockDepletedEvent" -> handleStockDepleted(message, acknowledgment)
                 else -> {
                     logger.warn("알 수 없는 이벤트 타입: $eventType")
@@ -121,6 +134,9 @@ class KafkaEventConsumer(
         val metrics = productMetricsRepository.findOrCreateByProductIdWithLock(event.productId)
         metrics.incrementLikeCount()
         productMetricsRepository.save(metrics)
+
+        // 랭킹 점수 업데이트
+        updateRankingScore(event.productId, RankingScoreCalculator.fromLike(rankingWeightProperties.like))
 
         // 처리 완료 기록
         eventHandledRepository.save(
@@ -192,6 +208,10 @@ class KafkaEventConsumer(
             )
             productMetricsRepository.save(metrics)
 
+            // 랭킹 점수 업데이트
+            val orderScore = RankingScoreCalculator.fromOrder(item.priceAtOrder, item.quantity, rankingWeightProperties.order)
+            updateRankingScore(item.productId, orderScore)
+
             logger.debug(
                 "상품 판매량 집계 완료: productId=${item.productId}, " +
                     "quantity=${item.quantity}, amount=$totalAmount, " +
@@ -257,10 +277,67 @@ class KafkaEventConsumer(
     }
 
     /**
+     * ProductViewEvent 처리
+     */
+    private fun handleProductView(message: String, acknowledgment: Acknowledgment) {
+        val event: ProductViewEvent = objectMapper.readValue(message)
+
+        if (isAlreadyHandled(event.eventId)) {
+            logger.debug("이미 처리된 이벤트: ProductViewEvent, eventId=${event.eventId}, productId=${event.productId}")
+            acknowledgeAfterCommit(acknowledgment)
+            return
+        }
+
+        // 집계 처리 (비관적 락 사용)
+        val metrics = productMetricsRepository.findOrCreateByProductIdWithLock(event.productId)
+        metrics.incrementViewCount()
+        productMetricsRepository.save(metrics)
+
+        // 랭킹 점수 업데이트
+        updateRankingScore(event.productId, RankingScoreCalculator.fromView(rankingWeightProperties.view))
+
+        // 처리 완료 기록
+        eventHandledRepository.save(
+            EventHandled.create(
+                eventId = event.eventId,
+                eventType = "ProductViewEvent",
+                aggregateType = "Product",
+                aggregateId = event.productId,
+            ),
+        )
+
+        acknowledgeAfterCommit(acknowledgment)
+        logger.info(
+            "ProductViewEvent 처리 완료: eventId=${event.eventId}, productId=${event.productId}, viewCount=${metrics.viewCount}",
+        )
+    }
+
+    /**
      * 이미 처리된 이벤트인지 확인 (멱등성 보장)
      */
-    private fun isAlreadyHandled(eventId: java.util.UUID): Boolean {
+    private fun isAlreadyHandled(eventId: UUID): Boolean {
         return eventHandledRepository.existsByEventId(eventId)
+    }
+
+    /**
+     * 랭킹 점수 업데이트
+     * 일간 랭킹과 시간별 랭킹에 점수를 각각 반영
+     */
+    private fun updateRankingScore(productId: Long, score: RankingScore) {
+        // 일간 랭킹 업데이트
+        val dailyKey = RankingKey.currentDaily(RankingScope.ALL)
+        rankingRepository.incrementScore(dailyKey, productId, score)
+        rankingRepository.setExpire(dailyKey) // TTL 갱신
+
+        // 시간별 랭킹 업데이트
+        val hourlyKey = RankingKey.currentHourly(RankingScope.ALL)
+        rankingRepository.incrementScore(hourlyKey, productId, score)
+        rankingRepository.setExpire(hourlyKey) // TTL 갱신
+
+        logger.debug(
+            "랭킹 점수 업데이트 완료: productId=$productId, score=${score.value}, " +
+                "dailyKey=${dailyKey.toRedisKey()}, hourlyKey=${hourlyKey.toRedisKey()}",
+        )
     }
 
     /**
