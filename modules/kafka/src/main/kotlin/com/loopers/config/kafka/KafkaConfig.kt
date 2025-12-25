@@ -1,6 +1,5 @@
 package com.loopers.config.kafka
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties
 import org.springframework.context.annotation.Bean
@@ -17,9 +16,9 @@ import org.springframework.kafka.listener.ContainerProperties
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
 import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.converter.BatchMessagingMessageConverter
-import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
+import org.springframework.kafka.support.converter.ByteArrayJacksonJsonMessageConverter
 import org.springframework.util.backoff.FixedBackOff
-import java.util.HashMap
+import tools.jackson.databind.json.JsonMapper
 
 @EnableKafka
 @Configuration
@@ -56,8 +55,8 @@ class KafkaConfig {
 
     @Bean
     fun jsonMessageConverter(
-        objectMapper: ObjectMapper,
-    ): ByteArrayJsonMessageConverter = ByteArrayJsonMessageConverter(objectMapper)
+        jsonMapper: JsonMapper,
+    ): ByteArrayJacksonJsonMessageConverter = ByteArrayJacksonJsonMessageConverter(jsonMapper)
 
     @Bean
     fun kafkaListenerContainerFactory(
@@ -101,7 +100,7 @@ class KafkaConfig {
     @Bean(BATCH_LISTENER)
     fun defaultBatchListenerContainerFactory(
         kafkaProperties: KafkaProperties,
-        converter: ByteArrayJsonMessageConverter,
+        converter: ByteArrayJacksonJsonMessageConverter,
     ): ConcurrentKafkaListenerContainerFactory<*, *> {
         val consumerConfig = HashMap(kafkaProperties.buildConsumerProperties()).apply {
             put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, MAX_POLLING_SIZE)

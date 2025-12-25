@@ -1,8 +1,8 @@
 package com.loopers.interfaces.api
 
-import com.fasterxml.jackson.databind.JsonMappingException
-import com.fasterxml.jackson.databind.exc.InvalidFormatException
-import com.fasterxml.jackson.databind.exc.MismatchedInputException
+import tools.jackson.databind.DatabindException
+import tools.jackson.databind.exc.InvalidFormatException
+import tools.jackson.databind.exc.MismatchedInputException
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
@@ -58,8 +58,6 @@ class ApiControllerAdvice {
     fun handleBadRequest(e: HttpMessageNotReadableException): ResponseEntity<ApiResponse<*>> {
         val errorMessage = when (val rootCause = e.rootCause) {
             is InvalidFormatException -> {
-                val fieldName = rootCause.path.joinToString(".") { it.fieldName ?: "?" }
-
                 val valueIndicationMessage = when {
                     rootCause.targetType.isEnum -> {
                         val enumClass = rootCause.targetType
@@ -73,17 +71,15 @@ class ApiControllerAdvice {
                 val expectedType = rootCause.targetType.simpleName
                 val value = rootCause.value
 
-                "필드 '$fieldName'의 값 '$value'이(가) 예상 타입($expectedType)과 일치하지 않습니다. $valueIndicationMessage"
+                "값 '$value'이(가) 예상 타입($expectedType)과 일치하지 않습니다. $valueIndicationMessage"
             }
 
             is MismatchedInputException -> {
-                val fieldPath = rootCause.path.joinToString(".") { it.fieldName ?: "?" }
-                "필수 필드 '$fieldPath'이(가) 누락되었습니다."
+                "필수 필드가 누락되었거나 타입이 일치하지 않습니다: ${rootCause.message}"
             }
 
-            is JsonMappingException -> {
-                val fieldPath = rootCause.path.joinToString(".") { it.fieldName ?: "?" }
-                "필드 '$fieldPath'에서 JSON 매핑 오류가 발생했습니다: ${rootCause.originalMessage}"
+            is DatabindException -> {
+                "JSON 매핑 오류가 발생했습니다: ${rootCause.message}"
             }
 
             else -> "요청 본문을 처리하는 중 오류가 발생했습니다. JSON 메세지 규격을 확인해주세요."

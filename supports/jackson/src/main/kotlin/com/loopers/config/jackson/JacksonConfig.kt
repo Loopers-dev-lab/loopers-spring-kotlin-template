@@ -1,25 +1,26 @@
 package com.loopers.config.jackson
 
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import tools.jackson.core.util.DefaultPrettyPrinter
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.databind.cfg.DateTimeFeature
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.kotlinModule
 
 /**
  * Jackson configuration for Spring Boot 4.0.
- * Provides ObjectMapper bean with Kotlin and Java Time support.
+ * Provides JsonMapper bean with Kotlin and Java Time support.
+ * Note: JavaTimeModule is built-in to Jackson 3.0, no need to register it.
+ * Note: WRITE_DATES_AS_TIMESTAMPS moved from SerializationFeature to DateTimeFeature in Jackson 3.0
  */
 @Configuration
 class JacksonConfig {
 
     @Bean
-    fun objectMapper(): ObjectMapper = ObjectMapper().apply {
-            registerKotlinModule()
-            registerModule(JavaTimeModule())
-            disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-        }
+    fun jsonMapper(): JsonMapper = JsonMapper.builder()
+        .addModule(kotlinModule())
+        .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .build()
 }

@@ -54,8 +54,15 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom("org.springframework.cloud:spring-cloud-dependencies:${project.properties["springCloudDependenciesVersion"]}")
+            mavenBom("tools.jackson:jackson-bom:${project.properties["jacksonVersion"]}")
         }
     }
+
+    // Allow both Jackson 2 and Jackson 3 to coexist
+    // kafka-clients 4.1.1 requires Jackson 2 (com.fasterxml.jackson)
+    // while Spring components use Jackson 3 (tools.jackson)
+    // Spring Boot 4 supports running both versions side-by-side
+    // Note: We keep jackson-annotations from Jackson 2 for compatibility
 
     dependencies {
         // Kotlin
@@ -65,8 +72,7 @@ subprojects {
         // Spring
         implementation("org.springframework.boot:spring-boot-starter")
         // Serialize
-        implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-        implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+        implementation("tools.jackson.module:jackson-module-kotlin")
         // Test
         testRuntimeOnly("org.junit.platform:junit-platform-launcher")
         // testcontainers:mysql 이 jdbc 사용함
