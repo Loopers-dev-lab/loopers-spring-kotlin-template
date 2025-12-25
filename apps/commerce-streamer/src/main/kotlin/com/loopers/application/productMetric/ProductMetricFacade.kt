@@ -23,7 +23,7 @@ class ProductMetricFacade(
 ) {
 
     private val zSetOps = redisTemplate.opsForZSet()
-    private val logger = LoggerFactory.getLogger(ProductMetricService::class.java)
+    private val logger = LoggerFactory.getLogger(ProductMetricFacade::class.java)
 
     @Transactional
     fun updateProductMetrics(messages: List<ConsumerRecord<String, String>>): Set<Long> {

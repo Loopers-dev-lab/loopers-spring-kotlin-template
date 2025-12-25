@@ -44,8 +44,8 @@ class ProductController(
     @GetMapping("/{productId}")
     override fun getProductInfo(
         @PathVariable productId: Long,
-        @RequestHeader("X-USER-ID") userId: Long?,
-    ): ApiResponse<ProductDto.GetProduct> {
-        return ApiResponse.success(ProductDto.GetProduct.from(productFacade.getProductDetail(productId, userId)))
-    }
+        @RequestHeader("X-USER-ID", required = false) userId: Long?,
+    ): ApiResponse<ProductDto.GetProduct> = ApiResponse.success(
+        ProductDto.GetProduct.from(productFacade.getProductDetail(productId, userId)),
+    )
 }

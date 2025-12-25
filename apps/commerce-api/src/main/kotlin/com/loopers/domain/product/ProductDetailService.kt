@@ -47,7 +47,7 @@ class ProductDetailService(
         val stock = stockRepository.findByRefProductId(productId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "해당 상품의 재고가 존재하지 않습니다.")
 
-        val rank = zset.reverseRank(CacheKeys.Ranking(date).key, productId)
+        val rank = zset.reverseRank(CacheKeys.Ranking(date).key, productId)?.plus(1)
 
         ProductDetailResult.from(product, brand, productTotalSignal.likeCount, stock.amount, rank)
     }
