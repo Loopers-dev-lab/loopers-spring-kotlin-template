@@ -1,5 +1,12 @@
 plugins {
     id("org.jetbrains.kotlin.plugin.jpa")
+    id("com.google.devtools.ksp")
+}
+
+kotlin {
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
 }
 
 configurations.all {
@@ -14,6 +21,8 @@ configurations.all {
 }
 
 dependencies {
+    val queryDslVersion: String by project
+
     // add-ons
     implementation(project(":modules:jpa"))
     implementation(project(":modules:redis"))
@@ -41,7 +50,7 @@ dependencies {
     implementation("org.springframework.kafka:spring-kafka")
 
     // querydsl
-    kapt("com.querydsl:querydsl-apt::jakarta")
+    ksp("io.github.openfeign.querydsl:querydsl-ksp-codegen:$queryDslVersion")
 
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))
