@@ -28,12 +28,12 @@ class Order(
 
     totalAmount: Money? = null,
 ) : BaseEntity() {
-    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "order_id", nullable = false)
-    private val _items: MutableList<OrderItem> = items.toMutableList()
+    private val orderItems: MutableList<OrderItem> = items.toMutableList()
 
     val items: List<OrderItem>
-        get() = _items.toList()
+        get() = orderItems.toList()
 
     @Embedded
     @AttributeOverrides(
