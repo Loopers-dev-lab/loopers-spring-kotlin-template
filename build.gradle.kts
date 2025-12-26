@@ -58,12 +58,6 @@ subprojects {
         }
     }
 
-    // Allow both Jackson 2 and Jackson 3 to coexist
-    // kafka-clients 4.1.1 requires Jackson 2 (com.fasterxml.jackson)
-    // while Spring components use Jackson 3 (tools.jackson)
-    // Spring Boot 4 supports running both versions side-by-side
-    // Note: We keep jackson-annotations from Jackson 2 for compatibility
-
     dependencies {
         // Kotlin
         runtimeOnly("org.springframework.boot:spring-boot-starter-validation")
