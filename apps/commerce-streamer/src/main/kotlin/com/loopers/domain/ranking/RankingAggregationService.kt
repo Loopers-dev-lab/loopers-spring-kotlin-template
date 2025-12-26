@@ -20,6 +20,7 @@ class RankingAggregationService(
 ) {
     companion object {
         private val DECAY_FACTOR = java.math.BigDecimal("0.1")
+        private const val MAX_RETRY_COUNT = 3
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -85,6 +86,7 @@ class RankingAggregationService(
         rankingWriter.incrementScores(redisKey, scoreDeltas)
 
         // DB: 카운트 누적 (점수는 저장하지 않음 - 가중치 변경 시 재계산 가능하도록)
+        // RDB 쓰기는 3회 재시도
         val statsToSave = entries.map { (key, counts) ->
             val snapshot = counts.toSnapshot()
             ProductHourlyMetricRow(
@@ -96,7 +98,9 @@ class RankingAggregationService(
                 orderAmount = snapshot.orderAmount,
             )
         }
-        metricRepository.batchAccumulateCounts(statsToSave)
+        executeWithRetry("batchAccumulateCounts") {
+            metricRepository.batchAccumulateCounts(statsToSave)
+        }
     }
 
     /**
@@ -132,11 +136,14 @@ class RankingAggregationService(
             }
 
             // 감쇠 적용하여 새 버킷 생성
+            // Redis createBucket은 3회 재시도
             val decayedScores = previousScores.mapValues { (_, score) ->
                 score.applyDecay(DECAY_FACTOR)
             }
 
-            rankingWriter.createBucket(currentBucketKey, decayedScores)
+            executeWithRetry("createBucket") {
+                rankingWriter.createBucket(currentBucketKey, decayedScores)
+            }
             logger.info(
                 "Bucket transition completed: {} -> {}, {} products with decayed scores",
                 previousBucketKey,
@@ -146,5 +153,35 @@ class RankingAggregationService(
         } catch (e: Exception) {
             logger.error("Bucket transition failed: {} -> {}", previousBucketKey, currentBucketKey, e)
         }
+    }
+
+    /**
+     * 재시도 로직 래퍼
+     *
+     * 실패 시 최대 3회까지 재시도하고, 모든 시도가 실패하면 에러 로깅 후 예외를 던짐
+     */
+    private fun executeWithRetry(
+        operationName: String,
+        action: () -> Unit,
+    ) {
+        var lastException: Exception? = null
+
+        repeat(MAX_RETRY_COUNT) { attempt ->
+            try {
+                action()
+                return
+            } catch (e: Exception) {
+                lastException = e
+                logger.warn(
+                    "{} failed, retry attempt {} of {}",
+                    operationName,
+                    attempt + 1,
+                    MAX_RETRY_COUNT,
+                )
+            }
+        }
+
+        logger.error("{} failed after {} retry attempts, data may be lost", operationName, MAX_RETRY_COUNT)
+        throw lastException!!
     }
 }
