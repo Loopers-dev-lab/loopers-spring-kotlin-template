@@ -1,4 +1,5 @@
 server:
+  port: 8083
   shutdown: graceful
   tomcat:
     threads:
@@ -10,6 +11,7 @@ server:
     keep-alive-timeout: 60s # 60s
   max-http-request-header-size: 8KB
 
+
 spring:
   main:
     web-application-type: servlet
@@ -20,23 +22,16 @@ spring:
   config:
     import:
       - jpa.yml
+      - redis.yml
+      - kafka.yml
+      - logging.yml
+      - monitoring.yml
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/commerce_streamer}
 
-  kafka:
-    consumer:
-      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-      group-id: metrics-consumer-group
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-
-      # 필수 설정: Manual ACK
-      enable-auto-commit: false
-      auto-offset-reset: earliest
-
-      properties:
-        session.timeout.ms: 30000
-        max.poll.records: 100
+management:
+  server:
+    port: 8084
 
 logging:
   level:
@@ -47,11 +42,25 @@ demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
 
+ranking:
+  weights:
+    view: 0.1      # 조회 가중치
+    like: 0.2      # 좋아요 가중치
+    unlike: -0.2   # 좋아요 취소 가중치
+    order: 0.6     # 주문 가중치
+
 ---
 spring:
   config:
     activate:
       on-profile: local, test
+
+server:
+  port: 8083
+
+management:
+  server:
+    port: 8084
 
 ---
 spring:
