@@ -243,7 +243,7 @@ class RankingWeightChangedEventConsumerTest {
             verify(exactly = 2) { scoreCalculator.calculate(any(), weight) }
             verify(exactly = 1) {
                 rankingWriter.replaceAll(
-                    match { it.startsWith("ranking:hourly:") },
+                    match { it.startsWith("ranking:products:") },
                     match { it.size == 2 && it.containsKey(100L) && it.containsKey(200L) },
                 )
             }

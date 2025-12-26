@@ -48,7 +48,7 @@ class RankingFacadeTest {
                 createProductView(productId = 3L, productName = "상품3", stockQuantity = 20, likeCount = 3L),
             )
 
-            every { productRankingReader.getTopRankings("ranking:hourly:2025012614", 0L, 11L) } returns rankings
+            every { productRankingReader.getTopRankings("ranking:products:2025012614", 0L, 11L) } returns rankings
             every { productService.findAllProductViewByIds(listOf(1L, 2L, 3L)) } returns productViews
 
             // when
@@ -74,7 +74,7 @@ class RankingFacadeTest {
                 size = 10,
             )
 
-            every { productRankingReader.getTopRankings("ranking:hourly:2025012614", 0L, 11L) } returns emptyList()
+            every { productRankingReader.getTopRankings("ranking:products:2025012614", 0L, 11L) } returns emptyList()
 
             // when
             val result = rankingFacade.findRankings(criteria)
@@ -103,7 +103,7 @@ class RankingFacadeTest {
                 createProductView(productId = 2L, productName = "상품2"),
             )
 
-            every { productRankingReader.getTopRankings("ranking:hourly:2025012614", 0L, 3L) } returns rankings
+            every { productRankingReader.getTopRankings("ranking:products:2025012614", 0L, 3L) } returns rankings
             every { productService.findAllProductViewByIds(listOf(1L, 2L)) } returns productViews
 
             // when
@@ -124,13 +124,13 @@ class RankingFacadeTest {
                 size = 10,
             )
 
-            every { productRankingReader.getTopRankings("ranking:hourly:2025012614", 10L, 11L) } returns emptyList()
+            every { productRankingReader.getTopRankings("ranking:products:2025012614", 10L, 11L) } returns emptyList()
 
             // when
             val result = rankingFacade.findRankings(criteria)
 
             // then
-            verify { productRankingReader.getTopRankings("ranking:hourly:2025012614", 10L, 11L) }
+            verify { productRankingReader.getTopRankings("ranking:products:2025012614", 10L, 11L) }
             assertThat(result.rankings).isEmpty()
         }
 
@@ -150,7 +150,7 @@ class RankingFacadeTest {
             rankingFacade.findRankings(criteria)
 
             // then
-            verify { productRankingReader.getTopRankings(match { it.startsWith("ranking:hourly:") }, 0L, 11L) }
+            verify { productRankingReader.getTopRankings(match { it.startsWith("ranking:products:") }, 0L, 11L) }
         }
 
         @DisplayName("상품 정보를 랭킹 순서대로 반환한다")
@@ -173,7 +173,7 @@ class RankingFacadeTest {
                 createProductView(productId = 3L, productName = "상품3"),
             )
 
-            every { productRankingReader.getTopRankings("ranking:hourly:2025012614", 0L, 11L) } returns rankings
+            every { productRankingReader.getTopRankings("ranking:products:2025012614", 0L, 11L) } returns rankings
             every { productService.findAllProductViewByIds(listOf(3L, 1L, 2L)) } returns productViews
 
             // when

@@ -7,7 +7,7 @@ import java.time.temporal.ChronoUnit
 
 object RankingKeyGenerator {
 
-    private const val PREFIX = "ranking:hourly"
+    private const val PREFIX = "ranking:products"
 
     private val FORMATTER = DateTimeFormatter
         .ofPattern("yyyyMMddHH")
@@ -16,7 +16,7 @@ object RankingKeyGenerator {
     /**
      * Generates bucket key from instant
      * @param instant Time (on the hour)
-     * @return Format: "ranking:hourly:yyyyMMddHH"
+     * @return Format: "ranking:products:yyyyMMddHH"
      */
     fun bucketKey(instant: Instant): String {
         val truncated = instant.truncatedTo(ChronoUnit.HOURS)

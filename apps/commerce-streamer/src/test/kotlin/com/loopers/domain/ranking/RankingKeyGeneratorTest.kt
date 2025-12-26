@@ -15,7 +15,7 @@ class RankingKeyGeneratorTest {
     @Nested
     inner class BucketKey {
 
-        @DisplayName("Instant에서 ranking:hourly:yyyyMMddHH 형식의 키를 생성한다")
+        @DisplayName("Instant에서 ranking:products:yyyyMMddHH 형식의 키를 생성한다")
         @Test
         fun `generates key in ranking hourly yyyyMMddHH format`() {
             // given
@@ -26,7 +26,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.bucketKey(instant)
 
             // then
-            assertThat(key).isEqualTo("ranking:hourly:2025011514")
+            assertThat(key).isEqualTo("ranking:products:2025011514")
         }
 
         @DisplayName("시간이 정시가 아니어도 정시로 truncate하여 키를 생성한다")
@@ -40,7 +40,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.bucketKey(instant)
 
             // then
-            assertThat(key).isEqualTo("ranking:hourly:2025123123")
+            assertThat(key).isEqualTo("ranking:products:2025123123")
         }
 
         @DisplayName("UTC 시간을 Asia/Seoul 타임존으로 변환하여 키를 생성한다")
@@ -54,7 +54,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.bucketKey(utcInstant)
 
             // then
-            assertThat(key).isEqualTo("ranking:hourly:2025011514")
+            assertThat(key).isEqualTo("ranking:products:2025011514")
         }
 
         @DisplayName("자정 경계에서 올바른 키를 생성한다")
@@ -68,7 +68,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.bucketKey(instant)
 
             // then
-            assertThat(key).isEqualTo("ranking:hourly:2025010100")
+            assertThat(key).isEqualTo("ranking:products:2025010100")
         }
 
         @DisplayName("일자 변경 경계에서 올바른 키를 생성한다")
@@ -82,7 +82,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.bucketKey(utcInstant)
 
             // then
-            assertThat(key).isEqualTo("ranking:hourly:2025011500")
+            assertThat(key).isEqualTo("ranking:products:2025011500")
         }
     }
 
@@ -90,14 +90,14 @@ class RankingKeyGeneratorTest {
     @Nested
     inner class CurrentBucketKey {
 
-        @DisplayName("현재 시간 기준으로 ranking:hourly: prefix를 가진 키를 생성한다")
+        @DisplayName("현재 시간 기준으로 ranking:products: prefix를 가진 키를 생성한다")
         @Test
         fun `generates key with ranking hourly prefix`() {
             // when
             val key = RankingKeyGenerator.currentBucketKey()
 
             // then
-            assertThat(key).startsWith("ranking:hourly:")
+            assertThat(key).startsWith("ranking:products:")
         }
 
         @DisplayName("현재 시간 기준으로 10자리 날짜시간 문자열을 포함한 키를 생성한다")
@@ -107,7 +107,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.currentBucketKey()
 
             // then
-            val dateTimePart = key.removePrefix("ranking:hourly:")
+            val dateTimePart = key.removePrefix("ranking:products:")
             assertThat(dateTimePart).matches("\\d{10}")
         }
     }
@@ -127,7 +127,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.previousBucketKey(instant)
 
             // then
-            assertThat(key).isEqualTo("ranking:hourly:2025011513")
+            assertThat(key).isEqualTo("ranking:products:2025011513")
         }
 
         @DisplayName("자정 경계에서 이전 시간 키를 올바르게 생성한다")
@@ -141,7 +141,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.previousBucketKey(instant)
 
             // then
-            assertThat(key).isEqualTo("ranking:hourly:2025011423")
+            assertThat(key).isEqualTo("ranking:products:2025011423")
         }
 
         @DisplayName("연도 경계에서 이전 시간 키를 올바르게 생성한다")
@@ -155,7 +155,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.previousBucketKey(instant)
 
             // then
-            assertThat(key).isEqualTo("ranking:hourly:2024123123")
+            assertThat(key).isEqualTo("ranking:products:2024123123")
         }
 
         @DisplayName("UTC 시간을 Asia/Seoul 타임존으로 변환하여 이전 시간 키를 생성한다")
@@ -169,7 +169,7 @@ class RankingKeyGeneratorTest {
             val key = RankingKeyGenerator.previousBucketKey(utcInstant)
 
             // then
-            assertThat(key).isEqualTo("ranking:hourly:2025011513")
+            assertThat(key).isEqualTo("ranking:products:2025011513")
         }
 
         @DisplayName("previousBucketKey()는 현재 시간 기준 이전 시간의 버킷 키를 생성한다")
@@ -180,9 +180,9 @@ class RankingKeyGeneratorTest {
             val previousKey = RankingKeyGenerator.previousBucketKey()
 
             // then
-            assertThat(previousKey).startsWith("ranking:hourly:")
-            val currentDateTimePart = currentKey.removePrefix("ranking:hourly:")
-            val previousDateTimePart = previousKey.removePrefix("ranking:hourly:")
+            assertThat(previousKey).startsWith("ranking:products:")
+            val currentDateTimePart = currentKey.removePrefix("ranking:products:")
+            val previousDateTimePart = previousKey.removePrefix("ranking:products:")
             assertThat(previousDateTimePart).matches("\\d{10}")
 
             // previousKey should be 1 hour before currentKey

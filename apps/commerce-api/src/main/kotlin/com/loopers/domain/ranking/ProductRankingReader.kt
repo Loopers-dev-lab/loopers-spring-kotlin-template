@@ -9,7 +9,7 @@ interface ProductRankingReader {
     /**
      * 상위 N개 랭킹을 페이지네이션하여 조회
      *
-     * @param bucketKey Redis 키 (예: "ranking:hourly:2025011514")
+     * @param bucketKey Redis 키 (예: "ranking:products:2025011514")
      * @param offset 시작 위치 (0-based)
      * @param limit 조회할 개수
      * @return ProductRanking 리스트 (rank는 1-based)
@@ -19,7 +19,7 @@ interface ProductRankingReader {
     /**
      * 특정 상품의 순위 조회
      *
-     * @param bucketKey Redis 키 (예: "ranking:hourly:2025011514")
+     * @param bucketKey Redis 키 (예: "ranking:products:2025011514")
      * @param productId 상품 ID
      * @return 순위 (1-based), 랭킹에 없으면 null
      */

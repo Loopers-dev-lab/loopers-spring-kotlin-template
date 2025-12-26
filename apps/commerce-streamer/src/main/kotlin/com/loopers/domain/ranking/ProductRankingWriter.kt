@@ -16,7 +16,7 @@ interface ProductRankingWriter {
      * ZINCRBY는 기존 점수에 더하므로 여러 번 호출해도 누적됨
      * Pipeline을 사용하여 네트워크 왕복을 최소화
      *
-     * @param bucketKey Redis 키 (예: "ranking:hourly:2025011514")
+     * @param bucketKey Redis 키 (예: "ranking:products:2025011514")
      * @param deltas 상품ID -> 점수 증분 맵
      */
     fun incrementScores(bucketKey: String, deltas: Map<Long, Score>)

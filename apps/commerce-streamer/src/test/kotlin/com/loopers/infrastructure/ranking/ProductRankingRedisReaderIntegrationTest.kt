@@ -21,7 +21,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
 ) {
 
     private val zSetOps = redisTemplate.opsForZSet()
-    private val testBucketKey = "ranking:hourly:2025011514"
+    private val testBucketKey = "ranking:products:2025011514"
 
     @AfterEach
     fun tearDown() {

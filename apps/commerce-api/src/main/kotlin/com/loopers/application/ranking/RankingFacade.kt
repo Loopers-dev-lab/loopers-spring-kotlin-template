@@ -15,7 +15,7 @@ class RankingFacade(
 ) {
 
     companion object {
-        private const val RANKING_KEY_PREFIX = "ranking:hourly:"
+        private const val RANKING_KEY_PREFIX = "ranking:products:"
     }
 
     /**

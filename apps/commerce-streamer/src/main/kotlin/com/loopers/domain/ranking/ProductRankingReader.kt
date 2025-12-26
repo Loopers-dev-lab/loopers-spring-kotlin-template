@@ -12,7 +12,7 @@ interface ProductRankingReader {
     /**
      * 버킷 내 전체 점수 조회 (버킷 전환용)
      *
-     * @param bucketKey Redis 키 (예: "ranking:hourly:2025011514")
+     * @param bucketKey Redis 키 (예: "ranking:products:2025011514")
      * @return productId → Score 맵
      */
     fun getAllScores(bucketKey: String): Map<Long, Score>
