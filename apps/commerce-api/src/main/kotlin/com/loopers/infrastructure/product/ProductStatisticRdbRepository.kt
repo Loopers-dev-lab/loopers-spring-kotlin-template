@@ -31,6 +31,16 @@ class ProductStatisticRdbRepository(
     }
 
     @Transactional
+    override fun increaseSalesCountBy(productId: Long, amount: Int) {
+        productStatisticJpaRepository.incrementSalesCount(productId, amount)
+    }
+
+    @Transactional
+    override fun increaseViewCountBy(productId: Long) {
+        productStatisticJpaRepository.incrementViewCount(productId)
+    }
+
+    @Transactional
     override fun save(productStatistic: ProductStatistic): ProductStatistic {
         return productStatisticJpaRepository.save(productStatistic)
     }

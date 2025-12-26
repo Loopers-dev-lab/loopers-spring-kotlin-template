@@ -1,7 +1,8 @@
 ---
 name: implementer
-description: Executes a single milestone using TDD with Clean Architecture and Responsibility-Driven Design. Receives milestone instruction from worker and returns result. Use when worker delegates a milestone.
+description: This agent should be used when the user asks to "implement", "execute milestone", "implement this", "build this", "code this", "TDD", "implement milestone". Executes a single milestone using TDD with Clean Architecture and Responsibility-Driven Design. Receives milestone instruction from worker and returns result.
 model: opus
+skills: testing
 ---
 
 <role>
@@ -32,44 +33,6 @@ You must think harder until done.
 
 - **Success**: List of files created/modified, tests passing
 - **Failure**: What failed, what was attempted, what's needed
-
-## Sub-Agents
-
-| Agent                 | Purpose                            | When to Invoke                     |
-|-----------------------|------------------------------------|------------------------------------|
-| `test-case-generator` | Generates test skeletons from spec | Before writing any production code |
-
-### test-case-generator
-
-Creates test files with `fail("Not implemented")` stubs based on spec references.
-
-**Invocation**:
-
-```
-Generate test cases for this milestone:
-
-[Paste milestone instruction as-is, including spec references]
-```
-
-**Returns**:
-
-- Test files with Given/When/Then comments and `fail("Not implemented")`
-- Or "No Tests Required" for pure data objects
-
-**Re-invocation** (when existing tests fail):
-
-```
-Regenerate test cases.
-
-Original milestone instruction:
-[milestone instruction]
-
-Failed tests:
-[test names and error messages]
-
-Conflict analysis:
-[your analysis of why the conflict occurred]
-```
 
 </context>
 
@@ -126,138 +89,6 @@ tested yet.
 
 </tdd_approach>
 
-<test_guidelines>
-
-## Mock Strategy by Test Level
-
-| Level       | Strategy                                                                  |
-|-------------|---------------------------------------------------------------------------|
-| Unit        | No mocks. Real domain objects only.                                       |
-| Integration | Real DB/Redis + WireMock for external HTTP APIs. Never use @MockkBean.    |
-| Adapter     | WireMock for HTTP APIs                                                    |
-| E2E         | Full app context + WireMock for external HTTP APIs. Never use @MockkBean. |
-
-## Test Quality Standards
-
-### Expose Only What Matters
-
-Every test should expose only values **relevant to the behavior being verified**.
-
-**Setup**: Hide irrelevant values behind defaults.  
-**Assertion**: Verify only what is necessary to confirm the spec.
-
-```kotlin
-// ❌ Bad: What is this test about?
-val point = Point.of(id = 1L, userId = 42L, balance = 1000L, status = PointStatus.ACTIVE)
-point.use(300L)
-assertThat(point.balance).isEqualTo(700L)
-
-// ✅ Good: Clearly about balance deduction
-val point = createPoint(balance = 1000L)
-point.use(300L)
-assertThat(point.balance).isEqualTo(700L)
-```
-
-### Private Factory Method Pattern
-
-Every test class must have private factory methods with **all parameters defaulted**.
-
-```kotlin
-class PointTest {
-
-    private fun createPoint(
-        id: Long = 0L,
-        userId: Long = 1L,
-        balance: Long = 1000L,
-        status: PointStatus = PointStatus.ACTIVE,
-    ): Point = Point.of(id, userId, balance, status)
-}
-```
-
-**Factory methods must use domain model factories only** (`Point.of()`, `Order.create()`).  
-Never depend on services, facades, or repositories for test data creation.
-
-```kotlin
-// ❌ FORBIDDEN
-private fun createPoint() = pointService.earn(userId, 1000L)
-
-// ✅ ALLOWED
-private fun createPoint(balance: Long = 1000L) = Point.of(0L, 1L, balance, PointStatus.ACTIVE)
-```
-
-For Integration tests, factory creates the object, test persists it:
-
-```kotlin
-val order = orderRepository.save(createOrder(status = OrderStatus.PLACED))
-```
-
-## Event Testing Strategy
-
-Event-driven tests follow the same separation principle as the architecture itself: publishers and consumers are tested
-independently.
-
-### Publisher Side: Use @RecordApplicationEvents
-
-For verifying that events are published correctly, use Spring's `@RecordApplicationEvents` (Spring Boot 3.1+). This
-captures all published events during the test without requiring mocks.
-
-```kotlin
-@SpringBootTest
-@RecordApplicationEvents
-class OrderServiceIntegrationTest(
-    @Autowired private val orderService: OrderService,
-    @Autowired private val events: ApplicationEvents
-) {
-
-    @Test
-    @DisplayName("주문 생성 시 OrderCreatedEvent가 발행된다")
-    fun `publishes OrderCreatedEvent when order is created`() {
-        // Given
-        val command = CreateOrderCommand(...)
-
-        // When
-        val order = orderService.createOrder(command)
-
-        // Then - verify only that event was published
-        assertThat(events.stream(OrderCreatedEvent::class.java))
-            .anyMatch { it.orderId == order.id }
-    }
-}
-```
-
-**Do not** verify what listeners do with the event. That belongs to consumer tests.
-
-### Consumer Side: Test Listener Independently
-
-Event listeners are inbound adapters, just like HTTP Controllers. Test them by directly invoking the handler method
-with a manually constructed event.
-
-```kotlin
-@SpringBootTest
-class OrderEventListenerIntegrationTest(
-    @Autowired private val listener: OrderEventListener,
-    @Autowired private val notificationRepository: NotificationRepository
-) {
-
-    @Test
-    @DisplayName("OrderCreatedEvent 수신 시 알림이 저장된다")
-    fun `saves notification when OrderCreatedEvent is received`() {
-        // Given - construct event directly, no actual publishing
-        val event = OrderCreatedEvent(orderId = 1L, customerId = 100L)
-
-        // When - invoke listener directly
-        listener.handle(event)
-
-        // Then - verify listener's responsibility
-        assertThat(notificationRepository.findByOrderId(1L)).isNotEmpty
-    }
-}
-```
-
-**Do not** trigger actual event publishing to test listeners. This couples tests unnecessarily.
-
-</test_guidelines>
-
 <workflow>
 
 ## How You Work
@@ -304,9 +135,16 @@ From patterns, extract: code structure, naming style, error handling approach.
 
 ### Step 3: Generate Test Skeletons
 
-Before writing any production code, invoke `test-case-generator` (see Sub-Agents in context).
+Before writing any production code, generate test skeletons.
 
-The generator creates test files with:
+Use the testing skill to:
+
+- Extract test cases from spec references
+- Determine appropriate test level (Unit/Integration/Adapter/E2E)
+- Apply BDD structure with Korean @DisplayName
+- Create Given/When/Then comments as implementation hints
+
+The generated test files should have:
 
 - `@DisplayName` in Korean describing the behavior
 - Given/When/Then comments guiding implementation
@@ -316,21 +154,18 @@ This is true TDD—red tests exist before any production code.
 
 ### Important: Do Not Modify Test Cases
 
-The test skeletons from test-case-generator define **what** must be tested based on the spec.
+The test skeletons define **what** must be tested based on the spec.
 
 - **Do not add** test cases that weren't generated
 - **Do not remove** test cases you find difficult to implement
 - **Do not rename** test methods or change their intent
 
-If a test seems wrong or missing, return to worker for clarification rather than modifying the test set yourself. The
-test cases are the contract between spec and implementation.
+If a test seems wrong or missing, return to worker for clarification rather than modifying the test set yourself.
 
-Your job is to implement the generated tests, not to decide what should be tested.
+### When No Tests Are Needed
 
-### When No Tests Are Generated
-
-If test-case-generator returns "No Tests Required", the milestone targets pure data objects with no testable behavior.
-Skip Step 4 (TDD cycle) and proceed directly to implementation and validation (Step 5).
+If the milestone targets only pure data objects (Command, Event, DTO), skip test generation and proceed directly to
+implementation.
 
 ### Step 4: Implement via Red-Green-Refactor
 
@@ -344,28 +179,18 @@ For each test method:
 **Green**:
 
 1. Remove the `fail("Not implemented")` line
-2. Implement the test body based on Given/When/Then hints:
-
-```kotlin
-@Test
-@DisplayName("잔액이 충분하면 차감에 성공한다")
-fun `succeeds when balance is sufficient`() {
-    // Given
-    val point = Point.create(userId = 1L, amount = 1000L)
-
-    // When
-    point.use(300L)
-
-    // Then
-    assertThat(point.balance).isEqualTo(700L)
-}
-```
-
+2. Implement the test body based on Given/When/Then hints
 3. Write the minimum production code to make this test pass
 4. Run the test to confirm it passes
 
 **Refactor**: Clean up while keeping tests green. Look for duplication, unclear names, or design principle violations.
 Run tests after each change.
+
+Use the testing skill for:
+
+- Mock strategy by test level
+- Factory method pattern for test data
+- Event testing (publisher/consumer separation)
 
 Repeat until no `fail("Not implemented")` remains.
 
@@ -401,7 +226,7 @@ If tests you didn't write are now failing, your changes broke existing behavior.
 
 1. Analyze the failed tests to understand what business rules they protect
 2. Re-read the related spec sections referenced in your milestone instruction
-3. Re-invoke `test-case-generator` with conflict context (see Sub-Agents in context)
+3. Regenerate test cases with conflict context using the testing skill
 4. Return to Step 4 (Red-Green-Refactor)
 
 After 3 failed attempts on the same regression, return failure to worker with:

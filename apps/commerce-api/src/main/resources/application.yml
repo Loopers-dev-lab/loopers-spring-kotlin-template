@@ -15,8 +15,13 @@ spring:
     web-application-type: servlet
   application:
     name: commerce-api
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   task:
     scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: 10s
       pool:
         size: 1  # 동일 @Scheduled 메서드의 동시 실행 방지
   profiles:
@@ -25,6 +30,7 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
   cloud:
@@ -47,6 +53,13 @@ pg:
   base-url: http://localhost:8081
   callback-base-url: http://localhost:8080
   merchant-id: loopers-commerce
+
+outbox:
+  relay:
+    batch-size: 100
+    send-timeout-seconds: 5
+    retry-interval-seconds: 10
+    max-age-minutes: 5
 
 resilience4j:
   circuitbreaker:
@@ -102,6 +115,11 @@ spring:
     activate:
       on-profile: local, test
 
+scheduler:
+  payment:
+    enabled: false
+  outbox:
+    enabled: false
 ---
 spring:
   config:

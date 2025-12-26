@@ -6,6 +6,7 @@ import com.loopers.application.payment.PaymentJob
 import com.loopers.domain.payment.PaymentSortType
 import com.loopers.domain.payment.PaymentStatus
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -20,6 +21,11 @@ import java.time.ZonedDateTime
  * - 5분 타임아웃은 Payment 도메인에서 자동 처리
  */
 @Component
+@ConditionalOnProperty(
+    name = ["scheduler.payment.enabled"],
+    havingValue = "true",
+    matchIfMissing = true,
+)
 class PaymentScheduler(
     private val paymentFacade: PaymentFacade,
     private val paymentJob: PaymentJob,

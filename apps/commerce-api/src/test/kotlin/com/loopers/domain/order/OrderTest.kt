@@ -6,9 +6,9 @@ import com.loopers.support.values.Money
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
-import kotlin.test.Test
 
 class OrderTest {
 
@@ -276,6 +276,38 @@ class OrderTest {
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
             assertThat(exception.message).isEqualTo("주문 금액은 0보다 커야 합니다.")
+        }
+
+        @DisplayName("pay() 성공 시 OrderPaidEventV1이 등록된다")
+        @Test
+        fun `pay() success registers OrderPaidEventV1`() {
+            // given
+            val order = createOrder(
+                status = OrderStatus.PLACED,
+                totalAmount = Money.krw(20000),
+            )
+
+            // when
+            order.pay()
+
+            // then
+            val events = order.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(OrderPaidEventV1::class.java)
+        }
+
+        @DisplayName("이미 PAID 상태에서 pay() 호출 시 이벤트가 등록되지 않는다 (멱등성)")
+        @Test
+        fun `pay() when already PAID does not register event`() {
+            // given
+            val order = createOrder(status = OrderStatus.PAID)
+
+            // when
+            order.pay()
+
+            // then
+            val events = order.pollEvents()
+            assertThat(events).isEmpty()
         }
     }
 

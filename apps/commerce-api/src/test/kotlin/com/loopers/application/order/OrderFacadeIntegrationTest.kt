@@ -100,13 +100,15 @@ class OrderFacadeIntegrationTest @Autowired constructor(
             val product = createProduct(price = Money.krw(20000))
             createPointAccount(userId, Money.krw(100000))
 
+            // given
+            stubPgPaymentSuccess()
+
+            // when
             val criteria = placeOrderCriteria(
                 userId = userId,
                 usePoint = Money.krw(10000),
                 items = listOf(OrderCriteria.PlaceOrderItem(productId = product.id, quantity = 2)),
             )
-
-            // when
             val orderInfo = orderFacade.placeOrder(criteria)
 
             // then

@@ -98,6 +98,10 @@ class OrderService(
 
         order.pay()
 
-        return orderRepository.save(order)
+        val savedOrder = orderRepository.save(order)
+
+        order.pollEvents().forEach { eventPublisher.publishEvent(it) }
+
+        return savedOrder
     }
 }

@@ -52,7 +52,7 @@ else
     PROMPT="$1"
 fi
 
-# 버그 수정: PROMPT="$1" 라인 제거됨
+# Bug fix: removed duplicate PROMPT="$1" line
 
 TEMP_DIR=$(mktemp -d)
 PROMPT_FILE="$TEMP_DIR/prompt.txt"

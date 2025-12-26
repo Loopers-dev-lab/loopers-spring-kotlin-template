@@ -3,8 +3,6 @@ package com.loopers.domain.user
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import com.loopers.utils.DatabaseCleanUp
-import com.ninjasquad.springmockk.SpykBean
-import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertAll
@@ -19,10 +17,9 @@ import java.time.LocalDate
 @SpringBootTest
 class UserServiceIntegrationTest @Autowired constructor(
     private val userService: UserService,
+    private val userRepository: UserRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
-    @SpykBean
-    private lateinit var userRepository: UserRepository
 
     @AfterEach
     fun tearDown() {
@@ -66,27 +63,17 @@ class UserServiceIntegrationTest @Autowired constructor(
     @DisplayName("회원가입 통합테스트")
     @Nested
     inner class SignUp {
-        @DisplayName("회원 가입시 User 저장이 수행된다")
-        @Test
-        fun saveUser_whenSignUp() {
-            // when
-            val command = signUpCommand()
-            userService.signUp(command)
-
-            // then
-            verify(atLeast = 1) {
-                userRepository.save(match { it.username == command.username })
-            }
-        }
 
         @DisplayName("회원가입을 하면 User가 저장된다.")
         @Test
         fun saveUser_whenUsernameIsUnique() {
-            // when
+            // given
             val command = signUpCommand()
+
+            // when
             val signUpUser = userService.signUp(command)
 
-            // then
+            // then - 상태 검증: DB에 저장된 데이터 확인
             val savedUser = userRepository.findById(signUpUser.id)
 
             assertAll(

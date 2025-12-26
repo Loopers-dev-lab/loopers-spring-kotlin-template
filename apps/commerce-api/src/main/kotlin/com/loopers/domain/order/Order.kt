@@ -116,6 +116,7 @@ class Order(
         }
 
         status = OrderStatus.PAID
+        getDomainEvents().add(OrderPaidEventV1.from(this))
     }
 
     /**

@@ -171,6 +171,30 @@ class ProductV1ApiE2ETest @Autowired constructor(
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.NOT_FOUND) },
             )
         }
+
+        @DisplayName("X-USER-ID 헤더와 함께 상품 조회하면 200 OK와 상품 상세 정보를 반환한다")
+        @Test
+        fun `returnProductDetail when X-USER-ID header is provided`() {
+            // given
+            val brand = createBrand(name = "테스트 브랜드")
+            val product = createProduct(
+                brand = brand,
+                name = "테스트 상품",
+                price = Money.krw(10000),
+                stockQuantity = 100,
+            )
+            val userId = 1L
+
+            // when
+            val response = getProduct(productId = product.id, userId = userId)
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.product?.id).isEqualTo(product.id) },
+                { assertThat(response.body?.data?.product?.name).isEqualTo("테스트 상품") },
+            )
+        }
     }
 
     private fun createBrand(name: String = "테스트 브랜드"): Brand {
@@ -224,9 +248,13 @@ class ProductV1ApiE2ETest @Autowired constructor(
         )
     }
 
-    private fun getProduct(productId: Long): ResponseEntity<ApiResponse<ProductV1Response.GetProduct>> {
+    private fun getProduct(
+        productId: Long,
+        userId: Long? = null,
+    ): ResponseEntity<ApiResponse<ProductV1Response.GetProduct>> {
         val headers = HttpHeaders().apply {
             contentType = MediaType.APPLICATION_JSON
+            userId?.let { set("X-USER-ID", it.toString()) }
         }
 
         return testRestTemplate.exchange(

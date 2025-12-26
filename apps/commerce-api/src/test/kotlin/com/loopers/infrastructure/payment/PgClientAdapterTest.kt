@@ -10,12 +10,17 @@ import com.loopers.support.values.Money
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
-import kotlin.test.Test
+import org.junit.jupiter.api.Test
 
+/**
+ * PgClientAdapter 단위 테스트
+ *
+ * Adapter 패턴 특성상 외부 Gateway를 mock으로 대체하여 테스트합니다.
+ * 모든 검증은 반환값(상태)을 기반으로 수행합니다.
+ */
 class PgClientAdapterTest {
 
     private val pgGateway: PgGateway = mockk()
@@ -26,18 +31,17 @@ class PgClientAdapterTest {
     @Nested
     inner class RequestPayment {
 
-        @DisplayName("0원 결제 요청 시 pgGateway 호출 없이 NotRequired를 반환한다")
+        @DisplayName("0원 결제 요청 시 NotRequired를 반환한다")
         @Test
-        fun `returns NotRequired without calling pgGateway when amount is zero`() {
+        fun `returns NotRequired when amount is zero`() {
             // given
             val request = createPaymentRequest(amount = Money.ZERO_KRW)
 
             // when
             val result = adapter.requestPayment(request)
 
-            // then
+            // then - 결과값으로 검증 (0원 결제는 NotRequired)
             assertThat(result).isEqualTo(PgPaymentCreateResult.NotRequired)
-            verify(exactly = 0) { pgGateway.requestPayment(any()) }
         }
 
         @DisplayName("pgGateway 호출 성공 시 Accepted를 반환한다")
@@ -55,9 +59,8 @@ class PgClientAdapterTest {
             // when
             val result = adapter.requestPayment(request)
 
-            // then
+            // then - 결과값으로 검증
             assertThat(result).isEqualTo(PgPaymentCreateResult.Accepted(transactionKey))
-            verify(exactly = 1) { pgGateway.requestPayment(any()) }
         }
 
         @DisplayName("PgResponseUncertainException 발생 시 Uncertain을 반환한다")
@@ -125,7 +128,7 @@ class PgClientAdapterTest {
             // when
             val result = adapter.findTransaction(transactionKey)
 
-            // then
+            // then - 결과값으로 검증
             val expectedTransaction = PgTransaction(
                 transactionKey = transactionKey,
                 paymentId = 1L,
@@ -133,7 +136,6 @@ class PgClientAdapterTest {
                 failureReason = null,
             )
             assertThat(result).isEqualTo(expectedTransaction)
-            verify(exactly = 1) { pgGateway.findTransaction(transactionKey) }
         }
     }
 
@@ -157,7 +159,7 @@ class PgClientAdapterTest {
             // when
             val result = adapter.findTransactionsByPaymentId(paymentId)
 
-            // then
+            // then - 결과값으로 검증
             val expectedTransactions = listOf(
                 PgTransaction(
                     transactionKey = "tx_12345",
@@ -173,7 +175,6 @@ class PgClientAdapterTest {
                 ),
             )
             assertThat(result).isEqualTo(expectedTransactions)
-            verify(exactly = 1) { pgGateway.findTransactionsByOrderId("000001") }
         }
     }
 

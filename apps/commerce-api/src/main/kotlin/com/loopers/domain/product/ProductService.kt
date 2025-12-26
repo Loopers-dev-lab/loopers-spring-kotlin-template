@@ -2,6 +2,7 @@ package com.loopers.domain.product
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Slice
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -12,6 +13,7 @@ class ProductService(
     private val stockRepository: StockRepository,
     private val productStatisticRepository: ProductStatisticRepository,
     private val brandRepository: BrandRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional(readOnly = true)
     fun findProductById(id: Long): Product {
@@ -205,6 +207,8 @@ class ProductService(
 
         stockRepository.saveAll(lockedStocks)
         productRepository.saveAll(products)
+
+        lockedStocks.flatMap { it.pollEvents() }.forEach { eventPublisher.publishEvent(it) }
     }
 
     @Transactional

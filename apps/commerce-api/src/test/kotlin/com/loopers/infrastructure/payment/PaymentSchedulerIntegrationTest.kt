@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.TestPropertySource
 import java.time.Instant
 
 /**
@@ -34,6 +35,7 @@ import java.time.Instant
  */
 @SpringBootTest
 @DisplayName("PaymentScheduler 통합 테스트")
+@TestPropertySource(properties = ["scheduler.payment.enabled=true"])
 class PaymentSchedulerIntegrationTest @Autowired constructor(
     private val paymentScheduler: PaymentScheduler,
     private val paymentRepository: PaymentRepository,
@@ -88,7 +90,7 @@ class PaymentSchedulerIntegrationTest @Autowired constructor(
 
             // payment1 - 예외 발생
             every { pgClient.findTransaction("tx_error_1") } throws
-                RuntimeException("PG 연결 오류")
+                    RuntimeException("PG 연결 오류")
 
             // payment2, payment3 - 정상 처리
             every { pgClient.findTransaction("tx_error_2") } returns createTransaction(

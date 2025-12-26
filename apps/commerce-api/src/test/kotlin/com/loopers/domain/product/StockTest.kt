@@ -5,10 +5,10 @@ import com.loopers.support.error.ErrorType
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
-import kotlin.test.Test
 
 class StockTest {
 
@@ -135,6 +135,65 @@ class StockTest {
             // then
             assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
             assertThat(exception.message).isEqualTo("재고가 부족합니다.")
+        }
+
+        @DisplayName("재고가 0이 되면 StockDepletedEventV1 이벤트가 등록된다.")
+        @Test
+        fun `decrease registers StockDepletedEventV1 when quantity becomes 0`() {
+            // given
+            val productId = 1L
+            val stock = createStock(productId = productId, quantity = 5)
+
+            // when
+            stock.decrease(5)
+
+            // then
+            assertThat(stock.quantity).isEqualTo(0)
+            val events = stock.pollEvents()
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(StockDepletedEventV1::class.java)
+            val event = events[0] as StockDepletedEventV1
+            assertThat(event.productId).isEqualTo(productId)
+        }
+
+        @DisplayName("재고가 0보다 크면 이벤트가 등록되지 않는다.")
+        @Test
+        fun `decrease does not register event when quantity greater than 0`() {
+            // given
+            val stock = createStock(quantity = 10)
+
+            // when
+            stock.decrease(5)
+
+            // then
+            assertThat(stock.quantity).isEqualTo(5)
+            val events = stock.pollEvents()
+            assertThat(events).isEmpty()
+        }
+    }
+
+    @DisplayName("이벤트 폴링 테스트")
+    @Nested
+    inner class PollEvents {
+        @DisplayName("pollEvents()는 이벤트를 반환하고 내부 리스트를 비운다.")
+        @Test
+        fun `pollEvents returns events and clears internal list`() {
+            // given
+            val stock = createStock(quantity = 3)
+            stock.decrease(3) // This should register StockDepletedEventV1
+
+            // when
+            val firstPoll = stock.pollEvents()
+
+            // then
+            assertThat(firstPoll).hasSize(1)
+            assertThat(firstPoll[0]).isInstanceOf(StockDepletedEventV1::class.java)
+
+            // when - poll again
+            val secondPoll = stock.pollEvents()
+
+            // then - should be empty
+            assertThat(secondPoll).isEmpty()
         }
     }
 

@@ -8,6 +8,7 @@ import com.loopers.domain.product.ProductRepository
 import com.loopers.domain.product.ProductSortType
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
+import com.loopers.domain.product.ProductViewedEventV1
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
 import com.loopers.support.values.Money
@@ -20,8 +21,11 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.event.ApplicationEvents
+import org.springframework.test.context.event.RecordApplicationEvents
 
 @SpringBootTest
+@RecordApplicationEvents
 class ProductFacadeIntegrationTest @Autowired constructor(
     private val productFacade: ProductFacade,
     private val productRepository: ProductRepository,
@@ -32,6 +36,9 @@ class ProductFacadeIntegrationTest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
 ) {
+    @Autowired
+    private lateinit var applicationEvents: ApplicationEvents
+
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
@@ -97,6 +104,43 @@ class ProductFacadeIntegrationTest @Autowired constructor(
             assertThat(cachedValue!!.productId).isEqualTo(product.id)
             assertThat(cachedValue.productName).isEqualTo("테스트 상품")
             assertThat(cachedValue.price).isEqualTo(50000L)
+        }
+
+        @Test
+        @DisplayName("상품을 조회하면 ProductViewedEventV1이 발행된다")
+        fun `findProductById() publishes ProductViewedEventV1`() {
+            // given
+            val product = createProduct()
+
+            // when
+            productFacade.findProductById(product.id)
+
+            // then
+            val events = applicationEvents.stream(ProductViewedEventV1::class.java).toList()
+            assertThat(events).hasSize(1)
+
+            val event = events[0]
+            assertThat(event.productId).isEqualTo(product.id)
+            assertThat(event.userId).isNull()
+        }
+
+        @Test
+        @DisplayName("userId와 함께 상품을 조회하면 userId가 포함된 이벤트가 발행된다")
+        fun `findProductById() with userId publishes event with userId`() {
+            // given
+            val product = createProduct()
+            val userId = 123L
+
+            // when
+            productFacade.findProductById(product.id, userId)
+
+            // then
+            val events = applicationEvents.stream(ProductViewedEventV1::class.java).toList()
+            assertThat(events).hasSize(1)
+
+            val event = events[0]
+            assertThat(event.productId).isEqualTo(product.id)
+            assertThat(event.userId).isEqualTo(userId)
         }
     }
 
@@ -296,9 +340,7 @@ class ProductFacadeIntegrationTest @Autowired constructor(
         fun `maintain product order when list cache hits with partial detail cache`() {
             // given - 상품 3개 생성 (최신순)
             val product1 = createProduct(name = "첫번째")
-            Thread.sleep(10)
             val product2 = createProduct(name = "두번째")
-            Thread.sleep(10)
             val product3 = createProduct(name = "세번째")
 
             val criteria = ProductCriteria.FindProducts(

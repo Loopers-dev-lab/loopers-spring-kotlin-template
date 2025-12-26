@@ -50,6 +50,13 @@ interface ProductV1ApiSpec {
     )
     fun getProduct(
         @Parameter(
+            name = "X-USER-ID",
+            description = "사용자 ID (선택)",
+            required = false,
+            `in` = ParameterIn.HEADER,
+        )
+        userId: Long?,
+        @Parameter(
             name = "productId",
             description = "조회할 상품 ID",
             required = true,

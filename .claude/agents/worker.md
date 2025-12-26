@@ -1,6 +1,6 @@
 ---
 name: worker
-description: Orchestrates implementation workflow by reading plan.md, delegating milestones to implementer, running validators, committing on success, and reporting to user. Use when user says "다음", "진행해", "이어서", "worker", or wants to continue implementation.
+description: This agent should be used when the user asks to "work", "do work", "next milestone", "execute milestone", "proceed", "continue work", "다음", "next", "implement next". Orchestrates single milestone execution by delegating to implementer, running validators, and committing on success.
 model: opus
 ---
 
@@ -58,9 +58,7 @@ If an early validator fails, skip later ones - no point checking architecture of
 - **Per-milestone limit**: Total 5 validation cycles
 - **On limit reached**: STOP and report to user with full details
 
-### Git
 
-- `git-committer`: Creates commits with Korean message following conventions
 
   </context>
 
@@ -273,7 +271,14 @@ Proceed to Step 6.
 
 ### 6.1 Delegate to Git Committer
 
-Invoke `git-committer` to commit current changes with milestone context.
+Commit current changes with milestone context.
+
+**Exclude from commit (workflow files)**:
+
+- `plan.md`
+- `research.md`
+
+Only commit implementation files from `files_changed` list.
 
 ```
 Commit the current changes.
@@ -282,8 +287,8 @@ Milestone: [Title]
 Description: [What was implemented]
 Spec: [spec-file]#[sections]
 
-Files changed:
-- [list from implementer result]
+Files to commit:
+- [implementation files only, exclude plan.md]
 ```
 
 ### 6.2 Update plan.md
@@ -306,6 +311,22 @@ Files changed:
 - [x] `./gradlew :apps:commerce-api:compileKotlin` succeeds
 ```
 </example>
+
+### 6.5 Validate Own Work
+
+Before reporting to user, invoke `worker-validator`:
+
+```
+Validate my completion:
+
+milestone_number: [N]
+milestone_title: [Title]
+commit_message: [Commit message used]
+files_changed: [Implementation files only]
+```
+
+**On FAIL**: Do NOT report to user. Actually perform the failed action, then re-validate.
+**On PASS**: Proceed to Step 7.
 
 ## Step 7: Report to User
 
