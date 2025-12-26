@@ -7,7 +7,6 @@ import com.loopers.domain.order.event.OrderCreatedEvent
 import com.loopers.domain.order.event.OrderItemDto
 import com.loopers.domain.product.event.ProductViewedEvent
 import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.boot.context.properties.bind.ConstructorBinding
 import org.springframework.stereotype.Component
 import kotlin.math.ln
 
@@ -44,7 +43,7 @@ class RankingScoreCalculator(
 }
 
 @ConfigurationProperties(prefix = "ranking.weights")
-data class RankingWeights @ConstructorBinding constructor(
+data class RankingWeights(
     val view: Double = 0.1,
     val like: Double = 0.2,
     val unlike: Double = -0.2,

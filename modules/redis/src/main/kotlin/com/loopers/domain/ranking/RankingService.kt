@@ -167,4 +167,58 @@ class RankingService(
             logger.info("TTL 설정: key=$key, TTL=${TTL_DAYS}일")
         }
     }
+
+    /**
+     * 전날 점수를 다음 날 키로 복사 (Cold Start 방지)
+     */
+    fun carryOverScores(
+        sourceDate: LocalDate,
+        targetDate: LocalDate,
+        weight: Double = 0.1,
+    ): Long {
+        val sourceKey = RankingKeyGenerator.generateDailyKey(sourceDate)
+        val targetKey = RankingKeyGenerator.generateDailyKey(targetDate)
+
+        logger.info("랭킹 Score Carry-Over 시작: sourceKey=$sourceKey, targetKey=$targetKey, weight=$weight")
+
+        val zSetOps = redisTemplate.opsForZSet()
+
+        // 1. 원본 키 존재 확인
+        val sourceSize = zSetOps.size(sourceKey) ?: 0L
+        if (sourceSize == 0L) {
+            logger.warn("원본 랭킹 키가 비어있음: sourceKey=$sourceKey")
+            return 0L
+        }
+
+        // 2. 대상 키 존재 확인 (이미 이벤트가 발생했을 수 있음)
+        val targetExists = redisTemplate.hasKey(targetKey) ?: false
+        if (targetExists) {
+            logger.info("대상 랭킹 키가 이미 존재함: targetKey=$targetKey (Carry-Over 건너뜀)")
+            return 0L
+        }
+
+        // 3. 모든 데이터 조회 후 가중치 적용하여 복사
+        val allEntries = zSetOps.reverseRangeWithScores(sourceKey, 0, sourceSize - 1) ?: emptySet()
+
+        var copiedCount = 0L
+        allEntries.forEach { tuple ->
+            val member = tuple.value ?: return@forEach
+            val score = tuple.score ?: return@forEach
+            val newScore = score * weight
+
+            // 대상 키에 가중치 적용한 점수로 추가
+            zSetOps.add(targetKey, member, newScore)
+            copiedCount++
+        }
+
+        // 4. TTL 설정 (2일)
+        ensureTtl(targetKey)
+
+        logger.info(
+            "랭킹 Score Carry-Over 완료:" +
+            "$sourceKey → $targetKey, weight=$weight, copied=$copiedCount/$sourceSize"
+        )
+
+        return copiedCount
+    }
 }
