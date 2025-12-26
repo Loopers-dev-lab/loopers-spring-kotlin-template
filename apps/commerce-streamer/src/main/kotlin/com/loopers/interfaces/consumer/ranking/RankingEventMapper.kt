@@ -9,14 +9,13 @@ import com.loopers.domain.ranking.event.RankingOrderPaidEventV1
 import com.loopers.domain.ranking.event.RankingProductViewedEventV1
 import com.loopers.eventschema.CloudEventEnvelope
 import org.springframework.stereotype.Component
-import java.math.RoundingMode
 
 /**
  * RankingEventMapper - CloudEventEnvelope를 AccumulateMetricCommand.Item으로 변환하는 매퍼
  *
  * - 역할: 이벤트 페이로드 파싱 및 AccumulateMetricCommand.Item 객체 생성
  * - 비즈니스 로직 없음: 순수 변환 작업만 수행
- * - ORDER_PAID 이벤트의 경우 totalAmount를 orderItems 수로 균등 분배
+ * - ORDER_PAID 이벤트의 경우 각 상품별 unitPrice * quantity로 개별 금액 계산
  */
 @Component
 class RankingEventMapper(
@@ -26,7 +25,7 @@ class RankingEventMapper(
      * CloudEventEnvelope를 AccumulateMetricCommand.Item 목록으로 변환
      *
      * - VIEW, LIKE_CREATED, LIKE_CANCELED: 단일 Item 반환
-     * - ORDER_PAID: 각 orderItem별로 Item 생성 (totalAmount 균등 분배)
+     * - ORDER_PAID: 각 orderItem별로 Item 생성 (unitPrice * quantity로 개별 계산)
      *
      * @param envelope CloudEventEnvelope
      * @return AccumulateMetricCommand.Item 목록
@@ -75,14 +74,11 @@ class RankingEventMapper(
             return emptyList()
         }
 
-        val amountPerItem = payload.totalAmount.toBigDecimal()
-            .divide(payload.orderItems.size.toBigDecimal(), 2, RoundingMode.HALF_UP)
-
         return payload.orderItems.map { item ->
             AccumulateMetricCommand.Item(
                 productId = item.productId,
                 metricType = MetricType.ORDER_PAID,
-                orderAmount = amountPerItem,
+                orderAmount = (item.unitPrice * item.quantity).toBigDecimal(),
                 occurredAt = envelope.time,
             )
         }

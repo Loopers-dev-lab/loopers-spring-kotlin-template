@@ -38,7 +38,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
                 userId = 1L,
                 totalAmount = 10000L,
                 orderItems = listOf(
-                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2, unitPrice = 5000L),
                 ),
             )
 
@@ -59,7 +59,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
                 userId = 1L,
                 totalAmount = 10000L,
                 orderItems = listOf(
-                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2, unitPrice = 5000L),
                 ),
             )
 
@@ -79,7 +79,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             val event = OrderPaidEventV1(
                 orderId = 1L,
                 orderItems = listOf(
-                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2, unitPrice = 5000L),
                 ),
                 userId = 1L,
                 totalAmount = 10000L,
@@ -104,7 +104,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
                 userId = 1L,
                 totalAmount = 10000L,
                 orderItems = listOf(
-                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2),
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 100L, quantity = 2, unitPrice = 5000L),
                 ),
                 occurredAt = occurredAt,
             )
@@ -150,7 +150,7 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
                 orderId = 789L,
                 userId = 1L,
                 totalAmount = 10000L,
-                orderItems = listOf(OrderPaidEventV1.OrderItemSnapshot(productId = 1L, quantity = 1)),
+                orderItems = listOf(OrderPaidEventV1.OrderItemSnapshot(productId = 1L, quantity = 1, unitPrice = 10000L)),
             )
 
             // when

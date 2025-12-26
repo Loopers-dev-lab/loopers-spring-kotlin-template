@@ -12,5 +12,7 @@ data class RankingOrderPaidEventV1(
 ) {
     data class OrderItem(
         val productId: Long,
+        val quantity: Int = 1,
+        val unitPrice: Long = 0L,
     )
 }

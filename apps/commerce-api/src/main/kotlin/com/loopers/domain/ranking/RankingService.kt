@@ -22,22 +22,22 @@ class RankingService(
         likeWeight: BigDecimal,
         orderWeight: BigDecimal,
     ): RankingWeight {
-        val rankingWeight = rankingWeightRepository.findLatest()
-            ?: RankingWeight.create(
-                viewWeight = viewWeight,
-                likeWeight = likeWeight,
-                orderWeight = orderWeight,
-            )
+        val existingWeight = rankingWeightRepository.findLatest()
 
-        rankingWeight.update(
+        val newWeight = existingWeight?.createNext(
             viewWeight = viewWeight,
             likeWeight = likeWeight,
             orderWeight = orderWeight,
+        ) ?: RankingWeight.create(
+            viewWeight = viewWeight,
+            likeWeight = likeWeight,
+            orderWeight = orderWeight,
+            registerEvent = true,
         )
 
-        val savedWeight = rankingWeightRepository.save(rankingWeight)
+        val savedWeight = rankingWeightRepository.save(newWeight)
 
-        rankingWeight.pollEvents().forEach { eventPublisher.publishEvent(it) }
+        newWeight.pollEvents().forEach { eventPublisher.publishEvent(it) }
 
         return savedWeight
     }

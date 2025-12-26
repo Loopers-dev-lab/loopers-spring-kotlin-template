@@ -89,7 +89,7 @@ class RankingWeightChangedEventConsumerTest {
             consumer.consume(listOf(record), acknowledgment)
 
             // then
-            verify(exactly = 1) { metricJpaRepository.findAllByStatHour(any()) }
+            verify(exactly = 2) { metricJpaRepository.findAllByStatHour(any()) } // current + previous bucket
             verify(exactly = 1) { eventHandledService.markAsHandled(any()) }
         }
 
@@ -197,14 +197,16 @@ class RankingWeightChangedEventConsumerTest {
         fun `recalculates all product scores on weight change`() {
             // given
             val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
-            val statHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousHour = now.minus(1, ChronoUnit.HOURS)
+            val currentStatHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousStatHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul"))
             val envelope = createEnvelope(
                 type = "loopers.ranking.weight-changed.v1",
                 payload = """{"occurredAt": "$now"}""",
             )
 
             val metric1 = createProductHourlyMetric(
-                statHour = statHour,
+                statHour = currentStatHour,
                 productId = 100L,
                 viewCount = 10,
                 likeCount = 5,
@@ -212,7 +214,7 @@ class RankingWeightChangedEventConsumerTest {
                 orderAmount = BigDecimal("1000"),
             )
             val metric2 = createProductHourlyMetric(
-                statHour = statHour,
+                statHour = currentStatHour,
                 productId = 200L,
                 viewCount = 20,
                 likeCount = 10,
@@ -227,7 +229,8 @@ class RankingWeightChangedEventConsumerTest {
             )
 
             every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { metricJpaRepository.findAllByStatHour(any()) } returns listOf(metric1, metric2)
+            every { metricJpaRepository.findAllByStatHour(currentStatHour) } returns listOf(metric1, metric2)
+            every { metricJpaRepository.findAllByStatHour(previousStatHour) } returns emptyList()
             every { rankingWeightRepository.findLatest() } returns weight
             every { scoreCalculator.calculate(any(), any()) } answers {
                 val snapshot = firstArg<CountSnapshot>()
@@ -356,7 +359,9 @@ class RankingWeightChangedEventConsumerTest {
         fun `uses current bucket key`() {
             // given
             val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
-            val statHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousHour = now.minus(1, ChronoUnit.HOURS)
+            val currentStatHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousStatHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul"))
             val expectedBucketKey = RankingKeyGenerator.currentBucketKey()
             val envelope = createEnvelope(
                 type = "loopers.ranking.weight-changed.v1",
@@ -364,13 +369,14 @@ class RankingWeightChangedEventConsumerTest {
             )
 
             val metric = createProductHourlyMetric(
-                statHour = statHour,
+                statHour = currentStatHour,
                 productId = 100L,
             )
             val weight = RankingWeight.fallback()
 
             every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { metricJpaRepository.findAllByStatHour(any()) } returns listOf(metric)
+            every { metricJpaRepository.findAllByStatHour(currentStatHour) } returns listOf(metric)
+            every { metricJpaRepository.findAllByStatHour(previousStatHour) } returns emptyList()
             every { rankingWeightRepository.findLatest() } returns weight
             every { scoreCalculator.calculate(any(), any()) } returns Score.of(100.0)
 
@@ -384,6 +390,264 @@ class RankingWeightChangedEventConsumerTest {
             // then
             verify(exactly = 1) { rankingWriter.replaceAll(capture(keySlot), any()) }
             assertThat(keySlot.captured).isEqualTo(expectedBucketKey)
+        }
+    }
+
+    @Nested
+    @DisplayName("이전 버킷 재계산 테스트")
+    inner class PreviousBucketRecalculationTest {
+
+        @Test
+        @DisplayName("가중치 변경 시 이전 버킷도 재계산한다")
+        fun `recalculates previous bucket on weight change`() {
+            // given
+            val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val previousHour = now.minus(1, ChronoUnit.HOURS)
+            val currentStatHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousStatHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul"))
+            val envelope = createEnvelope(
+                type = "loopers.ranking.weight-changed.v1",
+                payload = """{"occurredAt": "$now"}""",
+            )
+
+            val currentMetric = createProductHourlyMetric(
+                statHour = currentStatHour,
+                productId = 100L,
+                viewCount = 10,
+                likeCount = 5,
+                orderCount = 2,
+                orderAmount = BigDecimal("1000"),
+            )
+            val previousMetric = createProductHourlyMetric(
+                statHour = previousStatHour,
+                productId = 200L,
+                viewCount = 20,
+                likeCount = 10,
+                orderCount = 4,
+                orderAmount = BigDecimal("2000"),
+            )
+
+            val weight = RankingWeight.fallback()
+
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { metricJpaRepository.findAllByStatHour(currentStatHour) } returns listOf(currentMetric)
+            every { metricJpaRepository.findAllByStatHour(previousStatHour) } returns listOf(previousMetric)
+            every { rankingWeightRepository.findLatest() } returns weight
+            every { scoreCalculator.calculate(any(), any()) } returns Score.of(100.0)
+
+            val record = createConsumerRecord(envelope)
+
+            // when
+            consumer.consume(listOf(record), acknowledgment)
+
+            // then
+            verify(exactly = 2) { rankingWriter.replaceAll(any(), any()) }
+        }
+
+        @Test
+        @DisplayName("이전 버킷 점수에 감쇠 계수(0.1)가 적용된다")
+        fun `applies decay factor to previous bucket scores`() {
+            // given
+            val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val previousHour = now.minus(1, ChronoUnit.HOURS)
+            val currentStatHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousStatHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul"))
+            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+            val envelope = createEnvelope(
+                type = "loopers.ranking.weight-changed.v1",
+                payload = """{"occurredAt": "$now"}""",
+            )
+
+            val previousMetric = createProductHourlyMetric(
+                statHour = previousStatHour,
+                productId = 200L,
+                viewCount = 20,
+                likeCount = 10,
+                orderCount = 4,
+                orderAmount = BigDecimal("2000"),
+            )
+
+            val weight = RankingWeight.fallback()
+            val originalScore = Score.of(1000.0)
+
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { metricJpaRepository.findAllByStatHour(currentStatHour) } returns emptyList()
+            every { metricJpaRepository.findAllByStatHour(previousStatHour) } returns listOf(previousMetric)
+            every { rankingWeightRepository.findLatest() } returns weight
+            every { scoreCalculator.calculate(any(), any()) } returns originalScore
+
+            val scoresSlot = slot<Map<Long, Score>>()
+            val keySlot = slot<String>()
+
+            val record = createConsumerRecord(envelope)
+
+            // when
+            consumer.consume(listOf(record), acknowledgment)
+
+            // then
+            verify(exactly = 1) { rankingWriter.replaceAll(capture(keySlot), capture(scoresSlot)) }
+            assertThat(keySlot.captured).isEqualTo(previousBucketKey)
+            val decayedScore = scoresSlot.captured[200L]!!
+            assertThat(decayedScore.value).isEqualByComparingTo(BigDecimal("100.0"))
+        }
+
+        @Test
+        @DisplayName("이전 버킷에 메트릭이 없으면 Redis 업데이트를 스킵한다")
+        fun `skips previous bucket update when no metrics found`() {
+            // given
+            val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val previousHour = now.minus(1, ChronoUnit.HOURS)
+            val currentStatHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousStatHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul"))
+            val envelope = createEnvelope(
+                type = "loopers.ranking.weight-changed.v1",
+                payload = """{"occurredAt": "$now"}""",
+            )
+
+            val currentMetric = createProductHourlyMetric(
+                statHour = currentStatHour,
+                productId = 100L,
+            )
+
+            val weight = RankingWeight.fallback()
+
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { metricJpaRepository.findAllByStatHour(currentStatHour) } returns listOf(currentMetric)
+            every { metricJpaRepository.findAllByStatHour(previousStatHour) } returns emptyList()
+            every { rankingWeightRepository.findLatest() } returns weight
+            every { scoreCalculator.calculate(any(), any()) } returns Score.of(100.0)
+
+            val record = createConsumerRecord(envelope)
+
+            // when
+            consumer.consume(listOf(record), acknowledgment)
+
+            // then
+            verify(exactly = 1) { rankingWriter.replaceAll(any(), any()) }
+        }
+    }
+
+    @Nested
+    @DisplayName("재시도 로직 테스트")
+    inner class RetryLogicTest {
+
+        @Test
+        @DisplayName("현재 버킷 재계산 실패 시 3회까지 재시도한다")
+        fun `retries current bucket recalculation up to 3 times on failure`() {
+            // given
+            val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val currentStatHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousHour = now.minus(1, ChronoUnit.HOURS)
+            val previousStatHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul"))
+            val envelope = createEnvelope(
+                type = "loopers.ranking.weight-changed.v1",
+                payload = """{"occurredAt": "$now"}""",
+            )
+
+            val metric = createProductHourlyMetric(
+                statHour = currentStatHour,
+                productId = 100L,
+            )
+
+            val weight = RankingWeight.fallback()
+
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { metricJpaRepository.findAllByStatHour(currentStatHour) } returns listOf(metric)
+            every { metricJpaRepository.findAllByStatHour(previousStatHour) } returns emptyList()
+            every { rankingWeightRepository.findLatest() } returns weight
+            every { scoreCalculator.calculate(any(), any()) } returns Score.of(100.0)
+            every { rankingWriter.replaceAll(any(), any()) } throws RuntimeException("Redis error") andThenThrows RuntimeException("Redis error") andThen Unit
+
+            val record = createConsumerRecord(envelope)
+
+            // when
+            consumer.consume(listOf(record), acknowledgment)
+
+            // then
+            verify(exactly = 3) { rankingWriter.replaceAll(any(), any()) }
+            verify(exactly = 1) { eventHandledService.markAsHandled(any()) }
+        }
+
+        @Test
+        @DisplayName("3회 재시도 후에도 실패하면 예외를 던진다")
+        fun `throws exception after 3 failed retries`() {
+            // given
+            val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val currentStatHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousHour = now.minus(1, ChronoUnit.HOURS)
+            val previousStatHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul"))
+            val envelope = createEnvelope(
+                type = "loopers.ranking.weight-changed.v1",
+                payload = """{"occurredAt": "$now"}""",
+            )
+
+            val metric = createProductHourlyMetric(
+                statHour = currentStatHour,
+                productId = 100L,
+            )
+
+            val weight = RankingWeight.fallback()
+
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { metricJpaRepository.findAllByStatHour(currentStatHour) } returns listOf(metric)
+            every { metricJpaRepository.findAllByStatHour(previousStatHour) } returns emptyList()
+            every { rankingWeightRepository.findLatest() } returns weight
+            every { scoreCalculator.calculate(any(), any()) } returns Score.of(100.0)
+            every { rankingWriter.replaceAll(any(), any()) } throws RuntimeException("Redis error")
+
+            val record = createConsumerRecord(envelope)
+
+            // when & then
+            org.junit.jupiter.api.assertThrows<RuntimeException> {
+                consumer.consume(listOf(record), acknowledgment)
+            }
+            verify(exactly = 3) { rankingWriter.replaceAll(any(), any()) }
+            verify(exactly = 0) { eventHandledService.markAsHandled(any()) }
+        }
+
+        @Test
+        @DisplayName("이전 버킷 재계산 실패 시 3회까지 재시도한다")
+        fun `retries previous bucket recalculation up to 3 times on failure`() {
+            // given
+            val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val currentStatHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
+            val previousHour = now.minus(1, ChronoUnit.HOURS)
+            val previousStatHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul"))
+            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+            val envelope = createEnvelope(
+                type = "loopers.ranking.weight-changed.v1",
+                payload = """{"occurredAt": "$now"}""",
+            )
+
+            val currentMetric = createProductHourlyMetric(
+                statHour = currentStatHour,
+                productId = 100L,
+            )
+            val previousMetric = createProductHourlyMetric(
+                statHour = previousStatHour,
+                productId = 200L,
+            )
+
+            val weight = RankingWeight.fallback()
+
+            every { eventHandledService.isAlreadyHandled(any()) } returns false
+            every { metricJpaRepository.findAllByStatHour(currentStatHour) } returns listOf(currentMetric)
+            every { metricJpaRepository.findAllByStatHour(previousStatHour) } returns listOf(previousMetric)
+            every { rankingWeightRepository.findLatest() } returns weight
+            every { scoreCalculator.calculate(any(), any()) } returns Score.of(100.0)
+            every { rankingWriter.replaceAll(currentBucketKey, any()) } returns Unit
+            every { rankingWriter.replaceAll(previousBucketKey, any()) } throws RuntimeException("Redis error") andThenThrows RuntimeException("Redis error") andThen Unit
+
+            val record = createConsumerRecord(envelope)
+
+            // when
+            consumer.consume(listOf(record), acknowledgment)
+
+            // then
+            verify(exactly = 1) { rankingWriter.replaceAll(currentBucketKey, any()) }
+            verify(exactly = 3) { rankingWriter.replaceAll(previousBucketKey, any()) }
+            verify(exactly = 1) { eventHandledService.markAsHandled(any()) }
         }
     }
 
@@ -439,7 +703,7 @@ class RankingWeightChangedEventConsumerTest {
             consumer.consume(records, acknowledgment)
 
             // then
-            verify(exactly = 1) { metricJpaRepository.findAllByStatHour(any()) }
+            verify(exactly = 2) { metricJpaRepository.findAllByStatHour(any()) } // current + previous bucket
             verify(exactly = 1) { eventHandledService.markAsHandled("ranking-weight-changed:supported-event-id") }
             verify(exactly = 0) { eventHandledService.markAsHandled("ranking-weight-changed:unsupported-event-id") }
         }

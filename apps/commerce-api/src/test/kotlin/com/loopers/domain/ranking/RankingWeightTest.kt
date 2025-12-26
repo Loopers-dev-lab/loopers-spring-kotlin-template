@@ -141,43 +141,69 @@ class RankingWeightTest {
         }
     }
 
-    @DisplayName("RankingWeight 업데이트 테스트")
+    @DisplayName("RankingWeight createNext 테스트")
     @Nested
-    inner class Update {
+    inner class CreateNext {
 
-        @DisplayName("유효한 가중치로 업데이트한다")
+        @DisplayName("createNext로 새로운 인스턴스가 생성된다")
         @Test
-        fun `update with valid weights`() {
+        fun `createNext creates a new instance`() {
             // given
-            val rankingWeight = createRankingWeight()
+            val original = createRankingWeight()
             val newViewWeight = BigDecimal("0.30")
             val newLikeWeight = BigDecimal("0.30")
             val newOrderWeight = BigDecimal("0.40")
 
             // when
-            val updated = rankingWeight.update(
+            val next = original.createNext(
                 viewWeight = newViewWeight,
                 likeWeight = newLikeWeight,
                 orderWeight = newOrderWeight,
             )
 
             // then
-            assertThat(updated.viewWeight).isEqualTo(newViewWeight)
-            assertThat(updated.likeWeight).isEqualTo(newLikeWeight)
-            assertThat(updated.orderWeight).isEqualTo(newOrderWeight)
-            assertThat(updated).isSameAs(rankingWeight)
+            assertThat(next.viewWeight).isEqualTo(newViewWeight)
+            assertThat(next.likeWeight).isEqualTo(newLikeWeight)
+            assertThat(next.orderWeight).isEqualTo(newOrderWeight)
+            assertThat(next).isNotSameAs(original)
         }
 
-        @DisplayName("업데이트 시 잘못된 가중치면 예외가 발생한다")
+        @DisplayName("createNext 후 원본 인스턴스는 변경되지 않는다")
         @Test
-        fun `throw exception when updating with invalid weights`() {
+        fun `original instance remains unchanged after createNext`() {
             // given
-            val rankingWeight = createRankingWeight()
+            val originalViewWeight = BigDecimal("0.10")
+            val originalLikeWeight = BigDecimal("0.20")
+            val originalOrderWeight = BigDecimal("0.60")
+            val original = createRankingWeight(
+                viewWeight = originalViewWeight,
+                likeWeight = originalLikeWeight,
+                orderWeight = originalOrderWeight,
+            )
+
+            // when
+            original.createNext(
+                viewWeight = BigDecimal("0.30"),
+                likeWeight = BigDecimal("0.30"),
+                orderWeight = BigDecimal("0.40"),
+            )
+
+            // then
+            assertThat(original.viewWeight).isEqualTo(originalViewWeight)
+            assertThat(original.likeWeight).isEqualTo(originalLikeWeight)
+            assertThat(original.orderWeight).isEqualTo(originalOrderWeight)
+        }
+
+        @DisplayName("createNext 시 잘못된 가중치면 예외가 발생한다")
+        @Test
+        fun `throw exception when createNext with invalid weights`() {
+            // given
+            val original = createRankingWeight()
             val invalidWeight = BigDecimal("1.50")
 
             // when & then
             assertThatThrownBy {
-                rankingWeight.update(
+                original.createNext(
                     viewWeight = invalidWeight,
                     likeWeight = BigDecimal("0.30"),
                     orderWeight = BigDecimal("0.40"),
@@ -186,42 +212,57 @@ class RankingWeightTest {
                 .hasMessageContaining("viewWeight must be between 0 and 1")
         }
 
-        @DisplayName("업데이트 시 RankingWeightChangedEventV1 도메인 이벤트가 등록된다")
+        @DisplayName("createNext 시 RankingWeightChangedEventV1이 새 인스턴스에 등록된다")
         @Test
-        fun `registers RankingWeightChangedEventV1 when updating`() {
+        fun `registers RankingWeightChangedEventV1 on new instance when createNext`() {
             // given
-            val rankingWeight = createRankingWeight()
-            val newViewWeight = BigDecimal("0.30")
-            val newLikeWeight = BigDecimal("0.30")
-            val newOrderWeight = BigDecimal("0.40")
+            val original = createRankingWeight()
 
             // when
-            rankingWeight.update(
-                viewWeight = newViewWeight,
-                likeWeight = newLikeWeight,
-                orderWeight = newOrderWeight,
+            val next = original.createNext(
+                viewWeight = BigDecimal("0.30"),
+                likeWeight = BigDecimal("0.30"),
+                orderWeight = BigDecimal("0.40"),
             )
-            val events = rankingWeight.pollEvents()
+            val events = next.pollEvents()
 
             // then
             assertThat(events).hasSize(1)
             assertThat(events[0]).isInstanceOf(RankingWeightChangedEventV1::class.java)
         }
 
+        @DisplayName("createNext 시 원본 인스턴스에는 이벤트가 등록되지 않는다")
+        @Test
+        fun `original instance has no events after createNext`() {
+            // given
+            val original = createRankingWeight()
+
+            // when
+            original.createNext(
+                viewWeight = BigDecimal("0.30"),
+                likeWeight = BigDecimal("0.30"),
+                orderWeight = BigDecimal("0.40"),
+            )
+            val events = original.pollEvents()
+
+            // then
+            assertThat(events).isEmpty()
+        }
+
         @DisplayName("pollEvents 호출 후 이벤트 목록이 비워진다")
         @Test
         fun `clears events after pollEvents is called`() {
             // given
-            val rankingWeight = createRankingWeight()
-            rankingWeight.update(
+            val original = createRankingWeight()
+            val next = original.createNext(
                 viewWeight = BigDecimal("0.30"),
                 likeWeight = BigDecimal("0.30"),
                 orderWeight = BigDecimal("0.40"),
             )
 
             // when
-            rankingWeight.pollEvents()
-            val eventsAfterPoll = rankingWeight.pollEvents()
+            next.pollEvents()
+            val eventsAfterPoll = next.pollEvents()
 
             // then
             assertThat(eventsAfterPoll).isEmpty()

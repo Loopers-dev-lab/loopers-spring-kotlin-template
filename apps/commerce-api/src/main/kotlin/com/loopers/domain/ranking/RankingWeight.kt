@@ -48,17 +48,18 @@ class RankingWeight(
         validateWeights()
     }
 
-    fun update(
+    fun createNext(
         viewWeight: BigDecimal,
         likeWeight: BigDecimal,
         orderWeight: BigDecimal,
     ): RankingWeight {
-        this.viewWeight = viewWeight
-        this.likeWeight = likeWeight
-        this.orderWeight = orderWeight
-        validateWeights()
-        getDomainEvents().add(RankingWeightChangedEventV1.create())
-        return this
+        val newWeight = RankingWeight(
+            viewWeight = viewWeight,
+            likeWeight = likeWeight,
+            orderWeight = orderWeight,
+        )
+        newWeight.getDomainEvents().add(RankingWeightChangedEventV1.create())
+        return newWeight
     }
 
     private fun validateWeights() {
@@ -78,12 +79,17 @@ class RankingWeight(
             viewWeight: BigDecimal,
             likeWeight: BigDecimal,
             orderWeight: BigDecimal,
+            registerEvent: Boolean = false,
         ): RankingWeight {
-            return RankingWeight(
+            val weight = RankingWeight(
                 viewWeight = viewWeight,
                 likeWeight = likeWeight,
                 orderWeight = orderWeight,
             )
+            if (registerEvent) {
+                weight.getDomainEvents().add(RankingWeightChangedEventV1.create())
+            }
+            return weight
         }
 
         fun fallback(): RankingWeight {
