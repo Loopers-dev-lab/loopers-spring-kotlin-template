@@ -8,6 +8,7 @@ import com.loopers.domain.order.OrderCreatedEventV1
 import com.loopers.domain.order.OrderPaidEventV1
 import com.loopers.domain.product.ProductViewedEventV1
 import com.loopers.domain.product.StockDepletedEventV1
+import com.loopers.domain.ranking.RankingWeightChangedEventV1
 import com.loopers.support.event.DomainEvent
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
@@ -224,6 +225,22 @@ class CloudEventEnvelopeFactoryTest @Autowired constructor(
             assertThat(envelope!!.type).isEqualTo("loopers.stock.depleted.v1")
             assertThat(envelope.aggregateType).isEqualTo("Stock")
             assertThat(envelope.aggregateId).isEqualTo("800")
+        }
+
+        @DisplayName("RankingWeightChangedEventV1 - type: loopers.ranking.weight-changed.v1, aggregateType: RankingWeight, aggregateId: singleton")
+        @Test
+        fun `resolves RankingWeightChangedEventV1 metadata`() {
+            // given
+            val event = RankingWeightChangedEventV1.create()
+
+            // when
+            val envelope = cloudEventEnvelopeFactory.create(event)
+
+            // then
+            assertThat(envelope).isNotNull()
+            assertThat(envelope!!.type).isEqualTo("loopers.ranking.weight-changed.v1")
+            assertThat(envelope.aggregateType).isEqualTo("RankingWeight")
+            assertThat(envelope.aggregateId).isEqualTo("singleton")
         }
     }
 }
