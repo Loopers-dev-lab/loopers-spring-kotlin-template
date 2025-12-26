@@ -11,7 +11,7 @@ SET CHARACTER_SET_CLIENT = utf8mb4;
 SET CHARACTER_SET_RESULTS = utf8mb4;
 
 -- 재귀 깊이 제한 증가 (10만개 데이터 생성을 위해)
-SET SESSION cte_max_recursion_depth = 200000;
+SET SESSION cte_max_recursion_depth = 100000;
 
 -- ================================================
 -- 1. 브랜드 100개 생성
@@ -40,7 +40,7 @@ WITH RECURSIVE numbers AS (
     UNION ALL
     SELECT seq + 1
     FROM numbers
-    WHERE seq < 100000
+    WHERE seq <= 100000
 )
 SELECT
     CONCAT('Product_', LPAD(seq, 6, '0')),
