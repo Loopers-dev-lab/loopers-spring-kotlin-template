@@ -258,10 +258,12 @@ CREATE UNIQUE INDEX idx_event_outbox_event_id ON event_outbox(event_id);
 CREATE TABLE IF NOT EXISTS product_metrics (
     product_id BIGINT NOT NULL PRIMARY KEY COMMENT '상품 ID',
     likes_count INT NOT NULL DEFAULT 0 COMMENT '좋아요 수',
-    view_count INT NOT NULL DEFAULT 0 COMMENT '조회 수',
-    sales_count INT NOT NULL DEFAULT 0 COMMENT '판매 수',
+    views_count INT NOT NULL DEFAULT 0 COMMENT '조회 수',
+    orders_count INT NOT NULL DEFAULT 0 COMMENT '주문 수',
     version BIGINT NOT NULL DEFAULT 0 COMMENT '낙관적 락 버전',
-    updated_at DATETIME(6) NOT NULL COMMENT '수정 시각'
+    created_at DATETIME(6) NOT NULL COMMENT '생성 시각',
+    updated_at DATETIME(6) NOT NULL COMMENT '수정 시각',
+    CONSTRAINT fk_product_metrics_product FOREIGN KEY (product_id) REFERENCES products(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='상품별 집계 데이터';
 
 -- 생성 결과 확인
