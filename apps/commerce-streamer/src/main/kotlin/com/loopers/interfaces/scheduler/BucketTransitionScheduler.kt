@@ -27,7 +27,7 @@ class BucketTransitionScheduler(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @Scheduled(cron = "0 59 * * * *")
+    @Scheduled(cron = "0 50 * * * *")
     fun transition() {
         log.debug("[BucketTransitionScheduler] triggering bucket transition")
         rankingAggregationService.transitionBucket()

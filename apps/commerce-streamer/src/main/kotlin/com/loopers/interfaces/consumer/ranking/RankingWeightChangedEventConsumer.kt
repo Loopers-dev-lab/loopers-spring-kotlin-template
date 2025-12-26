@@ -17,7 +17,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.stereotype.Component
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -43,7 +42,6 @@ class RankingWeightChangedEventConsumer(
     companion object {
         private const val CONSUMER_GROUP = "ranking-weight-changed"
         private const val SUPPORTED_TYPE = "loopers.ranking.weight-changed.v1"
-        private val TTL_SECONDS = Duration.ofHours(25).seconds
         private val ZONE_ID = ZoneId.of("Asia/Seoul")
     }
 
@@ -108,7 +106,7 @@ class RankingWeightChangedEventConsumer(
             metric.productId to scoreCalculator.calculate(snapshot, weights)
         }
 
-        rankingWriter.replaceAll(currentBucketKey, newScores, TTL_SECONDS)
+        rankingWriter.replaceAll(currentBucketKey, newScores)
 
         logger.info(
             "Recalculated {} product scores with new weights (view={}, like={}, order={})",

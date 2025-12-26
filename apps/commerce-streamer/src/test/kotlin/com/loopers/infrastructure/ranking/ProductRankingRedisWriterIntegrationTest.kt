@@ -127,7 +127,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             )
 
             // when
-            productRankingWriter.replaceAll(testBucketKey, newScores, 3600L)
+            productRankingWriter.replaceAll(testBucketKey, newScores)
 
             // then - old entries should be removed
             val score101: Double? = zSetOps.score(testBucketKey, "101")
@@ -140,19 +140,19 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             assertThat(zSetOps.score(testBucketKey, "104")).isEqualTo(600.0)
         }
 
-        @DisplayName("TTL이 올바르게 설정된다")
+        @DisplayName("TTL이 올바르게 설정된다 (내부 TTL 2시간)")
         @Test
         fun `sets TTL correctly`() {
             // given
             val scores = mapOf(101L to Score.of(100.0))
 
             // when
-            productRankingWriter.replaceAll(testBucketKey, scores, 3600L)
+            productRankingWriter.replaceAll(testBucketKey, scores)
 
-            // then
+            // then - 내부 TTL은 2시간(7200초)
             val ttl = redisTemplate.getExpire(testBucketKey, TimeUnit.SECONDS)
-            assertThat(ttl).isGreaterThan(3500L)
-            assertThat(ttl).isLessThanOrEqualTo(3600L)
+            assertThat(ttl).isGreaterThan(7100L)
+            assertThat(ttl).isLessThanOrEqualTo(7200L)
         }
 
         @DisplayName("빈 scores 맵은 버킷을 삭제한다")
@@ -163,7 +163,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             assertThat(redisTemplate.hasKey(testBucketKey)).isTrue()
 
             // when
-            productRankingWriter.replaceAll(testBucketKey, emptyMap(), 3600L)
+            productRankingWriter.replaceAll(testBucketKey, emptyMap())
 
             // then
             assertThat(redisTemplate.hasKey(testBucketKey)).isFalse()
@@ -184,23 +184,23 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             )
 
             // when
-            productRankingWriter.createBucket(testBucketKey, scores, 3600L)
+            productRankingWriter.createBucket(testBucketKey, scores)
 
             // then
             assertThat(zSetOps.score(testBucketKey, "101")).isEqualTo(10.0)
             assertThat(zSetOps.score(testBucketKey, "102")).isEqualTo(20.0)
         }
 
-        @DisplayName("TTL이 올바르게 설정된다")
+        @DisplayName("TTL이 올바르게 설정된다 (내부 TTL 2시간)")
         @Test
         fun `sets TTL correctly`() {
             // given
             val scores = mapOf(101L to Score.of(100.0))
 
             // when
-            productRankingWriter.createBucket(testBucketKey, scores, 7200L)
+            productRankingWriter.createBucket(testBucketKey, scores)
 
-            // then
+            // then - 내부 TTL은 2시간(7200초)
             val ttl = redisTemplate.getExpire(testBucketKey, TimeUnit.SECONDS)
             assertThat(ttl).isGreaterThan(7100L)
             assertThat(ttl).isLessThanOrEqualTo(7200L)
@@ -210,7 +210,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
         @Test
         fun `does not create bucket when scores map is empty`() {
             // when
-            productRankingWriter.createBucket(testBucketKey, emptyMap(), 3600L)
+            productRankingWriter.createBucket(testBucketKey, emptyMap())
 
             // then
             assertThat(redisTemplate.hasKey(testBucketKey)).isFalse()
@@ -224,47 +224,11 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             val scores = mapOf(102L to Score.of(200.0))
 
             // when
-            productRankingWriter.createBucket(testBucketKey, scores, 3600L)
+            productRankingWriter.createBucket(testBucketKey, scores)
 
             // then
             assertThat(zSetOps.score(testBucketKey, "101")).isEqualTo(100.0)
             assertThat(zSetOps.score(testBucketKey, "102")).isEqualTo(200.0)
-        }
-    }
-
-    @DisplayName("setTtl()")
-    @Nested
-    inner class SetTtl {
-
-        @DisplayName("버킷의 TTL을 설정한다")
-        @Test
-        fun `sets TTL on bucket`() {
-            // given
-            zSetOps.add(testBucketKey, "101", 100.0)
-
-            // when
-            productRankingWriter.setTtl(testBucketKey, 1800L)
-
-            // then
-            val ttl = redisTemplate.getExpire(testBucketKey, TimeUnit.SECONDS)
-            assertThat(ttl).isGreaterThan(1700L)
-            assertThat(ttl).isLessThanOrEqualTo(1800L)
-        }
-
-        @DisplayName("이미 TTL이 설정된 버킷의 TTL을 갱신한다")
-        @Test
-        fun `updates TTL on bucket with existing TTL`() {
-            // given
-            zSetOps.add(testBucketKey, "101", 100.0)
-            redisTemplate.expire(testBucketKey, 100L, TimeUnit.SECONDS)
-
-            // when
-            productRankingWriter.setTtl(testBucketKey, 3600L)
-
-            // then
-            val ttl = redisTemplate.getExpire(testBucketKey, TimeUnit.SECONDS)
-            assertThat(ttl).isGreaterThan(3500L)
-            assertThat(ttl).isLessThanOrEqualTo(3600L)
         }
     }
 

@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.kafka.support.Acknowledgment
 import java.math.BigDecimal
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -136,7 +135,7 @@ class RankingWeightChangedEventConsumerTest {
 
             // then
             verify(exactly = 0) { metricJpaRepository.findAllByStatHour(any()) }
-            verify(exactly = 0) { rankingWriter.replaceAll(any(), any(), any()) }
+            verify(exactly = 0) { rankingWriter.replaceAll(any(), any()) }
             verify(exactly = 0) { eventHandledService.markAsHandled(any()) }
         }
 
@@ -246,7 +245,6 @@ class RankingWeightChangedEventConsumerTest {
                 rankingWriter.replaceAll(
                     match { it.startsWith("ranking:hourly:") },
                     match { it.size == 2 && it.containsKey(100L) && it.containsKey(200L) },
-                    Duration.ofHours(25).seconds,
                 )
             }
         }
@@ -270,7 +268,7 @@ class RankingWeightChangedEventConsumerTest {
 
             // then
             verify(exactly = 0) { scoreCalculator.calculate(any(), any()) }
-            verify(exactly = 0) { rankingWriter.replaceAll(any(), any(), any()) }
+            verify(exactly = 0) { rankingWriter.replaceAll(any(), any()) }
         }
 
         @Test
@@ -354,40 +352,6 @@ class RankingWeightChangedEventConsumerTest {
         }
 
         @Test
-        @DisplayName("replaceAll에 올바른 TTL이 전달된다 (25시간)")
-        fun `passes correct TTL to replaceAll (25 hours)`() {
-            // given
-            val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
-            val statHour = ZonedDateTime.ofInstant(now, ZoneId.of("Asia/Seoul"))
-            val envelope = createEnvelope(
-                type = "loopers.ranking.weight-changed.v1",
-                payload = """{"occurredAt": "$now"}""",
-            )
-
-            val metric = createProductHourlyMetric(
-                statHour = statHour,
-                productId = 100L,
-            )
-            val weight = RankingWeight.fallback()
-
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { metricJpaRepository.findAllByStatHour(any()) } returns listOf(metric)
-            every { rankingWeightRepository.findLatest() } returns weight
-            every { scoreCalculator.calculate(any(), any()) } returns Score.of(100.0)
-
-            val ttlSlot = slot<Long>()
-
-            val record = createConsumerRecord(envelope)
-
-            // when
-            consumer.consume(listOf(record), acknowledgment)
-
-            // then
-            verify(exactly = 1) { rankingWriter.replaceAll(any(), any(), capture(ttlSlot)) }
-            assertThat(ttlSlot.captured).isEqualTo(Duration.ofHours(25).seconds)
-        }
-
-        @Test
         @DisplayName("현재 시간대 버킷 키를 사용한다")
         fun `uses current bucket key`() {
             // given
@@ -418,7 +382,7 @@ class RankingWeightChangedEventConsumerTest {
             consumer.consume(listOf(record), acknowledgment)
 
             // then
-            verify(exactly = 1) { rankingWriter.replaceAll(capture(keySlot), any(), any()) }
+            verify(exactly = 1) { rankingWriter.replaceAll(capture(keySlot), any()) }
             assertThat(keySlot.captured).isEqualTo(expectedBucketKey)
         }
     }

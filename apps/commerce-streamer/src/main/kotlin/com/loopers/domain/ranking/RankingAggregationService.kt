@@ -2,17 +2,13 @@ package com.loopers.domain.ranking
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * RankingAggregationService - 랭킹 집계 핵심 서비스
  *
  * - 서비스가 버퍼를 내부적으로 소유 (스케줄러는 순수 트리거)
- * - AtomicReference로 버퍼 스왑을 원자적으로 수행
- * - ConcurrentHashMap의 copy + clear 방식은 그 사이에 도착한 이벤트를 잃을 위험이 있음
- *   getAndSet으로 전체 버퍼를 원자적으로 교체하면 이후 add()는 새 버퍼에 기록됨
+ * - MetricBuffer를 통해 원자적 버퍼 스왑 수행
+ * - poll() 시 새 버퍼로 교체되어 이벤트 유실 없이 안전하게 drain
  */
 @Service
 class RankingAggregationService(
@@ -23,14 +19,13 @@ class RankingAggregationService(
     private val scoreCalculator: RankingScoreCalculator,
 ) {
     companion object {
-        private val TTL_SECONDS = Duration.ofHours(25).seconds
         private val DECAY_FACTOR = java.math.BigDecimal("0.1")
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
     // 버퍼는 서비스 내부에서 소유
-    private val bufferRef = AtomicReference(ConcurrentHashMap<AggregationKey, MutableCounts>())
+    private val buffer = MetricBuffer()
 
     /**
      * 메트릭을 내부 버퍼에 축적
@@ -42,12 +37,10 @@ class RankingAggregationService(
         command.items.forEach { item ->
             val key = AggregationKey.from(item)
 
-            bufferRef.get()
-                .computeIfAbsent(key) { MutableCounts() }
-                .apply {
-                    increment(item.metricType)
-                    item.orderAmount?.let { addOrderAmount(it) }
-                }
+            buffer.accumulate(key) {
+                increment(item.metricType)
+                item.orderAmount?.let { addOrderAmount(it) }
+            }
         }
     }
 
@@ -57,7 +50,7 @@ class RankingAggregationService(
      * 스케줄러에서 순수 트리거로 호출됨
      */
     fun flush() {
-        val data = bufferRef.getAndSet(ConcurrentHashMap())
+        val data = buffer.poll()
         if (data.isEmpty()) return
 
         try {
@@ -87,10 +80,9 @@ class RankingAggregationService(
             key.productId to score
         }
 
-        // Redis: Pipeline으로 점수 증분 업데이트 (네트워크 왕복 최소화)
+        // Redis: Pipeline으로 점수 증분 업데이트
         // ZINCRBY는 기존 점수에 더하므로 여러 번 호출해도 누적
         rankingWriter.incrementScores(redisKey, scoreDeltas)
-        rankingWriter.setTtl(redisKey, TTL_SECONDS)
 
         // DB: 카운트 누적 (점수는 저장하지 않음 - 가중치 변경 시 재계산 가능하도록)
         val statsToSave = entries.map { (key, counts) ->
@@ -110,7 +102,6 @@ class RankingAggregationService(
     /**
      * 시간별 버킷 전환 수행
      *
-     * 매 시간 :59분에 호출되어 새 시간대 버킷을 생성
      * 이전 버킷의 점수에 감쇠 계수(0.1)를 적용하여 새 버킷의 초기 점수로 설정
      *
      * 예: 14시 버킷에 상품1=100점, 상품2=50점이 있다면
@@ -145,7 +136,7 @@ class RankingAggregationService(
                 score.applyDecay(DECAY_FACTOR)
             }
 
-            rankingWriter.createBucket(currentBucketKey, decayedScores, TTL_SECONDS)
+            rankingWriter.createBucket(currentBucketKey, decayedScores)
             logger.info(
                 "Bucket transition completed: {} -> {}, {} products with decayed scores",
                 previousBucketKey,

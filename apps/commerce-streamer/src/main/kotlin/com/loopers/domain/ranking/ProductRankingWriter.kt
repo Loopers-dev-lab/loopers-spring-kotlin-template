@@ -28,24 +28,15 @@ interface ProductRankingWriter {
      *
      * @param bucketKey Redis 키
      * @param scores 상품ID -> 점수 맵
-     * @param ttlSeconds TTL (초)
      */
-    fun replaceAll(bucketKey: String, scores: Map<Long, Score>, ttlSeconds: Long)
+    fun replaceAll(bucketKey: String, scores: Map<Long, Score>)
 
     /**
      * 새 버킷 생성 (버킷 전환 시)
      *
-     * @param bucketKey Redis 키
-     * @param scores 상품ID -> 점수 맵 (이전 버킷의 감쇠된 점수)
-     * @param ttlSeconds TTL (초)
-     */
-    fun createBucket(bucketKey: String, scores: Map<Long, Score>, ttlSeconds: Long)
-
-    /**
-     * TTL 설정
      *
      * @param bucketKey Redis 키
-     * @param ttlSeconds TTL (초)
+     * @param scores 상품ID -> 점수 맵 (이전 버킷의 감쇠된 점수)
      */
-    fun setTtl(bucketKey: String, ttlSeconds: Long)
+    fun createBucket(bucketKey: String, scores: Map<Long, Score>)
 }

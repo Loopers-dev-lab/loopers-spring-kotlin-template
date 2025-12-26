@@ -390,9 +390,9 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val bucketKey = RankingKeyGenerator.bucketKey(occurredAt)
             val ttl = redisTemplate.getExpire(bucketKey, java.util.concurrent.TimeUnit.SECONDS)
 
-            // TTL이 25시간(90000초) 근처인지 확인
-            assertThat(ttl).isGreaterThan(89000L)
-            assertThat(ttl).isLessThanOrEqualTo(90000L)
+            // TTL이 2시간(7200초) 근처인지 확인
+            assertThat(ttl).isGreaterThan(7100L)
+            assertThat(ttl).isLessThanOrEqualTo(7200L)
         }
     }
 
@@ -517,10 +517,10 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             // when
             rankingAggregationService.transitionBucket()
 
-            // then - TTL이 25시간(90000초) 근처인지 확인
+            // then - TTL이 2시간(7200초) 근처인지 확인
             val ttl = redisTemplate.getExpire(currentBucketKey, java.util.concurrent.TimeUnit.SECONDS)
-            assertThat(ttl).isGreaterThan(89000L)
-            assertThat(ttl).isLessThanOrEqualTo(90000L)
+            assertThat(ttl).isGreaterThan(7100L)
+            assertThat(ttl).isLessThanOrEqualTo(7200L)
         }
 
         @DisplayName("전체 전환 흐름: 이벤트 추가 -> flush -> 전환 -> 새 버킷에 감쇠 점수")
