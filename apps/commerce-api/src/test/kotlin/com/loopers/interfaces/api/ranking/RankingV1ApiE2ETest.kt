@@ -1,0 +1,307 @@
+package com.loopers.interfaces.api.ranking
+
+import com.loopers.domain.product.Brand
+import com.loopers.domain.product.BrandRepository
+import com.loopers.domain.product.Product
+import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.product.ProductStatistic
+import com.loopers.domain.product.ProductStatisticRepository
+import com.loopers.domain.product.Stock
+import com.loopers.domain.product.StockRepository
+import com.loopers.domain.ranking.RankingKeyGenerator
+import com.loopers.domain.ranking.RankingWeight
+import com.loopers.domain.ranking.RankingWeightRepository
+import com.loopers.interfaces.api.ApiResponse
+import com.loopers.support.values.Money
+import com.loopers.utils.DatabaseCleanUp
+import com.loopers.utils.RedisCleanUp
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertAll
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.web.client.TestRestTemplate
+import org.springframework.core.ParameterizedTypeReference
+import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.http.HttpEntity
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpMethod
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
+import java.math.BigDecimal
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class RankingV1ApiE2ETest @Autowired constructor(
+    private val testRestTemplate: TestRestTemplate,
+    private val productRepository: ProductRepository,
+    private val stockRepository: StockRepository,
+    private val brandRepository: BrandRepository,
+    private val productStatisticRepository: ProductStatisticRepository,
+    private val rankingWeightRepository: RankingWeightRepository,
+    private val redisTemplate: StringRedisTemplate,
+    private val databaseCleanUp: DatabaseCleanUp,
+    private val redisCleanUp: RedisCleanUp,
+) {
+
+    @AfterEach
+    fun tearDown() {
+        databaseCleanUp.truncateAllTables()
+        redisCleanUp.truncateAll()
+    }
+
+    @DisplayName("GET /api/v1/rankings")
+    @Nested
+    inner class GetRankings {
+
+        @DisplayName("랭킹을 조회하면 200 OK와 랭킹 목록을 반환한다")
+        @Test
+        fun returnRankingList_whenRequestIsValid() {
+            // given
+            val brand = createBrand()
+            val product1 = createProduct(brand = brand, name = "상품1")
+            val product2 = createProduct(brand = brand, name = "상품2")
+
+            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            redisTemplate.opsForZSet().add(bucketKey, product1.id.toString(), 100.0)
+            redisTemplate.opsForZSet().add(bucketKey, product2.id.toString(), 50.0)
+
+            // when
+            val response = getRankings()
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.rankings).hasSize(2) },
+                { assertThat(response.body?.data?.rankings?.get(0)?.rank).isEqualTo(1) },
+                { assertThat(response.body?.data?.rankings?.get(0)?.productId).isEqualTo(product1.id) },
+                { assertThat(response.body?.data?.rankings?.get(1)?.rank).isEqualTo(2) },
+                { assertThat(response.body?.data?.rankings?.get(1)?.productId).isEqualTo(product2.id) },
+            )
+        }
+
+        @DisplayName("페이지네이션이 정상 동작한다")
+        @Test
+        fun returnPaginatedRankings_whenPageParametersAreProvided() {
+            // given
+            val brand = createBrand()
+            repeat(5) { index ->
+                val product = createProduct(brand = brand, name = "상품${index + 1}")
+                val bucketKey = RankingKeyGenerator.currentBucketKey()
+                redisTemplate.opsForZSet().add(bucketKey, product.id.toString(), (100 - index).toDouble())
+            }
+
+            // when
+            val firstPage = getRankings(page = 0, size = 2)
+            val secondPage = getRankings(page = 1, size = 2)
+
+            // then
+            assertAll(
+                { assertThat(firstPage.body?.data?.rankings).hasSize(2) },
+                { assertThat(firstPage.body?.data?.hasNext).isTrue() },
+                { assertThat(secondPage.body?.data?.rankings).hasSize(2) },
+                { assertThat(secondPage.body?.data?.hasNext).isTrue() },
+            )
+        }
+
+        @DisplayName("랭킹이 없으면 빈 목록을 반환한다")
+        @Test
+        fun returnEmptyList_whenNoRankingsExist() {
+            // when
+            val response = getRankings()
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.rankings).isEmpty() },
+                { assertThat(response.body?.data?.hasNext).isFalse() },
+            )
+        }
+    }
+
+    @DisplayName("GET /api/v1/rankings/weight")
+    @Nested
+    inner class GetWeight {
+
+        @DisplayName("가중치를 조회하면 200 OK와 가중치 정보를 반환한다")
+        @Test
+        fun returnWeight_whenRequestIsValid() {
+            // given
+            createRankingWeight(
+                viewWeight = BigDecimal("0.10"),
+                likeWeight = BigDecimal("0.20"),
+                orderWeight = BigDecimal("0.60"),
+            )
+
+            // when
+            val response = getWeight()
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.viewWeight).isEqualByComparingTo(BigDecimal("0.10")) },
+                { assertThat(response.body?.data?.likeWeight).isEqualByComparingTo(BigDecimal("0.20")) },
+                { assertThat(response.body?.data?.orderWeight).isEqualByComparingTo(BigDecimal("0.60")) },
+            )
+        }
+
+        @DisplayName("가중치가 없으면 기본값을 반환한다")
+        @Test
+        fun returnFallbackWeight_whenNoWeightExists() {
+            // when
+            val response = getWeight()
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.viewWeight).isEqualByComparingTo(BigDecimal("0.10")) },
+                { assertThat(response.body?.data?.likeWeight).isEqualByComparingTo(BigDecimal("0.20")) },
+                { assertThat(response.body?.data?.orderWeight).isEqualByComparingTo(BigDecimal("0.60")) },
+            )
+        }
+    }
+
+    @DisplayName("PUT /api/v1/rankings/weight")
+    @Nested
+    inner class UpdateWeight {
+
+        @DisplayName("가중치를 수정하면 200 OK와 수정된 가중치를 반환한다")
+        @Test
+        fun returnUpdatedWeight_whenRequestIsValid() {
+            // given
+            createRankingWeight(
+                viewWeight = BigDecimal("0.10"),
+                likeWeight = BigDecimal("0.20"),
+                orderWeight = BigDecimal("0.60"),
+            )
+            val request = mapOf(
+                "viewWeight" to "0.30",
+                "likeWeight" to "0.40",
+                "orderWeight" to "0.50",
+            )
+
+            // when
+            val response = updateWeight(request)
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.viewWeight).isEqualByComparingTo(BigDecimal("0.30")) },
+                { assertThat(response.body?.data?.likeWeight).isEqualByComparingTo(BigDecimal("0.40")) },
+                { assertThat(response.body?.data?.orderWeight).isEqualByComparingTo(BigDecimal("0.50")) },
+            )
+        }
+
+        @DisplayName("가중치가 0~1 범위를 벗어나면 에러를 반환한다")
+        @Test
+        fun returnError_whenWeightIsOutOfRange() {
+            // given
+            createRankingWeight()
+            val request = mapOf(
+                "viewWeight" to "1.50",
+                "likeWeight" to "0.20",
+                "orderWeight" to "0.60",
+            )
+
+            // when
+            val response = updateWeight(request)
+
+            // then
+            assertThat(response.statusCode.is2xxSuccessful).isFalse()
+        }
+    }
+
+    private fun createBrand(name: String = "테스트 브랜드"): Brand {
+        return brandRepository.save(Brand.create(name))
+    }
+
+    private fun createProduct(
+        brand: Brand,
+        name: String = "테스트 상품",
+        price: Money = Money.krw(10000),
+        stockQuantity: Int = 100,
+    ): Product {
+        val product = Product.create(
+            name = name,
+            price = price,
+            brand = brand,
+        )
+        val savedProduct = productRepository.save(product)
+        stockRepository.save(Stock.create(savedProduct.id, stockQuantity))
+        productStatisticRepository.save(ProductStatistic.create(savedProduct.id))
+        return savedProduct
+    }
+
+    private fun createRankingWeight(
+        viewWeight: BigDecimal = BigDecimal("0.10"),
+        likeWeight: BigDecimal = BigDecimal("0.20"),
+        orderWeight: BigDecimal = BigDecimal("0.60"),
+    ): RankingWeight {
+        return rankingWeightRepository.save(
+            RankingWeight.create(
+                viewWeight = viewWeight,
+                likeWeight = likeWeight,
+                orderWeight = orderWeight,
+            ),
+        )
+    }
+
+    private fun getRankings(
+        date: String? = null,
+        page: Int? = null,
+        size: Int? = null,
+    ): ResponseEntity<ApiResponse<RankingV1Response.GetRankings>> {
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.APPLICATION_JSON
+        }
+
+        val queryParams = buildString {
+            val params = mutableListOf<String>()
+            date?.let { params.add("date=$it") }
+            page?.let { params.add("page=$it") }
+            size?.let { params.add("size=$it") }
+            if (params.isNotEmpty()) {
+                append("?")
+                append(params.joinToString("&"))
+            }
+        }
+
+        return testRestTemplate.exchange(
+            "/api/v1/rankings$queryParams",
+            HttpMethod.GET,
+            HttpEntity(null, headers),
+            object : ParameterizedTypeReference<ApiResponse<RankingV1Response.GetRankings>>() {},
+        )
+    }
+
+    private fun getWeight(): ResponseEntity<ApiResponse<RankingV1Response.GetWeight>> {
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.APPLICATION_JSON
+        }
+
+        return testRestTemplate.exchange(
+            "/api/v1/rankings/weight",
+            HttpMethod.GET,
+            HttpEntity(null, headers),
+            object : ParameterizedTypeReference<ApiResponse<RankingV1Response.GetWeight>>() {},
+        )
+    }
+
+    private fun updateWeight(
+        request: Map<String, String>,
+    ): ResponseEntity<ApiResponse<RankingV1Response.UpdateWeight>> {
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.APPLICATION_JSON
+        }
+
+        return testRestTemplate.exchange(
+            "/api/v1/rankings/weight",
+            HttpMethod.PUT,
+            HttpEntity(request, headers),
+            object : ParameterizedTypeReference<ApiResponse<RankingV1Response.UpdateWeight>>() {},
+        )
+    }
+}
