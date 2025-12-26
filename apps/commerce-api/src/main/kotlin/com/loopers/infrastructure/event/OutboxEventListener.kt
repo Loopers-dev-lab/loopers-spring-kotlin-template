@@ -21,8 +21,8 @@ import org.springframework.transaction.event.TransactionalEventListener
 
 /**
  * Transactional Outbox Pattern 구현
- * - 트랜잭션이 있으면 BEFORE_COMMIT에서 같은 트랜잭션으로 저장
- * - 트랜잭션이 없으면 fallbackExecution으로 별도 트랜잭션에서 저장
+ * - BEFORE_COMMIT: 비즈니스 로직과 같은 트랜잭션에서 저장
+ * - fallbackExecution: 트랜잭션 없는 컨텍스트에서도 실행
  * - 이벤트 유실 방지
  */
 @Component
@@ -33,7 +33,7 @@ class OutboxEventListener(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRED)
     fun handleDomainEvent(event: DomainEvent) {
         // 멱등성 체크
         if (eventOutboxRepository.existsByEventId(event.eventId)) {
