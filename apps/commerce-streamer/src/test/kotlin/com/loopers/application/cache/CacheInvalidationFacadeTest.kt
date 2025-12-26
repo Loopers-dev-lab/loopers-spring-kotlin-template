@@ -11,6 +11,7 @@ import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.springframework.dao.DataIntegrityViolationException
 import java.time.Instant
 
 class CacheInvalidationFacadeTest {
@@ -21,8 +22,12 @@ class CacheInvalidationFacadeTest {
 
     @BeforeEach
     fun setUp() {
-        productCacheService = mockk()
-        eventHandledRepository = mockk()
+        productCacheService = mockk(relaxed = true)
+        eventHandledRepository = mockk(relaxed = true)
+
+        // save 메서드는 파라미터를 그대로 반환
+        every { eventHandledRepository.save(any()) } answers { firstArg() }
+
         cacheInvalidationFacade = CacheInvalidationFacade(
             productCacheService,
             eventHandledRepository
@@ -41,10 +46,6 @@ class CacheInvalidationFacadeTest {
             quantity = 5,
             remainingStock = 10
         )
-
-        every { eventHandledRepository.existsByEventId(any()) } returns false
-        every { productCacheService.invalidateProductCache(any()) } just Runs
-        every { eventHandledRepository.save(any()) } returns mockk()
 
         // when
         cacheInvalidationFacade.handleEvent(event)
@@ -68,11 +69,6 @@ class CacheInvalidationFacadeTest {
             remainingStock = 0  // 재고 소진
         )
 
-        every { eventHandledRepository.existsByEventId(any()) } returns false
-        every { productCacheService.invalidateProductCache(any()) } just Runs
-        every { productCacheService.invalidateProductListCache() } just Runs
-        every { eventHandledRepository.save(any()) } returns mockk()
-
         // when
         cacheInvalidationFacade.handleEvent(event)
 
@@ -95,7 +91,8 @@ class CacheInvalidationFacadeTest {
             remainingStock = 5
         )
 
-        every { eventHandledRepository.existsByEventId("event-789") } returns true
+        // save 시 중복 예외 발생 시뮬레이션
+        every { eventHandledRepository.save(any()) } throws DataIntegrityViolationException("Duplicate key")
 
         // when
         cacheInvalidationFacade.handleEvent(event)
@@ -103,6 +100,5 @@ class CacheInvalidationFacadeTest {
         // then
         verify(exactly = 0) { productCacheService.invalidateProductCache(any()) }
         verify(exactly = 0) { productCacheService.invalidateProductListCache() }
-        verify(exactly = 0) { eventHandledRepository.save(any()) }
     }
 }
