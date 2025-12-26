@@ -36,7 +36,7 @@ class ProductStockEventConsumer(
         "$CONSUMER_GROUP:${envelope.id}"
     }
 
-    @KafkaListener(topics = ["stock-events"], containerFactory = KafkaConfig.BATCH_LISTENER)
+    @KafkaListener(topics = ["stock-events"], containerFactory = KafkaConfig.BATCH_LISTENER, groupId = "product-cache")
     fun consume(messages: List<ConsumerRecord<String, String>>, ack: Acknowledgment) {
         for ((index, record) in messages.withIndex()) {
             try {

@@ -38,7 +38,7 @@ class ProductOrderEventConsumer(
         "$CONSUMER_GROUP:${envelope.aggregateType}:${envelope.aggregateId}:$eventType"
     }
 
-    @KafkaListener(topics = ["order-events"], containerFactory = KafkaConfig.BATCH_LISTENER)
+    @KafkaListener(topics = ["order-events"], containerFactory = KafkaConfig.BATCH_LISTENER, groupId = "product-statistic")
     fun consume(messages: List<ConsumerRecord<String, String>>, ack: Acknowledgment) {
         for (record in messages) {
             try {

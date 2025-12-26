@@ -9,6 +9,7 @@ import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
+import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
@@ -23,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.ParameterizedTypeReference
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
@@ -39,6 +41,7 @@ class ProductV1ApiE2ETest @Autowired constructor(
     private val productStatisticRepository: ProductStatisticRepository,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
+    private val redisTemplate: RedisTemplate<String, String>,
 ) {
 
     @AfterEach
@@ -147,16 +150,17 @@ class ProductV1ApiE2ETest @Autowired constructor(
             // when
             val response = getProduct(product.id)
 
-            // then
+            // then - 응답 구조가 평탄화됨 (data.product.* -> data.*)
             assertAll(
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
-                { assertThat(response.body?.data?.product?.id).isEqualTo(product.id) },
-                { assertThat(response.body?.data?.product?.name).isEqualTo("테스트 상품") },
-                { assertThat(response.body?.data?.product?.price).isEqualTo(10000) },
-                { assertThat(response.body?.data?.product?.stock).isEqualTo(100) },
-                { assertThat(response.body?.data?.product?.brandId).isEqualTo(brand.id) },
-                { assertThat(response.body?.data?.product?.brandName).isEqualTo("테스트 브랜드") },
-                { assertThat(response.body?.data?.product?.likeCount).isEqualTo(0) },
+                { assertThat(response.body?.data?.id).isEqualTo(product.id) },
+                { assertThat(response.body?.data?.name).isEqualTo("테스트 상품") },
+                { assertThat(response.body?.data?.price).isEqualTo(10000) },
+                { assertThat(response.body?.data?.stock).isEqualTo(100) },
+                { assertThat(response.body?.data?.brandId).isEqualTo(brand.id) },
+                { assertThat(response.body?.data?.brandName).isEqualTo("테스트 브랜드") },
+                { assertThat(response.body?.data?.likeCount).isEqualTo(0) },
+                { assertThat(response.body?.data?.rank).isNull() },
             )
         }
 
@@ -188,11 +192,38 @@ class ProductV1ApiE2ETest @Autowired constructor(
             // when
             val response = getProduct(productId = product.id, userId = userId)
 
-            // then
+            // then - 응답 구조가 평탄화됨 (data.product.* -> data.*)
             assertAll(
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
-                { assertThat(response.body?.data?.product?.id).isEqualTo(product.id) },
-                { assertThat(response.body?.data?.product?.name).isEqualTo("테스트 상품") },
+                { assertThat(response.body?.data?.id).isEqualTo(product.id) },
+                { assertThat(response.body?.data?.name).isEqualTo("테스트 상품") },
+            )
+        }
+
+        @DisplayName("랭킹 데이터가 있으면 rank 필드에 순위가 반환된다")
+        @Test
+        fun `returnProductDetail with rank when ranking data exists`() {
+            // given
+            val brand = createBrand(name = "테스트 브랜드")
+            val product1 = createProduct(brand = brand, name = "1등 상품")
+            val product2 = createProduct(brand = brand, name = "2등 상품")
+
+            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            redisTemplate.opsForZSet().add(bucketKey, product1.id.toString(), 100.0)
+            redisTemplate.opsForZSet().add(bucketKey, product2.id.toString(), 50.0)
+
+            // when
+            val response1 = getProduct(product1.id)
+            val response2 = getProduct(product2.id)
+
+            // then
+            assertAll(
+                { assertThat(response1.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response1.body?.data?.id).isEqualTo(product1.id) },
+                { assertThat(response1.body?.data?.rank).isEqualTo(1) },
+                { assertThat(response2.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response2.body?.data?.id).isEqualTo(product2.id) },
+                { assertThat(response2.body?.data?.rank).isEqualTo(2) },
             )
         }
     }

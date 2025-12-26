@@ -18,12 +18,26 @@ class ProductV1Response {
     }
 
     data class GetProduct(
-        val product: ProductDto,
+        val id: Long,
+        val name: String,
+        val price: Int,
+        val stock: Int,
+        val brandId: Long,
+        val brandName: String,
+        val likeCount: Long,
+        val rank: Int?,
     ) {
         companion object {
             fun from(info: ProductInfo.FindProductById): GetProduct {
                 return GetProduct(
-                    product = ProductDto.from(info),
+                    id = info.productId,
+                    name = info.name,
+                    price = info.price.amount.toInt(),
+                    stock = info.stock,
+                    brandId = info.brandId,
+                    brandName = info.brandName,
+                    likeCount = info.likeCount,
+                    rank = info.rank,
                 )
             }
         }
@@ -37,6 +51,7 @@ class ProductV1Response {
         val brandId: Long,
         val brandName: String,
         val likeCount: Long,
+        val rank: Int? = null,
     ) {
         companion object {
             fun from(info: ProductInfo.FindProductById): ProductDto {
@@ -48,6 +63,7 @@ class ProductV1Response {
                     brandId = info.brandId,
                     brandName = info.brandName,
                     likeCount = info.likeCount,
+                    rank = info.rank,
                 )
             }
 

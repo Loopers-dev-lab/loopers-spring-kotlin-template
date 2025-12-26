@@ -56,6 +56,7 @@ class RankingWeightChangedEventConsumer(
     @KafkaListener(
         topics = ["ranking-events"],
         containerFactory = KafkaConfig.BATCH_LISTENER,
+        groupId = "ranking-weight-changed",
     )
     fun consume(messages: List<ConsumerRecord<String, String>>, ack: Acknowledgment) {
         for (record in messages) {

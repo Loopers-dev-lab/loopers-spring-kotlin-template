@@ -38,7 +38,7 @@ class ProductViewEventConsumer(
 
     private val supportedTypes = idempotencyKeyStrategies.keys
 
-    @KafkaListener(topics = ["product-events"], containerFactory = KafkaConfig.BATCH_LISTENER)
+    @KafkaListener(topics = ["product-events"], containerFactory = KafkaConfig.BATCH_LISTENER, groupId = "product-statistic")
     fun consume(messages: List<ConsumerRecord<String, String>>, ack: Acknowledgment) {
         // 1. Parse + Filter
         val parsedEnvelopes = mutableListOf<Pair<CloudEventEnvelope, String>>()
