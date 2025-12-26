@@ -384,4 +384,108 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             assertThat(productHourlyMetricJpaRepository.findAll()).isEmpty()
         }
     }
+
+    @DisplayName("버킷 전환 테스트")
+    @Nested
+    inner class BucketTransition {
+
+        @DisplayName("이전 버킷의 점수에 0.1 감쇠를 적용하여 새 버킷을 생성한다")
+        @Test
+        fun `transition creates new bucket with decayed scores`() {
+            // given - 이전 시간 버킷에 점수 설정
+            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+
+            // 이전 버킷에 점수 직접 설정
+            zSetOps.add(previousBucketKey, "1", 100.0)
+            zSetOps.add(previousBucketKey, "2", 50.0)
+            zSetOps.add(previousBucketKey, "3", 25.0)
+
+            // when
+            rankingAggregationService.transitionBucket()
+
+            // then - 새 버킷에 감쇠된 점수가 있어야 함
+            val score1 = zSetOps.score(currentBucketKey, "1")
+            val score2 = zSetOps.score(currentBucketKey, "2")
+            val score3 = zSetOps.score(currentBucketKey, "3")
+
+            // 100 * 0.1 = 10.0, 50 * 0.1 = 5.0, 25 * 0.1 = 2.5
+            assertThat(score1).isEqualTo(10.0)
+            assertThat(score2).isEqualTo(5.0)
+            assertThat(score3).isEqualTo(2.5)
+        }
+
+        @DisplayName("이전 버킷이 없으면 아무 작업도 하지 않는다")
+        @Test
+        fun `transition does nothing when previous bucket does not exist`() {
+            // given - 이전 버킷이 없는 상태
+            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+
+            // when
+            rankingAggregationService.transitionBucket()
+
+            // then - 새 버킷이 생성되지 않음
+            assertThat(redisTemplate.hasKey(currentBucketKey)).isFalse()
+        }
+
+        @DisplayName("현재 버킷이 이미 존재하면 중복 전환하지 않는다")
+        @Test
+        fun `transition does not overwrite existing current bucket`() {
+            // given
+            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+
+            // 이전 버킷 설정
+            zSetOps.add(previousBucketKey, "1", 100.0)
+
+            // 현재 버킷에 기존 점수 설정
+            zSetOps.add(currentBucketKey, "1", 999.0)
+
+            // when
+            rankingAggregationService.transitionBucket()
+
+            // then - 기존 점수가 유지됨 (덮어쓰지 않음)
+            val score = zSetOps.score(currentBucketKey, "1")
+            assertThat(score).isEqualTo(999.0)
+        }
+
+        @DisplayName("새 버킷에 TTL이 설정된다")
+        @Test
+        fun `transition sets TTL on new bucket`() {
+            // given
+            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+
+            zSetOps.add(previousBucketKey, "1", 100.0)
+
+            // when
+            rankingAggregationService.transitionBucket()
+
+            // then - TTL이 25시간(90000초) 근처인지 확인
+            val ttl = redisTemplate.getExpire(currentBucketKey, java.util.concurrent.TimeUnit.SECONDS)
+            assertThat(ttl).isGreaterThan(89000L)
+            assertThat(ttl).isLessThanOrEqualTo(90000L)
+        }
+
+        @DisplayName("전체 전환 흐름: 이벤트 추가 -> flush -> 전환 -> 새 버킷에 감쇠 점수")
+        @Test
+        fun `full transition flow with events`() {
+            // given - 이전 시간대에 이벤트 발생 시뮬레이션
+            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+
+            // 이전 버킷에 점수 설정 (실제 이벤트 처리 후의 상태)
+            // Product 1: 3 views, 2 likes, 1 order with 1000 amount
+            // Score = 3 * 0.10 + 2 * 0.20 + 1000 * 0.60 = 0.3 + 0.4 + 600 = 600.70
+            zSetOps.add(previousBucketKey, "1", 600.70)
+
+            // when - 버킷 전환
+            rankingAggregationService.transitionBucket()
+
+            // then - 새 버킷에 감쇠된 점수
+            // 600.70 * 0.1 = 60.07
+            val decayedScore = zSetOps.score(currentBucketKey, "1")
+            assertThat(decayedScore).isEqualTo(60.07)
+        }
+    }
 }

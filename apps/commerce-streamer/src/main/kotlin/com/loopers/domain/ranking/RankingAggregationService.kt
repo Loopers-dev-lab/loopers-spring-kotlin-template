@@ -18,11 +18,13 @@ import java.util.concurrent.atomic.AtomicReference
 class RankingAggregationService(
     private val metricRepository: ProductHourlyMetricRepository,
     private val rankingWriter: ProductRankingWriter,
+    private val rankingReader: ProductRankingReader,
     private val rankingWeightRepository: RankingWeightRepository,
     private val scoreCalculator: RankingScoreCalculator,
 ) {
     companion object {
         private val TTL_SECONDS = Duration.ofHours(25).seconds
+        private val DECAY_FACTOR = java.math.BigDecimal("0.1")
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -101,5 +103,55 @@ class RankingAggregationService(
             )
         }
         metricRepository.batchAccumulateCounts(statsToSave)
+    }
+
+    /**
+     * 시간별 버킷 전환 수행
+     *
+     * 매 시간 :59분에 호출되어 새 시간대 버킷을 생성
+     * 이전 버킷의 점수에 감쇠 계수(0.1)를 적용하여 새 버킷의 초기 점수로 설정
+     *
+     * 예: 14시 버킷에 상품1=100점, 상품2=50점이 있다면
+     *     15시 버킷은 상품1=10점, 상품2=5점으로 시작
+     */
+    fun transitionBucket() {
+        val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+        val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+
+        try {
+            // 이전 버킷이 없으면 전환할 것이 없음
+            if (!rankingReader.exists(previousBucketKey)) {
+                logger.debug("Previous bucket does not exist: {}", previousBucketKey)
+                return
+            }
+
+            // 현재 버킷이 이미 존재하면 이미 전환됨 (중복 실행 방지)
+            if (rankingReader.exists(currentBucketKey)) {
+                logger.debug("Current bucket already exists: {}", currentBucketKey)
+                return
+            }
+
+            // 이전 버킷의 모든 점수 조회
+            val previousScores = rankingReader.getAllScores(previousBucketKey)
+            if (previousScores.isEmpty()) {
+                logger.debug("Previous bucket is empty: {}", previousBucketKey)
+                return
+            }
+
+            // 감쇠 적용하여 새 버킷 생성
+            val decayedScores = previousScores.mapValues { (_, score) ->
+                score.applyDecay(DECAY_FACTOR)
+            }
+
+            rankingWriter.createBucket(currentBucketKey, decayedScores, TTL_SECONDS)
+            logger.info(
+                "Bucket transition completed: {} -> {}, {} products with decayed scores",
+                previousBucketKey,
+                currentBucketKey,
+                decayedScores.size,
+            )
+        } catch (e: Exception) {
+            logger.error("Bucket transition failed: {} -> {}", previousBucketKey, currentBucketKey, e)
+        }
     }
 }

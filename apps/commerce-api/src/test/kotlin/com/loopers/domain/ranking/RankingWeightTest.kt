@@ -185,6 +185,47 @@ class RankingWeightTest {
             }.isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("viewWeight must be between 0 and 1")
         }
+
+        @DisplayName("업데이트 시 RankingWeightChangedEventV1 도메인 이벤트가 등록된다")
+        @Test
+        fun `registers RankingWeightChangedEventV1 when updating`() {
+            // given
+            val rankingWeight = createRankingWeight()
+            val newViewWeight = BigDecimal("0.30")
+            val newLikeWeight = BigDecimal("0.30")
+            val newOrderWeight = BigDecimal("0.40")
+
+            // when
+            rankingWeight.update(
+                viewWeight = newViewWeight,
+                likeWeight = newLikeWeight,
+                orderWeight = newOrderWeight,
+            )
+            val events = rankingWeight.pollEvents()
+
+            // then
+            assertThat(events).hasSize(1)
+            assertThat(events[0]).isInstanceOf(RankingWeightChangedEventV1::class.java)
+        }
+
+        @DisplayName("pollEvents 호출 후 이벤트 목록이 비워진다")
+        @Test
+        fun `clears events after pollEvents is called`() {
+            // given
+            val rankingWeight = createRankingWeight()
+            rankingWeight.update(
+                viewWeight = BigDecimal("0.30"),
+                likeWeight = BigDecimal("0.30"),
+                orderWeight = BigDecimal("0.40"),
+            )
+
+            // when
+            rankingWeight.pollEvents()
+            val eventsAfterPoll = rankingWeight.pollEvents()
+
+            // then
+            assertThat(eventsAfterPoll).isEmpty()
+        }
     }
 
     @DisplayName("fallback 팩토리 메서드 테스트")

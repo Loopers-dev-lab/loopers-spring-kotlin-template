@@ -1,9 +1,11 @@
 package com.loopers.domain.ranking
 
 import com.loopers.domain.BaseEntity
+import com.loopers.support.event.DomainEvent
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
+import jakarta.persistence.Transient
 import java.math.BigDecimal
 
 @Entity
@@ -26,6 +28,22 @@ class RankingWeight(
     var orderWeight: BigDecimal = orderWeight
         private set
 
+    @Transient
+    private var domainEvents: MutableList<DomainEvent>? = null
+
+    private fun getDomainEvents(): MutableList<DomainEvent> {
+        if (domainEvents == null) {
+            domainEvents = mutableListOf()
+        }
+        return domainEvents!!
+    }
+
+    fun pollEvents(): List<DomainEvent> {
+        val events = getDomainEvents().toList()
+        getDomainEvents().clear()
+        return events
+    }
+
     init {
         validateWeights()
     }
@@ -39,6 +57,7 @@ class RankingWeight(
         this.likeWeight = likeWeight
         this.orderWeight = orderWeight
         validateWeights()
+        getDomainEvents().add(RankingWeightChangedEventV1.create())
         return this
     }
 

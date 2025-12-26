@@ -11,6 +11,7 @@ import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.ProductViewedEventV1
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
+import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.test.context.event.ApplicationEvents
 import org.springframework.test.context.event.RecordApplicationEvents
 
@@ -35,6 +37,7 @@ class ProductFacadeIntegrationTest @Autowired constructor(
     private val cacheTemplate: CacheTemplate,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
+    private val redisTemplate: RedisTemplate<String, String>,
 ) {
     @Autowired
     private lateinit var applicationEvents: ApplicationEvents
@@ -60,6 +63,31 @@ class ProductFacadeIntegrationTest @Autowired constructor(
 
             // then
             assertThat(result.productId).isEqualTo(product.id)
+            assertThat(result.rank).isNull() // 랭킹이 없으면 null
+        }
+
+        @Test
+        @DisplayName("랭킹 데이터가 있으면 rank 필드에 순위가 반환된다")
+        fun `return rank when product has ranking data`() {
+            // given
+            val product1 = createProduct(name = "1등 상품")
+            val product2 = createProduct(name = "2등 상품")
+            val product3 = createProduct(name = "3등 상품")
+
+            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            redisTemplate.opsForZSet().add(bucketKey, product1.id.toString(), 100.0)
+            redisTemplate.opsForZSet().add(bucketKey, product2.id.toString(), 80.0)
+            redisTemplate.opsForZSet().add(bucketKey, product3.id.toString(), 60.0)
+
+            // when
+            val result1 = productFacade.findProductById(product1.id)
+            val result2 = productFacade.findProductById(product2.id)
+            val result3 = productFacade.findProductById(product3.id)
+
+            // then
+            assertThat(result1.rank).isEqualTo(1)
+            assertThat(result2.rank).isEqualTo(2)
+            assertThat(result3.rank).isEqualTo(3)
         }
 
         @Test

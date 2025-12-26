@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.loopers.cache.CacheTemplate
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductViewedEventV1
+import com.loopers.domain.ranking.ProductRankingReader
+import com.loopers.domain.ranking.RankingKeyGenerator
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
@@ -14,6 +16,7 @@ class ProductFacade(
     private val productService: ProductService,
     private val cacheTemplate: CacheTemplate,
     private val eventPublisher: ApplicationEventPublisher,
+    private val productRankingReader: ProductRankingReader,
 ) {
     companion object {
         private val TYPE_CACHED_PRODUCT_DETAIL_V1 = object : TypeReference<CachedProductDetailV1>() {}
@@ -33,9 +36,12 @@ class ProductFacade(
             view
         }
 
+        val bucketKey = RankingKeyGenerator.currentBucketKey()
+        val rank = productRankingReader.getRankByProductId(bucketKey, id)
+
         eventPublisher.publishEvent(ProductViewedEventV1.create(id, userId))
 
-        return ProductInfo.FindProductById.from(productView)
+        return ProductInfo.FindProductById.from(productView, rank)
     }
 
     fun findProducts(criteria: ProductCriteria.FindProducts): ProductInfo.FindProducts {
