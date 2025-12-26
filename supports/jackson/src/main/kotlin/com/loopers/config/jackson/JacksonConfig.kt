@@ -2,6 +2,7 @@ package com.loopers.config.jackson
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import tools.jackson.core.util.DefaultPrettyPrinter
 import tools.jackson.databind.DeserializationFeature
 import tools.jackson.databind.cfg.DateTimeFeature
@@ -18,6 +19,7 @@ import tools.jackson.module.kotlin.kotlinModule
 class JacksonConfig {
 
     @Bean
+    @Primary
     fun jsonMapper(): JsonMapper = JsonMapper.builder()
         .addModule(kotlinModule())
         .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)

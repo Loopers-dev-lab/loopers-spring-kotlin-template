@@ -1,8 +1,5 @@
 package com.loopers.interfaces.api
 
-import tools.jackson.databind.DatabindException
-import tools.jackson.databind.exc.InvalidFormatException
-import tools.jackson.databind.exc.MismatchedInputException
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
@@ -14,6 +11,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.server.ServerWebInputException
 import org.springframework.web.servlet.resource.NoResourceFoundException
+import tools.jackson.databind.DatabindException
+import tools.jackson.databind.exc.InvalidFormatException
+import tools.jackson.databind.exc.MismatchedInputException
 
 @RestControllerAdvice
 class ApiControllerAdvice {
@@ -63,7 +63,9 @@ class ApiControllerAdvice {
             }
 
             is MismatchedInputException -> {
-                "필수 필드가 누락되었거나 타입이 일치하지 않습니다: ${rootCause.message}"
+                val fieldPath = rootCause.path.joinToString(".") { it.propertyName ?: "[${it.index}]" }
+                val fieldInfo = if (fieldPath.isNotEmpty()) "'$fieldPath' 필드: " else ""
+                "${fieldInfo}필수 필드가 누락되었거나 타입이 일치하지 않습니다."
             }
 
             is DatabindException -> {

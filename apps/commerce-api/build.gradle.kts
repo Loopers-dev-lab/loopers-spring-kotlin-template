@@ -9,17 +9,6 @@ kotlin {
     }
 }
 
-configurations.all {
-    resolutionStrategy {
-        eachDependency {
-            if (requested.group == "io.github.resilience4j") {
-                useVersion("2.3.0")
-                because("Force resilience4j version to 2.3.0 to avoid Spring Cloud BOM downgrade")
-            }
-        }
-    }
-}
-
 dependencies {
     val queryDslVersion: String by project
 
@@ -40,12 +29,12 @@ dependencies {
     // retry & resilience
     implementation("org.springframework.retry:spring-retry")
     implementation("org.springframework:spring-aspects")
-    implementation("io.github.resilience4j:resilience4j-spring-boot3:2.3.0")
-    implementation("io.github.resilience4j:resilience4j-rxjava3:2.3.0")
+    implementation("io.github.resilience4j:resilience4j-spring-boot3")
+    implementation("io.github.resilience4j:resilience4j-rxjava3")
     implementation("org.springframework.boot:spring-boot-starter-aspectj")
 
     // feign client
-    implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.3.0")
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
 
     // kafka (Producer only - Consumer는 commerce-streamer에서 처리)
     implementation("org.springframework.kafka:spring-kafka")
