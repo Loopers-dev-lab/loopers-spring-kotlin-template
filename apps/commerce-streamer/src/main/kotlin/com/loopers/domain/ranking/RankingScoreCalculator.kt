@@ -6,6 +6,7 @@ import com.loopers.domain.event.like.ProductUnlikedEvent
 import com.loopers.domain.order.event.OrderCreatedEvent
 import com.loopers.domain.order.event.OrderItemDto
 import com.loopers.domain.product.event.ProductViewedEvent
+import org.slf4j.LoggerFactory
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.stereotype.Component
 import kotlin.math.ln
@@ -14,6 +15,7 @@ import kotlin.math.ln
 class RankingScoreCalculator(
     private val weights: RankingWeights
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     fun calculateScore(event: DomainEvent): Double {
         return when (event) {
             is ProductViewedEvent -> weights.view
@@ -36,6 +38,7 @@ class RankingScoreCalculator(
             try {
                 calculateScore(it)
             } catch (e: IllegalArgumentException) {
+                logger.debug("배치 스코어 계산에서 제외된 이벤트: ${it.eventType}", e)
                 0.0
             }
         }

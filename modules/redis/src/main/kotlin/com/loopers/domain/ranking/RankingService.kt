@@ -91,9 +91,13 @@ class RankingService(
         val rangeWithScores = zSetOps.reverseRangeWithScores(key, start, end)
             ?: return emptyList()
 
-        return rangeWithScores.map { typedTuple ->
+        return rangeWithScores.mapNotNull { typedTuple ->
             val member = typedTuple.value ?: ""
-            val productId = member.removePrefix("product:").toLongOrNull() ?: 0L
+            val productId = member.removePrefix("product:").toLongOrNull()
+            if (productId == null) {
+                logger.warn("잘못된 랭킹 member 형식: member=$member")
+                return@mapNotNull null
+            }
             val score = typedTuple.score ?: 0.0
             productId to score
         }
