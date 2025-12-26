@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.infrastructure.product.ProductStatisticJpaRepository
-import com.loopers.interfaces.consumer.product.event.OrderPaidEventPayload
+import com.loopers.domain.product.event.OrderPaidEvent
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
@@ -57,7 +57,7 @@ class ProductOrderEventConsumerIntegrationTest @Autowired constructor(
         val envelope = createOrderPaidEnvelope(
             aggregateId = "order-1",
             orderItems = listOf(
-                OrderPaidEventPayload.OrderItem(productId = 100L, quantity = 3),
+                OrderPaidEvent.OrderItem(productId = 100L, quantity = 3),
             ),
         )
 
@@ -81,11 +81,11 @@ class ProductOrderEventConsumerIntegrationTest @Autowired constructor(
 
         val envelope1 = createOrderPaidEnvelope(
             aggregateId = "order-1",
-            orderItems = listOf(OrderPaidEventPayload.OrderItem(productId = 100L, quantity = 2)),
+            orderItems = listOf(OrderPaidEvent.OrderItem(productId = 100L, quantity = 2)),
         )
         val envelope2 = createOrderPaidEnvelope(
             aggregateId = "order-2",
-            orderItems = listOf(OrderPaidEventPayload.OrderItem(productId = 200L, quantity = 3)),
+            orderItems = listOf(OrderPaidEvent.OrderItem(productId = 200L, quantity = 3)),
         )
 
         // when
@@ -163,9 +163,9 @@ class ProductOrderEventConsumerIntegrationTest @Autowired constructor(
 
     private fun createOrderPaidEnvelope(
         aggregateId: String,
-        orderItems: List<OrderPaidEventPayload.OrderItem>,
+        orderItems: List<OrderPaidEvent.OrderItem>,
     ): CloudEventEnvelope {
-        val payload = OrderPaidEventPayload(
+        val payload = OrderPaidEvent(
             orderId = aggregateId.hashCode().toLong(),
             orderItems = orderItems,
         )

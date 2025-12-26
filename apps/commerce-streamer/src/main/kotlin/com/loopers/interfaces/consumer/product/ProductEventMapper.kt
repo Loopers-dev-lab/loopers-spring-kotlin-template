@@ -4,11 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.domain.product.UpdateLikeCountCommand
 import com.loopers.domain.product.UpdateSalesCountCommand
 import com.loopers.domain.product.UpdateViewCountCommand
+import com.loopers.domain.product.event.LikeEvent
+import com.loopers.domain.product.event.OrderPaidEvent
+import com.loopers.domain.product.event.ProductViewedEvent
+import com.loopers.domain.product.event.StockDepletedEvent
 import com.loopers.eventschema.CloudEventEnvelope
-import com.loopers.interfaces.consumer.product.event.LikeEventPayload
-import com.loopers.interfaces.consumer.product.event.OrderPaidEventPayload
-import com.loopers.interfaces.consumer.product.event.ProductViewedEventPayload
-import com.loopers.interfaces.consumer.product.event.StockDepletedEventPayload
 import org.springframework.stereotype.Component
 
 /**
@@ -30,7 +30,7 @@ class ProductEventMapper(
      */
     fun toLikeCommand(envelopes: List<CloudEventEnvelope>): UpdateLikeCountCommand {
         val items = envelopes.map { envelope ->
-            val payload = objectMapper.readValue(envelope.payload, LikeEventPayload::class.java)
+            val payload = objectMapper.readValue(envelope.payload, LikeEvent::class.java)
             val type = when (envelope.type) {
                 "loopers.like.created.v1" -> UpdateLikeCountCommand.LikeType.CREATED
                 "loopers.like.canceled.v1" -> UpdateLikeCountCommand.LikeType.CANCELED
@@ -49,7 +49,7 @@ class ProductEventMapper(
      */
     fun toSalesCommand(envelopes: List<CloudEventEnvelope>): UpdateSalesCountCommand {
         val items = envelopes.flatMap { envelope ->
-            val payload = objectMapper.readValue(envelope.payload, OrderPaidEventPayload::class.java)
+            val payload = objectMapper.readValue(envelope.payload, OrderPaidEvent::class.java)
             payload.orderItems.map { UpdateSalesCountCommand.Item(it.productId, it.quantity) }
         }
         return UpdateSalesCountCommand(items)
@@ -63,7 +63,7 @@ class ProductEventMapper(
      */
     fun toViewCommand(envelopes: List<CloudEventEnvelope>): UpdateViewCountCommand {
         val items = envelopes.map { envelope ->
-            val payload = objectMapper.readValue(envelope.payload, ProductViewedEventPayload::class.java)
+            val payload = objectMapper.readValue(envelope.payload, ProductViewedEvent::class.java)
             UpdateViewCountCommand.Item(payload.productId)
         }
         return UpdateViewCountCommand(items)
@@ -85,7 +85,7 @@ class ProductEventMapper(
      * @return productId - 캐시 무효화 대상
      */
     fun toStockDepletedProductId(envelope: CloudEventEnvelope): Long {
-        val payload = objectMapper.readValue(envelope.payload, StockDepletedEventPayload::class.java)
+        val payload = objectMapper.readValue(envelope.payload, StockDepletedEvent::class.java)
         return payload.productId
     }
 
@@ -97,7 +97,7 @@ class ProductEventMapper(
      * @throws IllegalArgumentException 알 수 없는 like 이벤트 타입인 경우
      */
     fun toLikeItem(envelope: CloudEventEnvelope): UpdateLikeCountCommand.Item {
-        val payload = objectMapper.readValue(envelope.payload, LikeEventPayload::class.java)
+        val payload = objectMapper.readValue(envelope.payload, LikeEvent::class.java)
         val type = when (envelope.type) {
             "loopers.like.created.v1" -> UpdateLikeCountCommand.LikeType.CREATED
             "loopers.like.canceled.v1" -> UpdateLikeCountCommand.LikeType.CANCELED
@@ -113,7 +113,7 @@ class ProductEventMapper(
      * @return UpdateSalesCountCommand.Item 목록 - 해당 주문의 orderItems 정보 포함
      */
     fun toSalesItems(envelope: CloudEventEnvelope): List<UpdateSalesCountCommand.Item> {
-        val payload = objectMapper.readValue(envelope.payload, OrderPaidEventPayload::class.java)
+        val payload = objectMapper.readValue(envelope.payload, OrderPaidEvent::class.java)
         return payload.orderItems.map { UpdateSalesCountCommand.Item(it.productId, it.quantity) }
     }
 }

@@ -6,7 +6,7 @@ import com.loopers.application.product.ProductCacheKeys
 import com.loopers.cache.CacheTemplate
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.infrastructure.idempotency.EventHandledJpaRepository
-import com.loopers.interfaces.consumer.product.event.StockDepletedEventPayload
+import com.loopers.domain.product.event.StockDepletedEvent
 import com.loopers.support.idempotency.EventHandled
 import com.loopers.support.idempotency.EventHandledRepository
 import com.loopers.utils.DatabaseCleanUp
@@ -160,7 +160,7 @@ class ProductStockEventConsumerIdempotencyIntegrationTest @Autowired constructor
         eventId: String,
         productId: Long,
     ): CloudEventEnvelope {
-        val payload = StockDepletedEventPayload(productId = productId)
+        val payload = StockDepletedEvent(productId = productId)
         return CloudEventEnvelope(
             id = eventId,
             type = "loopers.stock.depleted.v1",

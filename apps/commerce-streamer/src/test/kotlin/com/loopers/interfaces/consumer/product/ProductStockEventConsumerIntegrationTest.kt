@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.application.product.ProductCacheKeys
 import com.loopers.cache.CacheTemplate
 import com.loopers.eventschema.CloudEventEnvelope
-import com.loopers.interfaces.consumer.product.event.StockDepletedEventPayload
+import com.loopers.domain.product.event.StockDepletedEvent
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
 import org.assertj.core.api.Assertions.assertThat
@@ -193,7 +193,7 @@ class ProductStockEventConsumerIntegrationTest @Autowired constructor(
         eventId: String,
         productId: Long,
     ): CloudEventEnvelope {
-        val payload = StockDepletedEventPayload(productId = productId)
+        val payload = StockDepletedEvent(productId = productId)
         return CloudEventEnvelope(
             id = eventId,
             type = "loopers.stock.depleted.v1",

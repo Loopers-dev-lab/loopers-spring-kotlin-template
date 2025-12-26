@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.domain.product.ProductStatistic
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.infrastructure.product.ProductStatisticJpaRepository
-import com.loopers.interfaces.consumer.product.event.LikeEventPayload
+import com.loopers.domain.product.event.LikeEvent
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
@@ -209,7 +209,7 @@ class ProductLikeEventConsumerIntegrationTest @Autowired constructor(
         productId: Long,
         userId: Long,
     ): CloudEventEnvelope {
-        val payload = LikeEventPayload(productId = productId, userId = userId)
+        val payload = LikeEvent(productId = productId, userId = userId)
         return CloudEventEnvelope(
             id = eventId,
             type = type,

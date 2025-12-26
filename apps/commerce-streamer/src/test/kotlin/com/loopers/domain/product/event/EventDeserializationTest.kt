@@ -1,5 +1,6 @@
-package com.loopers.interfaces.consumer.product.event
+package com.loopers.domain.product.event
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -9,8 +10,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
-@DisplayName("New Event Payloads (Simplified) Unit Tests")
-class NewEventPayloadsTest {
+@DisplayName("Domain Event Deserialization Unit Tests")
+class EventDeserializationTest {
 
     private lateinit var objectMapper: ObjectMapper
 
@@ -18,16 +19,18 @@ class NewEventPayloadsTest {
     fun setUp() {
         objectMapper = ObjectMapper().apply {
             registerModule(kotlinModule())
+            // JacksonConfig와 동일한 설정 - 알 수 없는 필드 무시
+            configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         }
     }
 
-    @DisplayName("LikeEventPayload deserialization")
+    @DisplayName("LikeEvent deserialization")
     @Nested
-    inner class LikeEventPayloadDeserialization {
+    inner class LikeEventDeserialization {
 
-        @DisplayName("deserializes JSON to LikeEventPayload")
+        @DisplayName("deserializes JSON to LikeEvent")
         @Test
-        fun `deserializes JSON to LikeEventPayload`() {
+        fun `deserializes JSON to LikeEvent`() {
             // given
             val json = """
                 {
@@ -37,11 +40,11 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: LikeEventPayload = objectMapper.readValue(json)
+            val event: LikeEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.productId).isEqualTo(100L)
-            assertThat(payload.userId).isEqualTo(1L)
+            assertThat(event.productId).isEqualTo(100L)
+            assertThat(event.userId).isEqualTo(1L)
         }
 
         @DisplayName("ignores extra fields in JSON")
@@ -58,21 +61,21 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: LikeEventPayload = objectMapper.readValue(json)
+            val event: LikeEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.productId).isEqualTo(200L)
-            assertThat(payload.userId).isEqualTo(2L)
+            assertThat(event.productId).isEqualTo(200L)
+            assertThat(event.userId).isEqualTo(2L)
         }
     }
 
-    @DisplayName("OrderPaidEventPayload deserialization")
+    @DisplayName("OrderPaidEvent deserialization")
     @Nested
-    inner class OrderPaidEventPayloadDeserialization {
+    inner class OrderPaidEventDeserialization {
 
-        @DisplayName("deserializes JSON to OrderPaidEventPayload")
+        @DisplayName("deserializes JSON to OrderPaidEvent")
         @Test
-        fun `deserializes JSON to OrderPaidEventPayload`() {
+        fun `deserializes JSON to OrderPaidEvent`() {
             // given
             val json = """
                 {
@@ -85,11 +88,11 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: OrderPaidEventPayload = objectMapper.readValue(json)
+            val event: OrderPaidEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.orderId).isEqualTo(1001L)
-            assertThat(payload.orderItems).hasSize(2)
+            assertThat(event.orderId).isEqualTo(1001L)
+            assertThat(event.orderItems).hasSize(2)
         }
 
         @DisplayName("OrderItem is correctly mapped")
@@ -107,13 +110,13 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: OrderPaidEventPayload = objectMapper.readValue(json)
+            val event: OrderPaidEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.orderItems[0].productId).isEqualTo(100L)
-            assertThat(payload.orderItems[0].quantity).isEqualTo(3)
-            assertThat(payload.orderItems[1].productId).isEqualTo(200L)
-            assertThat(payload.orderItems[1].quantity).isEqualTo(5)
+            assertThat(event.orderItems[0].productId).isEqualTo(100L)
+            assertThat(event.orderItems[0].quantity).isEqualTo(3)
+            assertThat(event.orderItems[1].productId).isEqualTo(200L)
+            assertThat(event.orderItems[1].quantity).isEqualTo(5)
         }
 
         @DisplayName("handles empty orderItems list")
@@ -128,10 +131,10 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: OrderPaidEventPayload = objectMapper.readValue(json)
+            val event: OrderPaidEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.orderItems).isEmpty()
+            assertThat(event.orderItems).isEmpty()
         }
 
         @DisplayName("ignores extra fields in JSON")
@@ -149,21 +152,21 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: OrderPaidEventPayload = objectMapper.readValue(json)
+            val event: OrderPaidEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.orderId).isEqualTo(1004L)
-            assertThat(payload.orderItems).hasSize(1)
+            assertThat(event.orderId).isEqualTo(1004L)
+            assertThat(event.orderItems).hasSize(1)
         }
     }
 
-    @DisplayName("ProductViewedEventPayload deserialization")
+    @DisplayName("ProductViewedEvent deserialization")
     @Nested
-    inner class ProductViewedEventPayloadDeserialization {
+    inner class ProductViewedEventDeserialization {
 
-        @DisplayName("deserializes JSON to ProductViewedEventPayload")
+        @DisplayName("deserializes JSON to ProductViewedEvent")
         @Test
-        fun `deserializes JSON to ProductViewedEventPayload`() {
+        fun `deserializes JSON to ProductViewedEvent`() {
             // given
             val json = """
                 {
@@ -173,11 +176,11 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: ProductViewedEventPayload = objectMapper.readValue(json)
+            val event: ProductViewedEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.productId).isEqualTo(500L)
-            assertThat(payload.userId).isEqualTo(10L)
+            assertThat(event.productId).isEqualTo(500L)
+            assertThat(event.userId).isEqualTo(10L)
         }
 
         @DisplayName("ignores extra fields in JSON")
@@ -193,21 +196,21 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: ProductViewedEventPayload = objectMapper.readValue(json)
+            val event: ProductViewedEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.productId).isEqualTo(600L)
-            assertThat(payload.userId).isEqualTo(20L)
+            assertThat(event.productId).isEqualTo(600L)
+            assertThat(event.userId).isEqualTo(20L)
         }
     }
 
-    @DisplayName("StockDepletedEventPayload deserialization")
+    @DisplayName("StockDepletedEvent deserialization")
     @Nested
-    inner class StockDepletedEventPayloadDeserialization {
+    inner class StockDepletedEventDeserialization {
 
-        @DisplayName("deserializes JSON to StockDepletedEventPayload")
+        @DisplayName("deserializes JSON to StockDepletedEvent")
         @Test
-        fun `deserializes JSON to StockDepletedEventPayload`() {
+        fun `deserializes JSON to StockDepletedEvent`() {
             // given
             val json = """
                 {
@@ -216,10 +219,10 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: StockDepletedEventPayload = objectMapper.readValue(json)
+            val event: StockDepletedEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.productId).isEqualTo(999L)
+            assertThat(event.productId).isEqualTo(999L)
         }
 
         @DisplayName("ignores extra fields in JSON")
@@ -234,10 +237,10 @@ class NewEventPayloadsTest {
             """.trimIndent()
 
             // when
-            val payload: StockDepletedEventPayload = objectMapper.readValue(json)
+            val event: StockDepletedEvent = objectMapper.readValue(json)
 
             // then
-            assertThat(payload.productId).isEqualTo(888L)
+            assertThat(event.productId).isEqualTo(888L)
         }
     }
 }

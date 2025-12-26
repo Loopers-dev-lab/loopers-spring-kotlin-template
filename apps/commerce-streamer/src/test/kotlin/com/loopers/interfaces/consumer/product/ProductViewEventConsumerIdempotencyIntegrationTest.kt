@@ -5,7 +5,7 @@ import com.loopers.domain.product.ProductStatistic
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.infrastructure.idempotency.EventHandledJpaRepository
 import com.loopers.infrastructure.product.ProductStatisticJpaRepository
-import com.loopers.interfaces.consumer.product.event.ProductViewedEventPayload
+import com.loopers.domain.product.event.ProductViewedEvent
 import com.loopers.support.idempotency.EventHandled
 import com.loopers.support.idempotency.EventHandledRepository
 import com.loopers.utils.DatabaseCleanUp
@@ -157,7 +157,7 @@ class ProductViewEventConsumerIdempotencyIntegrationTest @Autowired constructor(
         productId: Long,
         userId: Long,
     ): CloudEventEnvelope {
-        val payload = ProductViewedEventPayload(productId = productId, userId = userId)
+        val payload = ProductViewedEvent(productId = productId, userId = userId)
         return CloudEventEnvelope(
             id = eventId,
             type = "loopers.product.viewed.v1",

@@ -5,7 +5,7 @@ import com.loopers.domain.product.ProductStatistic
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.infrastructure.idempotency.EventHandledJpaRepository
 import com.loopers.infrastructure.product.ProductStatisticJpaRepository
-import com.loopers.interfaces.consumer.product.event.OrderPaidEventPayload
+import com.loopers.domain.product.event.OrderPaidEvent
 import com.loopers.support.idempotency.EventHandled
 import com.loopers.support.idempotency.EventHandledRepository
 import com.loopers.utils.DatabaseCleanUp
@@ -62,7 +62,7 @@ class ProductOrderEventConsumerIdempotencyIntegrationTest @Autowired constructor
         val envelope = createOrderPaidEnvelope(
             aggregateId = aggregateId,
             orderItems = listOf(
-                OrderPaidEventPayload.OrderItem(productId = 100L, quantity = orderQuantity),
+                OrderPaidEvent.OrderItem(productId = 100L, quantity = orderQuantity),
             ),
         )
         val messageJson = objectMapper.writeValueAsString(envelope)
@@ -98,7 +98,7 @@ class ProductOrderEventConsumerIdempotencyIntegrationTest @Autowired constructor
         val envelope = createOrderPaidEnvelope(
             aggregateId = aggregateId,
             orderItems = listOf(
-                OrderPaidEventPayload.OrderItem(productId = 100L, quantity = 5),
+                OrderPaidEvent.OrderItem(productId = 100L, quantity = 5),
             ),
         )
 
@@ -122,7 +122,7 @@ class ProductOrderEventConsumerIdempotencyIntegrationTest @Autowired constructor
         val envelope = createOrderPaidEnvelope(
             aggregateId = aggregateId,
             orderItems = listOf(
-                OrderPaidEventPayload.OrderItem(productId = 100L, quantity = 1),
+                OrderPaidEvent.OrderItem(productId = 100L, quantity = 1),
             ),
         )
 
@@ -155,9 +155,9 @@ class ProductOrderEventConsumerIdempotencyIntegrationTest @Autowired constructor
 
     private fun createOrderPaidEnvelope(
         aggregateId: String,
-        orderItems: List<OrderPaidEventPayload.OrderItem>,
+        orderItems: List<OrderPaidEvent.OrderItem>,
     ): CloudEventEnvelope {
-        val payload = OrderPaidEventPayload(
+        val payload = OrderPaidEvent(
             orderId = aggregateId.hashCode().toLong(),
             orderItems = orderItems,
         )
