@@ -39,9 +39,10 @@ class RankingV1Controller(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int
     ): ApiResponse<Page<RankingV1Dto.RankingResponse>> {
-        // 페이지 크기 제한 (DoS 방지)
+        // 페이지 파라미터 검증 및 제한 (DoS 방지)
+        val validPage = page.coerceAtLeast(0)
         val validSize = size.coerceIn(1, 100)
-        val pageable = PageRequest.of(page, validSize)
+        val pageable = PageRequest.of(validPage, validSize)
 
         val rankings = rankingFacade.getRankings(date, pageable)
 
