@@ -50,14 +50,14 @@ class MutableCountsTest {
     @Nested
     inner class Increment {
 
-        @DisplayName("VIEW 이벤트 타입은 views를 증가시킨다")
+        @DisplayName("VIEW 메트릭 타입은 views를 증가시킨다")
         @Test
-        fun `VIEW event type increments views`() {
+        fun `VIEW metric type increments views`() {
             // given
             val counts = MutableCounts()
 
             // when
-            counts.increment(RankingEventType.VIEW)
+            counts.increment(MetricType.VIEW)
 
             // then
             assertThat(counts.getViews()).isEqualTo(1L)
@@ -65,14 +65,14 @@ class MutableCountsTest {
             assertThat(counts.getOrderCount()).isEqualTo(0L)
         }
 
-        @DisplayName("LIKE_CREATED 이벤트 타입은 likes를 증가시킨다")
+        @DisplayName("LIKE_CREATED 메트릭 타입은 likes를 증가시킨다")
         @Test
-        fun `LIKE_CREATED event type increments likes`() {
+        fun `LIKE_CREATED metric type increments likes`() {
             // given
             val counts = MutableCounts()
 
             // when
-            counts.increment(RankingEventType.LIKE_CREATED)
+            counts.increment(MetricType.LIKE_CREATED)
 
             // then
             assertThat(counts.getLikes()).isEqualTo(1L)
@@ -80,27 +80,27 @@ class MutableCountsTest {
             assertThat(counts.getOrderCount()).isEqualTo(0L)
         }
 
-        @DisplayName("LIKE_CANCELED 이벤트 타입은 likes를 감소시킨다")
+        @DisplayName("LIKE_CANCELED 메트릭 타입은 likes를 감소시킨다")
         @Test
-        fun `LIKE_CANCELED event type decrements likes`() {
+        fun `LIKE_CANCELED metric type decrements likes`() {
             // given
             val counts = MutableCounts()
 
             // when
-            counts.increment(RankingEventType.LIKE_CANCELED)
+            counts.increment(MetricType.LIKE_CANCELED)
 
             // then
             assertThat(counts.getLikes()).isEqualTo(-1L)
         }
 
-        @DisplayName("ORDER_PAID 이벤트 타입은 orderCount를 증가시킨다")
+        @DisplayName("ORDER_PAID 메트릭 타입은 orderCount를 증가시킨다")
         @Test
-        fun `ORDER_PAID event type increments orderCount`() {
+        fun `ORDER_PAID metric type increments orderCount`() {
             // given
             val counts = MutableCounts()
 
             // when
-            counts.increment(RankingEventType.ORDER_PAID)
+            counts.increment(MetricType.ORDER_PAID)
 
             // then
             assertThat(counts.getOrderCount()).isEqualTo(1L)
@@ -115,9 +115,9 @@ class MutableCountsTest {
             val counts = MutableCounts()
 
             // when
-            repeat(5) { counts.increment(RankingEventType.VIEW) }
-            repeat(3) { counts.increment(RankingEventType.LIKE_CREATED) }
-            repeat(2) { counts.increment(RankingEventType.ORDER_PAID) }
+            repeat(5) { counts.increment(MetricType.VIEW) }
+            repeat(3) { counts.increment(MetricType.LIKE_CREATED) }
+            repeat(2) { counts.increment(MetricType.ORDER_PAID) }
 
             // then
             assertThat(counts.getViews()).isEqualTo(5L)
@@ -132,8 +132,8 @@ class MutableCountsTest {
             val counts = MutableCounts()
 
             // when
-            counts.increment(RankingEventType.LIKE_CREATED)
-            counts.increment(RankingEventType.LIKE_CANCELED)
+            counts.increment(MetricType.LIKE_CREATED)
+            counts.increment(MetricType.LIKE_CANCELED)
 
             // then
             assertThat(counts.getLikes()).isEqualTo(0L)
@@ -146,8 +146,8 @@ class MutableCountsTest {
             val counts = MutableCounts()
 
             // when
-            counts.increment(RankingEventType.LIKE_CANCELED)
-            counts.increment(RankingEventType.LIKE_CANCELED)
+            counts.increment(MetricType.LIKE_CANCELED)
+            counts.increment(MetricType.LIKE_CANCELED)
 
             // then
             assertThat(counts.getLikes()).isEqualTo(-2L)
@@ -210,10 +210,10 @@ class MutableCountsTest {
         fun `returns snapshot of current state`() {
             // given
             val counts = MutableCounts()
-            counts.increment(RankingEventType.VIEW)
-            counts.increment(RankingEventType.VIEW)
-            counts.increment(RankingEventType.LIKE_CREATED)
-            counts.increment(RankingEventType.ORDER_PAID)
+            counts.increment(MetricType.VIEW)
+            counts.increment(MetricType.VIEW)
+            counts.increment(MetricType.LIKE_CREATED)
+            counts.increment(MetricType.ORDER_PAID)
             counts.addOrderAmount(BigDecimal("500.00"))
 
             // when
@@ -231,12 +231,12 @@ class MutableCountsTest {
         fun `snapshot is immutable - changes to original do not affect snapshot`() {
             // given
             val counts = MutableCounts()
-            counts.increment(RankingEventType.VIEW)
+            counts.increment(MetricType.VIEW)
             val snapshot = counts.toSnapshot()
 
             // when - 스냅샷 생성 후 원본 변경
-            counts.increment(RankingEventType.VIEW)
-            counts.increment(RankingEventType.VIEW)
+            counts.increment(MetricType.VIEW)
+            counts.increment(MetricType.VIEW)
 
             // then - 스냅샷은 변경되지 않음
             assertThat(snapshot.views).isEqualTo(1L)
@@ -250,10 +250,10 @@ class MutableCountsTest {
             val counts = MutableCounts()
 
             // when
-            counts.increment(RankingEventType.VIEW)
+            counts.increment(MetricType.VIEW)
             val snapshot1 = counts.toSnapshot()
 
-            counts.increment(RankingEventType.VIEW)
+            counts.increment(MetricType.VIEW)
             val snapshot2 = counts.toSnapshot()
 
             // then
@@ -281,7 +281,7 @@ class MutableCountsTest {
                 executor.submit {
                     try {
                         repeat(incrementsPerThread) {
-                            counts.increment(RankingEventType.VIEW)
+                            counts.increment(MetricType.VIEW)
                         }
                     } finally {
                         latch.countDown()
@@ -312,9 +312,9 @@ class MutableCountsTest {
                     try {
                         repeat(operationsPerThread) {
                             if (threadIndex % 2 == 0) {
-                                counts.increment(RankingEventType.LIKE_CREATED)
+                                counts.increment(MetricType.LIKE_CREATED)
                             } else {
-                                counts.increment(RankingEventType.LIKE_CANCELED)
+                                counts.increment(MetricType.LIKE_CANCELED)
                             }
                         }
                     } finally {
@@ -363,7 +363,7 @@ class MutableCountsTest {
             assertThat(counts.getOrderAmount()).isEqualByComparingTo(expectedTotal)
         }
 
-        @DisplayName("동시에 여러 이벤트 타입을 처리해도 각각 정확한 카운트를 유지한다")
+        @DisplayName("동시에 여러 메트릭 타입을 처리해도 각각 정확한 카운트를 유지한다")
         @Test
         fun `concurrent mixed operations maintain correct counts`() {
             // given
@@ -377,15 +377,15 @@ class MutableCountsTest {
             repeat(threadCount) { threadIndex ->
                 executor.submit {
                     try {
-                        val eventType = when (threadIndex % 4) {
-                            0 -> RankingEventType.VIEW
-                            1 -> RankingEventType.LIKE_CREATED
-                            2 -> RankingEventType.ORDER_PAID
-                            else -> RankingEventType.LIKE_CANCELED
+                        val metricType = when (threadIndex % 4) {
+                            0 -> MetricType.VIEW
+                            1 -> MetricType.LIKE_CREATED
+                            2 -> MetricType.ORDER_PAID
+                            else -> MetricType.LIKE_CANCELED
                         }
                         repeat(operationsPerThread) {
-                            counts.increment(eventType)
-                            if (eventType == RankingEventType.ORDER_PAID) {
+                            counts.increment(metricType)
+                            if (metricType == MetricType.ORDER_PAID) {
                                 counts.addOrderAmount(BigDecimal.ONE)
                             }
                         }
@@ -428,7 +428,7 @@ class MutableCountsTest {
                 executor.submit {
                     try {
                         repeat(operationsPerThread) {
-                            counts.increment(RankingEventType.VIEW)
+                            counts.increment(MetricType.VIEW)
                         }
                     } finally {
                         latch.countDown()

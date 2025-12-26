@@ -16,13 +16,13 @@ data class AggregationKey(
 ) {
     companion object {
         /**
-         * 이벤트로부터 AggregationKey 생성
+         * 메트릭 항목으로부터 AggregationKey 생성
          * hourBucket은 occurredAt을 시간 단위로 truncate
          */
-        fun from(event: RankingEvent): AggregationKey {
+        fun from(item: AccumulateMetricCommand.Item): AggregationKey {
             return AggregationKey(
-                productId = event.productId,
-                hourBucket = event.occurredAt.truncatedTo(ChronoUnit.HOURS),
+                productId = item.productId,
+                hourBucket = item.occurredAt.truncatedTo(ChronoUnit.HOURS),
             )
         }
 

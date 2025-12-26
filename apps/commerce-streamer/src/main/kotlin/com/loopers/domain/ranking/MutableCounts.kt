@@ -18,18 +18,18 @@ class MutableCounts {
     private val orderAmount = AtomicReference(BigDecimal.ZERO)
 
     /**
-     * 이벤트 타입에 따라 해당 카운터 증가/감소
+     * 메트릭 타입에 따라 해당 카운터 증가/감소
      * - VIEW: views 증가
      * - LIKE_CREATED: likes 증가
      * - LIKE_CANCELED: likes 감소
      * - ORDER_PAID: orderCount 증가
      */
-    fun increment(eventType: RankingEventType) {
-        when (eventType) {
-            RankingEventType.VIEW -> views.incrementAndGet()
-            RankingEventType.LIKE_CREATED -> likes.incrementAndGet()
-            RankingEventType.LIKE_CANCELED -> likes.decrementAndGet()
-            RankingEventType.ORDER_PAID -> orderCount.incrementAndGet()
+    fun increment(metricType: MetricType) {
+        when (metricType) {
+            MetricType.VIEW -> views.incrementAndGet()
+            MetricType.LIKE_CREATED -> likes.incrementAndGet()
+            MetricType.LIKE_CANCELED -> likes.decrementAndGet()
+            MetricType.ORDER_PAID -> orderCount.incrementAndGet()
         }
     }
 

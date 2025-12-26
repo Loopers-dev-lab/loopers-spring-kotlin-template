@@ -2,6 +2,7 @@ package com.loopers.interfaces.consumer.ranking
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.config.kafka.KafkaConfig
+import com.loopers.domain.ranking.AccumulateMetricCommand
 import com.loopers.domain.ranking.RankingAggregationService
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.support.idempotency.EventHandledService
@@ -56,8 +57,8 @@ class RankingEventConsumer(
         if (envelope.type !in SUPPORTED_TYPES) return
         val idempotencyKey = idempotencyKeyExtractor(envelope)
         if (eventHandledService.isAlreadyHandled(idempotencyKey)) return
-        val rankingEvents = rankingEventMapper.toRankingEvents(envelope)
-        rankingEvents.forEach { rankingAggregationService.add(it) }
+        val items = rankingEventMapper.toAccumulateMetricItems(envelope)
+        rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = items))
         eventHandledService.markAsHandled(idempotencyKey)
     }
 }

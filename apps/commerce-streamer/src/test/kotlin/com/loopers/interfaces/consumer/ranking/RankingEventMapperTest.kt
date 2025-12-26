@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.loopers.domain.ranking.RankingEventType
+import com.loopers.domain.ranking.MetricType
 import com.loopers.eventschema.CloudEventEnvelope
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -33,11 +33,11 @@ class RankingEventMapperTest {
     }
 
     @Nested
-    @DisplayName("toRankingEvents - VIEW 이벤트 매핑")
-    inner class ToRankingEventsViewTest {
+    @DisplayName("toAccumulateMetricItems - VIEW 이벤트 매핑")
+    inner class ToAccumulateMetricItemsViewTest {
         @Test
-        @DisplayName("product.viewed 이벤트를 VIEW 타입의 RankingEvent로 매핑한다")
-        fun `maps product viewed event to VIEW type RankingEvent`() {
+        @DisplayName("product.viewed 이벤트를 VIEW 타입의 Item으로 매핑한다")
+        fun `maps product viewed event to VIEW type Item`() {
             // given
             val eventTime = Instant.parse("2025-01-01T10:00:00Z")
             val envelope = createEnvelope(
@@ -48,23 +48,23 @@ class RankingEventMapperTest {
             )
 
             // when
-            val events = rankingEventMapper.toRankingEvents(envelope)
+            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
 
             // then
-            assertThat(events).hasSize(1)
-            assertThat(events[0].productId).isEqualTo(100L)
-            assertThat(events[0].eventType).isEqualTo(RankingEventType.VIEW)
-            assertThat(events[0].orderAmount).isNull()
-            assertThat(events[0].occurredAt).isEqualTo(eventTime)
+            assertThat(items).hasSize(1)
+            assertThat(items[0].productId).isEqualTo(100L)
+            assertThat(items[0].metricType).isEqualTo(MetricType.VIEW)
+            assertThat(items[0].orderAmount).isNull()
+            assertThat(items[0].occurredAt).isEqualTo(eventTime)
         }
     }
 
     @Nested
-    @DisplayName("toRankingEvents - LIKE_CREATED 이벤트 매핑")
-    inner class ToRankingEventsLikeCreatedTest {
+    @DisplayName("toAccumulateMetricItems - LIKE_CREATED 이벤트 매핑")
+    inner class ToAccumulateMetricItemsLikeCreatedTest {
         @Test
-        @DisplayName("like.created 이벤트를 LIKE_CREATED 타입의 RankingEvent로 매핑한다")
-        fun `maps like created event to LIKE_CREATED type RankingEvent`() {
+        @DisplayName("like.created 이벤트를 LIKE_CREATED 타입의 Item으로 매핑한다")
+        fun `maps like created event to LIKE_CREATED type Item`() {
             // given
             val eventTime = Instant.parse("2025-01-01T10:00:00Z")
             val envelope = createEnvelope(
@@ -75,23 +75,23 @@ class RankingEventMapperTest {
             )
 
             // when
-            val events = rankingEventMapper.toRankingEvents(envelope)
+            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
 
             // then
-            assertThat(events).hasSize(1)
-            assertThat(events[0].productId).isEqualTo(200L)
-            assertThat(events[0].eventType).isEqualTo(RankingEventType.LIKE_CREATED)
-            assertThat(events[0].orderAmount).isNull()
-            assertThat(events[0].occurredAt).isEqualTo(eventTime)
+            assertThat(items).hasSize(1)
+            assertThat(items[0].productId).isEqualTo(200L)
+            assertThat(items[0].metricType).isEqualTo(MetricType.LIKE_CREATED)
+            assertThat(items[0].orderAmount).isNull()
+            assertThat(items[0].occurredAt).isEqualTo(eventTime)
         }
     }
 
     @Nested
-    @DisplayName("toRankingEvents - LIKE_CANCELED 이벤트 매핑")
-    inner class ToRankingEventsLikeCanceledTest {
+    @DisplayName("toAccumulateMetricItems - LIKE_CANCELED 이벤트 매핑")
+    inner class ToAccumulateMetricItemsLikeCanceledTest {
         @Test
-        @DisplayName("like.canceled 이벤트를 LIKE_CANCELED 타입의 RankingEvent로 매핑한다")
-        fun `maps like canceled event to LIKE_CANCELED type RankingEvent`() {
+        @DisplayName("like.canceled 이벤트를 LIKE_CANCELED 타입의 Item으로 매핑한다")
+        fun `maps like canceled event to LIKE_CANCELED type Item`() {
             // given
             val eventTime = Instant.parse("2025-01-01T10:00:00Z")
             val envelope = createEnvelope(
@@ -102,23 +102,23 @@ class RankingEventMapperTest {
             )
 
             // when
-            val events = rankingEventMapper.toRankingEvents(envelope)
+            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
 
             // then
-            assertThat(events).hasSize(1)
-            assertThat(events[0].productId).isEqualTo(300L)
-            assertThat(events[0].eventType).isEqualTo(RankingEventType.LIKE_CANCELED)
-            assertThat(events[0].orderAmount).isNull()
-            assertThat(events[0].occurredAt).isEqualTo(eventTime)
+            assertThat(items).hasSize(1)
+            assertThat(items[0].productId).isEqualTo(300L)
+            assertThat(items[0].metricType).isEqualTo(MetricType.LIKE_CANCELED)
+            assertThat(items[0].orderAmount).isNull()
+            assertThat(items[0].occurredAt).isEqualTo(eventTime)
         }
     }
 
     @Nested
-    @DisplayName("toRankingEvents - ORDER_PAID 이벤트 매핑")
-    inner class ToRankingEventsOrderPaidTest {
+    @DisplayName("toAccumulateMetricItems - ORDER_PAID 이벤트 매핑")
+    inner class ToAccumulateMetricItemsOrderPaidTest {
         @Test
-        @DisplayName("order.paid 이벤트를 ORDER_PAID 타입의 RankingEvent 목록으로 매핑한다")
-        fun `maps order paid event to list of ORDER_PAID type RankingEvents`() {
+        @DisplayName("order.paid 이벤트를 ORDER_PAID 타입의 Item 목록으로 매핑한다")
+        fun `maps order paid event to list of ORDER_PAID type Items`() {
             // given
             val eventTime = Instant.parse("2025-01-01T10:00:00Z")
             val envelope = createEnvelope(
@@ -129,21 +129,21 @@ class RankingEventMapperTest {
             )
 
             // when
-            val events = rankingEventMapper.toRankingEvents(envelope)
+            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
 
             // then
-            assertThat(events).hasSize(2)
+            assertThat(items).hasSize(2)
 
             // totalAmount 30000 / 2 items = 15000 per item
-            assertThat(events[0].productId).isEqualTo(100L)
-            assertThat(events[0].eventType).isEqualTo(RankingEventType.ORDER_PAID)
-            assertThat(events[0].orderAmount).isEqualByComparingTo(BigDecimal("15000"))
-            assertThat(events[0].occurredAt).isEqualTo(eventTime)
+            assertThat(items[0].productId).isEqualTo(100L)
+            assertThat(items[0].metricType).isEqualTo(MetricType.ORDER_PAID)
+            assertThat(items[0].orderAmount).isEqualByComparingTo(BigDecimal("15000"))
+            assertThat(items[0].occurredAt).isEqualTo(eventTime)
 
-            assertThat(events[1].productId).isEqualTo(200L)
-            assertThat(events[1].eventType).isEqualTo(RankingEventType.ORDER_PAID)
-            assertThat(events[1].orderAmount).isEqualByComparingTo(BigDecimal("15000"))
-            assertThat(events[1].occurredAt).isEqualTo(eventTime)
+            assertThat(items[1].productId).isEqualTo(200L)
+            assertThat(items[1].metricType).isEqualTo(MetricType.ORDER_PAID)
+            assertThat(items[1].orderAmount).isEqualByComparingTo(BigDecimal("15000"))
+            assertThat(items[1].occurredAt).isEqualTo(eventTime)
         }
 
         @Test
@@ -159,13 +159,13 @@ class RankingEventMapperTest {
             )
 
             // when
-            val events = rankingEventMapper.toRankingEvents(envelope)
+            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
 
             // then
-            assertThat(events).hasSize(1)
-            assertThat(events[0].productId).isEqualTo(100L)
-            assertThat(events[0].eventType).isEqualTo(RankingEventType.ORDER_PAID)
-            assertThat(events[0].orderAmount).isEqualByComparingTo(BigDecimal("50000"))
+            assertThat(items).hasSize(1)
+            assertThat(items[0].productId).isEqualTo(100L)
+            assertThat(items[0].metricType).isEqualTo(MetricType.ORDER_PAID)
+            assertThat(items[0].orderAmount).isEqualByComparingTo(BigDecimal("50000"))
         }
 
         @Test
@@ -179,10 +179,10 @@ class RankingEventMapperTest {
             )
 
             // when
-            val events = rankingEventMapper.toRankingEvents(envelope)
+            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
 
             // then
-            assertThat(events).isEmpty()
+            assertThat(items).isEmpty()
         }
 
         @Test
@@ -198,21 +198,21 @@ class RankingEventMapperTest {
             )
 
             // when
-            val events = rankingEventMapper.toRankingEvents(envelope)
+            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
 
             // then
-            assertThat(events).hasSize(3)
+            assertThat(items).hasSize(3)
             // 10000 / 3 = 3333.333...
             val expectedAmount = BigDecimal("10000").divide(BigDecimal("3"), 2, java.math.RoundingMode.HALF_UP)
-            events.forEach { event ->
-                assertThat(event.orderAmount).isEqualByComparingTo(expectedAmount)
+            items.forEach { item ->
+                assertThat(item.orderAmount).isEqualByComparingTo(expectedAmount)
             }
         }
     }
 
     @Nested
-    @DisplayName("toRankingEvents - 알 수 없는 이벤트 타입")
-    inner class ToRankingEventsUnknownTypeTest {
+    @DisplayName("toAccumulateMetricItems - 알 수 없는 이벤트 타입")
+    inner class ToAccumulateMetricItemsUnknownTypeTest {
         @Test
         @DisplayName("알 수 없는 이벤트 타입에서 예외가 발생한다")
         fun `throws exception for unknown event type`() {
@@ -224,7 +224,7 @@ class RankingEventMapperTest {
             )
 
             // when & then
-            assertThatThrownBy { rankingEventMapper.toRankingEvents(envelope) }
+            assertThatThrownBy { rankingEventMapper.toAccumulateMetricItems(envelope) }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("Unknown event type")
                 .hasMessageContaining("loopers.unknown.event.v1")

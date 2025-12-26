@@ -90,56 +90,56 @@ class AggregationKeyTest {
     @Nested
     inner class From {
 
-        @DisplayName("RankingEvent로부터 AggregationKey를 생성한다")
+        @DisplayName("AccumulateMetricCommand.Item으로부터 AggregationKey를 생성한다")
         @Test
-        fun `creates AggregationKey from RankingEvent`() {
+        fun `creates AggregationKey from AccumulateMetricCommand Item`() {
             // given
-            val event = RankingEvent(
+            val item = AccumulateMetricCommand.Item(
                 productId = 100L,
-                eventType = RankingEventType.VIEW,
+                metricType = MetricType.VIEW,
                 orderAmount = null,
                 occurredAt = Instant.parse("2025-01-15T14:30:45Z"),
             )
 
             // when
-            val key = AggregationKey.from(event)
+            val key = AggregationKey.from(item)
 
             // then
             assertThat(key.productId).isEqualTo(100L)
             assertThat(key.hourBucket).isEqualTo(Instant.parse("2025-01-15T14:00:00Z"))
         }
 
-        @DisplayName("이벤트의 occurredAt이 시간 단위로 truncate된다")
+        @DisplayName("항목의 occurredAt이 시간 단위로 truncate된다")
         @Test
         fun `truncates occurredAt to hour`() {
             // given
-            val event = RankingEvent(
+            val item = AccumulateMetricCommand.Item(
                 productId = 1L,
-                eventType = RankingEventType.LIKE_CREATED,
+                metricType = MetricType.LIKE_CREATED,
                 orderAmount = null,
                 occurredAt = Instant.parse("2025-01-15T14:59:59.999Z"),
             )
 
             // when
-            val key = AggregationKey.from(event)
+            val key = AggregationKey.from(item)
 
             // then
             assertThat(key.hourBucket).isEqualTo(Instant.parse("2025-01-15T14:00:00Z"))
         }
 
-        @DisplayName("정각 시간의 이벤트는 해당 시간 버킷에 포함된다")
+        @DisplayName("정각 시간의 항목은 해당 시간 버킷에 포함된다")
         @Test
-        fun `event at exact hour belongs to that hour bucket`() {
+        fun `item at exact hour belongs to that hour bucket`() {
             // given
-            val event = RankingEvent(
+            val item = AccumulateMetricCommand.Item(
                 productId = 1L,
-                eventType = RankingEventType.VIEW,
+                metricType = MetricType.VIEW,
                 orderAmount = null,
                 occurredAt = Instant.parse("2025-01-15T15:00:00Z"),
             )
 
             // when
-            val key = AggregationKey.from(event)
+            val key = AggregationKey.from(item)
 
             // then
             assertThat(key.hourBucket).isEqualTo(Instant.parse("2025-01-15T15:00:00Z"))
@@ -198,20 +198,20 @@ class AggregationKeyTest {
     @Nested
     inner class HourBucketTruncation {
 
-        @DisplayName("14:59:58 이벤트가 15:00:02에 flush되어도 14시 버킷에 집계된다")
+        @DisplayName("14:59:58 항목이 15:00:02에 flush되어도 14시 버킷에 집계된다")
         @Test
-        fun `event at 14_59_58 flushed at 15_00_02 goes to 14h bucket`() {
-            // given - 14:59:58에 발생한 이벤트
-            val eventOccurredAt = Instant.parse("2025-01-15T14:59:58Z")
-            val event = RankingEvent(
+        fun `item at 14_59_58 flushed at 15_00_02 goes to 14h bucket`() {
+            // given - 14:59:58에 발생한 항목
+            val itemOccurredAt = Instant.parse("2025-01-15T14:59:58Z")
+            val item = AccumulateMetricCommand.Item(
                 productId = 1L,
-                eventType = RankingEventType.VIEW,
+                metricType = MetricType.VIEW,
                 orderAmount = null,
-                occurredAt = eventOccurredAt,
+                occurredAt = itemOccurredAt,
             )
 
             // when - flush 시점(15:00:02)과 무관하게 occurredAt 기준으로 버킷 결정
-            val key = AggregationKey.from(event)
+            val key = AggregationKey.from(item)
 
             // then
             assertThat(key.hourBucket).isEqualTo(Instant.parse("2025-01-15T14:00:00Z"))

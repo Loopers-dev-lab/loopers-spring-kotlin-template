@@ -33,20 +33,22 @@ class RankingAggregationService(
     private val bufferRef = AtomicReference(ConcurrentHashMap<AggregationKey, MutableCounts>())
 
     /**
-     * 이벤트를 내부 버퍼에 추가
+     * 메트릭을 내부 버퍼에 축적
      *
-     * 시간 버킷은 이벤트의 occurredAt을 시간 단위로 truncate하여 결정
-     * 14:59:58에 발생한 이벤트가 15:00:02에 flush되어도 14:00 버킷에 올바르게 집계됨
+     * 시간 버킷은 항목의 occurredAt을 시간 단위로 truncate하여 결정
+     * 14:59:58에 발생한 항목이 15:00:02에 flush되어도 14:00 버킷에 올바르게 집계됨
      */
-    fun add(event: RankingEvent) {
-        val key = AggregationKey.from(event)
+    fun accumulateMetric(command: AccumulateMetricCommand) {
+        command.items.forEach { item ->
+            val key = AggregationKey.from(item)
 
-        bufferRef.get()
-            .computeIfAbsent(key) { MutableCounts() }
-            .apply {
-                increment(event.eventType)
-                event.orderAmount?.let { addOrderAmount(it) }
-            }
+            bufferRef.get()
+                .computeIfAbsent(key) { MutableCounts() }
+                .apply {
+                    increment(item.metricType)
+                    item.orderAmount?.let { addOrderAmount(it) }
+                }
+        }
     }
 
     /**

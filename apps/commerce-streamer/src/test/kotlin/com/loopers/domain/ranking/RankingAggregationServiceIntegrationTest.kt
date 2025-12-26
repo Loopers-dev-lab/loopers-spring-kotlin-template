@@ -51,21 +51,25 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
     @Nested
     inner class FullFlow {
 
-        @DisplayName("이벤트 추가 후 flush하면 DB와 Redis에 모두 저장된다")
+        @DisplayName("메트릭 추가 후 flush하면 DB와 Redis에 모두 저장된다")
         @Test
-        fun `add and flush persists to both DB and Redis`() {
+        fun `accumulateMetric and flush persists to both DB and Redis`() {
             // given
             val productId = 1L
             val occurredAt = Instant.now()
-            val event = RankingEvent(
-                productId = productId,
-                eventType = RankingEventType.VIEW,
-                orderAmount = null,
-                occurredAt = occurredAt,
+            val command = AccumulateMetricCommand(
+                items = listOf(
+                    AccumulateMetricCommand.Item(
+                        productId = productId,
+                        metricType = MetricType.VIEW,
+                        orderAmount = null,
+                        occurredAt = occurredAt,
+                    ),
+                ),
             )
 
             // when
-            rankingAggregationService.add(event)
+            rankingAggregationService.accumulateMetric(command)
             rankingAggregationService.flush()
 
             // then - DB 검증
@@ -80,26 +84,38 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             assertThat(score).isEqualTo(0.10) // 1 view * 0.10 viewWeight
         }
 
-        @DisplayName("여러 이벤트를 누적한 후 flush하면 합계가 저장된다")
+        @DisplayName("여러 메트릭을 누적한 후 flush하면 합계가 저장된다")
         @Test
-        fun `multiple events are accumulated before flush`() {
+        fun `multiple metrics are accumulated before flush`() {
             // given
             val productId = 1L
             val occurredAt = Instant.now()
 
             // 3 views, 2 likes, 1 order with 1000 amount
             repeat(3) {
-                rankingAggregationService.add(
-                    RankingEvent(productId = productId, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = occurredAt),
+                rankingAggregationService.accumulateMetric(
+                    AccumulateMetricCommand(
+                        items = listOf(
+                            AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
+                        ),
+                    ),
                 )
             }
             repeat(2) {
-                rankingAggregationService.add(
-                    RankingEvent(productId = productId, eventType = RankingEventType.LIKE_CREATED, orderAmount = null, occurredAt = occurredAt),
+                rankingAggregationService.accumulateMetric(
+                    AccumulateMetricCommand(
+                        items = listOf(
+                            AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CREATED, orderAmount = null, occurredAt = occurredAt),
+                        ),
+                    ),
                 )
             }
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.ORDER_PAID, orderAmount = BigDecimal("1000.00"), occurredAt = occurredAt),
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.ORDER_PAID, orderAmount = BigDecimal("1000.00"), occurredAt = occurredAt),
+                    ),
+                ),
             )
 
             // when
@@ -120,23 +136,23 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             assertThat(score).isEqualTo(600.70)
         }
 
-        @DisplayName("여러 상품의 이벤트가 각각 저장된다")
+        @DisplayName("여러 상품의 메트릭이 각각 저장된다")
         @Test
-        fun `events for multiple products are stored separately`() {
+        fun `metrics for multiple products are stored separately`() {
             // given
             val occurredAt = Instant.now()
-            val product1Events = listOf(
-                RankingEvent(productId = 1L, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = occurredAt),
-                RankingEvent(productId = 1L, eventType = RankingEventType.LIKE_CREATED, orderAmount = null, occurredAt = occurredAt),
+            val product1Items = listOf(
+                AccumulateMetricCommand.Item(productId = 1L, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
+                AccumulateMetricCommand.Item(productId = 1L, metricType = MetricType.LIKE_CREATED, orderAmount = null, occurredAt = occurredAt),
             )
-            val product2Events = listOf(
-                RankingEvent(productId = 2L, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = occurredAt),
-                RankingEvent(productId = 2L, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = occurredAt),
+            val product2Items = listOf(
+                AccumulateMetricCommand.Item(productId = 2L, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
+                AccumulateMetricCommand.Item(productId = 2L, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
             )
 
             // when
-            product1Events.forEach { rankingAggregationService.add(it) }
-            product2Events.forEach { rankingAggregationService.add(it) }
+            rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = product1Items))
+            rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = product2Items))
             rankingAggregationService.flush()
 
             // then - DB 검증
@@ -158,16 +174,20 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             assertThat(zSetOps.score(bucketKey, "2")).isEqualTo(0.20)
         }
 
-        @DisplayName("flush 후 새 이벤트는 새 버퍼에 저장된다")
+        @DisplayName("flush 후 새 메트릭은 새 버퍼에 저장된다")
         @Test
-        fun `events after flush go to new buffer`() {
+        fun `metrics after flush go to new buffer`() {
             // given
             val productId = 1L
             val occurredAt = Instant.now()
 
-            // when - 첫 번째 이벤트 추가 및 flush
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = occurredAt),
+            // when - 첫 번째 메트릭 추가 및 flush
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
+                    ),
+                ),
             )
             rankingAggregationService.flush()
 
@@ -176,9 +196,13 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             assertThat(metrics).hasSize(1)
             assertThat(metrics[0].viewCount).isEqualTo(1L)
 
-            // when - 두 번째 이벤트 추가 및 flush
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = occurredAt),
+            // when - 두 번째 메트릭 추가 및 flush
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
+                    ),
+                ),
             )
             rankingAggregationService.flush()
 
@@ -197,19 +221,27 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
     @Nested
     inner class HourBucketHandling {
 
-        @DisplayName("다른 시간 버킷의 이벤트는 개별 레코드로 저장된다")
+        @DisplayName("다른 시간 버킷의 메트릭은 개별 레코드로 저장된다")
         @Test
-        fun `events in different hour buckets are stored separately`() {
+        fun `metrics in different hour buckets are stored separately`() {
             // given
             val productId = 1L
             val hour14 = Instant.parse("2025-01-15T14:30:00Z")
             val hour15 = Instant.parse("2025-01-15T15:30:00Z")
 
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = hour14),
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = hour14),
+                    ),
+                ),
             )
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = hour15),
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = hour15),
+                    ),
+                ),
             )
 
             // when
@@ -228,27 +260,27 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             assertThat(zSetOps.score(bucket15Key, productId.toString())).isEqualTo(0.10)
         }
 
-        @DisplayName("시간 경계에서 14:59:58과 15:00:02 이벤트가 각각의 버킷에 저장된다")
+        @DisplayName("시간 경계에서 14:59:58과 15:00:02 메트릭이 각각의 버킷에 저장된다")
         @Test
-        fun `events at hour boundary are correctly bucketed`() {
+        fun `metrics at hour boundary are correctly bucketed`() {
             // given
             val productId = 1L
-            val event1459 = RankingEvent(
+            val item1459 = AccumulateMetricCommand.Item(
                 productId = productId,
-                eventType = RankingEventType.VIEW,
+                metricType = MetricType.VIEW,
                 orderAmount = null,
                 occurredAt = Instant.parse("2025-01-15T14:59:58Z"),
             )
-            val event1500 = RankingEvent(
+            val item1500 = AccumulateMetricCommand.Item(
                 productId = productId,
-                eventType = RankingEventType.VIEW,
+                metricType = MetricType.VIEW,
                 orderAmount = null,
                 occurredAt = Instant.parse("2025-01-15T15:00:02Z"),
             )
 
             // when
-            rankingAggregationService.add(event1459)
-            rankingAggregationService.add(event1500)
+            rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = listOf(item1459)))
+            rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = listOf(item1500)))
             rankingAggregationService.flush()
 
             // then - DB 검증
@@ -276,11 +308,19 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val productId = 1L
             val occurredAt = Instant.now()
 
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.LIKE_CREATED, orderAmount = null, occurredAt = occurredAt),
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CREATED, orderAmount = null, occurredAt = occurredAt),
+                    ),
+                ),
             )
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.LIKE_CANCELED, orderAmount = null, occurredAt = occurredAt),
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CANCELED, orderAmount = null, occurredAt = occurredAt),
+                    ),
+                ),
             )
 
             // when
@@ -299,11 +339,19 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val productId = 1L
             val occurredAt = Instant.now()
 
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.LIKE_CANCELED, orderAmount = null, occurredAt = occurredAt),
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CANCELED, orderAmount = null, occurredAt = occurredAt),
+                    ),
+                ),
             )
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.LIKE_CANCELED, orderAmount = null, occurredAt = occurredAt),
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CANCELED, orderAmount = null, occurredAt = occurredAt),
+                    ),
+                ),
             )
 
             // when
@@ -327,8 +375,12 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val productId = 1L
             val occurredAt = Instant.now()
 
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = occurredAt),
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
+                    ),
+                ),
             )
 
             // when
@@ -357,8 +409,12 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val productId = 1L
             val occurredAt = Instant.now()
 
-            rankingAggregationService.add(
-                RankingEvent(productId = productId, eventType = RankingEventType.VIEW, orderAmount = null, occurredAt = occurredAt),
+            rankingAggregationService.accumulateMetric(
+                AccumulateMetricCommand(
+                    items = listOf(
+                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
+                    ),
+                ),
             )
 
             // when
