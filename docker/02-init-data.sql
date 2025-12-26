@@ -11,7 +11,7 @@ SET CHARACTER_SET_CLIENT = utf8mb4;
 SET CHARACTER_SET_RESULTS = utf8mb4;
 
 -- 재귀 깊이 제한 증가 (10만개 데이터 생성을 위해)
-SET SESSION cte_max_recursion_depth = 100000;
+SET SESSION cte_max_recursion_depth = 200000;
 
 -- ================================================
 -- 1. 브랜드 100개 생성
@@ -34,13 +34,13 @@ FROM numbers;
 -- ================================================
 -- 2. 상품 10만개 생성
 -- ================================================
-INSERT INTO products (name, description, price, stock, brand_id, likes_count, created_at, updated_at)
+INSERT INTO products (name, description, price, stock, brand_id, likes_count, views_count, orders_count, created_at, updated_at)
 WITH RECURSIVE numbers AS (
     SELECT 1 AS seq
     UNION ALL
     SELECT seq + 1
     FROM numbers
-    WHERE seq <= 100000
+    WHERE seq < 100000
 )
 SELECT
     CONCAT('Product_', LPAD(seq, 6, '0')),
@@ -49,6 +49,8 @@ SELECT
     FLOOR(10 + RAND() * 990),                        -- 재고: 10 ~ 1,000
     FLOOR(1 + RAND() * 100),                         -- brand_id: 1 ~ 100
     FLOOR(RAND() * RAND() * 10000),                  -- 좋아요: 0 ~ 10,000 (편향 분포)
+    FLOOR(RAND() * RAND() * 50000),                  -- 조회수: 0 ~ 50,000 (편향 분포)
+    FLOOR(RAND() * RAND() * 5000),                   -- 주문수: 0 ~ 5,000 (편향 분포)
     DATE_SUB(NOW(), INTERVAL FLOOR(RAND() * 365) DAY),
     NOW()
 FROM numbers;
