@@ -105,6 +105,7 @@ class BatchMetricsEventFacade(
             EventHandled(
                 eventId = event.eventId,
                 eventType = event.eventType,
+                occurredAt = event.occurredAt,
                 handledAt = Instant.now()
             )
         }
