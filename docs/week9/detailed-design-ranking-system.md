@@ -61,11 +61,11 @@ flowchart TD
 
 ### 1.2 버킷 전환 플로우
 
-매시 59분에 실행되어 현재 버킷의 Score에 Decay Factor(0.1)를 적용하고 다음 버킷을 준비하는 플로우입니다.
+매시 50분에 실행되어 현재 버킷의 Score에 Decay Factor(0.1)를 적용하고 다음 버킷을 준비하는 플로우입니다.
 
 ```mermaid
 flowchart TD
-    Start([스케줄러 트리거 - 매시 59분]) --> FetchCurrentScores[현재 버킷 Redis ZRANGE 전체 조회]
+    Start([스케줄러 트리거 - 매시 50분]) --> FetchCurrentScores[현재 버킷 Redis ZRANGE 전체 조회]
     
     FetchCurrentScores --> RedisReadSuccess{조회 성공?}
     
@@ -84,7 +84,7 @@ flowchart TD
     RedisWriteSuccess -->|실패| LogRetryWarn[WARN 로그]
     LogRetryWarn --> RetryRedis{재시도 3회 이내?}
     RetryRedis -->|Yes| CreateNextBucket
-    RetryRedis -->|No| SendAlert[ERROR 로그 + 알림 발송]
+    RetryRedis -->|No| SendAlert[ERROR 로그]
     SendAlert --> End1([버킷 전환 실패])
     
     RedisWriteSuccess -->|성공| End2([버킷 전환 완료])
@@ -128,7 +128,7 @@ flowchart TD
     FetchSuccess -->|실패| LogFetchError[WARN 로그]
     LogFetchError --> RetryFetch{재시도 3회 이내?}
     RetryFetch -->|Yes| FetchCurrentBucket
-    RetryFetch -->|No| FetchFail[ERROR 로그 + 알림 발송]
+    RetryFetch -->|No| FetchFail[ERROR 로그]
     FetchFail --> End1([재계산 실패 - 수동 재트리거 필요])
     
     FetchSuccess -->|성공| CalcScores[Score 계산<br/>현재 카운트 × Weight × 1.0<br/>+ 이전 카운트 × Weight × 0.1]
@@ -140,7 +140,7 @@ flowchart TD
     RedisSuccess -->|실패| LogRedisWarn[WARN 로그]
     LogRedisWarn --> RetryRedis{재시도 3회 이내?}
     RetryRedis -->|Yes| ReplaceRedis
-    RetryRedis -->|No| LogRedisError[ERROR 로그 + 알림 발송]
+    RetryRedis -->|No| LogRedisError[ERROR 로그]
     LogRedisError --> End2([재계산 실패 - 수동 재트리거 필요])
     
     RedisSuccess -->|성공| LogSuccess[INFO 로그]
@@ -163,13 +163,13 @@ flowchart TD
 
 ```sql
 CREATE TABLE ranking_weight (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     view_weight DECIMAL(3,2) NOT NULL,
     like_weight DECIMAL(3,2) NOT NULL,
     order_weight DECIMAL(3,2) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMPTZ
+    created_at DATETIME NOT NULL DEFAULT NOW(),
+    updated_at DATETIME NOT NULL DEFAULT NOW(),
+    deleted_at DATETIME
 );
 ```
 
@@ -196,16 +196,16 @@ LIMIT 1;
 
 ```sql
 CREATE TABLE product_hourly_metric (
-    id BIGSERIAL PRIMARY KEY,
-    stat_hour TIMESTAMPTZ NOT NULL,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    stat_hour DATETIME NOT NULL,
     product_id BIGINT NOT NULL,
     view_count BIGINT NOT NULL DEFAULT 0,
     like_count BIGINT NOT NULL DEFAULT 0,
     order_count BIGINT NOT NULL DEFAULT 0,
     order_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMPTZ,
+    created_at DATETIME NOT NULL DEFAULT NOW(),
+    updated_at DATETIME NOT NULL DEFAULT NOW(),
+    deleted_at DATETIME,
     
     CONSTRAINT uk_stat_hour_product UNIQUE (stat_hour, product_id)
 );
@@ -261,7 +261,7 @@ viewCount × viewWeight + likeCount × likeWeight + orderAmount × orderWeight
 | Weight 조회 실패 (fallback) | WARN | `Weight fetch failed, using fallback weights` |
 | Redis ZRANGE 실패 (버킷 전환) | WARN | `Redis ZRANGE failed, falling back to RDB calculation` |
 | Redis ZADD 재시도 (버킷 전환) | WARN | `Bucket transition ZADD retry attempt={}` |
-| Redis ZADD 최종 실패 (버킷 전환) | ERROR | `Bucket transition failed after 3 retries, manual intervention required` |
+| Redis ZADD 최종 실패 (버킷 전환) | ERROR | `Bucket transition failed after 3 retries` |
 | Weight 변경 | INFO | `RankingWeight updated, view={}, like={}, order={}` |
 | Score 재계산 완료 | INFO | `Score recalculation completed, productCount={}` |
 | Score 재계산 실패 | ERROR | `Score recalculation failed, manual re-trigger required` |
@@ -274,8 +274,8 @@ viewCount × viewWeight + likeCount × likeWeight + orderAmount × orderWeight
 | Redis ZINCRBY 실패 | 로그 후 버퍼 초기화 | 과집계 방지, 약간의 누락 허용 |
 | Weight 조회 실패 | Fallback Weight 사용 (view=0.1, like=0.2, order=0.6) | 서비스 중단 없이 계속 동작 |
 | 버킷 전환 Redis 조회 실패 | RDB 카운트로 Score 유추 | cold start 방지 |
-| 버킷 전환 Redis 쓰기 실패 | 재시도 3회, 실패 시 알림 | 수동 조치로 복구 |
-| Score 재계산 실패 | 알림 후 수동 재트리거 | Weight 재변경으로 복구 |
+| 버킷 전환 Redis 쓰기 실패 | 재시도 3회, 실패 시 로그 | 다음 스케줄에서 복구 |
+| Score 재계산 실패 | 로그 후 수동 재트리거 | Weight 재변경으로 복구 |
 
 ## 4. 설계 결정 공유
 
@@ -285,7 +285,7 @@ viewCount × viewWeight + likeCount × likeWeight + orderAmount × orderWeight
 |----------|------|
 | RDB 우선 저장 + Redis best-effort | RDB가 source of truth (Weight 변경 시 재계산 기준), 과집계보다 누락이 나음, 랭킹은 "대략적인 인기도"이므로 엄격한 정합성 불필요 |
 | Flush 주기 30초 | 10초는 DB I/O 부담, 1분은 실시간성 저하, 30초가 균형점 |
-| 버킷 전환 매시 59분 | 1000개 상품 기준 1초 이내 완료, 현재 버킷에 더 많은 이벤트 반영 후 Decay 적용 |
+| 버킷 전환 매시 50분 | 1000개 상품 기준 1초 이내 완료, 현재 버킷에 더 많은 이벤트 반영 후 Decay 적용 |
 | Redis 실패 시 RDB fallback | 빈 상태 시작보다 유추된 Score라도 있는 게 사용자 경험에 유리, cold start 방지 |
 | Weight 변경 동기 + 비동기 분리 | API 응답 속도 보장, 재계산은 상품 수에 비례하므로 백그라운드 처리가 적절 |
 | 현재 + 이전 버킷만 재계산 | 0.1^2 = 0.01로 2시간 전 데이터는 영향 미미, 단순함 우선 |

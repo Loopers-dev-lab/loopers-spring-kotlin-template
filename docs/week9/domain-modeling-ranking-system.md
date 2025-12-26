@@ -151,14 +151,14 @@ classDiagram
 
 | 공식 |
 |------|
-| viewCount × viewWeight + likeCount × likeWeight + orderCount × orderWeight |
+| viewCount × viewWeight + likeCount × likeWeight + orderAmount × orderWeight |
 
 **계산 예시**
 
-| viewCount | likeCount | orderCount | viewWeight | likeWeight | orderWeight | Score |
-|-----------|-----------|------------|------------|------------|-------------|-------|
-| 100 | 10 | 5 | 0.1 | 0.3 | 0.6 | 16.0 |
-| 50 | -2 | 3 | 0.1 | 0.3 | 0.6 | 6.2 |
+| viewCount | likeCount | orderAmount | viewWeight | likeWeight | orderWeight | Score |
+|-----------|-----------|-------------|------------|------------|-------------|-------|
+| 100 | 10 | 5000 | 0.1 | 0.3 | 0.6 | 3016.0 |
+| 50 | -2 | 3000 | 0.1 | 0.3 | 0.6 | 1804.4 |
 
 **버킷 전환 시 Decay 적용**
 
