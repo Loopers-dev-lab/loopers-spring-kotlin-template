@@ -40,7 +40,7 @@ class RankingKafkaConsumer(
         containerFactory = "batchKafkaListenerContainerFactory",
     )
     fun consumeBatch(
-        messages: List<ConsumerRecord<String, ByteArray>>,
+        messages: List<ConsumerRecord<String, String>>,
         acknowledgment: Acknowledgment,
     ) {
         logger.info("랭킹 배치 메시지 수신: ${messages.size}개")
@@ -49,9 +49,7 @@ class RankingKafkaConsumer(
             // 1. JSON 파싱
             val events = messages.mapNotNull { record ->
                 try {
-                    // ByteArrayJsonMessageConverter가 변환하지만, ConsumerRecord로 받으면 수동 변환 필요
-                    val messageString = String(record.value(), Charsets.UTF_8)
-                    parseEvent(messageString)
+                    parseEvent(record.value())
                 } catch (e: Exception) {
                     logger.error("개별 메시지 파싱 실패: key=${record.key()}, partition=${record.partition()}, offset=${record.offset()}", e)
                     null
@@ -85,10 +83,10 @@ class RankingKafkaConsumer(
      * - eventType을 읽고 적절한 클래스로 변환
      *
      * @param message JSON 문자열
-     * @return 파싱된 DomainEvent
-     * @throws IllegalArgumentException eventType이 없거나 지원하지 않는 타입
+     * @return 파싱된 DomainEvent, 또는 지원하지 않는 타입인 경우 null
+     * @throws IllegalArgumentException eventType이 없는 경우
      */
-    private fun parseEvent(message: String): DomainEvent {
+    private fun parseEvent(message: String): DomainEvent? {
         try {
             val node = objectMapper.readTree(message)
             val eventTypeNode = node.get("eventType")
@@ -108,7 +106,7 @@ class RankingKafkaConsumer(
             // 랭킹과 무관한 이벤트는 무시 (예: STOCK_DECREASED, PAYMENT_COMPLETED)
             else -> {
                 logger.debug("랭킹 처리 대상 아님: eventType=$eventType")
-                throw IllegalArgumentException("Unsupported event type for ranking: $eventType")
+                null
             }
         }
         } catch (e: Exception) {

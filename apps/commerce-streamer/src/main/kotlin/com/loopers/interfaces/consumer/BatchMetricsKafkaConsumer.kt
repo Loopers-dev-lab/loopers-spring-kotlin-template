@@ -32,7 +32,7 @@ class BatchMetricsKafkaConsumer(
     )
     @Transactional
     fun consumeBatch(
-        messages: List<ConsumerRecord<String, ByteArray>>,
+        messages: List<ConsumerRecord<String, String>>,
         acknowledgment: Acknowledgment
     ) {
         logger.info("배치 메시지 수신: ${messages.size}개")
@@ -40,10 +40,8 @@ class BatchMetricsKafkaConsumer(
         try {
             val events = messages.mapNotNull { record ->
                 try {
-                    // ByteArrayJsonMessageConverter가 변환하지만, ConsumerRecord로 받으면 수동 변환 필요
-                    val messageString = String(record.value(), Charsets.UTF_8)
-                    logger.debug("메시지 수신: key=${record.key()}, value=$messageString")
-                    parseEvent(messageString)
+                    logger.debug("메시지 수신: key=${record.key()}, value=${record.value()}")
+                    parseEvent(record.value())
                 } catch (e: Exception) {
                     logger.error("개별 메시지 파싱 실패: key=${record.key()}, partition=${record.partition()}, offset=${record.offset()}", e)
                     null
