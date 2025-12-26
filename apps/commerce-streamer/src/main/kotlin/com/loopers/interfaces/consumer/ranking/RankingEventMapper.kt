@@ -1,10 +1,12 @@
 package com.loopers.interfaces.consumer.ranking
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.loopers.domain.product.event.LikeEvent
-import com.loopers.domain.product.event.ProductViewedEvent
 import com.loopers.domain.ranking.RankingEvent
 import com.loopers.domain.ranking.RankingEventType
+import com.loopers.domain.ranking.event.RankingLikeCanceledEventV1
+import com.loopers.domain.ranking.event.RankingLikeCreatedEventV1
+import com.loopers.domain.ranking.event.RankingOrderPaidEventV1
+import com.loopers.domain.ranking.event.RankingProductViewedEventV1
 import com.loopers.eventschema.CloudEventEnvelope
 import org.springframework.stereotype.Component
 import java.math.RoundingMode
@@ -41,7 +43,7 @@ class RankingEventMapper(
     }
 
     private fun mapProductViewedEvent(envelope: CloudEventEnvelope): RankingEvent {
-        val payload = objectMapper.readValue(envelope.payload, ProductViewedEvent::class.java)
+        val payload = objectMapper.readValue(envelope.payload, RankingProductViewedEventV1::class.java)
         return RankingEvent(
             productId = payload.productId,
             eventType = RankingEventType.VIEW,
@@ -51,9 +53,15 @@ class RankingEventMapper(
     }
 
     private fun mapLikeEvent(envelope: CloudEventEnvelope, eventType: RankingEventType): RankingEvent {
-        val payload = objectMapper.readValue(envelope.payload, LikeEvent::class.java)
+        val productId = when (eventType) {
+            RankingEventType.LIKE_CREATED ->
+                objectMapper.readValue(envelope.payload, RankingLikeCreatedEventV1::class.java).productId
+            RankingEventType.LIKE_CANCELED ->
+                objectMapper.readValue(envelope.payload, RankingLikeCanceledEventV1::class.java).productId
+            else -> throw IllegalArgumentException("Unexpected event type for like event: $eventType")
+        }
         return RankingEvent(
-            productId = payload.productId,
+            productId = productId,
             eventType = eventType,
             orderAmount = null,
             occurredAt = envelope.time,
@@ -61,7 +69,7 @@ class RankingEventMapper(
     }
 
     private fun mapOrderPaidEvent(envelope: CloudEventEnvelope): List<RankingEvent> {
-        val payload = objectMapper.readValue(envelope.payload, OrderPaidEventPayload::class.java)
+        val payload = objectMapper.readValue(envelope.payload, RankingOrderPaidEventV1::class.java)
 
         if (payload.orderItems.isEmpty()) {
             return emptyList()
@@ -78,23 +86,5 @@ class RankingEventMapper(
                 occurredAt = envelope.time,
             )
         }
-    }
-
-    /**
-     * OrderPaidEventV1 페이로드를 위한 내부 데이터 클래스
-     *
-     * - commerce-api의 OrderPaidEventV1과 동일한 구조
-     * - totalAmount를 포함하여 orderAmount 계산에 사용
-     */
-    private data class OrderPaidEventPayload(
-        val orderId: Long,
-        val userId: Long,
-        val totalAmount: Long,
-        val orderItems: List<OrderItemSnapshot>,
-    ) {
-        data class OrderItemSnapshot(
-            val productId: Long,
-            val quantity: Int,
-        )
     }
 }

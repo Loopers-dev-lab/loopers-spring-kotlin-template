@@ -1,5 +1,6 @@
 package com.loopers.interfaces.consumer.ranking
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -25,6 +26,8 @@ class RankingEventMapperTest {
         objectMapper = jacksonObjectMapper().apply {
             registerModule(JavaTimeModule())
             disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            // JacksonConfig와 동일한 설정 - 알 수 없는 필드 무시
+            configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         }
         rankingEventMapper = RankingEventMapper(objectMapper)
     }
