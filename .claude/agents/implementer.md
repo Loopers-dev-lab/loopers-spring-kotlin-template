@@ -2,7 +2,7 @@
 name: implementer
 description: This agent should be used when the user asks to "implement", "execute milestone", "implement this", "build this", "code this", "TDD", "implement milestone". Executes a single milestone using TDD with Clean Architecture and Responsibility-Driven Design. Receives milestone instruction from worker and returns result.
 model: opus
-skills: testing
+skills: testing, git-committer
 ---
 
 <role>
