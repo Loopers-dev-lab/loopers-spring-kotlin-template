@@ -57,9 +57,9 @@ class RankingFacadeIntegrationTest @Autowired constructor(
         @Test
         fun `returns rankings with product details when data exists in Redis`() {
             // given
-            val product1 = createProduct(name = "상품1")
-            val product2 = createProduct(name = "상품2")
-            val product3 = createProduct(name = "상품3")
+            val product1 = createProduct(name = "상품1", stockQuantity = 50)
+            val product2 = createProduct(name = "상품2", stockQuantity = 30)
+            val product3 = createProduct(name = "상품3", stockQuantity = 20)
 
             val bucketKey = RankingKeyGenerator.currentBucketKey()
 
@@ -81,10 +81,14 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             assertThat(result.rankings[0].productId).isEqualTo(product3.id)
             assertThat(result.rankings[0].rank).isEqualTo(1)
             assertThat(result.rankings[0].name).isEqualTo("상품3")
+            assertThat(result.rankings[0].stock).isEqualTo(20)
+            assertThat(result.rankings[0].likeCount).isEqualTo(0L)
             assertThat(result.rankings[1].productId).isEqualTo(product1.id)
             assertThat(result.rankings[1].rank).isEqualTo(2)
+            assertThat(result.rankings[1].stock).isEqualTo(50)
             assertThat(result.rankings[2].productId).isEqualTo(product2.id)
             assertThat(result.rankings[2].rank).isEqualTo(3)
+            assertThat(result.rankings[2].stock).isEqualTo(30)
         }
 
         @DisplayName("Redis에 데이터가 없으면 빈 목록을 반환한다")

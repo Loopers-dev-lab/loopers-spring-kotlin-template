@@ -54,7 +54,6 @@ class RankingFacade(
             productViewMap[ranking.productId]?.let { productView ->
                 RankingInfo.RankingUnit.from(
                     rank = ranking.rank,
-                    score = ranking.score,
                     productView = productView,
                 )
             }

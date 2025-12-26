@@ -24,10 +24,10 @@ class RankingV1Response {
         val productId: Long,
         val name: String,
         val price: Int,
-        val status: String,
+        val stock: Int,
         val brandId: Long,
         val brandName: String,
-        val score: BigDecimal,
+        val likeCount: Long,
     ) {
         companion object {
             fun from(unit: RankingInfo.RankingUnit): RankingDto {
@@ -36,10 +36,10 @@ class RankingV1Response {
                     productId = unit.productId,
                     name = unit.name,
                     price = unit.price.amount.toInt(),
-                    status = unit.status.name,
+                    stock = unit.stock,
                     brandId = unit.brandId,
                     brandName = unit.brandName,
-                    score = unit.score,
+                    likeCount = unit.likeCount,
                 )
             }
         }

@@ -1,6 +1,5 @@
 package com.loopers.application.ranking
 
-import com.loopers.domain.product.ProductSaleStatus
 import com.loopers.domain.product.ProductView
 import com.loopers.domain.ranking.RankingWeight
 import com.loopers.support.values.Money
@@ -26,25 +25,24 @@ class RankingInfo {
      * @property productId 상품 ID
      * @property name 상품명
      * @property price 상품 가격
-     * @property status 상품 판매 상태
+     * @property stock 재고 수량
      * @property brandId 브랜드 ID
      * @property brandName 브랜드명
-     * @property score 점수
+     * @property likeCount 좋아요 수
      */
     data class RankingUnit(
         val rank: Int,
         val productId: Long,
         val name: String,
         val price: Money,
-        val status: ProductSaleStatus,
+        val stock: Int,
         val brandId: Long,
         val brandName: String,
-        val score: BigDecimal,
+        val likeCount: Long,
     ) {
         companion object {
             fun from(
                 rank: Int,
-                score: BigDecimal,
                 productView: ProductView,
             ): RankingUnit {
                 return RankingUnit(
@@ -52,10 +50,10 @@ class RankingInfo {
                     productId = productView.productId,
                     name = productView.productName,
                     price = productView.price,
-                    status = productView.status,
+                    stock = productView.stockQuantity,
                     brandId = productView.brandId,
                     brandName = productView.brandName,
-                    score = score,
+                    likeCount = productView.likeCount,
                 )
             }
         }

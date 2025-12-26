@@ -43,9 +43,9 @@ class RankingFacadeTest {
                 ProductRanking(productId = 3L, rank = 3, score = BigDecimal("80.00")),
             )
             val productViews = listOf(
-                createProductView(productId = 1L, productName = "상품1"),
-                createProductView(productId = 2L, productName = "상품2"),
-                createProductView(productId = 3L, productName = "상품3"),
+                createProductView(productId = 1L, productName = "상품1", stockQuantity = 50, likeCount = 10L),
+                createProductView(productId = 2L, productName = "상품2", stockQuantity = 30, likeCount = 5L),
+                createProductView(productId = 3L, productName = "상품3", stockQuantity = 20, likeCount = 3L),
             )
 
             every { productRankingReader.getTopRankings("ranking:hourly:2025012614", 0L, 11L) } returns rankings
@@ -59,7 +59,8 @@ class RankingFacadeTest {
             assertThat(result.rankings[0].rank).isEqualTo(1)
             assertThat(result.rankings[0].productId).isEqualTo(1L)
             assertThat(result.rankings[0].name).isEqualTo("상품1")
-            assertThat(result.rankings[0].score).isEqualTo(BigDecimal("100.00"))
+            assertThat(result.rankings[0].stock).isEqualTo(50)
+            assertThat(result.rankings[0].likeCount).isEqualTo(10L)
             assertThat(result.hasNext).isFalse()
         }
 
