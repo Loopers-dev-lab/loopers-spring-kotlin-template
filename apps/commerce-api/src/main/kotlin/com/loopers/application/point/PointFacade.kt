@@ -5,9 +5,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class PointFacade(
-    private val pointService: PointService,
-) {
+class PointFacade(private val pointService: PointService) {
     @Transactional
     fun chargePoint(userId: Long, request: PointChargeRequest): PointInfo {
         val point = pointService.chargePoint(userId, request.toMoney())

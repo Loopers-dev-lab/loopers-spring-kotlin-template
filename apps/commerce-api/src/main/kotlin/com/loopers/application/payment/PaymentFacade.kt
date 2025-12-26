@@ -8,9 +8,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-class PaymentFacade(
-    private val paymentService: PaymentService,
-) {
+class PaymentFacade(private val paymentService: PaymentService) {
     @Transactional
     fun requestCardPayment(request: PaymentRequest): PaymentInfo {
         // 1. 결제 정보 생성
