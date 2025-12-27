@@ -34,7 +34,7 @@ FROM numbers;
 -- ================================================
 -- 2. 상품 10만개 생성
 -- ================================================
-INSERT INTO products (name, description, price, stock, brand_id, likes_count, views_count, orders_count, created_at, updated_at)
+INSERT INTO products (name, description, price, stock, brand_id, likes_count, created_at, updated_at)
 WITH RECURSIVE numbers AS (
     SELECT 1 AS seq
     UNION ALL
@@ -49,8 +49,6 @@ SELECT
     FLOOR(10 + RAND() * 990),                        -- 재고: 10 ~ 1,000
     FLOOR(1 + RAND() * 100),                         -- brand_id: 1 ~ 100
     FLOOR(RAND() * RAND() * 10000),                  -- 좋아요: 0 ~ 10,000 (편향 분포)
-    FLOOR(RAND() * RAND() * 50000),                  -- 조회수: 0 ~ 50,000 (편향 분포)
-    FLOOR(RAND() * RAND() * 5000),                   -- 주문수: 0 ~ 5,000 (편향 분포)
     DATE_SUB(NOW(), INTERVAL FLOOR(RAND() * 365) DAY),
     NOW()
 FROM numbers;

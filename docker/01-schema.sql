@@ -33,8 +33,6 @@ CREATE TABLE IF NOT EXISTS products (
     stock INT NOT NULL,
     brand_id BIGINT NOT NULL,
     likes_count INT NOT NULL DEFAULT 0,
-    views_count INT NOT NULL DEFAULT 0 COMMENT '조회수',
-    orders_count INT NOT NULL DEFAULT 0 COMMENT '주문수',
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
     deleted_at DATETIME(6) NULL,
@@ -157,8 +155,6 @@ CREATE TABLE IF NOT EXISTS commerce_payments (
 -- ================================================
 CREATE INDEX idx_products_brand_id ON products(brand_id);
 CREATE INDEX idx_products_likes_count ON products(likes_count);
-CREATE INDEX idx_products_views_count ON products(views_count);
-CREATE INDEX idx_products_orders_count ON products(orders_count);
 CREATE INDEX idx_members_member_id ON members(member_id);
 CREATE INDEX idx_orders_member_id ON orders(member_id);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
