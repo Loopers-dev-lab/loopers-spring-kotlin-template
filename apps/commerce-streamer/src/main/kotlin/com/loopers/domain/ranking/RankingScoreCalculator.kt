@@ -51,4 +51,11 @@ data class RankingWeights(
     val like: Double = 0.2,
     val unlike: Double = -0.2,
     val order: Double = 0.6
-)
+) {
+    init {
+        require(view >= 0) { "view 가중치는 음수일 수 없습니다: $view" }
+        require(like >= 0) { "like 가중치는 음수일 수 없습니다: $like" }
+        require(unlike < 0) { "unlike 가중치는 음수여야 합니다: $unlike" }
+        require(order >= 0) { "order 가중치는 음수일 수 없습니다: $order" }
+    }
+}
