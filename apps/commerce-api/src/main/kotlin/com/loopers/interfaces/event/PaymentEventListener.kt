@@ -13,6 +13,7 @@ import com.loopers.domain.payment.PgService
 import com.loopers.domain.payment.dto.PgCommand
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.user.UserActivityEvent
+import java.time.ZonedDateTime
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.scheduling.annotation.Async
@@ -166,6 +167,9 @@ class PaymentEventListener(
         orderService.fail(event.orderId)
         log.debug("주문 상태 변경 완료: orderId=${event.orderId}")
 
+        val order = orderService.getById(event.orderId)
+        val orderCreatedAt = order.createdAt
+
         // 2. 쿠폰 롤백 (사용 취소)
         if (event.couponId != null) {
             couponService.rollback(event.userId, event.couponId)
@@ -180,6 +184,7 @@ class PaymentEventListener(
             orderId = event.orderId,
             userId = event.userId,
             reason = event.reason,
+            orderCreatedAt = orderCreatedAt,
             orderDetails = orderDetails,
         )
     }
@@ -227,6 +232,7 @@ class PaymentEventListener(
                 OutboxEvent.OrderCompleted.OrderItem(
                     productId = it.productId,
                     quantity = it.quantity.toInt(),
+                    price = it.price,
                 )
             },
         )
@@ -246,16 +252,19 @@ class PaymentEventListener(
         orderId: Long,
         userId: Long,
         reason: String?,
+        orderCreatedAt: ZonedDateTime,
         orderDetails: List<OrderDetail>,
     ) {
         val metricEvent = OutboxEvent.OrderCanceled(
             orderId = orderId,
             userId = userId,
             reason = reason,
+            orderCreatedAt = orderCreatedAt,
             items = orderDetails.map {
                 OutboxEvent.OrderCanceled.OrderItem(
                     productId = it.productId,
                     quantity = it.quantity.toInt(),
+                    price = it.price,
                 )
             },
         )

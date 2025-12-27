@@ -3,13 +3,11 @@ package com.loopers.interfaces.event
 import com.loopers.domain.like.ProductLikeEvent
 import com.loopers.domain.outbox.AggregateType
 import com.loopers.domain.outbox.OutboxEvent
-import com.loopers.domain.outbox.OutboxEventPublisher
 import com.loopers.domain.outbox.OutboxService
 import com.loopers.domain.product.ProductEvent
 import com.loopers.domain.user.UserService
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
-import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.event.TransactionPhase
@@ -33,7 +31,6 @@ import org.springframework.transaction.event.TransactionalEventListener
 class ProductEventListener(
     private val outboxService: OutboxService,
     private val userService: UserService,
-    private val outboxEventPublisher: OutboxEventPublisher,
 ) {
     private val log = LoggerFactory.getLogger(ProductEventListener::class.java)
 

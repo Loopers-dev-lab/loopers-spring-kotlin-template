@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.domain.event.OutboxEvent
 import com.loopers.domain.stock.ProductStockService
 import com.loopers.support.util.EventIdExtractor
+import com.loopers.support.util.readEvent
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -20,7 +21,7 @@ class ProductStockFacade(
      */
     fun handleSoldOutEvents(records: List<ConsumerRecord<Any, Any>>) {
         records.forEach { record ->
-            val event = objectMapper.readValue(record.value() as String, OutboxEvent.SoldOut::class.java)
+            val event = readEvent<OutboxEvent.SoldOut>(record, objectMapper)
             val eventId = EventIdExtractor.extract(record)
 
             log.debug("품절 이벤트 처리: productId={}, eventId={}", event.productId, eventId)

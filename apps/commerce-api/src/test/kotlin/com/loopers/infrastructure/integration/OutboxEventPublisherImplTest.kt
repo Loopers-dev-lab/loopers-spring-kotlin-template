@@ -105,10 +105,12 @@ class OutboxEventPublisherImplTest : IntegrationTest() {
                 OutboxEvent.OrderCompleted.OrderItem(
                     productId = 1L,
                     quantity = 2,
+                    price = 20000L,
                 ),
                 OutboxEvent.OrderCompleted.OrderItem(
                     productId = 2L,
                     quantity = 1,
+                    price = 10000L,
                 ),
             ),
             timestamp = ZonedDateTime.now(),
@@ -136,10 +138,12 @@ class OutboxEventPublisherImplTest : IntegrationTest() {
             orderId = 1L,
             userId = 100L,
             reason = "고객 요청",
+            orderCreatedAt = ZonedDateTime.now(),
             items = listOf(
                 OutboxEvent.OrderCanceled.OrderItem(
                     productId = 1L,
                     quantity = 2,
+                    price = 20000L,
                 ),
             ),
             timestamp = ZonedDateTime.now(),

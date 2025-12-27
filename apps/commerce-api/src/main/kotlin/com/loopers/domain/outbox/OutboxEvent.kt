@@ -80,6 +80,7 @@ object OutboxEvent {
         data class OrderItem(
             val productId: Long,
             val quantity: Int,
+            val price: Long,
         )
 
         companion object {
@@ -96,12 +97,14 @@ object OutboxEvent {
         val orderId: Long,
         val userId: Long,
         val reason: String?,
+        val orderCreatedAt: ZonedDateTime,
         val items: List<OrderItem>,
         val timestamp: ZonedDateTime = ZonedDateTime.now(),
     ) {
         data class OrderItem(
             val productId: Long,
             val quantity: Int,
+            val price: Long,
         )
 
         companion object {

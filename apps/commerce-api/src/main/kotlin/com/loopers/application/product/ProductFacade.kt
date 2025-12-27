@@ -1,6 +1,7 @@
 package com.loopers.application.product
 
 import com.loopers.application.dto.PageResult
+import com.loopers.application.ranking.RankingFacade
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.like.ProductLikeService
 import com.loopers.domain.product.ProductEvent
@@ -24,6 +25,7 @@ class ProductFacade(
     private val userService: UserService,
     private val productCache: ProductCache,
     private val applicationEventPublisher: ApplicationEventPublisher,
+    private val rankingFacade: RankingFacade,
 ) {
     @Transactional(readOnly = true)
     fun getProducts(brandId: Long?, sort: ProductSort, pageable: Pageable): Page<ProductResult.ListInfo> {
@@ -69,7 +71,11 @@ class ProductFacade(
         productCache.getProductDetail(productId, userId)?.let { cachedResult ->
             // 캐시 히트여도 조회 이벤트는 발행 (메트릭 수집 목적)
             publishViewEvent(productId, userId)
-            return cachedResult
+            val rankInfo = rankingFacade.getProductRank(productId)
+            return cachedResult.copy(
+                rank = rankInfo?.rank,
+                score = rankInfo?.score,
+            )
         }
 
         // 1. 상품 조회
@@ -92,19 +98,25 @@ class ProductFacade(
 
         val result = ProductResult.DetailInfo.from(product, userLiked, productLikeCount.likeCount, brand)
 
+        val rankInfo = rankingFacade.getProductRank(productId)
+        val rankedResult = result.copy(
+            rank = rankInfo?.rank,
+            score = rankInfo?.score,
+        )
+
         // 트랜잭션 커밋 후 캐시 저장
         TransactionUtils.executeAfterCommit {
             productCache.setProductDetail(
                 productId,
                 userId,
-                result,
+                rankedResult,
             )
         }
 
         // 상품 조회 이벤트 발행 (메트릭 수집용)
         publishViewEvent(productId, userId)
 
-        return result
+        return rankedResult
     }
 
     private fun publishViewEvent(productId: Long, userId: String?) {

@@ -8,13 +8,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 object EventIdExtractor {
     private const val EVENT_ID_HEADER = "eventId"
 
-    /**
-     * Kafka 헤더에서 eventId 추출
-     *
-     * @param record Kafka ConsumerRecord
-     * @return eventId (UUID 형식)
-     * @throws IllegalArgumentException eventId 헤더가 없는 경우
-     */
     fun extract(record: ConsumerRecord<Any, Any>): String {
         val header = record.headers().lastHeader(EVENT_ID_HEADER)
             ?: throw IllegalArgumentException(

@@ -85,6 +85,8 @@ class ProductResultTest {
                 softly.assertThat(result.brandName).isEqualTo("테스트 브랜드")
                 softly.assertThat(result.likeCount).isEqualTo(10L)
                 softly.assertThat(result.likedByMe).isTrue()
+                softly.assertThat(result.rank).isNull()
+                softly.assertThat(result.score).isNull()
             }
         }
 
@@ -103,6 +105,8 @@ class ProductResultTest {
             assertSoftly { softly ->
                 softly.assertThat(result.likeCount).isEqualTo(5L)
                 softly.assertThat(result.likedByMe).isFalse()
+                softly.assertThat(result.rank).isNull()
+                softly.assertThat(result.score).isNull()
             }
         }
 
@@ -121,6 +125,8 @@ class ProductResultTest {
             assertSoftly { softly ->
                 softly.assertThat(result.likeCount).isZero()
                 softly.assertThat(result.likedByMe).isFalse()
+                softly.assertThat(result.rank).isNull()
+                softly.assertThat(result.score).isNull()
             }
         }
 
@@ -143,6 +149,8 @@ class ProductResultTest {
             assertSoftly { softly ->
                 softly.assertThat(result.likeCount).isEqualTo(likeCount)
                 softly.assertThat(result.likedByMe).isEqualTo(userLiked)
+                softly.assertThat(result.rank).isNull()
+                softly.assertThat(result.score).isNull()
             }
         }
     }

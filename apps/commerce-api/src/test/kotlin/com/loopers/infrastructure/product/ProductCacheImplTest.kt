@@ -55,6 +55,8 @@ class ProductCacheImplTest : IntegrationTest() {
                 brandName = "테스트 브랜드",
                 likeCount = 5L,
                 likedByMe = true,
+                rank = null,
+                score = null,
             )
 
             // when
@@ -81,6 +83,8 @@ class ProductCacheImplTest : IntegrationTest() {
                 brandName = "테스트 브랜드",
                 likeCount = 5L,
                 likedByMe = false,
+                rank = null,
+                score = null,
             )
 
             // when
@@ -108,6 +112,8 @@ class ProductCacheImplTest : IntegrationTest() {
                 brandName = "테스트 브랜드",
                 likeCount = 5L,
                 likedByMe = true,
+                rank = null,
+                score = null,
             )
 
             val detailInfo2 = detailInfo1.copy(likedByMe = false)
@@ -137,6 +143,8 @@ class ProductCacheImplTest : IntegrationTest() {
                 brandName = "테스트 브랜드",
                 likeCount = 5L,
                 likedByMe = true,
+                rank = null,
+                score = null,
             )
 
             productCache.setProductDetail(productId, "user1", detailInfo)

@@ -42,6 +42,8 @@ object ProductResult {
         val brandName: String,
         val likeCount: Long,
         val likedByMe: Boolean,
+        val rank: Long?,
+        val score: Double?,
     ) {
         companion object {
             fun from(
@@ -57,6 +59,8 @@ object ProductResult {
                     brandName = brand.name,
                     likeCount = productLikeCount,
                     likedByMe = userLiked,
+                    rank = null,
+                    score = null,
                 )
             }
         }
