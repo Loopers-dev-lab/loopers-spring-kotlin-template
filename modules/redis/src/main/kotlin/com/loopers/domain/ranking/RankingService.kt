@@ -210,9 +210,12 @@ class RankingService(
             val score = tuple.score ?: return@forEach
             val newScore = score * weight
 
-            // 대상 키에 가중치 적용한 점수로 추가
-            zSetOps.add(targetKey, member, newScore)
-            copiedCount++
+            // 대상 키에 member가 없을 때만 추가 (실시간 이벤트가 먼저 추가된 경우 보존)
+            val currentScore = zSetOps.score(targetKey, member)
+            if (currentScore == null) {
+                zSetOps.add(targetKey, member, newScore)
+                copiedCount++
+            }
         }
 
         // 4. TTL 설정 (2일)
