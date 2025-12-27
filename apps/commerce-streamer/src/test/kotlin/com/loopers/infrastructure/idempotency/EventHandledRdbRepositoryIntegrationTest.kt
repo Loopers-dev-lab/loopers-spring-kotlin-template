@@ -2,16 +2,15 @@ package com.loopers.infrastructure.idempotency
 
 import com.loopers.support.idempotency.EventHandled
 import com.loopers.support.idempotency.EventHandledRepository
+import com.loopers.support.idempotency.IdempotencyResult
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.dao.DataIntegrityViolationException
 
 @SpringBootTest
 @DisplayName("EventHandledRdbRepository 통합 테스트")
@@ -29,20 +28,97 @@ class EventHandledRdbRepositoryIntegrationTest @Autowired constructor(
     @Nested
     inner class Save {
 
-        @DisplayName("EventHandled를 저장하고 ID가 생성된 엔티티를 반환한다")
+        @DisplayName("EventHandled 저장 성공 시 IdempotencyResult.Recorded를 반환한다")
         @Test
-        fun `persists EventHandled and returns entity with generated id greater than 0`() {
+        fun `returns Recorded on successful save`() {
             // given
             val idempotencyKey = "product-statistic:Order:123:paid"
             val eventHandled = EventHandled(idempotencyKey = idempotencyKey)
 
             // when
-            val saved = eventHandledRepository.save(eventHandled)
+            val result = eventHandledRepository.save(eventHandled)
 
             // then
-            assertThat(saved.id).isGreaterThan(0L)
-            assertThat(saved.idempotencyKey).isEqualTo(idempotencyKey)
-            assertThat(saved.handledAt).isNotNull()
+            assertThat(result).isEqualTo(IdempotencyResult.Recorded)
+        }
+
+        @DisplayName("저장된 EventHandled가 데이터베이스에 존재하는지 확인한다")
+        @Test
+        fun `persisted EventHandled exists in database`() {
+            // given
+            val idempotencyKey = "product-statistic:Order:123:paid"
+            val eventHandled = EventHandled(idempotencyKey = idempotencyKey)
+
+            // when
+            eventHandledRepository.save(eventHandled)
+
+            // then
+            assertThat(eventHandledRepository.existsByIdempotencyKey(idempotencyKey)).isTrue()
+        }
+
+        @DisplayName("중복 키 저장 시 IdempotencyResult.RecordFailed를 반환한다")
+        @Test
+        fun `returns RecordFailed on duplicate key`() {
+            // given
+            val idempotencyKey = "product-statistic:Order:123:paid"
+            eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
+
+            // when
+            val result = eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
+
+            // then
+            assertThat(result).isEqualTo(IdempotencyResult.RecordFailed)
+        }
+    }
+
+    @DisplayName("saveAll()")
+    @Nested
+    inner class SaveAll {
+
+        @DisplayName("여러 EventHandled 저장 성공 시 IdempotencyResult.Recorded를 반환한다")
+        @Test
+        fun `returns Recorded on successful saveAll`() {
+            // given
+            val eventHandledList = listOf(
+                EventHandled(idempotencyKey = "ranking:view:event-1"),
+                EventHandled(idempotencyKey = "ranking:view:event-2"),
+                EventHandled(idempotencyKey = "ranking:view:event-3"),
+            )
+
+            // when
+            val result = eventHandledRepository.saveAll(eventHandledList)
+
+            // then
+            assertThat(result).isEqualTo(IdempotencyResult.Recorded)
+        }
+
+        @DisplayName("빈 리스트 저장 시 IdempotencyResult.Recorded를 반환한다")
+        @Test
+        fun `returns Recorded on empty list`() {
+            // when
+            val result = eventHandledRepository.saveAll(emptyList())
+
+            // then
+            assertThat(result).isEqualTo(IdempotencyResult.Recorded)
+        }
+
+        @DisplayName("중복 키가 포함된 리스트 저장 시 IdempotencyResult.RecordFailed를 반환한다")
+        @Test
+        fun `returns RecordFailed when list contains duplicate key`() {
+            // given
+            eventHandledRepository.save(EventHandled(idempotencyKey = "ranking:view:event-1"))
+
+            val eventHandledList = listOf(
+                // duplicate key
+                EventHandled(idempotencyKey = "ranking:view:event-1"),
+                EventHandled(idempotencyKey = "ranking:view:event-2"),
+            )
+
+            // when
+            val result = eventHandledRepository.saveAll(eventHandledList)
+
+            // then
+            assertThat(result).isEqualTo(IdempotencyResult.RecordFailed)
         }
     }
 
@@ -92,25 +168,6 @@ class EventHandledRdbRepositoryIntegrationTest @Autowired constructor(
 
             // then
             assertThat(exists).isFalse()
-        }
-    }
-
-    @DisplayName("유니크 제약조건")
-    @Nested
-    inner class UniqueConstraint {
-
-        @DisplayName("중복된 idempotencyKey는 저장할 수 없다")
-        @Test
-        fun `prevents duplicate idempotencyKey`() {
-            // given
-            val idempotencyKey = "product-statistic:Order:123:paid"
-
-            eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
-
-            // when & then
-            assertThrows<DataIntegrityViolationException> {
-                eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
-            }
         }
     }
 }

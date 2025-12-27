@@ -16,18 +16,8 @@ data class AggregationKey(
 ) {
     companion object {
         /**
-         * 메트릭 항목으로부터 AggregationKey 생성
-         * hourBucket은 occurredAt을 시간 단위로 truncate
-         */
-        fun from(item: AccumulateMetricCommand.Item): AggregationKey {
-            return AggregationKey(
-                productId = item.productId,
-                hourBucket = item.occurredAt.truncatedTo(ChronoUnit.HOURS),
-            )
-        }
-
-        /**
          * productId와 발생 시각으로 AggregationKey 생성
+         * hourBucket은 occurredAt을 시간 단위로 truncate
          */
         fun of(productId: Long, occurredAt: Instant): AggregationKey {
             return AggregationKey(

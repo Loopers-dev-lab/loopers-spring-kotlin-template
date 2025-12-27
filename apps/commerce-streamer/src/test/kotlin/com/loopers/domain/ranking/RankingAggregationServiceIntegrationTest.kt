@@ -1,5 +1,6 @@
 package com.loopers.domain.ranking
 
+import com.loopers.infrastructure.idempotency.EventHandledJpaRepository
 import com.loopers.infrastructure.ranking.ProductHourlyMetricJpaRepository
 import com.loopers.infrastructure.ranking.RankingWeightJpaRepository
 import com.loopers.utils.DatabaseCleanUp
@@ -23,6 +24,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
     private val rankingAggregationService: RankingAggregationService,
     private val productHourlyMetricJpaRepository: ProductHourlyMetricJpaRepository,
     private val rankingWeightJpaRepository: RankingWeightJpaRepository,
+    private val eventHandledJpaRepository: EventHandledJpaRepository,
     private val redisTemplate: RedisTemplate<String, String>,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
@@ -53,23 +55,18 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
 
         @DisplayName("메트릭 추가 후 flush하면 DB와 Redis에 모두 저장된다")
         @Test
-        fun `accumulateMetric and flush persists to both DB and Redis`() {
+        fun `accumulateViewMetric and flush persists to both DB and Redis`() {
             // given
             val productId = 1L
             val occurredAt = Instant.now()
-            val command = AccumulateMetricCommand(
-                items = listOf(
-                    AccumulateMetricCommand.Item(
-                        productId = productId,
-                        metricType = MetricType.VIEW,
-                        orderAmount = null,
-                        occurredAt = occurredAt,
-                    ),
-                ),
+            val command = AccumulateViewMetricCommand(
+                eventId = "view-event-full-flow",
+                productId = productId,
+                occurredAt = occurredAt,
             )
 
             // when
-            rankingAggregationService.accumulateMetric(command)
+            rankingAggregationService.accumulateViewMetric(command)
             rankingAggregationService.flush()
 
             // then - DB 검증
@@ -92,29 +89,29 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val occurredAt = Instant.now()
 
             // 3 views, 2 likes, 1 order with 1000 amount
-            repeat(3) {
-                rankingAggregationService.accumulateMetric(
-                    AccumulateMetricCommand(
-                        items = listOf(
-                            AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
-                        ),
+            repeat(3) { idx ->
+                rankingAggregationService.accumulateViewMetric(
+                    AccumulateViewMetricCommand(
+                        eventId = "view-event-multi-$idx",
+                        productId = productId,
+                        occurredAt = occurredAt,
                     ),
                 )
             }
-            repeat(2) {
-                rankingAggregationService.accumulateMetric(
-                    AccumulateMetricCommand(
-                        items = listOf(
-                            AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CREATED, orderAmount = null, occurredAt = occurredAt),
-                        ),
+            repeat(2) { idx ->
+                rankingAggregationService.accumulateLikeCreatedMetric(
+                    AccumulateLikeCreatedMetricCommand(
+                        eventId = "like-event-multi-$idx",
+                        productId = productId,
+                        occurredAt = occurredAt,
                     ),
                 )
             }
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.ORDER_PAID, orderAmount = BigDecimal("1000.00"), occurredAt = occurredAt),
-                    ),
+            rankingAggregationService.accumulateOrderPaidMetric(
+                AccumulateOrderPaidMetricCommand(
+                    eventId = "order-event-multi",
+                    items = listOf(AccumulateOrderPaidMetricCommand.Item(productId = productId, orderAmount = BigDecimal("1000.00"))),
+                    occurredAt = occurredAt,
                 ),
             )
 
@@ -141,18 +138,24 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         fun `metrics for multiple products are stored separately`() {
             // given
             val occurredAt = Instant.now()
-            val product1Items = listOf(
-                AccumulateMetricCommand.Item(productId = 1L, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
-                AccumulateMetricCommand.Item(productId = 1L, metricType = MetricType.LIKE_CREATED, orderAmount = null, occurredAt = occurredAt),
+
+            // Product 1: 1 view + 1 like
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-p1", productId = 1L, occurredAt = occurredAt),
             )
-            val product2Items = listOf(
-                AccumulateMetricCommand.Item(productId = 2L, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
-                AccumulateMetricCommand.Item(productId = 2L, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
+            rankingAggregationService.accumulateLikeCreatedMetric(
+                AccumulateLikeCreatedMetricCommand(eventId = "like-p1", productId = 1L, occurredAt = occurredAt),
+            )
+
+            // Product 2: 2 views
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-p2-1", productId = 2L, occurredAt = occurredAt),
+            )
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-p2-2", productId = 2L, occurredAt = occurredAt),
             )
 
             // when
-            rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = product1Items))
-            rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = product2Items))
             rankingAggregationService.flush()
 
             // then - DB 검증
@@ -182,12 +185,8 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val occurredAt = Instant.now()
 
             // when - 첫 번째 메트릭 추가 및 flush
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
-                    ),
-                ),
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-buffer-1", productId = productId, occurredAt = occurredAt),
             )
             rankingAggregationService.flush()
 
@@ -197,12 +196,8 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             assertThat(metrics[0].viewCount).isEqualTo(1L)
 
             // when - 두 번째 메트릭 추가 및 flush
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
-                    ),
-                ),
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-buffer-2", productId = productId, occurredAt = occurredAt),
             )
             rankingAggregationService.flush()
 
@@ -229,19 +224,11 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val hour14 = Instant.parse("2025-01-15T14:30:00Z")
             val hour15 = Instant.parse("2025-01-15T15:30:00Z")
 
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = hour14),
-                    ),
-                ),
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-hour14", productId = productId, occurredAt = hour14),
             )
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = hour15),
-                    ),
-                ),
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-hour15", productId = productId, occurredAt = hour15),
             )
 
             // when
@@ -265,22 +252,16 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         fun `metrics at hour boundary are correctly bucketed`() {
             // given
             val productId = 1L
-            val item1459 = AccumulateMetricCommand.Item(
-                productId = productId,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
-                occurredAt = Instant.parse("2025-01-15T14:59:58Z"),
-            )
-            val item1500 = AccumulateMetricCommand.Item(
-                productId = productId,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
-                occurredAt = Instant.parse("2025-01-15T15:00:02Z"),
-            )
+            val time1459 = Instant.parse("2025-01-15T14:59:58Z")
+            val time1500 = Instant.parse("2025-01-15T15:00:02Z")
 
             // when
-            rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = listOf(item1459)))
-            rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = listOf(item1500)))
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-1459", productId = productId, occurredAt = time1459),
+            )
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-1500", productId = productId, occurredAt = time1500),
+            )
             rankingAggregationService.flush()
 
             // then - DB 검증
@@ -308,19 +289,11 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val productId = 1L
             val occurredAt = Instant.now()
 
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CREATED, orderAmount = null, occurredAt = occurredAt),
-                    ),
-                ),
+            rankingAggregationService.accumulateLikeCreatedMetric(
+                AccumulateLikeCreatedMetricCommand(eventId = "like-created-cancel-test", productId = productId, occurredAt = occurredAt),
             )
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CANCELED, orderAmount = null, occurredAt = occurredAt),
-                    ),
-                ),
+            rankingAggregationService.accumulateLikeCanceledMetric(
+                AccumulateLikeCanceledMetricCommand(eventId = "like-canceled-cancel-test", productId = productId, occurredAt = occurredAt),
             )
 
             // when
@@ -339,19 +312,11 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val productId = 1L
             val occurredAt = Instant.now()
 
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CANCELED, orderAmount = null, occurredAt = occurredAt),
-                    ),
-                ),
+            rankingAggregationService.accumulateLikeCanceledMetric(
+                AccumulateLikeCanceledMetricCommand(eventId = "like-canceled-only-1", productId = productId, occurredAt = occurredAt),
             )
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.LIKE_CANCELED, orderAmount = null, occurredAt = occurredAt),
-                    ),
-                ),
+            rankingAggregationService.accumulateLikeCanceledMetric(
+                AccumulateLikeCanceledMetricCommand(eventId = "like-canceled-only-2", productId = productId, occurredAt = occurredAt),
             )
 
             // when
@@ -375,12 +340,8 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val productId = 1L
             val occurredAt = Instant.now()
 
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
-                    ),
-                ),
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-ttl-test", productId = productId, occurredAt = occurredAt),
             )
 
             // when
@@ -409,12 +370,8 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val productId = 1L
             val occurredAt = Instant.now()
 
-            rankingAggregationService.accumulateMetric(
-                AccumulateMetricCommand(
-                    items = listOf(
-                        AccumulateMetricCommand.Item(productId = productId, metricType = MetricType.VIEW, orderAmount = null, occurredAt = occurredAt),
-                    ),
-                ),
+            rankingAggregationService.accumulateViewMetric(
+                AccumulateViewMetricCommand(eventId = "view-fallback-test", productId = productId, occurredAt = occurredAt),
             )
 
             // when
@@ -542,6 +499,160 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             // 600.70 * 0.1 = 60.07
             val decayedScore = zSetOps.score(currentBucketKey, "1")
             assertThat(decayedScore).isEqualTo(60.07)
+        }
+    }
+
+    @DisplayName("새로운 accumulate 메서드 멱등성 통합 테스트")
+    @Nested
+    inner class NewAccumulateMethodsIdempotency {
+
+        @DisplayName("accumulateViewMetric - 첫 호출은 버퍼에 축적되고 멱등성 키가 저장된다")
+        @Test
+        fun `accumulateViewMetric stores data and idempotency key on first call`() {
+            // given
+            val command = AccumulateViewMetricCommand(
+                eventId = "view-event-123",
+                productId = 1L,
+                occurredAt = Instant.now(),
+            )
+
+            // when
+            rankingAggregationService.accumulateViewMetric(command)
+            rankingAggregationService.flush()
+
+            // then - DB 검증
+            val metrics = productHourlyMetricJpaRepository.findAll()
+            assertThat(metrics).hasSize(1)
+            assertThat(metrics[0].viewCount).isEqualTo(1L)
+
+            // then - 멱등성 키 저장 검증
+            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:view:view-event-123")).isTrue()
+        }
+
+        @DisplayName("accumulateViewMetric - 중복 호출 시 버퍼에 축적되지 않는다")
+        @Test
+        fun `accumulateViewMetric does not accumulate on duplicate call`() {
+            // given
+            val command = AccumulateViewMetricCommand(
+                eventId = "view-event-duplicate",
+                productId = 1L,
+                occurredAt = Instant.now(),
+            )
+
+            // when - 첫 번째 호출
+            rankingAggregationService.accumulateViewMetric(command)
+            rankingAggregationService.flush()
+
+            // when - 중복 호출
+            rankingAggregationService.accumulateViewMetric(command)
+            rankingAggregationService.flush()
+
+            // then - viewCount가 1인지 확인 (중복 추가되지 않음)
+            val metrics = productHourlyMetricJpaRepository.findAll()
+            assertThat(metrics).hasSize(1)
+            assertThat(metrics[0].viewCount).isEqualTo(1L)
+        }
+
+        @DisplayName("accumulateLikeCreatedMetric - 멱등성 동작 검증")
+        @Test
+        fun `accumulateLikeCreatedMetric is idempotent`() {
+            // given
+            val command = AccumulateLikeCreatedMetricCommand(
+                eventId = "like-created-event-456",
+                productId = 2L,
+                occurredAt = Instant.now(),
+            )
+
+            // when - 두 번 호출
+            rankingAggregationService.accumulateLikeCreatedMetric(command)
+            rankingAggregationService.accumulateLikeCreatedMetric(command)
+            rankingAggregationService.flush()
+
+            // then - likeCount가 1인지 확인
+            val metrics = productHourlyMetricJpaRepository.findAll()
+            assertThat(metrics).hasSize(1)
+            assertThat(metrics[0].likeCount).isEqualTo(1L)
+            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:like-created:like-created-event-456")).isTrue()
+        }
+
+        @DisplayName("accumulateLikeCanceledMetric - 멱등성 동작 검증")
+        @Test
+        fun `accumulateLikeCanceledMetric is idempotent`() {
+            // given
+            val command = AccumulateLikeCanceledMetricCommand(
+                eventId = "like-canceled-event-789",
+                productId = 3L,
+                occurredAt = Instant.now(),
+            )
+
+            // when - 두 번 호출
+            rankingAggregationService.accumulateLikeCanceledMetric(command)
+            rankingAggregationService.accumulateLikeCanceledMetric(command)
+            rankingAggregationService.flush()
+
+            // then - likeCount가 -1인지 확인 (취소 1회만)
+            val metrics = productHourlyMetricJpaRepository.findAll()
+            assertThat(metrics).hasSize(1)
+            assertThat(metrics[0].likeCount).isEqualTo(-1L)
+            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:like-canceled:like-canceled-event-789")).isTrue()
+        }
+
+        @DisplayName("accumulateOrderPaidMetric - 여러 아이템과 멱등성 동작 검증")
+        @Test
+        fun `accumulateOrderPaidMetric handles multiple items and is idempotent`() {
+            // given
+            val command = AccumulateOrderPaidMetricCommand(
+                eventId = "order-paid-event-999",
+                items = listOf(
+                    AccumulateOrderPaidMetricCommand.Item(productId = 1L, orderAmount = BigDecimal("1000")),
+                    AccumulateOrderPaidMetricCommand.Item(productId = 2L, orderAmount = BigDecimal("2000")),
+                ),
+                occurredAt = Instant.now(),
+            )
+
+            // when - 두 번 호출
+            rankingAggregationService.accumulateOrderPaidMetric(command)
+            rankingAggregationService.accumulateOrderPaidMetric(command)
+            rankingAggregationService.flush()
+
+            // then - 각 상품별로 orderCount가 1인지 확인
+            val metrics = productHourlyMetricJpaRepository.findAll()
+            assertThat(metrics).hasSize(2)
+
+            val product1Metric = metrics.find { it.productId == 1L }
+            val product2Metric = metrics.find { it.productId == 2L }
+
+            assertThat(product1Metric!!.orderCount).isEqualTo(1L)
+            assertThat(product1Metric.orderAmount).isEqualByComparingTo(BigDecimal("1000"))
+            assertThat(product2Metric!!.orderCount).isEqualTo(1L)
+            assertThat(product2Metric.orderAmount).isEqualByComparingTo(BigDecimal("2000"))
+
+            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:order-paid:order-paid-event-999")).isTrue()
+        }
+    }
+
+    @DisplayName("onShutdown 통합 테스트")
+    @Nested
+    inner class OnShutdownIntegration {
+
+        @DisplayName("onShutdown 호출 시 버퍼의 데이터가 모두 flush된다")
+        @Test
+        fun `onShutdown flushes all buffered data`() {
+            // given - 데이터 버퍼에 축적
+            val command = AccumulateViewMetricCommand(
+                eventId = "shutdown-test-event",
+                productId = 1L,
+                occurredAt = Instant.now(),
+            )
+            rankingAggregationService.accumulateViewMetric(command)
+
+            // when - onShutdown 호출
+            rankingAggregationService.onShutdown()
+
+            // then - 데이터가 저장되었는지 확인
+            val metrics = productHourlyMetricJpaRepository.findAll()
+            assertThat(metrics).hasSize(1)
+            assertThat(metrics[0].viewCount).isEqualTo(1L)
         }
     }
 }

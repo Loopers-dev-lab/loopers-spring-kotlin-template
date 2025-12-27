@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.loopers.domain.ranking.MetricType
+import com.loopers.domain.ranking.AccumulateLikeCanceledMetricCommand
+import com.loopers.domain.ranking.AccumulateLikeCreatedMetricCommand
+import com.loopers.domain.ranking.AccumulateOrderPaidMetricCommand
+import com.loopers.domain.ranking.AccumulateViewMetricCommand
 import com.loopers.eventschema.CloudEventEnvelope
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -33,14 +35,16 @@ class RankingEventMapperTest {
     }
 
     @Nested
-    @DisplayName("toAccumulateMetricItems - VIEW 이벤트 매핑")
-    inner class ToAccumulateMetricItemsViewTest {
+    @DisplayName("toViewCommand - VIEW 이벤트를 AccumulateViewMetricCommand로 변환")
+    inner class ToViewCommandTest {
         @Test
-        @DisplayName("product.viewed 이벤트를 VIEW 타입의 Item으로 매핑한다")
-        fun `maps product viewed event to VIEW type Item`() {
+        @DisplayName("product.viewed 이벤트를 AccumulateViewMetricCommand로 매핑한다")
+        fun `maps product viewed event to AccumulateViewMetricCommand`() {
             // given
+            val eventId = "view-event-123"
             val eventTime = Instant.parse("2025-01-01T10:00:00Z")
             val envelope = createEnvelope(
+                id = eventId,
                 type = "loopers.product.viewed.v1",
                 aggregateId = "100",
                 payload = """{"productId": 100, "userId": 1}""",
@@ -48,26 +52,46 @@ class RankingEventMapperTest {
             )
 
             // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
+            val command = rankingEventMapper.toViewCommand(envelope)
 
             // then
-            assertThat(items).hasSize(1)
-            assertThat(items[0].productId).isEqualTo(100L)
-            assertThat(items[0].metricType).isEqualTo(MetricType.VIEW)
-            assertThat(items[0].orderAmount).isNull()
-            assertThat(items[0].occurredAt).isEqualTo(eventTime)
+            assertThat(command).isInstanceOf(AccumulateViewMetricCommand::class.java)
+            assertThat(command.eventId).isEqualTo(eventId)
+            assertThat(command.productId).isEqualTo(100L)
+            assertThat(command.occurredAt).isEqualTo(eventTime)
+        }
+
+        @Test
+        @DisplayName("eventId는 envelope.id에서 추출된다")
+        fun `eventId is extracted from envelope id`() {
+            // given
+            val eventId = "unique-event-id-456"
+            val envelope = createEnvelope(
+                id = eventId,
+                type = "loopers.product.viewed.v1",
+                aggregateId = "100",
+                payload = """{"productId": 100, "userId": 1}""",
+            )
+
+            // when
+            val command = rankingEventMapper.toViewCommand(envelope)
+
+            // then
+            assertThat(command.eventId).isEqualTo(eventId)
         }
     }
 
     @Nested
-    @DisplayName("toAccumulateMetricItems - LIKE_CREATED 이벤트 매핑")
-    inner class ToAccumulateMetricItemsLikeCreatedTest {
+    @DisplayName("toLikeCreatedCommand - LIKE_CREATED 이벤트를 AccumulateLikeCreatedMetricCommand로 변환")
+    inner class ToLikeCreatedCommandTest {
         @Test
-        @DisplayName("like.created 이벤트를 LIKE_CREATED 타입의 Item으로 매핑한다")
-        fun `maps like created event to LIKE_CREATED type Item`() {
+        @DisplayName("like.created 이벤트를 AccumulateLikeCreatedMetricCommand로 매핑한다")
+        fun `maps like created event to AccumulateLikeCreatedMetricCommand`() {
             // given
+            val eventId = "like-created-event-123"
             val eventTime = Instant.parse("2025-01-01T10:00:00Z")
             val envelope = createEnvelope(
+                id = eventId,
                 type = "loopers.like.created.v1",
                 aggregateId = "200",
                 payload = """{"productId": 200, "userId": 1}""",
@@ -75,26 +99,27 @@ class RankingEventMapperTest {
             )
 
             // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
+            val command = rankingEventMapper.toLikeCreatedCommand(envelope)
 
             // then
-            assertThat(items).hasSize(1)
-            assertThat(items[0].productId).isEqualTo(200L)
-            assertThat(items[0].metricType).isEqualTo(MetricType.LIKE_CREATED)
-            assertThat(items[0].orderAmount).isNull()
-            assertThat(items[0].occurredAt).isEqualTo(eventTime)
+            assertThat(command).isInstanceOf(AccumulateLikeCreatedMetricCommand::class.java)
+            assertThat(command.eventId).isEqualTo(eventId)
+            assertThat(command.productId).isEqualTo(200L)
+            assertThat(command.occurredAt).isEqualTo(eventTime)
         }
     }
 
     @Nested
-    @DisplayName("toAccumulateMetricItems - LIKE_CANCELED 이벤트 매핑")
-    inner class ToAccumulateMetricItemsLikeCanceledTest {
+    @DisplayName("toLikeCanceledCommand - LIKE_CANCELED 이벤트를 AccumulateLikeCanceledMetricCommand로 변환")
+    inner class ToLikeCanceledCommandTest {
         @Test
-        @DisplayName("like.canceled 이벤트를 LIKE_CANCELED 타입의 Item으로 매핑한다")
-        fun `maps like canceled event to LIKE_CANCELED type Item`() {
+        @DisplayName("like.canceled 이벤트를 AccumulateLikeCanceledMetricCommand로 매핑한다")
+        fun `maps like canceled event to AccumulateLikeCanceledMetricCommand`() {
             // given
+            val eventId = "like-canceled-event-123"
             val eventTime = Instant.parse("2025-01-01T10:00:00Z")
             val envelope = createEnvelope(
+                id = eventId,
                 type = "loopers.like.canceled.v1",
                 aggregateId = "300",
                 payload = """{"productId": 300, "userId": 1}""",
@@ -102,26 +127,27 @@ class RankingEventMapperTest {
             )
 
             // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
+            val command = rankingEventMapper.toLikeCanceledCommand(envelope)
 
             // then
-            assertThat(items).hasSize(1)
-            assertThat(items[0].productId).isEqualTo(300L)
-            assertThat(items[0].metricType).isEqualTo(MetricType.LIKE_CANCELED)
-            assertThat(items[0].orderAmount).isNull()
-            assertThat(items[0].occurredAt).isEqualTo(eventTime)
+            assertThat(command).isInstanceOf(AccumulateLikeCanceledMetricCommand::class.java)
+            assertThat(command.eventId).isEqualTo(eventId)
+            assertThat(command.productId).isEqualTo(300L)
+            assertThat(command.occurredAt).isEqualTo(eventTime)
         }
     }
 
     @Nested
-    @DisplayName("toAccumulateMetricItems - ORDER_PAID 이벤트 매핑")
-    inner class ToAccumulateMetricItemsOrderPaidTest {
+    @DisplayName("toOrderPaidCommand - ORDER_PAID 이벤트를 AccumulateOrderPaidMetricCommand로 변환")
+    inner class ToOrderPaidCommandTest {
         @Test
-        @DisplayName("order.paid 이벤트를 ORDER_PAID 타입의 Item 목록으로 매핑한다 - unitPrice * quantity로 계산")
-        fun `maps order paid event to list of ORDER_PAID type Items with per-item calculation`() {
+        @DisplayName("order.paid 이벤트를 AccumulateOrderPaidMetricCommand로 매핑한다 - unitPrice * quantity로 계산")
+        fun `maps order paid event to AccumulateOrderPaidMetricCommand with per-item calculation`() {
             // given
+            val eventId = "order-paid-event-123"
             val eventTime = Instant.parse("2025-01-01T10:00:00Z")
             val envelope = createEnvelope(
+                id = eventId,
                 type = "loopers.order.paid.v1",
                 aggregateId = "order-1",
                 payload = """{"orderId": 1, "userId": 1, "totalAmount": 30000, "orderItems": [{"productId": 100, "quantity": 2, "unitPrice": 10000}, {"productId": 200, "quantity": 1, "unitPrice": 10000}]}""",
@@ -129,146 +155,51 @@ class RankingEventMapperTest {
             )
 
             // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
+            val command = rankingEventMapper.toOrderPaidCommand(envelope)
 
-            // then - unitPrice * quantity로 개별 계산
-            assertThat(items).hasSize(2)
+            // then
+            assertThat(command).isInstanceOf(AccumulateOrderPaidMetricCommand::class.java)
+            assertThat(command.eventId).isEqualTo(eventId)
+            assertThat(command.occurredAt).isEqualTo(eventTime)
+            assertThat(command.items).hasSize(2)
 
             // 상품 100: unitPrice 10000 * quantity 2 = 20000
-            assertThat(items[0].productId).isEqualTo(100L)
-            assertThat(items[0].metricType).isEqualTo(MetricType.ORDER_PAID)
-            assertThat(items[0].orderAmount).isEqualByComparingTo(BigDecimal("20000"))
-            assertThat(items[0].occurredAt).isEqualTo(eventTime)
+            assertThat(command.items[0].productId).isEqualTo(100L)
+            assertThat(command.items[0].orderAmount).isEqualByComparingTo(BigDecimal("20000"))
 
             // 상품 200: unitPrice 10000 * quantity 1 = 10000
-            assertThat(items[1].productId).isEqualTo(200L)
-            assertThat(items[1].metricType).isEqualTo(MetricType.ORDER_PAID)
-            assertThat(items[1].orderAmount).isEqualByComparingTo(BigDecimal("10000"))
-            assertThat(items[1].occurredAt).isEqualTo(eventTime)
+            assertThat(command.items[1].productId).isEqualTo(200L)
+            assertThat(command.items[1].orderAmount).isEqualByComparingTo(BigDecimal("10000"))
         }
 
         @Test
-        @DisplayName("단일 상품 주문 시 unitPrice * quantity가 해당 상품의 orderAmount가 된다")
-        fun `single item order gets unitPrice times quantity as orderAmount`() {
+        @DisplayName("빈 orderItems 주문 시 빈 items 리스트를 가진 Command를 반환한다")
+        fun `returns Command with empty items for order with no items`() {
             // given
-            val eventTime = Instant.parse("2025-01-01T10:00:00Z")
+            val eventId = "order-paid-empty-123"
             val envelope = createEnvelope(
-                type = "loopers.order.paid.v1",
-                aggregateId = "order-2",
-                payload = """{"orderId": 2, "userId": 1, "totalAmount": 50000, "orderItems": [{"productId": 100, "quantity": 5, "unitPrice": 10000}]}""",
-                time = eventTime,
-            )
-
-            // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
-
-            // then - unitPrice 10000 * quantity 5 = 50000
-            assertThat(items).hasSize(1)
-            assertThat(items[0].productId).isEqualTo(100L)
-            assertThat(items[0].metricType).isEqualTo(MetricType.ORDER_PAID)
-            assertThat(items[0].orderAmount).isEqualByComparingTo(BigDecimal("50000"))
-        }
-
-        @Test
-        @DisplayName("빈 orderItems 주문 시 빈 리스트를 반환한다")
-        fun `returns empty list for order with no items`() {
-            // given
-            val envelope = createEnvelope(
+                id = eventId,
                 type = "loopers.order.paid.v1",
                 aggregateId = "order-3",
                 payload = """{"orderId": 3, "userId": 1, "totalAmount": 0, "orderItems": []}""",
             )
 
             // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
+            val command = rankingEventMapper.toOrderPaidCommand(envelope)
 
             // then
-            assertThat(items).isEmpty()
-        }
-
-        @Test
-        @DisplayName("10000원 상품과 1000원 상품이 균등 분배되지 않고 개별 금액으로 계산된다")
-        fun `high and low price items are NOT equally distributed but calculated per item`() {
-            // given - 스펙 예시: 10000원 상품 1개 + 1000원 상품 1개
-            val eventTime = Instant.parse("2025-01-01T10:00:00Z")
-            val envelope = createEnvelope(
-                type = "loopers.order.paid.v1",
-                aggregateId = "order-price-diff",
-                payload = """{"orderId": 4, "userId": 1, "totalAmount": 11000, "orderItems": [{"productId": 100, "quantity": 1, "unitPrice": 10000}, {"productId": 200, "quantity": 1, "unitPrice": 1000}]}""",
-                time = eventTime,
-            )
-
-            // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
-
-            // then - 균등 분배(5500)가 아닌 개별 금액으로 계산
-            assertThat(items).hasSize(2)
-
-            // 상품 100: 10000원 (균등 분배였다면 5500원)
-            assertThat(items[0].productId).isEqualTo(100L)
-            assertThat(items[0].orderAmount).isEqualByComparingTo(BigDecimal("10000"))
-            assertThat(items[0].orderAmount).isNotEqualByComparingTo(BigDecimal("5500"))
-
-            // 상품 200: 1000원 (균등 분배였다면 5500원)
-            assertThat(items[1].productId).isEqualTo(200L)
-            assertThat(items[1].orderAmount).isEqualByComparingTo(BigDecimal("1000"))
-            assertThat(items[1].orderAmount).isNotEqualByComparingTo(BigDecimal("5500"))
-        }
-
-        @Test
-        @DisplayName("이전 버전 이벤트(quantity, unitPrice 필드 없음)는 기본값(quantity=1, unitPrice=0)으로 처리된다")
-        fun `deserializes legacy events with default values for quantity and unitPrice`() {
-            // given - 이전 버전 이벤트 형식 (productId만 존재)
-            val eventTime = Instant.parse("2025-01-01T10:00:00Z")
-            val envelope = createEnvelope(
-                type = "loopers.order.paid.v1",
-                aggregateId = "order-legacy",
-                payload = """{"orderId": 99, "userId": 1, "totalAmount": 20000, "orderItems": [{"productId": 100}, {"productId": 200}]}""",
-                time = eventTime,
-            )
-
-            // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
-
-            // then - 기본값 사용: unitPrice=0, quantity=1 -> orderAmount=0
-            assertThat(items).hasSize(2)
-            assertThat(items[0].productId).isEqualTo(100L)
-            assertThat(items[0].orderAmount).isEqualByComparingTo(BigDecimal("0"))
-            assertThat(items[1].productId).isEqualTo(200L)
-            assertThat(items[1].orderAmount).isEqualByComparingTo(BigDecimal("0"))
-        }
-
-        @Test
-        @DisplayName("새 버전 이벤트는 unitPrice * quantity로 정확하게 계산된다")
-        fun `new events calculate orderAmount as unitPrice times quantity`() {
-            // given - 새 버전 이벤트 형식 (quantity, unitPrice 포함)
-            val eventTime = Instant.parse("2025-01-01T10:00:00Z")
-            val envelope = createEnvelope(
-                type = "loopers.order.paid.v1",
-                aggregateId = "order-new",
-                payload = """{"orderId": 100, "userId": 1, "totalAmount": 35000, "orderItems": [{"productId": 100, "quantity": 2, "unitPrice": 10000}, {"productId": 200, "quantity": 3, "unitPrice": 5000}]}""",
-                time = eventTime,
-            )
-
-            // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
-
-            // then - unitPrice * quantity로 개별 계산
-            assertThat(items).hasSize(2)
-            // 상품 100: unitPrice 10000 * quantity 2 = 20000
-            assertThat(items[0].productId).isEqualTo(100L)
-            assertThat(items[0].orderAmount).isEqualByComparingTo(BigDecimal("20000"))
-            // 상품 200: unitPrice 5000 * quantity 3 = 15000
-            assertThat(items[1].productId).isEqualTo(200L)
-            assertThat(items[1].orderAmount).isEqualByComparingTo(BigDecimal("15000"))
+            assertThat(command.eventId).isEqualTo(eventId)
+            assertThat(command.items).isEmpty()
         }
 
         @Test
         @DisplayName("여러 상품의 다양한 quantity와 unitPrice가 각각 정확하게 계산된다")
         fun `multiple items with various quantities and prices are calculated correctly`() {
             // given
+            val eventId = "order-paid-multi-123"
             val eventTime = Instant.parse("2025-01-01T10:00:00Z")
             val envelope = createEnvelope(
+                id = eventId,
                 type = "loopers.order.paid.v1",
                 aggregateId = "order-multi",
                 payload = """{"orderId": 5, "userId": 1, "totalAmount": 125000, "orderItems": [{"productId": 100, "quantity": 3, "unitPrice": 25000}, {"productId": 200, "quantity": 2, "unitPrice": 15000}, {"productId": 300, "quantity": 1, "unitPrice": 20000}]}""",
@@ -276,40 +207,19 @@ class RankingEventMapperTest {
             )
 
             // when
-            val items = rankingEventMapper.toAccumulateMetricItems(envelope)
+            val command = rankingEventMapper.toOrderPaidCommand(envelope)
 
             // then
-            assertThat(items).hasSize(3)
+            assertThat(command.items).hasSize(3)
             // 상품 100: 25000 * 3 = 75000
-            assertThat(items[0].productId).isEqualTo(100L)
-            assertThat(items[0].orderAmount).isEqualByComparingTo(BigDecimal("75000"))
+            assertThat(command.items[0].productId).isEqualTo(100L)
+            assertThat(command.items[0].orderAmount).isEqualByComparingTo(BigDecimal("75000"))
             // 상품 200: 15000 * 2 = 30000
-            assertThat(items[1].productId).isEqualTo(200L)
-            assertThat(items[1].orderAmount).isEqualByComparingTo(BigDecimal("30000"))
+            assertThat(command.items[1].productId).isEqualTo(200L)
+            assertThat(command.items[1].orderAmount).isEqualByComparingTo(BigDecimal("30000"))
             // 상품 300: 20000 * 1 = 20000
-            assertThat(items[2].productId).isEqualTo(300L)
-            assertThat(items[2].orderAmount).isEqualByComparingTo(BigDecimal("20000"))
-        }
-    }
-
-    @Nested
-    @DisplayName("toAccumulateMetricItems - 알 수 없는 이벤트 타입")
-    inner class ToAccumulateMetricItemsUnknownTypeTest {
-        @Test
-        @DisplayName("알 수 없는 이벤트 타입에서 예외가 발생한다")
-        fun `throws exception for unknown event type`() {
-            // given
-            val envelope = createEnvelope(
-                type = "loopers.unknown.event.v1",
-                aggregateId = "100",
-                payload = """{"productId": 100}""",
-            )
-
-            // when & then
-            assertThatThrownBy { rankingEventMapper.toAccumulateMetricItems(envelope) }
-                .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("Unknown event type")
-                .hasMessageContaining("loopers.unknown.event.v1")
+            assertThat(command.items[2].productId).isEqualTo(300L)
+            assertThat(command.items[2].orderAmount).isEqualByComparingTo(BigDecimal("20000"))
         }
     }
 

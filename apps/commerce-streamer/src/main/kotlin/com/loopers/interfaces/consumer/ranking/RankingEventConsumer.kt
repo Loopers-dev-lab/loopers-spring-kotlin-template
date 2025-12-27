@@ -2,10 +2,8 @@ package com.loopers.interfaces.consumer.ranking
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.config.kafka.KafkaConfig
-import com.loopers.domain.ranking.AccumulateMetricCommand
 import com.loopers.domain.ranking.RankingAggregationService
 import com.loopers.eventschema.CloudEventEnvelope
-import com.loopers.support.idempotency.EventHandledService
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
@@ -16,28 +14,22 @@ import org.springframework.stereotype.Component
  *
  * - 구독 토픽: product-events, like-events, order-events
  * - 지원 이벤트: loopers.product.viewed.v1, loopers.like.created.v1, loopers.like.canceled.v1, loopers.order.paid.v1
- * - 멱등성: DB 기반 (idempotencyKey: {consumerGroup}:{eventId})
- * - 처리 방식: 레코드 단위 순차 처리
+ * - 멱등성: Service 레이어에서 처리 (EventHandledRepository 사용)
+ * - 처리 방식: 레코드 단위 순차 처리, 순수 위임 (pure delegation)
  */
 @Component
 class RankingEventConsumer(
     private val rankingAggregationService: RankingAggregationService,
     private val rankingEventMapper: RankingEventMapper,
-    private val eventHandledService: EventHandledService,
     private val objectMapper: ObjectMapper,
 ) {
     companion object {
-        private const val CONSUMER_GROUP = "ranking-aggregation"
         private val SUPPORTED_TYPES = setOf(
             "loopers.product.viewed.v1",
             "loopers.like.created.v1",
             "loopers.like.canceled.v1",
             "loopers.order.paid.v1",
         )
-    }
-
-    private val idempotencyKeyExtractor: (CloudEventEnvelope) -> String = { envelope ->
-        "$CONSUMER_GROUP:${envelope.id}"
     }
 
     @KafkaListener(
@@ -55,10 +47,24 @@ class RankingEventConsumer(
     private fun processRecord(record: ConsumerRecord<String, String>) {
         val envelope = objectMapper.readValue(record.value(), CloudEventEnvelope::class.java)
         if (envelope.type !in SUPPORTED_TYPES) return
-        val idempotencyKey = idempotencyKeyExtractor(envelope)
-        if (eventHandledService.isAlreadyHandled(idempotencyKey)) return
-        val items = rankingEventMapper.toAccumulateMetricItems(envelope)
-        rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = items))
-        eventHandledService.markAsHandled(idempotencyKey)
+
+        when (envelope.type) {
+            "loopers.product.viewed.v1" -> {
+                val command = rankingEventMapper.toViewCommand(envelope)
+                rankingAggregationService.accumulateViewMetric(command)
+            }
+            "loopers.like.created.v1" -> {
+                val command = rankingEventMapper.toLikeCreatedCommand(envelope)
+                rankingAggregationService.accumulateLikeCreatedMetric(command)
+            }
+            "loopers.like.canceled.v1" -> {
+                val command = rankingEventMapper.toLikeCanceledCommand(envelope)
+                rankingAggregationService.accumulateLikeCanceledMetric(command)
+            }
+            "loopers.order.paid.v1" -> {
+                val command = rankingEventMapper.toOrderPaidCommand(envelope)
+                rankingAggregationService.accumulateOrderPaidMetric(command)
+            }
+        }
     }
 }

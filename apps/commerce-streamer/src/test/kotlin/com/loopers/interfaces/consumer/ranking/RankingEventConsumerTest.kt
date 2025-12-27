@@ -4,17 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.loopers.domain.ranking.AccumulateMetricCommand
-import com.loopers.domain.ranking.MetricType
+import com.loopers.domain.ranking.AccumulateLikeCanceledMetricCommand
+import com.loopers.domain.ranking.AccumulateLikeCreatedMetricCommand
+import com.loopers.domain.ranking.AccumulateOrderPaidMetricCommand
+import com.loopers.domain.ranking.AccumulateViewMetricCommand
 import com.loopers.domain.ranking.RankingAggregationService
 import com.loopers.eventschema.CloudEventEnvelope
-import com.loopers.support.idempotency.EventHandledService
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -28,7 +27,6 @@ class RankingEventConsumerTest {
 
     private lateinit var rankingAggregationService: RankingAggregationService
     private lateinit var rankingEventMapper: RankingEventMapper
-    private lateinit var eventHandledService: EventHandledService
     private lateinit var objectMapper: ObjectMapper
     private lateinit var consumer: RankingEventConsumer
     private lateinit var acknowledgment: Acknowledgment
@@ -37,7 +35,6 @@ class RankingEventConsumerTest {
     fun setUp() {
         rankingAggregationService = mockk(relaxed = true)
         rankingEventMapper = mockk()
-        eventHandledService = mockk(relaxed = true)
         objectMapper = jacksonObjectMapper().apply {
             registerModule(JavaTimeModule())
             disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -47,31 +44,28 @@ class RankingEventConsumerTest {
         consumer = RankingEventConsumer(
             rankingAggregationService = rankingAggregationService,
             rankingEventMapper = rankingEventMapper,
-            eventHandledService = eventHandledService,
             objectMapper = objectMapper,
         )
     }
 
     @Nested
-    @DisplayName("이벤트 타입 필터링 테스트")
-    inner class EventTypeFilteringTest {
+    @DisplayName("이벤트 타입별 서비스 위임 테스트")
+    inner class EventTypeDelegationTest {
 
         @Test
-        @DisplayName("지원하는 이벤트 타입만 처리한다 - loopers.product.viewed.v1")
-        fun `processes supported event type - product viewed`() {
+        @DisplayName("loopers.product.viewed.v1 이벤트를 accumulateViewMetric으로 위임한다")
+        fun `delegates product viewed event to accumulateViewMetric`() {
             // given
             val envelope = createEnvelope(
                 type = "loopers.product.viewed.v1",
                 payload = """{"productId": 100, "userId": 1}""",
             )
-            val item = AccumulateMetricCommand.Item(
+            val command = AccumulateViewMetricCommand(
+                eventId = envelope.id,
                 productId = 100L,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
                 occurredAt = envelope.time,
             )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(any()) } returns listOf(item)
+            every { rankingEventMapper.toViewCommand(any()) } returns command
 
             val record = createConsumerRecord(envelope)
 
@@ -79,26 +73,24 @@ class RankingEventConsumerTest {
             consumer.consume(listOf(record), acknowledgment)
 
             // then
-            verify(exactly = 1) { rankingEventMapper.toAccumulateMetricItems(any()) }
-            verify(exactly = 1) { rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = listOf(item))) }
+            verify(exactly = 1) { rankingEventMapper.toViewCommand(any()) }
+            verify(exactly = 1) { rankingAggregationService.accumulateViewMetric(command) }
         }
 
         @Test
-        @DisplayName("지원하는 이벤트 타입만 처리한다 - loopers.like.created.v1")
-        fun `processes supported event type - like created`() {
+        @DisplayName("loopers.like.created.v1 이벤트를 accumulateLikeCreatedMetric으로 위임한다")
+        fun `delegates like created event to accumulateLikeCreatedMetric`() {
             // given
             val envelope = createEnvelope(
                 type = "loopers.like.created.v1",
                 payload = """{"productId": 200, "userId": 1}""",
             )
-            val item = AccumulateMetricCommand.Item(
+            val command = AccumulateLikeCreatedMetricCommand(
+                eventId = envelope.id,
                 productId = 200L,
-                metricType = MetricType.LIKE_CREATED,
-                orderAmount = null,
                 occurredAt = envelope.time,
             )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(any()) } returns listOf(item)
+            every { rankingEventMapper.toLikeCreatedCommand(any()) } returns command
 
             val record = createConsumerRecord(envelope)
 
@@ -106,26 +98,24 @@ class RankingEventConsumerTest {
             consumer.consume(listOf(record), acknowledgment)
 
             // then
-            verify(exactly = 1) { rankingEventMapper.toAccumulateMetricItems(any()) }
-            verify(exactly = 1) { rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = listOf(item))) }
+            verify(exactly = 1) { rankingEventMapper.toLikeCreatedCommand(any()) }
+            verify(exactly = 1) { rankingAggregationService.accumulateLikeCreatedMetric(command) }
         }
 
         @Test
-        @DisplayName("지원하는 이벤트 타입만 처리한다 - loopers.like.canceled.v1")
-        fun `processes supported event type - like canceled`() {
+        @DisplayName("loopers.like.canceled.v1 이벤트를 accumulateLikeCanceledMetric으로 위임한다")
+        fun `delegates like canceled event to accumulateLikeCanceledMetric`() {
             // given
             val envelope = createEnvelope(
                 type = "loopers.like.canceled.v1",
                 payload = """{"productId": 300, "userId": 1}""",
             )
-            val item = AccumulateMetricCommand.Item(
+            val command = AccumulateLikeCanceledMetricCommand(
+                eventId = envelope.id,
                 productId = 300L,
-                metricType = MetricType.LIKE_CANCELED,
-                orderAmount = null,
                 occurredAt = envelope.time,
             )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(any()) } returns listOf(item)
+            every { rankingEventMapper.toLikeCanceledCommand(any()) } returns command
 
             val record = createConsumerRecord(envelope)
 
@@ -133,26 +123,29 @@ class RankingEventConsumerTest {
             consumer.consume(listOf(record), acknowledgment)
 
             // then
-            verify(exactly = 1) { rankingEventMapper.toAccumulateMetricItems(any()) }
-            verify(exactly = 1) { rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = listOf(item))) }
+            verify(exactly = 1) { rankingEventMapper.toLikeCanceledCommand(any()) }
+            verify(exactly = 1) { rankingAggregationService.accumulateLikeCanceledMetric(command) }
         }
 
         @Test
-        @DisplayName("지원하는 이벤트 타입만 처리한다 - loopers.order.paid.v1")
-        fun `processes supported event type - order paid`() {
+        @DisplayName("loopers.order.paid.v1 이벤트를 accumulateOrderPaidMetric으로 위임한다")
+        fun `delegates order paid event to accumulateOrderPaidMetric`() {
             // given
             val envelope = createEnvelope(
                 type = "loopers.order.paid.v1",
-                payload = """{"orderId": 1, "userId": 1, "totalAmount": 10000, "orderItems": [{"productId": 100, "quantity": 1}]}""",
+                payload = """{"orderId": 1, "userId": 1, "totalAmount": 10000, "orderItems": [{"productId": 100, "unitPrice": 10000, "quantity": 1}]}""",
             )
-            val item = AccumulateMetricCommand.Item(
-                productId = 100L,
-                metricType = MetricType.ORDER_PAID,
-                orderAmount = BigDecimal("10000"),
+            val command = AccumulateOrderPaidMetricCommand(
+                eventId = envelope.id,
+                items = listOf(
+                    AccumulateOrderPaidMetricCommand.Item(
+                        productId = 100L,
+                        orderAmount = BigDecimal("10000"),
+                    ),
+                ),
                 occurredAt = envelope.time,
             )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(any()) } returns listOf(item)
+            every { rankingEventMapper.toOrderPaidCommand(any()) } returns command
 
             val record = createConsumerRecord(envelope)
 
@@ -160,9 +153,14 @@ class RankingEventConsumerTest {
             consumer.consume(listOf(record), acknowledgment)
 
             // then
-            verify(exactly = 1) { rankingEventMapper.toAccumulateMetricItems(any()) }
-            verify(exactly = 1) { rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = listOf(item))) }
+            verify(exactly = 1) { rankingEventMapper.toOrderPaidCommand(any()) }
+            verify(exactly = 1) { rankingAggregationService.accumulateOrderPaidMetric(command) }
         }
+    }
+
+    @Nested
+    @DisplayName("이벤트 타입 필터링 테스트")
+    inner class EventTypeFilteringTest {
 
         @Test
         @DisplayName("지원하지 않는 이벤트 타입은 무시한다")
@@ -178,9 +176,14 @@ class RankingEventConsumerTest {
             consumer.consume(listOf(record), acknowledgment)
 
             // then
-            verify(exactly = 0) { rankingEventMapper.toAccumulateMetricItems(any()) }
-            verify(exactly = 0) { rankingAggregationService.accumulateMetric(any()) }
-            verify(exactly = 0) { eventHandledService.markAsHandled(any()) }
+            verify(exactly = 0) { rankingEventMapper.toViewCommand(any()) }
+            verify(exactly = 0) { rankingEventMapper.toLikeCreatedCommand(any()) }
+            verify(exactly = 0) { rankingEventMapper.toLikeCanceledCommand(any()) }
+            verify(exactly = 0) { rankingEventMapper.toOrderPaidCommand(any()) }
+            verify(exactly = 0) { rankingAggregationService.accumulateViewMetric(any()) }
+            verify(exactly = 0) { rankingAggregationService.accumulateLikeCreatedMetric(any()) }
+            verify(exactly = 0) { rankingAggregationService.accumulateLikeCanceledMetric(any()) }
+            verify(exactly = 0) { rankingAggregationService.accumulateOrderPaidMetric(any()) }
         }
 
         @Test
@@ -197,14 +200,12 @@ class RankingEventConsumerTest {
                 type = "loopers.unknown.event.v1",
                 payload = """{"productId": 200}""",
             )
-            val item = AccumulateMetricCommand.Item(
+            val command = AccumulateViewMetricCommand(
+                eventId = supportedEnvelope.id,
                 productId = 100L,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
                 occurredAt = supportedEnvelope.time,
             )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(any()) } returns listOf(item)
+            every { rankingEventMapper.toViewCommand(any()) } returns command
 
             val records = listOf(
                 createConsumerRecord(supportedEnvelope),
@@ -215,95 +216,8 @@ class RankingEventConsumerTest {
             consumer.consume(records, acknowledgment)
 
             // then
-            verify(exactly = 1) { rankingEventMapper.toAccumulateMetricItems(any()) }
-            verify(exactly = 1) { rankingAggregationService.accumulateMetric(any()) }
-        }
-    }
-
-    @Nested
-    @DisplayName("멱등성 테스트")
-    inner class IdempotencyTest {
-
-        @Test
-        @DisplayName("이미 처리된 이벤트는 무시한다")
-        fun `ignores already handled events`() {
-            // given
-            val eventId = "already-handled-event-id"
-            val envelope = createEnvelope(
-                id = eventId,
-                type = "loopers.product.viewed.v1",
-                payload = """{"productId": 100, "userId": 1}""",
-            )
-            every { eventHandledService.isAlreadyHandled("ranking-aggregation:$eventId") } returns true
-
-            val record = createConsumerRecord(envelope)
-
-            // when
-            consumer.consume(listOf(record), acknowledgment)
-
-            // then
-            verify(exactly = 0) { rankingEventMapper.toAccumulateMetricItems(any()) }
-            verify(exactly = 0) { rankingAggregationService.accumulateMetric(any()) }
-            verify(exactly = 0) { eventHandledService.markAsHandled(any()) }
-        }
-
-        @Test
-        @DisplayName("새로운 이벤트 처리 후 멱등성 키를 저장한다")
-        fun `marks event as handled after processing new event`() {
-            // given
-            val eventId = "new-event-id"
-            val envelope = createEnvelope(
-                id = eventId,
-                type = "loopers.product.viewed.v1",
-                payload = """{"productId": 100, "userId": 1}""",
-            )
-            val item = AccumulateMetricCommand.Item(
-                productId = 100L,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
-                occurredAt = envelope.time,
-            )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(any()) } returns listOf(item)
-
-            val record = createConsumerRecord(envelope)
-
-            // when
-            consumer.consume(listOf(record), acknowledgment)
-
-            // then
-            verify(exactly = 1) { eventHandledService.markAsHandled("ranking-aggregation:$eventId") }
-        }
-
-        @Test
-        @DisplayName("멱등성 키 형식이 올바르다 - consumerGroup:eventId")
-        fun `idempotency key format is correct`() {
-            // given
-            val eventId = "test-event-id-123"
-            val envelope = createEnvelope(
-                id = eventId,
-                type = "loopers.product.viewed.v1",
-                payload = """{"productId": 100, "userId": 1}""",
-            )
-            val item = AccumulateMetricCommand.Item(
-                productId = 100L,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
-                occurredAt = envelope.time,
-            )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(any()) } returns listOf(item)
-
-            val keySlot = slot<String>()
-            every { eventHandledService.isAlreadyHandled(capture(keySlot)) } returns false
-
-            val record = createConsumerRecord(envelope)
-
-            // when
-            consumer.consume(listOf(record), acknowledgment)
-
-            // then
-            assertThat(keySlot.captured).isEqualTo("ranking-aggregation:$eventId")
+            verify(exactly = 1) { rankingEventMapper.toViewCommand(any()) }
+            verify(exactly = 1) { rankingAggregationService.accumulateViewMetric(any()) }
         }
     }
 
@@ -325,21 +239,18 @@ class RankingEventConsumerTest {
                 type = "loopers.like.created.v1",
                 payload = """{"productId": 200, "userId": 1}""",
             )
-            val item1 = AccumulateMetricCommand.Item(
+            val viewCommand = AccumulateViewMetricCommand(
+                eventId = envelope1.id,
                 productId = 100L,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
                 occurredAt = envelope1.time,
             )
-            val item2 = AccumulateMetricCommand.Item(
+            val likeCommand = AccumulateLikeCreatedMetricCommand(
+                eventId = envelope2.id,
                 productId = 200L,
-                metricType = MetricType.LIKE_CREATED,
-                orderAmount = null,
                 occurredAt = envelope2.time,
             )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(match { it.id == "event-1" }) } returns listOf(item1)
-            every { rankingEventMapper.toAccumulateMetricItems(match { it.id == "event-2" }) } returns listOf(item2)
+            every { rankingEventMapper.toViewCommand(any()) } returns viewCommand
+            every { rankingEventMapper.toLikeCreatedCommand(any()) } returns likeCommand
 
             val records = listOf(
                 createConsumerRecord(envelope1),
@@ -350,41 +261,10 @@ class RankingEventConsumerTest {
             consumer.consume(records, acknowledgment)
 
             // then
-            verify(exactly = 2) { rankingEventMapper.toAccumulateMetricItems(any()) }
-            verify(exactly = 2) { rankingAggregationService.accumulateMetric(any()) }
-            verify(exactly = 2) { eventHandledService.markAsHandled(any()) }
-        }
-
-        @Test
-        @DisplayName("ORDER_PAID 이벤트는 여러 Item을 생성하여 하나의 Command로 accumulateMetric한다")
-        fun `accumulates all Items from ORDER_PAID in single Command`() {
-            // given
-            val envelope = createEnvelope(
-                type = "loopers.order.paid.v1",
-                payload = """{"orderId": 1, "userId": 1, "totalAmount": 30000, "orderItems": [{"productId": 100, "quantity": 1}, {"productId": 200, "quantity": 1}]}""",
-            )
-            val item1 = AccumulateMetricCommand.Item(
-                productId = 100L,
-                metricType = MetricType.ORDER_PAID,
-                orderAmount = BigDecimal("15000"),
-                occurredAt = envelope.time,
-            )
-            val item2 = AccumulateMetricCommand.Item(
-                productId = 200L,
-                metricType = MetricType.ORDER_PAID,
-                orderAmount = BigDecimal("15000"),
-                occurredAt = envelope.time,
-            )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(any()) } returns listOf(item1, item2)
-
-            val record = createConsumerRecord(envelope)
-
-            // when
-            consumer.consume(listOf(record), acknowledgment)
-
-            // then
-            verify(exactly = 1) { rankingAggregationService.accumulateMetric(AccumulateMetricCommand(items = listOf(item1, item2))) }
+            verify(exactly = 1) { rankingEventMapper.toViewCommand(any()) }
+            verify(exactly = 1) { rankingEventMapper.toLikeCreatedCommand(any()) }
+            verify(exactly = 1) { rankingAggregationService.accumulateViewMetric(any()) }
+            verify(exactly = 1) { rankingAggregationService.accumulateLikeCreatedMetric(any()) }
         }
 
         @Test
@@ -395,14 +275,12 @@ class RankingEventConsumerTest {
                 type = "loopers.product.viewed.v1",
                 payload = """{"productId": 100, "userId": 1}""",
             )
-            val item = AccumulateMetricCommand.Item(
+            val command = AccumulateViewMetricCommand(
+                eventId = envelope.id,
                 productId = 100L,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
                 occurredAt = envelope.time,
             )
-            every { eventHandledService.isAlreadyHandled(any()) } returns false
-            every { rankingEventMapper.toAccumulateMetricItems(any()) } returns listOf(item)
+            every { rankingEventMapper.toViewCommand(any()) } returns command
 
             val record = createConsumerRecord(envelope)
 

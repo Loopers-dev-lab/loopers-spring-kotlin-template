@@ -1,5 +1,8 @@
 package com.loopers.domain.ranking
 
+import com.loopers.support.idempotency.EventHandled
+import com.loopers.support.idempotency.EventHandledRepository
+import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -9,6 +12,7 @@ import org.springframework.stereotype.Service
  * - 서비스가 버퍼를 내부적으로 소유 (스케줄러는 순수 트리거)
  * - MetricBuffer를 통해 원자적 버퍼 스왑 수행
  * - poll() 시 새 버퍼로 교체되어 이벤트 유실 없이 안전하게 drain
+ * - 멱등성 체크를 서비스 레이어에서 수행 (EventHandledRepository 사용)
  */
 @Service
 class RankingAggregationService(
@@ -17,10 +21,13 @@ class RankingAggregationService(
     private val rankingReader: ProductRankingReader,
     private val rankingWeightRepository: RankingWeightRepository,
     private val scoreCalculator: RankingScoreCalculator,
+    private val eventHandledRepository: EventHandledRepository,
 ) {
     companion object {
         private val DECAY_FACTOR = java.math.BigDecimal("0.1")
         private const val MAX_RETRY_COUNT = 3
+        private const val IDEMPOTENCY_PREFIX = "ranking"
+        private const val BUFFER_HARD_THRESHOLD = 10000
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -28,20 +35,91 @@ class RankingAggregationService(
     // 버퍼는 서비스 내부에서 소유
     private val buffer = MetricBuffer()
 
-    /**
-     * 메트릭을 내부 버퍼에 축적
-     *
-     * 시간 버킷은 항목의 occurredAt을 시간 단위로 truncate하여 결정
-     * 14:59:58에 발생한 항목이 15:00:02에 flush되어도 14:00 버킷에 올바르게 집계됨
-     */
-    fun accumulateMetric(command: AccumulateMetricCommand) {
-        command.items.forEach { item ->
-            val key = AggregationKey.from(item)
+    // ==================== Public API with Idempotency ====================
 
-            buffer.accumulate(key) {
-                increment(item.metricType)
-                item.orderAmount?.let { addOrderAmount(it) }
+    /**
+     * VIEW 이벤트 메트릭을 축적
+     *
+     * 멱등성 체크 -> 버퍼 축적 -> 멱등성 기록 순서로 수행
+     * 기록 실패는 비즈니스 로직에 영향을 주지 않음
+     */
+    fun accumulateViewMetric(command: AccumulateViewMetricCommand) {
+        val idempotencyKey = "$IDEMPOTENCY_PREFIX:view:${command.eventId}"
+        if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
+
+        accumulateToBuffer(AggregationKey.of(command.productId, command.occurredAt)) {
+            increment(MetricType.VIEW)
+        }
+
+        eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
+    }
+
+    /**
+     * LIKE_CREATED 이벤트 메트릭을 축적
+     */
+    fun accumulateLikeCreatedMetric(command: AccumulateLikeCreatedMetricCommand) {
+        val idempotencyKey = "$IDEMPOTENCY_PREFIX:like-created:${command.eventId}"
+        if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
+
+        accumulateToBuffer(AggregationKey.of(command.productId, command.occurredAt)) {
+            increment(MetricType.LIKE_CREATED)
+        }
+
+        eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
+    }
+
+    /**
+     * LIKE_CANCELED 이벤트 메트릭을 축적
+     */
+    fun accumulateLikeCanceledMetric(command: AccumulateLikeCanceledMetricCommand) {
+        val idempotencyKey = "$IDEMPOTENCY_PREFIX:like-canceled:${command.eventId}"
+        if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
+
+        accumulateToBuffer(AggregationKey.of(command.productId, command.occurredAt)) {
+            increment(MetricType.LIKE_CANCELED)
+        }
+
+        eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
+    }
+
+    /**
+     * ORDER_PAID 이벤트 메트릭을 축적
+     *
+     * 여러 주문 아이템을 각각의 상품별로 버퍼에 축적
+     */
+    fun accumulateOrderPaidMetric(command: AccumulateOrderPaidMetricCommand) {
+        val idempotencyKey = "$IDEMPOTENCY_PREFIX:order-paid:${command.eventId}"
+        if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
+
+        command.items.forEach { item ->
+            accumulateToBuffer(AggregationKey.of(item.productId, command.occurredAt)) {
+                increment(MetricType.ORDER_PAID)
+                addOrderAmount(item.orderAmount)
             }
+        }
+
+        eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
+    }
+
+    // ==================== Buffer Management ====================
+
+    /**
+     * 모든 버퍼 연산의 단일 진입점
+     * threshold 체크가 누락되지 않도록 보장
+     */
+    private fun accumulateToBuffer(key: AggregationKey, action: MutableCounts.() -> Unit) {
+        buffer.accumulate(key, action)
+        checkBufferThreshold()
+    }
+
+    /**
+     * 버퍼 임계치 체크 및 필요시 동기적 flush 수행
+     */
+    private fun checkBufferThreshold() {
+        val currentSize = buffer.size()
+        if (currentSize >= BUFFER_HARD_THRESHOLD) {
+            logger.warn("Buffer reached threshold ({}), triggering synchronous flush", currentSize)
+            flush()
         }
     }
 
@@ -183,5 +261,20 @@ class RankingAggregationService(
 
         logger.error("{} failed after {} retry attempts, data may be lost", operationName, MAX_RETRY_COUNT)
         throw lastException!!
+    }
+
+    // ==================== Lifecycle ====================
+
+    /**
+     * 애플리케이션 종료 시 버퍼에 남은 데이터를 최종 flush
+     *
+     * SIGTERM 수신 시 Spring 컨테이너가 @PreDestroy 메서드를 호출하여
+     * 버퍼 데이터 손실을 방지함
+     */
+    @PreDestroy
+    fun onShutdown() {
+        logger.info("Shutting down RankingAggregationService, performing final flush...")
+        flush()
+        logger.info("Final flush completed")
     }
 }

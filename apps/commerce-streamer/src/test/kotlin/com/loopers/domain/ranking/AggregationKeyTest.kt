@@ -86,66 +86,6 @@ class AggregationKeyTest {
         }
     }
 
-    @DisplayName("from 팩토리 메서드 테스트")
-    @Nested
-    inner class From {
-
-        @DisplayName("AccumulateMetricCommand.Item으로부터 AggregationKey를 생성한다")
-        @Test
-        fun `creates AggregationKey from AccumulateMetricCommand Item`() {
-            // given
-            val item = AccumulateMetricCommand.Item(
-                productId = 100L,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
-                occurredAt = Instant.parse("2025-01-15T14:30:45Z"),
-            )
-
-            // when
-            val key = AggregationKey.from(item)
-
-            // then
-            assertThat(key.productId).isEqualTo(100L)
-            assertThat(key.hourBucket).isEqualTo(Instant.parse("2025-01-15T14:00:00Z"))
-        }
-
-        @DisplayName("항목의 occurredAt이 시간 단위로 truncate된다")
-        @Test
-        fun `truncates occurredAt to hour`() {
-            // given
-            val item = AccumulateMetricCommand.Item(
-                productId = 1L,
-                metricType = MetricType.LIKE_CREATED,
-                orderAmount = null,
-                occurredAt = Instant.parse("2025-01-15T14:59:59.999Z"),
-            )
-
-            // when
-            val key = AggregationKey.from(item)
-
-            // then
-            assertThat(key.hourBucket).isEqualTo(Instant.parse("2025-01-15T14:00:00Z"))
-        }
-
-        @DisplayName("정각 시간의 항목은 해당 시간 버킷에 포함된다")
-        @Test
-        fun `item at exact hour belongs to that hour bucket`() {
-            // given
-            val item = AccumulateMetricCommand.Item(
-                productId = 1L,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
-                occurredAt = Instant.parse("2025-01-15T15:00:00Z"),
-            )
-
-            // when
-            val key = AggregationKey.from(item)
-
-            // then
-            assertThat(key.hourBucket).isEqualTo(Instant.parse("2025-01-15T15:00:00Z"))
-        }
-    }
-
     @DisplayName("of 팩토리 메서드 테스트")
     @Nested
     inner class Of {
@@ -203,15 +143,9 @@ class AggregationKeyTest {
         fun `item at 14_59_58 flushed at 15_00_02 goes to 14h bucket`() {
             // given - 14:59:58에 발생한 항목
             val itemOccurredAt = Instant.parse("2025-01-15T14:59:58Z")
-            val item = AccumulateMetricCommand.Item(
-                productId = 1L,
-                metricType = MetricType.VIEW,
-                orderAmount = null,
-                occurredAt = itemOccurredAt,
-            )
 
             // when - flush 시점(15:00:02)과 무관하게 occurredAt 기준으로 버킷 결정
-            val key = AggregationKey.from(item)
+            val key = AggregationKey.of(1L, itemOccurredAt)
 
             // then
             assertThat(key.hourBucket).isEqualTo(Instant.parse("2025-01-15T14:00:00Z"))

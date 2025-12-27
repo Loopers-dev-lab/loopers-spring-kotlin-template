@@ -17,18 +17,42 @@ enum class MetricType {
 }
 
 /**
- * AccumulateMetricCommand - 시간별 상품 메트릭 축적 Command
- *
- * - 버퍼에 적재되어 flush 시 DB/Redis에 반영
- * - occurredAt 기준으로 시간 버킷 결정
+ * Command for VIEW event
  */
-data class AccumulateMetricCommand(
+data class AccumulateViewMetricCommand(
+    val eventId: String,
+    val productId: Long,
+    val occurredAt: Instant,
+)
+
+/**
+ * Command for LIKE_CREATED event
+ */
+data class AccumulateLikeCreatedMetricCommand(
+    val eventId: String,
+    val productId: Long,
+    val occurredAt: Instant,
+)
+
+/**
+ * Command for LIKE_CANCELED event
+ */
+data class AccumulateLikeCanceledMetricCommand(
+    val eventId: String,
+    val productId: Long,
+    val occurredAt: Instant,
+)
+
+/**
+ * Command for ORDER_PAID event
+ */
+data class AccumulateOrderPaidMetricCommand(
+    val eventId: String,
     val items: List<Item>,
+    val occurredAt: Instant,
 ) {
     data class Item(
         val productId: Long,
-        val metricType: MetricType,
-        val orderAmount: BigDecimal?,
-        val occurredAt: Instant,
+        val orderAmount: BigDecimal,
     )
 }
