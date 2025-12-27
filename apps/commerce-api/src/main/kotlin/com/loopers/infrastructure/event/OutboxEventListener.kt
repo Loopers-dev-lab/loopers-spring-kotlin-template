@@ -14,16 +14,16 @@ import com.loopers.domain.product.event.ProductViewedEvent
 import com.loopers.domain.product.event.StockDecreasedEvent
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Propagation
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
 /**
  * Transactional Outbox Pattern 구현
  * - BEFORE_COMMIT: 비즈니스 로직과 같은 트랜잭션에서 저장
- * - fallbackExecution: 트랜잭션 없는 컨텍스트에서도 실행
  * - 이벤트 유실 방지
+ *
+ * Note: @TransactionalEventListener(phase = BEFORE_COMMIT)는
+ * 이미 트랜잭션 컨텍스트 안에서 실행되므로 별도의 @Transactional 불필요
  */
 @Component
 class OutboxEventListener(
@@ -32,8 +32,7 @@ class OutboxEventListener(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
-    @Transactional(propagation = Propagation.REQUIRED)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     fun handleDomainEvent(event: DomainEvent) {
         // 멱등성 체크
         if (eventOutboxRepository.existsByEventId(event.eventId)) {
