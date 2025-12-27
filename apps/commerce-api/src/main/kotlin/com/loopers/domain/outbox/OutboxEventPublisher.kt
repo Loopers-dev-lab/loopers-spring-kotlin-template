@@ -1,19 +1,16 @@
 package com.loopers.domain.outbox
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.json.JsonMapper
 
 /**
  * Outbox 이벤트 발행자
  * 도메인 이벤트를 Outbox 테이블에 저장
  */
 @Service
-class OutboxEventPublisher(
-    private val outboxEventRepository: OutboxEventRepository,
-    private val objectMapper: ObjectMapper,
-) {
+class OutboxEventPublisher(private val outboxEventRepository: OutboxEventRepository, private val jsonMapper: JsonMapper) {
     private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
 
     /**
@@ -30,7 +27,7 @@ class OutboxEventPublisher(
         aggregateId: Long,
     ) {
         try {
-            val payloadJson = objectMapper.writeValueAsString(payload)
+            val payloadJson = jsonMapper.writeValueAsString(payload)
 
             val outboxEvent = OutboxEvent.create(
                 eventType = eventType,
@@ -45,7 +42,7 @@ class OutboxEventPublisher(
 
             logger.debug(
                 "Outbox 이벤트 저장: eventType=$eventType, aggregateType=$aggregateType, " +
-                    "aggregateId=$aggregateId, partitionKey=$partitionKey",
+                        "aggregateId=$aggregateId, partitionKey=$partitionKey",
             )
         } catch (e: Exception) {
             logger.error("Outbox 이벤트 저장 실패: eventType=$eventType", e)

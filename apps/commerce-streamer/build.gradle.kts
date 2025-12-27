@@ -1,8 +1,16 @@
 plugins {
     id("org.jetbrains.kotlin.plugin.jpa")
+    id("com.google.devtools.ksp")
+}
+
+kotlin {
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
 }
 
 dependencies {
+
     // add-ons
     implementation(project(":modules:jpa"))
     implementation(project(":modules:redis"))
@@ -15,9 +23,6 @@ dependencies {
     // web
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-
-    // querydsl
-    kapt("com.querydsl:querydsl-apt::jakarta")
 
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))

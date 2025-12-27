@@ -1,14 +1,7 @@
 package com.loopers.interfaces.api
 
-data class ApiResponse<T>(
-    val meta: Metadata,
-    val data: T?,
-) {
-    data class Metadata(
-        val result: Result,
-        val errorCode: String?,
-        val message: String?,
-    ) {
+data class ApiResponse<T>(val meta: Metadata, val data: T?) {
+    data class Metadata(val result: Result, val errorCode: String?, val message: String?) {
         enum class Result { SUCCESS, FAIL }
 
         companion object {

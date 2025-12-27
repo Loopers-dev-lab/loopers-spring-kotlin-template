@@ -11,14 +11,12 @@ data class OrderCreateInfo(
     val status: String,
 ) {
     companion object {
-        fun from(order: Order): OrderCreateInfo {
-            return OrderCreateInfo(
+        fun from(order: Order): OrderCreateInfo = OrderCreateInfo(
                 orderId = order.id,
                 userId = order.userId,
                 totalAmount = order.totalAmount.amount,
                 currency = order.totalAmount.currency.name,
                 status = order.status.name,
             )
-        }
     }
 }

@@ -13,15 +13,13 @@ class PgClientConfig {
     fun feignLoggerLevel(): Logger.Level = Logger.Level.FULL
 
     @Bean
-    fun feignOptions(): Request.Options {
-        return Request.Options(
+    fun feignOptions(): Request.Options = Request.Options(
             1000L,
             TimeUnit.MILLISECONDS,
             3000L,
             TimeUnit.MILLISECONDS,
             true,
         )
-    }
 
     @Bean
     fun feignRetryer(): Retryer = Retryer.NEVER_RETRY

@@ -20,8 +20,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.resttestclient.TestRestTemplate
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpMethod
@@ -33,28 +34,16 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureTestRestTemplate
 @ContextConfiguration(initializers = [RedisTestContainersConfig::class])
-@DisplayName("RankingController 통합 테스트")
-class RankingV1ApiE2ETest {
-
-    @Autowired
-    private lateinit var testRestTemplate: TestRestTemplate
-
-    @Autowired
-    private lateinit var rankingRepository: RankingRepository
-
-    @Autowired
-    private lateinit var productRepository: ProductRepository
-
-    @Autowired
-    private lateinit var brandRepository: BrandRepository
-
-    @Autowired
-    private lateinit var redisTemplate: RedisTemplate<String, String>
-
-    @Autowired
-    private lateinit var databaseCleanUp: DatabaseCleanUp
-
+class RankingV1ApiE2ETest @Autowired constructor(
+    private val testRestTemplate: TestRestTemplate,
+    private val rankingRepository: RankingRepository,
+    private val productRepository: ProductRepository,
+    private val brandRepository: BrandRepository,
+    private val redisTemplate: RedisTemplate<String, String>,
+    private val databaseCleanUp: DatabaseCleanUp,
+) {
     private lateinit var brand: Brand
     private lateinit var product1: Product
     private lateinit var product2: Product

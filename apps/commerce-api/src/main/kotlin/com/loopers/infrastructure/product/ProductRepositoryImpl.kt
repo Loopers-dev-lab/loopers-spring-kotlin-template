@@ -10,9 +10,7 @@ import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Repository
 
 @Repository
-class ProductRepositoryImpl(
-    private val productJpaRepository: ProductJpaRepository,
-) : ProductRepository {
+class ProductRepositoryImpl(private val productJpaRepository: ProductJpaRepository) : ProductRepository {
     override fun findById(id: Long): Product? = productJpaRepository.findByIdOrNull(id)
 
     override fun findAllById(ids: List<Long>): List<Product> = productJpaRepository.findAllById(ids)

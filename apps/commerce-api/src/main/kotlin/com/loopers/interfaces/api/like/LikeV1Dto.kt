@@ -30,8 +30,5 @@ class LikeV1Dto {
         }
     }
 
-    data class BrandSummary(
-        val id: Long,
-        val name: String,
-    )
+    data class BrandSummary(val id: Long, val name: String)
 }

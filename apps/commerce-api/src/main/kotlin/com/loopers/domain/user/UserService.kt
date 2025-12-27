@@ -7,9 +7,7 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 
 @Service
-class UserService(
-    private val userRepository: UserRepository,
-) {
+class UserService(private val userRepository: UserRepository) {
     fun registerUser(
         name: String,
         email: String,
@@ -39,11 +37,9 @@ class UserService(
         }
     }
 
-    fun getUser(userId: Long): User {
-        return userRepository.findById(userId)
+    fun getUser(userId: Long): User = userRepository.findById(userId)
             ?: throw CoreException(
                 errorType = ErrorType.NOT_FOUND,
                 customMessage = "사용자를 찾을 수 없습니다: $userId",
             )
-    }
 }

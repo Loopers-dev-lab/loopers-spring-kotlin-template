@@ -16,10 +16,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1/like")
-class LikeV1Controller(
-    private val likeFacade: LikeFacade,
-    private val productFacade: ProductFacade,
-) : LikeV1ApiSpec {
+class LikeV1Controller(private val likeFacade: LikeFacade, private val productFacade: ProductFacade) : LikeV1ApiSpec {
     @PostMapping("/products/{productId}")
     override fun addLike(
         @RequestHeader("X-USER-ID") userId: Long,

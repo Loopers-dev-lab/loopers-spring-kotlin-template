@@ -8,7 +8,4 @@ package com.loopers.application.payment
  * @property orderId 주문 정보
  * @property transactions 주문에 엮인 트랜잭션 목록
  */
-data class OrderInfo(
-    val orderId: String,
-    val transactions: List<TransactionInfo>,
-)
+data class OrderInfo(val orderId: String, val transactions: List<TransactionInfo>)

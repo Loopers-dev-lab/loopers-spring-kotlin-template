@@ -1,8 +1,7 @@
 package com.loopers.config.kafka
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.springframework.boot.autoconfigure.kafka.KafkaProperties
+import org.springframework.boot.kafka.autoconfigure.KafkaProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.annotation.EnableKafka
@@ -17,9 +16,9 @@ import org.springframework.kafka.listener.ContainerProperties
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
 import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.converter.BatchMessagingMessageConverter
-import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter
+import org.springframework.kafka.support.converter.ByteArrayJacksonJsonMessageConverter
 import org.springframework.util.backoff.FixedBackOff
-import java.util.HashMap
+import tools.jackson.databind.json.JsonMapper
 
 @EnableKafka
 @Configuration
@@ -52,14 +51,12 @@ class KafkaConfig {
     }
 
     @Bean
-    fun kafkaTemplate(producerFactory: ProducerFactory<Any, Any>): KafkaTemplate<Any, Any> {
-        return KafkaTemplate(producerFactory)
-    }
+    fun kafkaTemplate(producerFactory: ProducerFactory<Any, Any>): KafkaTemplate<Any, Any> = KafkaTemplate(producerFactory)
 
     @Bean
-    fun jsonMessageConverter(objectMapper: ObjectMapper): ByteArrayJsonMessageConverter {
-        return ByteArrayJsonMessageConverter(objectMapper)
-    }
+    fun jsonMessageConverter(
+        jsonMapper: JsonMapper,
+    ): ByteArrayJacksonJsonMessageConverter = ByteArrayJacksonJsonMessageConverter(jsonMapper)
 
     @Bean
     fun kafkaListenerContainerFactory(
@@ -68,14 +65,12 @@ class KafkaConfig {
     ): ConcurrentKafkaListenerContainerFactory<*, *> {
         val consumerConfig = HashMap(kafkaProperties.buildConsumerProperties())
 
-        return ConcurrentKafkaListenerContainerFactory<Any, Any>().apply {
-            consumerFactory = DefaultKafkaConsumerFactory(consumerConfig)
-            containerProperties.ackMode = ContainerProperties.AckMode.MANUAL
-            setConcurrency(3)
-
-            // DLQ 설정
-            setCommonErrorHandler(createErrorHandler(kafkaTemplate))
-        }
+        val factory = ConcurrentKafkaListenerContainerFactory<Any, Any>()
+        factory.setConsumerFactory(DefaultKafkaConsumerFactory(consumerConfig))
+        factory.containerProperties.ackMode = ContainerProperties.AckMode.MANUAL
+        factory.setConcurrency(3)
+        factory.setCommonErrorHandler(createErrorHandler(kafkaTemplate))
+        return factory
     }
 
     /**
@@ -105,24 +100,23 @@ class KafkaConfig {
     @Bean(BATCH_LISTENER)
     fun defaultBatchListenerContainerFactory(
         kafkaProperties: KafkaProperties,
-        converter: ByteArrayJsonMessageConverter,
+        converter: ByteArrayJacksonJsonMessageConverter,
     ): ConcurrentKafkaListenerContainerFactory<*, *> {
-        val consumerConfig = HashMap(kafkaProperties.buildConsumerProperties())
-            .apply {
-                put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, MAX_POLLING_SIZE)
-                put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, FETCH_MIN_BYTES)
-                put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, FETCH_MAX_WAIT_MS)
-                put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, SESSION_TIMEOUT_MS)
-                put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, HEARTBEAT_INTERVAL_MS)
-                put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, MAX_POLL_INTERVAL_MS)
-            }
-
-        return ConcurrentKafkaListenerContainerFactory<Any, Any>().apply {
-            consumerFactory = DefaultKafkaConsumerFactory(consumerConfig)
-            containerProperties.ackMode = ContainerProperties.AckMode.MANUAL
-            setBatchMessageConverter(BatchMessagingMessageConverter(converter))
-            setConcurrency(3)
-            isBatchListener = true
+        val consumerConfig = HashMap(kafkaProperties.buildConsumerProperties()).apply {
+            put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, MAX_POLLING_SIZE)
+            put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, FETCH_MIN_BYTES)
+            put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, FETCH_MAX_WAIT_MS)
+            put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, SESSION_TIMEOUT_MS)
+            put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, HEARTBEAT_INTERVAL_MS)
+            put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, MAX_POLL_INTERVAL_MS)
         }
+
+        val factory = ConcurrentKafkaListenerContainerFactory<Any, Any>()
+        factory.setConsumerFactory(DefaultKafkaConsumerFactory(consumerConfig))
+        factory.containerProperties.ackMode = ContainerProperties.AckMode.MANUAL
+        factory.setBatchMessageConverter(BatchMessagingMessageConverter(converter))
+        factory.setConcurrency(3)
+        factory.setBatchListener(true)
+        return factory
     }
 }

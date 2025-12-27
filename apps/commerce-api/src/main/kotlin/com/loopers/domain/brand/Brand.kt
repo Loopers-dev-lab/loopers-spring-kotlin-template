@@ -9,10 +9,7 @@ import jakarta.persistence.Table
 
 @Entity
 @Table(name = "brands")
-class Brand(
-    name: String,
-    description: String?,
-) : BaseEntity() {
+class Brand(name: String, description: String?) : BaseEntity() {
     @Column(nullable = false, unique = true, length = 100)
     var name: String = name
         protected set

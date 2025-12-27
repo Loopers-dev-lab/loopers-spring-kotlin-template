@@ -15,9 +15,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1/payments")
-class PaymentApi(
-    private val paymentApplicationService: PaymentApplicationService,
-) {
+class PaymentApi(private val paymentApplicationService: PaymentApplicationService) {
     @PostMapping
     fun request(
         userInfo: UserInfo,
@@ -42,19 +40,18 @@ class PaymentApi(
     fun getTransaction(
         userInfo: UserInfo,
         @PathVariable("transactionKey") transactionKey: String,
-    ): ApiResponse<PaymentDto.TransactionDetailResponse> {
-        return paymentApplicationService.getTransactionDetailInfo(userInfo, transactionKey)
+    ): ApiResponse<PaymentDto.TransactionDetailResponse> = paymentApplicationService.getTransactionDetailInfo(
+        userInfo,
+        transactionKey,
+    )
             .let { PaymentDto.TransactionDetailResponse.from(it) }
             .let { ApiResponse.success(it) }
-    }
 
     @GetMapping
     fun getTransactionsByOrder(
         userInfo: UserInfo,
         @RequestParam("orderId", required = false) orderId: String,
-    ): ApiResponse<PaymentDto.OrderResponse> {
-        return paymentApplicationService.findTransactionsByOrderId(userInfo, orderId)
+    ): ApiResponse<PaymentDto.OrderResponse> = paymentApplicationService.findTransactionsByOrderId(userInfo, orderId)
             .let { PaymentDto.OrderResponse.from(it) }
             .let { ApiResponse.success(it) }
-    }
 }

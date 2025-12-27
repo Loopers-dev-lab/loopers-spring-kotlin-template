@@ -1,7 +1,5 @@
 package com.loopers.infrastructure.product
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.loopers.domain.product.CacheResult
 import com.loopers.domain.product.ProductCacheRepository
 import com.loopers.domain.product.SortType
@@ -9,13 +7,13 @@ import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ScanOptions
 import org.springframework.stereotype.Repository
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 
 @Repository
-class ProductCacheRepositoryImpl(
-    private val redisTemplate: RedisTemplate<String, String>,
-    private val objectMapper: ObjectMapper,
-) : ProductCacheRepository {
+class ProductCacheRepositoryImpl(private val redisTemplate: RedisTemplate<String, String>, private val jsonMapper: JsonMapper) :
+    ProductCacheRepository {
     companion object {
         private const val PRODUCT_DETAIL_CACHE_PREFIX = "product:detail:"
         private const val PRODUCT_LIST_CACHE_PREFIX = "product:list:"
@@ -26,7 +24,7 @@ class ProductCacheRepositoryImpl(
         try {
             val cached = redisTemplate.opsForValue().get(cacheKey)
             if (cached != null) {
-                val value = objectMapper.readValue(cached, typeReference)
+                val value = jsonMapper.readValue(cached, typeReference)
                 CacheResult.Hit(value)
             } else {
                 CacheResult.Miss
@@ -42,7 +40,7 @@ class ProductCacheRepositoryImpl(
         ttl: Duration,
     ) {
         runCatching {
-            val cacheValue = objectMapper.writeValueAsString(data)
+            val cacheValue = jsonMapper.writeValueAsString(data)
             redisTemplate.opsForValue().set(cacheKey, cacheValue, ttl)
         }.onFailure { e ->
             logger.error("Failed to write to Redis cache: cacheKey=$cacheKey", e)
@@ -84,7 +82,7 @@ class ProductCacheRepositoryImpl(
                 .count(100)
                 .build()
 
-            connection.scan(scanOptions).use { cursor ->
+            connection.keyCommands().scan(scanOptions).use { cursor ->
                 while (cursor.hasNext()) {
                     keys.add(String(cursor.next()))
                 }

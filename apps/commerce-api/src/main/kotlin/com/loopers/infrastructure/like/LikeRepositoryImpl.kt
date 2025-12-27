@@ -7,9 +7,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Repository
 
 @Repository
-class LikeRepositoryImpl(
-    private val likeJpaRepository: LikeJpaRepository,
-) : LikeRepository {
+class LikeRepositoryImpl(private val likeJpaRepository: LikeJpaRepository) : LikeRepository {
     override fun existsByUserIdAndProductId(
         userId: Long,
         productId: Long,
@@ -26,9 +24,10 @@ class LikeRepositoryImpl(
     override fun save(like: Like): Like = likeJpaRepository.save(like)
     override fun saveAll(likes: List<Like>): List<Like> = likeJpaRepository.saveAll(likes)
 
-    override fun deleteByUserIdAndProductId(userId: Long, productId: Long): Long {
-        return likeJpaRepository.deleteByUserIdAndProductId(userId, productId)
-    }
+    override fun deleteByUserIdAndProductId(userId: Long, productId: Long): Long = likeJpaRepository.deleteByUserIdAndProductId(
+        userId,
+        productId,
+    )
 
     override fun findByUserId(
         userId: Long,

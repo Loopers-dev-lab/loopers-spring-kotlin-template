@@ -21,19 +21,13 @@ data class RankingPageInfo(
 /**
  * 랭킹 항목 정보
  */
-data class RankingItemInfo(
-    val rank: Int,
-    val score: Double,
-    val product: RankingProductInfo,
-) {
+data class RankingItemInfo(val rank: Int, val score: Double, val product: RankingProductInfo) {
     companion object {
-        fun from(ranking: Ranking, product: Product): RankingItemInfo {
-            return RankingItemInfo(
+        fun from(ranking: Ranking, product: Product): RankingItemInfo = RankingItemInfo(
                 rank = ranking.rank,
                 score = ranking.score.value,
                 product = RankingProductInfo.from(product),
             )
-        }
     }
 }
 
@@ -49,8 +43,7 @@ data class RankingProductInfo(
     val likeCount: Long,
 ) {
     companion object {
-        fun from(product: Product): RankingProductInfo {
-            return RankingProductInfo(
+        fun from(product: Product): RankingProductInfo = RankingProductInfo(
                 id = product.id,
                 name = product.name,
                 price = product.price.amount,
@@ -58,6 +51,5 @@ data class RankingProductInfo(
                 brand = BrandInfo.from(product.brand),
                 likeCount = product.likeCount,
             )
-        }
     }
 }

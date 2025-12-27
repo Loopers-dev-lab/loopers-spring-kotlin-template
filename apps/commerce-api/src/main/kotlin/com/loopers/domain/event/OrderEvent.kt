@@ -19,8 +19,7 @@ data class OrderCreatedEvent(
     val createdAt: ZonedDateTime,
 ) {
     companion object {
-        fun from(order: Order, couponId: Long?): OrderCreatedEvent {
-            return OrderCreatedEvent(
+        fun from(order: Order, couponId: Long?): OrderCreatedEvent = OrderCreatedEvent(
                 eventId = UUID.randomUUID(),
                 orderId = requireNotNull(order.id) { "Order id must not be null when creating OrderCreatedEvent" },
                 userId = order.userId,
@@ -29,27 +28,19 @@ data class OrderCreatedEvent(
                 items = order.items.map { OrderItemInfo.from(it) },
                 createdAt = order.createdAt,
             )
-        }
     }
 
     /**
      * 주문 상품 정보
      */
-    data class OrderItemInfo(
-        val productId: Long,
-        val productName: String,
-        val quantity: Int,
-        val priceAtOrder: Long,
-    ) {
+    data class OrderItemInfo(val productId: Long, val productName: String, val quantity: Int, val priceAtOrder: Long) {
         companion object {
-            fun from(orderItem: com.loopers.domain.order.OrderItem): OrderItemInfo {
-                return OrderItemInfo(
+            fun from(orderItem: com.loopers.domain.order.OrderItem): OrderItemInfo = OrderItemInfo(
                     productId = orderItem.productId,
                     productName = orderItem.productName,
                     quantity = orderItem.quantity,
                     priceAtOrder = orderItem.priceAtOrder.amount.toLong(),
                 )
-            }
         }
     }
 }

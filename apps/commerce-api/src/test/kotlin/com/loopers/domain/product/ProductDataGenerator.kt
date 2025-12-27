@@ -19,23 +19,13 @@ import kotlin.random.Random
 @SpringBootTest
 @ActiveProfiles("local")
 @Disabled("데이터 생성용 테스트 - 필요시에만 실행")
-class ProductDataGenerator {
-
-    @Autowired
-    private lateinit var productRepository: ProductRepository
-
-    @Autowired
-    private lateinit var brandRepository: BrandRepository
-
-    @Autowired
-    private lateinit var stockRepository: StockRepository
-
-    @Autowired
-    private lateinit var userRepository: UserRepository
-
-    @Autowired
-    private lateinit var likeRepository: LikeRepository
-
+class ProductDataGenerator @Autowired constructor(
+    private val productRepository: ProductRepository,
+    private val brandRepository: BrandRepository,
+    private val stockRepository: StockRepository,
+    private val userRepository: UserRepository,
+    private val likeRepository: LikeRepository,
+) {
     @Test
     @Transactional
     fun `10만개 상품 데이터 생성`() {

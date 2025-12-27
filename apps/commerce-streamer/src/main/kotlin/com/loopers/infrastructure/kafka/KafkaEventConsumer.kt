@@ -1,7 +1,5 @@
 package com.loopers.infrastructure.kafka
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import com.loopers.domain.event.EventHandled
 import com.loopers.domain.event.EventHandledRepository
 import com.loopers.domain.event.LikeAddedEvent
@@ -12,9 +10,9 @@ import com.loopers.domain.event.StockDepletedEvent
 import com.loopers.domain.product.ProductMetricsRepository
 import com.loopers.domain.ranking.RankingKey
 import com.loopers.domain.ranking.RankingRepository
+import com.loopers.domain.ranking.RankingScope
 import com.loopers.domain.ranking.RankingScore
 import com.loopers.domain.ranking.RankingScoreCalculator
-import com.loopers.domain.ranking.RankingScope
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.kafka.annotation.KafkaListener
@@ -27,6 +25,8 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.readValue
 import java.util.UUID
 
 /**
@@ -39,7 +39,7 @@ import java.util.UUID
 @Component
 @ConditionalOnBean(KafkaTemplate::class)
 class KafkaEventConsumer(
-    private val objectMapper: ObjectMapper,
+    private val jsonMapper: JsonMapper,
     private val eventHandledRepository: EventHandledRepository,
     private val productMetricsRepository: ProductMetricsRepository,
     private val rankingRepository: RankingRepository,
@@ -69,9 +69,13 @@ class KafkaEventConsumer(
             // 이벤트 타입에 따라 분기 처리
             when (eventType) {
                 "LikeAddedEvent" -> handleLikeAdded(message, acknowledgment)
+
                 "LikeRemovedEvent" -> handleLikeRemoved(message, acknowledgment)
+
                 "ProductViewEvent" -> handleProductView(message, acknowledgment)
+
                 "StockDepletedEvent" -> handleStockDepleted(message, acknowledgment)
+
                 else -> {
                     logger.warn("알 수 없는 이벤트 타입: $eventType")
                     acknowledgeAfterCommit(acknowledgment)
@@ -105,6 +109,7 @@ class KafkaEventConsumer(
 
             when (eventType) {
                 "OrderCreatedEvent" -> handleOrderCreated(message, acknowledgment)
+
                 else -> {
                     logger.warn("알 수 없는 이벤트 타입: $eventType")
                     acknowledgeAfterCommit(acknowledgment)
@@ -121,7 +126,7 @@ class KafkaEventConsumer(
      * LikeAddedEvent 처리
      */
     private fun handleLikeAdded(message: String, acknowledgment: Acknowledgment) {
-        val event: LikeAddedEvent = objectMapper.readValue(message)
+        val event: LikeAddedEvent = jsonMapper.readValue(message)
 
         // 멱등성 체크
         if (isAlreadyHandled(event.eventId)) {
@@ -158,7 +163,7 @@ class KafkaEventConsumer(
      * LikeRemovedEvent 처리
      */
     private fun handleLikeRemoved(message: String, acknowledgment: Acknowledgment) {
-        val event: LikeRemovedEvent = objectMapper.readValue(message)
+        val event: LikeRemovedEvent = jsonMapper.readValue(message)
 
         if (isAlreadyHandled(event.eventId)) {
             logger.debug("이미 처리된 이벤트: LikeRemovedEvent, eventId=${event.eventId}, productId=${event.productId}")
@@ -190,7 +195,7 @@ class KafkaEventConsumer(
      * OrderCreatedEvent 처리
      */
     private fun handleOrderCreated(message: String, acknowledgment: Acknowledgment) {
-        val event: OrderCreatedEvent = objectMapper.readValue(message)
+        val event: OrderCreatedEvent = jsonMapper.readValue(message)
 
         if (isAlreadyHandled(event.eventId)) {
             logger.debug("이미 처리된 이벤트: OrderCreatedEvent, eventId=${event.eventId}, orderId=${event.orderId}")
@@ -214,8 +219,8 @@ class KafkaEventConsumer(
 
             logger.debug(
                 "상품 판매량 집계 완료: productId=${item.productId}, " +
-                    "quantity=${item.quantity}, amount=$totalAmount, " +
-                    "totalSalesCount=${metrics.salesCount}, totalSalesAmount=${metrics.totalSalesAmount}",
+                        "quantity=${item.quantity}, amount=$totalAmount, " +
+                        "totalSalesCount=${metrics.salesCount}, totalSalesAmount=${metrics.totalSalesAmount}",
             )
         }
 
@@ -231,7 +236,7 @@ class KafkaEventConsumer(
         acknowledgeAfterCommit(acknowledgment)
         logger.info(
             "OrderCreatedEvent 처리 완료: eventId=${event.eventId}, orderId=${event.orderId}, " +
-                "items=${event.items.size}개 상품 판매량 집계",
+                    "items=${event.items.size}개 상품 판매량 집계",
         )
     }
 
@@ -246,7 +251,7 @@ class KafkaEventConsumer(
      * - 추후 확장: 재고 소진 알림 발송, 자동 발주 등
      */
     private fun handleStockDepleted(message: String, acknowledgment: Acknowledgment) {
-        val event: StockDepletedEvent = objectMapper.readValue(message)
+        val event: StockDepletedEvent = jsonMapper.readValue(message)
 
         if (isAlreadyHandled(event.eventId)) {
             logger.debug("이미 처리된 이벤트: StockDepletedEvent, eventId=${event.eventId}, productId=${event.productId}")
@@ -257,7 +262,7 @@ class KafkaEventConsumer(
         // 재고 소진 이벤트 로깅
         logger.warn(
             "재고 소진 이벤트 수신: productId=${event.productId}, " +
-                "previousQuantity=${event.previousQuantity}",
+                    "previousQuantity=${event.previousQuantity}",
         )
 
         // 처리 완료 기록
@@ -280,7 +285,7 @@ class KafkaEventConsumer(
      * ProductViewEvent 처리
      */
     private fun handleProductView(message: String, acknowledgment: Acknowledgment) {
-        val event: ProductViewEvent = objectMapper.readValue(message)
+        val event: ProductViewEvent = jsonMapper.readValue(message)
 
         if (isAlreadyHandled(event.eventId)) {
             logger.debug("이미 처리된 이벤트: ProductViewEvent, eventId=${event.eventId}, productId=${event.productId}")
@@ -315,9 +320,7 @@ class KafkaEventConsumer(
     /**
      * 이미 처리된 이벤트인지 확인 (멱등성 보장)
      */
-    private fun isAlreadyHandled(eventId: UUID): Boolean {
-        return eventHandledRepository.existsByEventId(eventId)
-    }
+    private fun isAlreadyHandled(eventId: UUID): Boolean = eventHandledRepository.existsByEventId(eventId)
 
     /**
      * 랭킹 점수 업데이트
@@ -336,7 +339,7 @@ class KafkaEventConsumer(
 
         logger.debug(
             "랭킹 점수 업데이트 완료: productId=$productId, score=${score.value}, " +
-                "dailyKey=${dailyKey.toRedisKey()}, hourlyKey=${hourlyKey.toRedisKey()}",
+                    "dailyKey=${dailyKey.toRedisKey()}, hourlyKey=${hourlyKey.toRedisKey()}",
         )
     }
 
