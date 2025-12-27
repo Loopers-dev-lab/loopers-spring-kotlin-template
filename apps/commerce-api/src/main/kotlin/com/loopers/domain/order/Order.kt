@@ -30,10 +30,10 @@ class Order(
 ) : BaseEntity() {
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
-    private val orderItems: MutableList<OrderItem> = items.toMutableList()
+    private val _items: MutableList<OrderItem> = items.toMutableList()
 
     val items: List<OrderItem>
-        get() = orderItems.toList()
+        get() = _items.toList()
 
     @Embedded
     @AttributeOverrides(

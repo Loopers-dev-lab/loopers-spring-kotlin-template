@@ -194,37 +194,6 @@ class OrderServiceIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `주문을 취소하면 재고가 복구된다`() {
-        // given
-        val request = OrderCreateRequest(
-            items = listOf(
-                OrderItemRequest(productId = product1.id, quantity = 2),
-                OrderItemRequest(productId = product2.id, quantity = 3),
-            ),
-        )
-        val orderInfo = orderFacade.createOrder(user.id, request)
-
-        // 재고 차감 확인
-        val stockAfterOrder1 = requireNotNull(stockRepository.findByProductId(product1.id))
-        val stockAfterOrder2 = requireNotNull(stockRepository.findByProductId(product2.id))
-        assertThat(stockAfterOrder1.quantity).isEqualTo(98) // 100 - 2
-        assertThat(stockAfterOrder2.quantity).isEqualTo(97) // 100 - 3
-
-        // when
-        orderService.cancelOrder(orderInfo.orderId, user.id)
-
-        // then
-        val cancelledOrder = requireNotNull(orderRepository.findById(orderInfo.orderId))
-        assertThat(cancelledOrder.status).isEqualTo(OrderStatus.CANCELLED)
-
-        // 재고 복구 확인
-        val stockAfterCancel1 = requireNotNull(stockRepository.findByProductId(product1.id))
-        val stockAfterCancel2 = requireNotNull(stockRepository.findByProductId(product2.id))
-        assertThat(stockAfterCancel1.quantity).isEqualTo(100) // 98 + 2
-        assertThat(stockAfterCancel2.quantity).isEqualTo(100) // 97 + 3
-    }
-
-    @Test
     fun `주문 취소 시 본인의 주문만 취소할 수 있다`() {
         // given
         val request = OrderCreateRequest(

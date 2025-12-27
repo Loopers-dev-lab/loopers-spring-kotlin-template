@@ -13,7 +13,7 @@ interface OrderJpaRepository : JpaRepository<Order, Long> {
     fun findByUserId(userId: Long, pageable: Pageable): Page<Order>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = ["orderItems"])
+    @EntityGraph(attributePaths = ["_items"])
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     fun findByIdWithLock(id: Long): Order?
 }
