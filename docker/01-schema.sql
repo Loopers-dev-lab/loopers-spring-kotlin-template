@@ -194,7 +194,7 @@ CREATE TABLE IF NOT EXISTS dead_letter_queue (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'DLQ 레코드 ID',
     event_id VARCHAR(36) NOT NULL UNIQUE COMMENT '이벤트 고유 ID',
     event_type VARCHAR(50) NOT NULL COMMENT '이벤트 타입',
-    aggregate_id BIGINT NOT NULL COMMENT '집합 ID',
+    aggregate_id VARCHAR(255) NULL COMMENT '집합 ID',
     payload TEXT NOT NULL COMMENT '메시지 본문 (JSON)',
     error_message TEXT NOT NULL COMMENT '에러 메시지',
     stack_trace TEXT NOT NULL COMMENT '스택 트레이스',
@@ -222,6 +222,10 @@ CREATE TABLE IF NOT EXISTS event_handled (
     handled_at DATETIME(6) NOT NULL COMMENT '처리 시각'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='이벤트 중복 처리 방지';
 
+-- event_handled 테이블 인덱스 (정리 작업 및 조회 성능 향상)
+CREATE INDEX idx_event_handled_type_time ON event_handled(event_type, handled_at);
+CREATE INDEX idx_event_handled_cleanup ON event_handled(handled_at);
+
 -- ================================================
 -- 13. event_outbox 테이블 (Transactional Outbox Pattern)
 -- ================================================
@@ -247,6 +251,7 @@ CREATE TABLE IF NOT EXISTS event_outbox (
 -- event_outbox 테이블 인덱스
 CREATE INDEX idx_event_outbox_processed ON event_outbox(processed, created_at);
 CREATE UNIQUE INDEX idx_event_outbox_event_id ON event_outbox(event_id);
+CREATE INDEX idx_event_outbox_cleanup ON event_outbox(processed, processed_at);
 
 -- ================================================
 -- 14. product_metrics 테이블 (상품별 집계 데이터)
