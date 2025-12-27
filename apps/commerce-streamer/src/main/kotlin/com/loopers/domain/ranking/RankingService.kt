@@ -54,7 +54,7 @@ class RankingService(
             // DB 멱등성 체크
             if (eventService.isAlreadyHandled(event.eventId, aggregateId)) {
                 log.debug("이미 처리된 랭킹 조회수 이벤트: eventId={}, aggregateId={}", event.eventId, aggregateId)
-                return
+                return@forEach
             }
 
             // 즉시 처리 완료 기록 (배치 내 중복 방지)
@@ -117,7 +117,7 @@ class RankingService(
             // DB 멱등성 체크
             if (eventService.isAlreadyHandled(event.eventId, aggregateId)) {
                 log.debug("이미 처리된 랭킹 좋아요 이벤트: eventId={}, aggregateId={}", event.eventId, aggregateId)
-                return
+                return@forEach
             }
 
             // 즉시 처리 완료 기록 (배치 내 중복 방지)
@@ -188,7 +188,7 @@ class RankingService(
                 // DB 멱등성 체크
                 if (eventService.isAlreadyHandled(event.eventId, aggregateId)) {
                     log.debug("이미 처리된 랭킹 주문 이벤트: eventId={}, aggregateId={}", event.eventId, aggregateId)
-                    return
+                    return@forEach
                 }
 
                 // 즉시 처리 완료 기록 (배치 내 중복 방지)
