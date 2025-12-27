@@ -263,42 +263,66 @@ sequenceDiagram
 
 **5. Weight 변경 및 재계산 흐름 (US-3)**
 
+Weight 변경 시 재계산 대상:
+- **이전 버킷**: 이미 지난 시간대이므로 재계산 불필요 (계산에만 사용)
+- **현재 버킷**: (현재 metric × 새 Weight) + (이전 metric × 새 Weight × 0.1)
+- **다음 버킷**: 스케줄러가 이미 생성했다면 (현재 버킷 점수 × 0.1)로 업데이트
+
 ```mermaid
 sequenceDiagram
     participant C as Admin Client
-    participant RS as Rankings 도메인<br/>(commerce-api)
+    participant API as Rankings 도메인<br/>(commerce-api)
+    participant K as Kafka
+    participant CS as 랭킹 집계 시스템<br/>(commerce-streamer)
     participant DB as RDB
     participant R as Redis
 
-    C->>RS: Weight 변경 요청
-    activate RS
+    C->>API: Weight 변경 요청
+    activate API
     
     alt 유효성 검증 실패
-        RS-->>C: 에러 응답 (음수 등)
+        API-->>C: 에러 응답 (음수 등)
     else 유효성 검증 성공
-        RS->>DB: Weight 설정 업데이트
+        API->>DB: Weight 설정 업데이트
         activate DB
-        DB-->>RS: 업데이트 완료
+        DB-->>API: 업데이트 완료
         deactivate DB
         
-        RS->>DB: 현재 버킷 카운트 조회
-        activate DB
-        DB-->>RS: 상품별 카운트 목록
-        deactivate DB
-        
-        RS->>R: 이전 Score 조회 (ZRANGE)
-        activate R
-        R-->>RS: 상품별 이전 Score
-        deactivate R
-        
-        RS->>RS: Score 재계산<br/>(카운트 × 새 Weight) + (이전 Score × 0.1)
-        
-        RS->>R: ZADD (전체 Score 교체)
-        activate R
-        R-->>RS: 갱신 완료
-        deactivate R
-        
-        RS-->>C: 변경 완료 응답
+        API->>K: RankingWeightChangedEvent 발행
+        API-->>C: 변경 완료 응답 (재계산은 비동기)
     end
-    deactivate RS
+    deactivate API
+    
+    Note over K,CS: 비동기 재계산 (commerce-streamer)
+    
+    K->>CS: RankingWeightChangedEvent 수신
+    activate CS
+    
+    CS->>DB: 새 Weight 조회
+    CS->>DB: 이전 버킷 metric 조회 (계산용)
+    CS->>DB: 현재 버킷 metric 조회
+    
+    CS->>CS: 이전 점수 계산 (저장 X)<br/>previousScore = 이전 metric × Weight
+    
+    CS->>CS: 현재 버킷 점수 계산<br/>currentScore = (현재 metric × Weight)<br/>+ (previousScore × 0.1)
+    
+    CS->>R: 현재 버킷 ZADD (전체 교체)
+    activate R
+    R-->>CS: 갱신 완료
+    deactivate R
+    
+    CS->>R: 다음 버킷 존재 여부 확인
+    activate R
+    R-->>CS: 존재 여부 반환
+    deactivate R
+    
+    opt 다음 버킷 존재 시
+        CS->>CS: 다음 버킷 점수 계산<br/>nextScore = currentScore × 0.1
+        CS->>R: 다음 버킷 ZADD (전체 교체)
+        activate R
+        R-->>CS: 갱신 완료
+        deactivate R
+    end
+    
+    deactivate CS
 ```

@@ -44,4 +44,21 @@ object RankingKeyGenerator {
      * @return Format: "ranking:products:yyyyMMddHH" for previous hour
      */
     fun previousBucketKey(): String = previousBucketKey(Instant.now())
+
+    /**
+     * Next bucket key from given instant (1 hour after)
+     * @param instant Time reference
+     * @return Format: "ranking:products:yyyyMMddHH" for next hour
+     */
+    fun nextBucketKey(instant: Instant): String {
+        val truncated = instant.truncatedTo(ChronoUnit.HOURS)
+        val nextHour = truncated.plus(1, ChronoUnit.HOURS)
+        return "$PREFIX:${FORMATTER.format(nextHour)}"
+    }
+
+    /**
+     * Next bucket key based on current time
+     * @return Format: "ranking:products:yyyyMMddHH" for next hour
+     */
+    fun nextBucketKey(): String = nextBucketKey(Instant.now())
 }

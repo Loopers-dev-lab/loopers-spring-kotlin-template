@@ -116,34 +116,57 @@ flowchart TD
 
 RankingWeightChangedEvent를 수신하여 RDB 카운트 기반으로 전체 Score를 재계산하는 플로우입니다.
 
+**재계산 대상 버킷:**
+- **이전 버킷**: 이미 지난 시간대이므로 Redis에 저장하지 않음 (cold start 방지를 위한 계산에만 사용)
+- **현재 버킷**: (현재 metric × 새 Weight) + (이전 metric × 새 Weight × 0.1)
+- **다음 버킷**: 스케줄러가 이미 생성했다면 (현재 버킷 점수 × 0.1)로 업데이트
+
 ```mermaid
 flowchart TD
     Start([RankingWeightChangedEvent 수신]) --> FetchWeight[새 Weight 설정 조회]
     
-    FetchWeight --> FetchCurrentBucket[현재 버킷 RDB 카운트 조회]
-    FetchCurrentBucket --> FetchPrevBucket[이전 버킷 RDB 카운트 조회]
+    FetchWeight --> FetchPrevMetric[이전 버킷 RDB metric 조회<br/>계산용, 저장 X]
+    FetchPrevMetric --> FetchCurrentMetric[현재 버킷 RDB metric 조회]
     
-    FetchPrevBucket --> FetchSuccess{조회 성공?}
+    FetchCurrentMetric --> FetchSuccess{조회 성공?}
     
     FetchSuccess -->|실패| LogFetchError[WARN 로그]
     LogFetchError --> RetryFetch{재시도 3회 이내?}
-    RetryFetch -->|Yes| FetchCurrentBucket
+    RetryFetch -->|Yes| FetchPrevMetric
     RetryFetch -->|No| FetchFail[ERROR 로그]
     FetchFail --> End1([재계산 실패 - 수동 재트리거 필요])
     
-    FetchSuccess -->|성공| CalcScores[Score 계산<br/>현재 카운트 × Weight × 1.0<br/>+ 이전 카운트 × Weight × 0.1]
+    FetchSuccess -->|성공| CalcPrevScores[이전 점수 계산<br/>prevScore = 이전 metric × Weight<br/>저장 안 함]
     
-    CalcScores --> ReplaceRedis[Redis ZADD로 전체 교체]
+    CalcPrevScores --> CalcCurrentScores[현재 버킷 점수 계산<br/>score = 현재 metric × Weight<br/>+ prevScore × 0.1]
     
-    ReplaceRedis --> RedisSuccess{갱신 성공?}
+    CalcCurrentScores --> ReplaceCurrentBucket[현재 버킷 Redis ZADD]
     
-    RedisSuccess -->|실패| LogRedisWarn[WARN 로그]
-    LogRedisWarn --> RetryRedis{재시도 3회 이내?}
-    RetryRedis -->|Yes| ReplaceRedis
-    RetryRedis -->|No| LogRedisError[ERROR 로그]
-    LogRedisError --> End2([재계산 실패 - 수동 재트리거 필요])
+    ReplaceCurrentBucket --> CurrentSuccess{갱신 성공?}
     
-    RedisSuccess -->|성공| LogSuccess[INFO 로그]
+    CurrentSuccess -->|실패| LogCurrentWarn[WARN 로그]
+    LogCurrentWarn --> RetryCurrentRedis{재시도 3회 이내?}
+    RetryCurrentRedis -->|Yes| ReplaceCurrentBucket
+    RetryCurrentRedis -->|No| LogCurrentError[ERROR 로그]
+    LogCurrentError --> End2([재계산 실패 - 수동 재트리거 필요])
+    
+    CurrentSuccess -->|성공| CheckNextBucket{다음 버킷 존재?}
+    
+    CheckNextBucket -->|존재 안 함| LogSuccess[INFO 로그]
+    
+    CheckNextBucket -->|존재| CalcNextScores[다음 버킷 점수 계산<br/>nextScore = 현재 점수 × 0.1]
+    
+    CalcNextScores --> ReplaceNextBucket[다음 버킷 Redis ZADD]
+    
+    ReplaceNextBucket --> NextSuccess{갱신 성공?}
+    
+    NextSuccess -->|실패| LogNextWarn[WARN 로그]
+    LogNextWarn --> RetryNextRedis{재시도 3회 이내?}
+    RetryNextRedis -->|Yes| ReplaceNextBucket
+    RetryNextRedis -->|No| LogNextError[ERROR 로그 - 다음 버킷 업데이트 실패]
+    LogNextError --> LogSuccess
+    
+    NextSuccess -->|성공| LogSuccess
     LogSuccess --> End3([재계산 완료])
 ```
 
@@ -288,7 +311,7 @@ viewCount × viewWeight + likeCount × likeWeight + orderAmount × orderWeight
 | 버킷 전환 매시 50분 | 1000개 상품 기준 1초 이내 완료, 현재 버킷에 더 많은 이벤트 반영 후 Decay 적용 |
 | Redis 실패 시 RDB fallback | 빈 상태 시작보다 유추된 Score라도 있는 게 사용자 경험에 유리, cold start 방지 |
 | Weight 변경 동기 + 비동기 분리 | API 응답 속도 보장, 재계산은 상품 수에 비례하므로 백그라운드 처리가 적절 |
-| 현재 + 이전 버킷만 재계산 | 0.1^2 = 0.01로 2시간 전 데이터는 영향 미미, 단순함 우선 |
+| 현재 + 다음 버킷만 재계산 | 이전 버킷은 이미 지난 시간대로 재계산 불필요, 이전 metric은 cold start 방지를 위한 계산에만 사용, 다음 버킷은 스케줄러가 미리 생성했을 수 있으므로 업데이트 필요 |
 | orderCount + orderAmount 둘 다 저장 | Score 계산에는 orderAmount 사용, orderCount는 향후 분석용으로 보존 |
 | UK (stat_hour, product_id) 단일 | Atomic Upsert와 시간대별 조회 모두 커버, 인덱스 중복 방지 |
 | Fallback Weight (view=0.1, like=0.2, order=0.6) | 주문이 가장 강한 구매 의도 시그널, 조회는 가장 약함 |

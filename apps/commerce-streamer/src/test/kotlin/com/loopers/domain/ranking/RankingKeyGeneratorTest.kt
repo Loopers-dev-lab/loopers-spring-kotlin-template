@@ -197,4 +197,90 @@ class RankingKeyGeneratorTest {
             }
         }
     }
+
+    @DisplayName("nextBucketKey 메서드 테스트")
+    @Nested
+    inner class NextBucketKey {
+
+        @DisplayName("현재 시간 기준 다음 시간의 버킷 키를 생성한다")
+        @Test
+        fun `generates next hour bucket key`() {
+            // given
+            val instant = ZonedDateTime.of(2025, 1, 15, 14, 30, 0, 0, ZoneId.of("Asia/Seoul"))
+                .toInstant()
+
+            // when
+            val key = RankingKeyGenerator.nextBucketKey(instant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:2025011515")
+        }
+
+        @DisplayName("자정 경계에서 다음 시간 키를 올바르게 생성한다")
+        @Test
+        fun `handles midnight boundary correctly for next bucket`() {
+            // given
+            val instant = ZonedDateTime.of(2025, 1, 14, 23, 30, 0, 0, ZoneId.of("Asia/Seoul"))
+                .toInstant()
+
+            // when
+            val key = RankingKeyGenerator.nextBucketKey(instant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:2025011500")
+        }
+
+        @DisplayName("연도 경계에서 다음 시간 키를 올바르게 생성한다")
+        @Test
+        fun `handles year boundary correctly for next bucket`() {
+            // given
+            val instant = ZonedDateTime.of(2025, 12, 31, 23, 0, 0, 0, ZoneId.of("Asia/Seoul"))
+                .toInstant()
+
+            // when
+            val key = RankingKeyGenerator.nextBucketKey(instant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:2026010100")
+        }
+
+        @DisplayName("UTC 시간을 Asia/Seoul 타임존으로 변환하여 다음 시간 키를 생성한다")
+        @Test
+        fun `converts UTC to Asia Seoul timezone for next bucket`() {
+            // given
+            // UTC 2025-01-15 05:30:00 = KST 2025-01-15 14:30:00, so next = KST 15:00
+            val utcInstant = Instant.parse("2025-01-15T05:30:00Z")
+
+            // when
+            val key = RankingKeyGenerator.nextBucketKey(utcInstant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:2025011515")
+        }
+
+        @DisplayName("nextBucketKey()는 현재 시간 기준 다음 시간의 버킷 키를 생성한다")
+        @Test
+        fun `nextBucketKey without argument generates next hour key`() {
+            // when
+            val currentKey = RankingKeyGenerator.currentBucketKey()
+            val nextKey = RankingKeyGenerator.nextBucketKey()
+
+            // then
+            assertThat(nextKey).startsWith("ranking:products:")
+            val currentDateTimePart = currentKey.removePrefix("ranking:products:")
+            val nextDateTimePart = nextKey.removePrefix("ranking:products:")
+            assertThat(nextDateTimePart).matches("\\d{10}")
+
+            // nextKey should be 1 hour after currentKey
+            val currentHour = currentDateTimePart.takeLast(2).toInt()
+            val nextHour = nextDateTimePart.takeLast(2).toInt()
+
+            // Handle hour boundary (e.g., currentHour=23, nextHour=0)
+            if (currentHour == 23) {
+                assertThat(nextHour).isEqualTo(0)
+            } else {
+                assertThat(nextHour).isEqualTo(currentHour + 1)
+            }
+        }
+    }
 }

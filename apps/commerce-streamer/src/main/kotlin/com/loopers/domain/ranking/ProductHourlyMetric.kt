@@ -52,6 +52,17 @@ class ProductHourlyMetric(
         require(orderCount >= 0) { "orderCount는 음수가 될 수 없습니다: $orderCount" }
     }
 
+    /**
+     * Convert entity to CountSnapshot for score calculation
+     */
+    fun toSnapshot(): CountSnapshot =
+        CountSnapshot(
+            views = viewCount,
+            likes = likeCount,
+            orderCount = orderCount,
+            orderAmount = orderAmount,
+        )
+
     companion object {
         fun create(
             statHour: ZonedDateTime,

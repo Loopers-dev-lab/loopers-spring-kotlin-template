@@ -56,3 +56,10 @@ data class AccumulateOrderPaidMetricCommand(
         val orderAmount: BigDecimal,
     )
 }
+
+/**
+ * Command for weight change triggered recalculation
+ */
+data class RecalculateScoresCommand(
+    val eventId: String,
+)
