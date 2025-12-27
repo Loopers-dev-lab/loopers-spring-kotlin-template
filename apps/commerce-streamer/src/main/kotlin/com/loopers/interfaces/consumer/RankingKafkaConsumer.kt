@@ -5,6 +5,7 @@ import com.loopers.application.facade.RankingEventFacade
 import com.loopers.domain.event.DomainEvent
 import com.loopers.domain.event.like.ProductLikedEvent
 import com.loopers.domain.event.like.ProductUnlikedEvent
+import com.loopers.domain.event.product.ProductBrowsedEvent
 import com.loopers.domain.order.event.OrderCreatedEvent
 import com.loopers.domain.product.event.ProductViewedEvent
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -103,6 +104,11 @@ class RankingKafkaConsumer(
                 "PRODUCT_LIKED" -> objectMapper.readValue(message, ProductLikedEvent::class.java)
                 "PRODUCT_UNLIKED" -> objectMapper.readValue(message, ProductUnlikedEvent::class.java)
                 "ORDER_CREATED" -> objectMapper.readValue(message, OrderCreatedEvent::class.java)
+                "PRODUCT_BROWSED" -> {
+                    // 목록 조회는 특정 상품 없음 (랭킹 집계 대상 아님)
+                    logger.debug("목록 조회 이벤트 수신: eventType=$eventType")
+                    null
+                }
                 // 랭킹과 무관한 이벤트는 무시 (예: STOCK_DECREASED, PAYMENT_COMPLETED)
                 else -> {
                     logger.debug("랭킹 처리 대상 아님: eventType=$eventType")

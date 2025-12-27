@@ -4,6 +4,7 @@ import com.loopers.domain.event.DomainEvent
 import com.loopers.domain.event.EventHandled
 import com.loopers.domain.event.like.ProductLikedEvent
 import com.loopers.domain.event.like.ProductUnlikedEvent
+import com.loopers.domain.event.product.ProductBrowsedEvent
 import com.loopers.domain.product.event.ProductViewedEvent
 import com.loopers.domain.metrics.ProductMetricsService
 import com.loopers.domain.order.event.OrderCreatedEvent
@@ -77,6 +78,10 @@ class BatchMetricsEventFacade(
                             quantity = item.quantity
                         )
                     }
+                }
+                is ProductBrowsedEvent -> {
+                    // 목록 조회는 특정 상품 없음 (메트릭 집계 대상 아님)
+                    logger.debug("목록 조회 이벤트 수신: eventId=${event.eventId}")
                 }
                 else -> logger.debug("처리 대상 아님: eventType=${event.eventType}")
             }

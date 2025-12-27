@@ -8,6 +8,7 @@ import com.loopers.domain.event.like.ProductLikedEvent
 import com.loopers.domain.event.like.ProductUnlikedEvent
 import com.loopers.domain.event.payment.PaymentCompletedEvent
 import com.loopers.domain.event.payment.PaymentFailedEvent
+import com.loopers.domain.event.product.ProductBrowsedEvent
 import com.loopers.domain.product.event.ProductViewedEvent
 import com.loopers.domain.event.product.StockDecreasedEvent
 import com.loopers.domain.order.event.OrderCreatedEvent
@@ -79,6 +80,7 @@ class BatchMetricsKafkaConsumer(
                 "PRODUCT_LIKED" -> objectMapper.readValue(message, ProductLikedEvent::class.java)
                 "PRODUCT_UNLIKED" -> objectMapper.readValue(message, ProductUnlikedEvent::class.java)
                 "PRODUCT_VIEWED" -> objectMapper.readValue(message, ProductViewedEvent::class.java)
+                "PRODUCT_BROWSED" -> objectMapper.readValue(message, ProductBrowsedEvent::class.java)
                 "STOCK_DECREASED" -> objectMapper.readValue(message, StockDecreasedEvent::class.java)
                 "ORDER_CREATED" -> objectMapper.readValue(message, OrderCreatedEvent::class.java)
                 "PAYMENT_COMPLETED" -> objectMapper.readValue(message, PaymentCompletedEvent::class.java)
