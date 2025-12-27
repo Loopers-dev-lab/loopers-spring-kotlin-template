@@ -46,6 +46,8 @@ class ApiControllerAdvice {
     fun handleBadRequest(e: HttpMessageNotReadableException): ResponseEntity<ApiResponse<*>> {
         val errorMessage = when (val rootCause = e.rootCause) {
             is InvalidFormatException -> {
+                val fieldPath = rootCause.path.joinToString(".") { it.propertyName ?: "[${it.index}]" }
+                val fieldInfo = if (fieldPath.isNotEmpty()) "필드 '$fieldPath'에서 " else ""
                 val valueIndicationMessage = when {
                     rootCause.targetType.isEnum -> {
                         val enumClass = rootCause.targetType
@@ -59,7 +61,7 @@ class ApiControllerAdvice {
                 val expectedType = rootCause.targetType.simpleName
                 val value = rootCause.value
 
-                "값 '$value'이(가) 예상 타입($expectedType)과 일치하지 않습니다. $valueIndicationMessage"
+                "${fieldInfo}값 '$value'이(가) 예상 타입($expectedType)과 일치하지 않습니다. $valueIndicationMessage"
             }
 
             is MismatchedInputException -> {
