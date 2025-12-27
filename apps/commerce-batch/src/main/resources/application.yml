@@ -1,0 +1,46 @@
+spring:
+  batch:
+    job:
+      enabled: false # 서버 재시작시 배치 자동실행 방지
+      name: ${job.name:NONE}
+    jdbc:
+      initialize-schema: never
+  main:
+    web-application-type: none
+  application:
+    name: commerce-batch
+  profiles:
+    active: local
+  config:
+    import:
+      - jpa.yml
+      - logging.yml
+      - monitoring.yml
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+---
+spring:
+  config:
+    activate:
+      on-profile: qa
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prd
+
+springdoc:
+  api-docs:
+    enabled: false
