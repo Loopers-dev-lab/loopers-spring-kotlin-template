@@ -65,32 +65,27 @@ class BatchMetricsKafkaConsumer(
 
     private fun parseEvent(message: String): DomainEvent {
         try {
-            logger.debug("파싱 시작: message=$message")
             val node = objectMapper.readTree(message)
-            logger.debug("JSON 파싱 성공: node=$node")
-            
             val eventTypeNode = node.get("eventType")
-            logger.debug("eventTypeNode: $eventTypeNode")
-            
+
             if (eventTypeNode == null || eventTypeNode.isNull) {
-                logger.error("eventType 필드가 없음. 전체 노드: $node")
+                logger.error("eventType 필드가 없음")
                 throw IllegalArgumentException("Missing eventType in message: $message")
             }
-            
+
             val eventType = eventTypeNode.asText()
-            logger.debug("eventType 추출: $eventType")
 
             return when (eventType) {
-            "PRODUCT_LIKED" -> objectMapper.readValue(message, ProductLikedEvent::class.java)
-            "PRODUCT_UNLIKED" -> objectMapper.readValue(message, ProductUnlikedEvent::class.java)
-            "PRODUCT_VIEWED" -> objectMapper.readValue(message, ProductViewedEvent::class.java)
-            "STOCK_DECREASED" -> objectMapper.readValue(message, StockDecreasedEvent::class.java)
-            "ORDER_CREATED" -> objectMapper.readValue(message, OrderCreatedEvent::class.java)
-            "PAYMENT_COMPLETED" -> objectMapper.readValue(message, PaymentCompletedEvent::class.java)
-            "PAYMENT_FAILED" -> objectMapper.readValue(message, PaymentFailedEvent::class.java)
-            "COUPON_USED" -> objectMapper.readValue(message, CouponUsedEvent::class.java)
+                "PRODUCT_LIKED" -> objectMapper.readValue(message, ProductLikedEvent::class.java)
+                "PRODUCT_UNLIKED" -> objectMapper.readValue(message, ProductUnlikedEvent::class.java)
+                "PRODUCT_VIEWED" -> objectMapper.readValue(message, ProductViewedEvent::class.java)
+                "STOCK_DECREASED" -> objectMapper.readValue(message, StockDecreasedEvent::class.java)
+                "ORDER_CREATED" -> objectMapper.readValue(message, OrderCreatedEvent::class.java)
+                "PAYMENT_COMPLETED" -> objectMapper.readValue(message, PaymentCompletedEvent::class.java)
+                "PAYMENT_FAILED" -> objectMapper.readValue(message, PaymentFailedEvent::class.java)
+                "COUPON_USED" -> objectMapper.readValue(message, CouponUsedEvent::class.java)
 
-            else -> throw IllegalArgumentException("Unknown event type: $eventType")
+                else -> throw IllegalArgumentException("Unknown event type: $eventType")
             }
         } catch (e: Exception) {
             logger.error("이벤트 파싱 실패: message=$message", e)

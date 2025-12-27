@@ -98,17 +98,17 @@ class RankingKafkaConsumer(
             
             val eventType = eventTypeNode.asText()
 
-        return when (eventType) {
-            "PRODUCT_VIEWED" -> objectMapper.readValue(message, ProductViewedEvent::class.java)
-            "PRODUCT_LIKED" -> objectMapper.readValue(message, ProductLikedEvent::class.java)
-            "PRODUCT_UNLIKED" -> objectMapper.readValue(message, ProductUnlikedEvent::class.java)
-            "ORDER_CREATED" -> objectMapper.readValue(message, OrderCreatedEvent::class.java)
-            // 랭킹과 무관한 이벤트는 무시 (예: STOCK_DECREASED, PAYMENT_COMPLETED)
-            else -> {
-                logger.debug("랭킹 처리 대상 아님: eventType=$eventType")
-                null
+            return when (eventType) {
+                "PRODUCT_VIEWED" -> objectMapper.readValue(message, ProductViewedEvent::class.java)
+                "PRODUCT_LIKED" -> objectMapper.readValue(message, ProductLikedEvent::class.java)
+                "PRODUCT_UNLIKED" -> objectMapper.readValue(message, ProductUnlikedEvent::class.java)
+                "ORDER_CREATED" -> objectMapper.readValue(message, OrderCreatedEvent::class.java)
+                // 랭킹과 무관한 이벤트는 무시 (예: STOCK_DECREASED, PAYMENT_COMPLETED)
+                else -> {
+                    logger.debug("랭킹 처리 대상 아님: eventType=$eventType")
+                    null
+                }
             }
-        }
         } catch (e: Exception) {
             logger.error("이벤트 파싱 실패: message=$message", e)
             throw e
