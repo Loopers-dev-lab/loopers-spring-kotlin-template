@@ -10,7 +10,6 @@ kotlin {
 }
 
 dependencies {
-    val queryDslVersion: String by project
 
     // add-ons
     implementation(project(":modules:jpa"))
@@ -38,9 +37,6 @@ dependencies {
 
     // kafka (Producer only - Consumer는 commerce-streamer에서 처리)
     implementation("org.springframework.kafka:spring-kafka")
-
-    // querydsl
-    ksp("io.github.openfeign.querydsl:querydsl-ksp-codegen:$queryDslVersion")
 
     // Spring Boot 4.0 rest test client
     testImplementation("org.springframework.boot:spring-boot-resttestclient")

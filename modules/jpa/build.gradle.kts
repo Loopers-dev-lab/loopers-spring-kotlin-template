@@ -11,13 +11,10 @@ kotlin {
 }
 
 dependencies {
-    val queryDslVersion: String by project
 
     // jpa
     api("org.springframework.boot:spring-boot-starter-data-jpa")
-    // querydsl
-    api("io.github.openfeign.querydsl:querydsl-jpa:$queryDslVersion")
-    ksp("io.github.openfeign.querydsl:querydsl-ksp-codegen:$queryDslVersion")
+
     // jdbc-mysql
     runtimeOnly("com.mysql:mysql-connector-j")
 

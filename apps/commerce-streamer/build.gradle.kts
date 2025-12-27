@@ -10,7 +10,6 @@ kotlin {
 }
 
 dependencies {
-    val queryDslVersion: String by project
 
     // add-ons
     implementation(project(":modules:jpa"))
@@ -24,9 +23,6 @@ dependencies {
     // web
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-
-    // querydsl
-    ksp("io.github.openfeign.querydsl:querydsl-ksp-codegen:$queryDslVersion")
 
     // test-fixtures
     testImplementation(testFixtures(project(":modules:jpa")))
