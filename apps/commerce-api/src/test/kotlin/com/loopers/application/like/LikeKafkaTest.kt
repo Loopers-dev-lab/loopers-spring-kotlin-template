@@ -7,8 +7,9 @@ import com.loopers.domain.outbox.OutboxStatus
 import com.loopers.domain.product.ProductModel
 import com.loopers.domain.product.signal.ProductTotalSignalModel
 import com.loopers.domain.user.UserFixture
+import com.loopers.event.CatalogEventPayload
+import com.loopers.event.CatalogType
 import com.loopers.event.EventType
-import com.loopers.event.LikeEventPayload
 import com.loopers.infrastructure.outbox.OutBoxJpaRepository
 import com.loopers.infrastructure.product.ProductJpaRepository
 import com.loopers.infrastructure.product.signal.ProductTotalSignalJpaRepository
@@ -30,7 +31,7 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 @EmbeddedKafka(
-    topics = [EventType.Topic.LIKE_EVENT],
+    topics = [EventType.Topic.CATALOG_EVENT],
     brokerProperties = ["listeners=PLAINTEXT://localhost:19092", "port=19092"],
 )
 class LikeKafkaTest(
@@ -85,7 +86,7 @@ class LikeKafkaTest(
         val consumer = consumerFactory.createConsumer()
 
         try {
-            consumer.subscribe(listOf(EventType.Topic.LIKE_EVENT))
+            consumer.subscribe(listOf(EventType.Topic.CATALOG_EVENT))
 
             // act
             likeFacade.like(testUser.id, productId)
@@ -96,13 +97,13 @@ class LikeKafkaTest(
                 val records = consumer.poll(Duration.ofSeconds(2))
                 if (records.count() > 0) {
                     val record: ConsumerRecord<String, String> = records.iterator().next()
-                    assertThat(record.topic()).isEqualTo(EventType.Topic.LIKE_EVENT)
+                    assertThat(record.topic()).isEqualTo(EventType.Topic.CATALOG_EVENT)
 
                     val payload =
-                        objectMapper.readValue(record.value(), LikeEventPayload::class.java)
+                        objectMapper.readValue(record.value(), CatalogEventPayload::class.java)
                     assertThat(payload.productId).isEqualTo(productId)
                     assertThat(payload.userId).isEqualTo(testUser.id)
-                    assertThat(payload.type).isEqualTo(LikeEventPayload.LikeType.LIKED)
+                    assertThat(payload.type).isEqualTo(CatalogType.LIKED)
                     kafkaMessageReceived = true
                 }
                 assertThat(kafkaMessageReceived).isTrue()

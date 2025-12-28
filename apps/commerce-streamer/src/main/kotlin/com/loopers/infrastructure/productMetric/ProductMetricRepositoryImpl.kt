@@ -12,4 +12,9 @@ class ProductMetricRepositoryImpl(private val productMetricJpaRepository: Produc
     )
 
     override fun save(metric: ProductMetricModel): ProductMetricModel = productMetricJpaRepository.saveAndFlush(metric)
+
+    override fun findAll(): List<ProductMetricModel> = productMetricJpaRepository.findAll()
+
+    override fun findByRefProductIdIn(productIds: Set<Long>): List<ProductMetricModel> = 
+        productMetricJpaRepository.findByRefProductIdIn(productIds)
 }

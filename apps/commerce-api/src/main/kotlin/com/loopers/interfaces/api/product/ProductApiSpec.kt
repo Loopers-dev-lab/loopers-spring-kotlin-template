@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.product
 import com.loopers.interfaces.api.ApiResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.enums.ParameterIn
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.data.domain.Pageable
 
@@ -20,4 +21,10 @@ interface ProductApiSpec {
         @Parameter(description = "페이징 정보 (page, size, sort)") pageable: Pageable,
         @Parameter(description = "브랜드 ID 필터 (선택)") brandId: Long?,
     ): ApiResponse<ProductDto.PageResponse<ProductDto.ProductInfoResponse>>
+
+    @Operation(summary = "상품 상세 조회", description = "해당 상품의 상세 정보를 조회한다.")
+    fun getProductInfo(
+        @Parameter(name = "productId", description = "상품 ID", required = true, `in` = ParameterIn.PATH) productId: Long,
+        @Parameter(name = "userId", description = "사용자 ID", required = false, `in` = ParameterIn.HEADER) userId: Long?,
+    ): ApiResponse<ProductDto.GetProduct>
 }
