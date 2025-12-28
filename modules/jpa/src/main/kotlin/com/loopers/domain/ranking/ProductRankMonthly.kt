@@ -6,6 +6,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import java.time.DateTimeException
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -77,7 +78,7 @@ class ProductRankMonthly(
                     yearMonth.substring(0, 4).toInt(),
                     yearMonth.substring(4, 6).toInt(),
                 )
-            } catch (e: java.time.DateTimeException) {
+            } catch (e: DateTimeException) {
                 throw IllegalArgumentException("Invalid yearMonth value: $yearMonth", e)
             }
         }
