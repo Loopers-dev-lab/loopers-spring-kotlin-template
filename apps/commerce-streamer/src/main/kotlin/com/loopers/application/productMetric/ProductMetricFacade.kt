@@ -94,8 +94,12 @@ class ProductMetricFacade(
     /** 변경된 상품들에 대해 즉시 랭킹 업데이트 */
     fun updateRankingForProducts(productIds: Set<Long>) {
         val dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
-        val formattedDate = LocalDate.now().format(dateFormatter)
+        val currentDate = LocalDate.now()
+        val formattedDate = currentDate.format(dateFormatter)
+        val previousFormattedDate = currentDate.minusDays(1).format(dateFormatter)
+
         val key = "LOOPERS::ranking-v1:$formattedDate"
+        val previousKey = "LOOPERS::ranking-v1:$previousFormattedDate"
 
         logger.debug("Updating ranking for ${productIds.size} products on date: $formattedDate")
 
@@ -108,7 +112,7 @@ class ProductMetricFacade(
 
         metrics.forEach { metric ->
             // 전 시간의 랭킹 점수 가져오기 (없으면 0)
-            val previousScore = zSetOps.score(key, metric.refProductId.toString()) ?: 0.0
+            val previousScore = zSetOps.score(previousKey, metric.refProductId.toString()) ?: 0.0
 
             val score =
                 calculateRankingScore(
