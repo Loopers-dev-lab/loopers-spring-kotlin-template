@@ -47,9 +47,8 @@ class RankingAggregationService(
         val idempotencyKey = "$IDEMPOTENCY_PREFIX:view:${command.eventId}"
         if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
 
-        accumulateToBuffer(AggregationKey.of(command.productId, command.occurredAt)) {
-            increment(MetricType.VIEW)
-        }
+        buffer.incrementView(AggregationKey.of(command.productId, command.occurredAt))
+        checkBufferThreshold()
 
         eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
     }
@@ -61,9 +60,8 @@ class RankingAggregationService(
         val idempotencyKey = "$IDEMPOTENCY_PREFIX:like-created:${command.eventId}"
         if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
 
-        accumulateToBuffer(AggregationKey.of(command.productId, command.occurredAt)) {
-            increment(MetricType.LIKE_CREATED)
-        }
+        buffer.incrementLikeCreated(AggregationKey.of(command.productId, command.occurredAt))
+        checkBufferThreshold()
 
         eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
     }
@@ -75,9 +73,8 @@ class RankingAggregationService(
         val idempotencyKey = "$IDEMPOTENCY_PREFIX:like-canceled:${command.eventId}"
         if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
 
-        accumulateToBuffer(AggregationKey.of(command.productId, command.occurredAt)) {
-            increment(MetricType.LIKE_CANCELED)
-        }
+        buffer.incrementLikeCanceled(AggregationKey.of(command.productId, command.occurredAt))
+        checkBufferThreshold()
 
         eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
     }
@@ -92,25 +89,14 @@ class RankingAggregationService(
         if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
 
         command.items.forEach { item ->
-            accumulateToBuffer(AggregationKey.of(item.productId, command.occurredAt)) {
-                increment(MetricType.ORDER_PAID)
-                addOrderAmount(item.orderAmount)
-            }
+            buffer.incrementOrderPaid(AggregationKey.of(item.productId, command.occurredAt), item.orderAmount)
+            checkBufferThreshold()
         }
 
         eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
     }
 
     // ==================== Buffer Management ====================
-
-    /**
-     * 모든 버퍼 연산의 단일 진입점
-     * threshold 체크가 누락되지 않도록 보장
-     */
-    private fun accumulateToBuffer(key: AggregationKey, action: MutableCounts.() -> Unit) {
-        buffer.accumulate(key, action)
-        checkBufferThreshold()
-    }
 
     /**
      * 버퍼 임계치 체크 및 필요시 동기적 flush 수행

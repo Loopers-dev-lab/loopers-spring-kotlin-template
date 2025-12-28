@@ -1,5 +1,6 @@
 package com.loopers.domain.ranking
 
+import java.math.BigDecimal
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
@@ -13,13 +14,27 @@ import java.util.concurrent.atomic.AtomicReference
 class MetricBuffer {
     private val bufferRef = AtomicReference(ConcurrentHashMap<AggregationKey, MutableCounts>())
 
-    /**
-     * 메트릭을 버퍼에 축적
-     */
-    fun accumulate(key: AggregationKey, action: MutableCounts.() -> Unit) {
-        bufferRef.get()
-            .computeIfAbsent(key) { MutableCounts() }
-            .apply(action)
+    private fun getOrCreate(key: AggregationKey): MutableCounts {
+        return bufferRef.get().computeIfAbsent(key) { MutableCounts() }
+    }
+
+    fun incrementView(key: AggregationKey) {
+        getOrCreate(key).increment(MetricType.VIEW)
+    }
+
+    fun incrementLikeCreated(key: AggregationKey) {
+        getOrCreate(key).increment(MetricType.LIKE_CREATED)
+    }
+
+    fun incrementLikeCanceled(key: AggregationKey) {
+        getOrCreate(key).increment(MetricType.LIKE_CANCELED)
+    }
+
+    fun incrementOrderPaid(key: AggregationKey, orderAmount: BigDecimal) {
+        getOrCreate(key).apply {
+            increment(MetricType.ORDER_PAID)
+            addOrderAmount(orderAmount)
+        }
     }
 
     /**

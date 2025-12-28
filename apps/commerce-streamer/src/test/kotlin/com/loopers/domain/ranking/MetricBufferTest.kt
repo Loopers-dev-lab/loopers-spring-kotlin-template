@@ -48,7 +48,7 @@ class MetricBufferTest {
         }
     }
 
-    @DisplayName("accumulate 메서드 테스트")
+    @DisplayName("explicit increment 메서드 테스트")
     @Nested
     inner class Accumulate {
 
@@ -60,9 +60,7 @@ class MetricBufferTest {
             val key = createKey(1L)
 
             // when
-            buffer.accumulate(key) {
-                increment(MetricType.VIEW)
-            }
+            buffer.incrementView(key)
 
             // then
             assertThat(buffer.isEmpty()).isFalse()
@@ -78,9 +76,7 @@ class MetricBufferTest {
 
             // when
             repeat(5) {
-                buffer.accumulate(key) {
-                    increment(MetricType.VIEW)
-                }
+                buffer.incrementView(key)
             }
 
             // then
@@ -98,9 +94,9 @@ class MetricBufferTest {
             val key2 = createKey(2L)
 
             // when
-            buffer.accumulate(key1) { increment(MetricType.VIEW) }
-            buffer.accumulate(key2) { increment(MetricType.VIEW) }
-            buffer.accumulate(key1) { increment(MetricType.VIEW) }
+            buffer.incrementView(key1)
+            buffer.incrementView(key2)
+            buffer.incrementView(key1)
 
             // then
             assertThat(buffer.size()).isEqualTo(2)
@@ -117,12 +113,9 @@ class MetricBufferTest {
             val key = createKey(1L)
 
             // when
-            buffer.accumulate(key) {
-                increment(MetricType.VIEW)
-                increment(MetricType.LIKE_CREATED)
-                increment(MetricType.ORDER_PAID)
-                addOrderAmount(BigDecimal("100.00"))
-            }
+            buffer.incrementView(key)
+            buffer.incrementLikeCreated(key)
+            buffer.incrementOrderPaid(key, BigDecimal("100.00"))
 
             // then
             val snapshot = buffer.snapshot()
@@ -144,7 +137,7 @@ class MetricBufferTest {
             // given
             val buffer = MetricBuffer()
             val key = createKey(1L)
-            buffer.accumulate(key) { increment(MetricType.VIEW) }
+            buffer.incrementView(key)
 
             // when
             val result = buffer.poll()
@@ -161,11 +154,11 @@ class MetricBufferTest {
             // given
             val buffer = MetricBuffer()
             val key = createKey(1L)
-            buffer.accumulate(key) { increment(MetricType.VIEW) }
+            buffer.incrementView(key)
 
             // when
             val firstPoll = buffer.poll()
-            buffer.accumulate(key) { increment(MetricType.LIKE_CREATED) }
+            buffer.incrementLikeCreated(key)
             val secondPoll = buffer.poll()
 
             // then
@@ -182,7 +175,7 @@ class MetricBufferTest {
             // given
             val buffer = MetricBuffer()
             val key = createKey(1L)
-            buffer.accumulate(key) { increment(MetricType.VIEW) }
+            buffer.incrementView(key)
 
             // when
             val firstPoll = buffer.poll()
@@ -204,7 +197,7 @@ class MetricBufferTest {
             // given
             val buffer = MetricBuffer()
             val key = createKey(1L)
-            buffer.accumulate(key) { increment(MetricType.VIEW) }
+            buffer.incrementView(key)
 
             // when
             val snapshot1 = buffer.snapshot()
@@ -222,7 +215,7 @@ class MetricBufferTest {
             // given
             val buffer = MetricBuffer()
             val key = createKey(1L)
-            buffer.accumulate(key) { increment(MetricType.VIEW) }
+            buffer.incrementView(key)
 
             // when
             buffer.snapshot()
@@ -246,14 +239,14 @@ class MetricBufferTest {
             // when & then
             assertThat(buffer.size()).isEqualTo(0)
 
-            buffer.accumulate(createKey(1L)) { increment(MetricType.VIEW) }
+            buffer.incrementView(createKey(1L))
             assertThat(buffer.size()).isEqualTo(1)
 
-            buffer.accumulate(createKey(2L)) { increment(MetricType.VIEW) }
+            buffer.incrementView(createKey(2L))
             assertThat(buffer.size()).isEqualTo(2)
 
             // 동일 키는 카운트 증가 안함
-            buffer.accumulate(createKey(1L)) { increment(MetricType.VIEW) }
+            buffer.incrementView(createKey(1L))
             assertThat(buffer.size()).isEqualTo(2)
         }
 
@@ -266,7 +259,7 @@ class MetricBufferTest {
             // then
             assertThat(buffer.isEmpty()).isTrue()
 
-            buffer.accumulate(createKey(1L)) { increment(MetricType.VIEW) }
+            buffer.incrementView(createKey(1L))
             assertThat(buffer.isEmpty()).isFalse()
 
             buffer.poll()
@@ -294,9 +287,7 @@ class MetricBufferTest {
                 executor.submit {
                     try {
                         repeat(incrementsPerThread) {
-                            buffer.accumulate(key) {
-                                increment(MetricType.VIEW)
-                            }
+                            buffer.incrementView(key)
                         }
                     } finally {
                         latch.countDown()
@@ -323,18 +314,14 @@ class MetricBufferTest {
 
             // 먼저 데이터를 축적
             repeat(accumulateCount) {
-                buffer.accumulate(key) {
-                    increment(MetricType.VIEW)
-                }
+                buffer.incrementView(key)
             }
 
             // when - poll과 accumulate를 동시에 수행
             val pollResult = buffer.poll()
 
             // poll 직후 새로운 축적
-            buffer.accumulate(key) {
-                increment(MetricType.LIKE_CREATED)
-            }
+            buffer.incrementLikeCreated(key)
 
             val secondPoll = buffer.poll()
 
@@ -364,9 +351,7 @@ class MetricBufferTest {
                     try {
                         repeat(keyCount) { keyId ->
                             repeat(incrementsPerKey) {
-                                buffer.accumulate(createKey(keyId.toLong())) {
-                                    increment(MetricType.VIEW)
-                                }
+                                buffer.incrementView(createKey(keyId.toLong()))
                             }
                         }
                     } finally {
