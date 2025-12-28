@@ -14,9 +14,7 @@ import com.loopers.domain.ranking.RankingScope
 import com.loopers.domain.ranking.RankingScore
 import com.loopers.domain.ranking.RankingScoreCalculator
 import org.slf4j.LoggerFactory
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.kafka.annotation.KafkaListener
-import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.messaging.handler.annotation.Header
@@ -37,7 +35,6 @@ import java.util.UUID
  * Redis ZSET에 랭킹 점수를 실시간으로 반영
  */
 @Component
-@ConditionalOnBean(KafkaTemplate::class)
 class KafkaEventConsumer(
     private val jsonMapper: JsonMapper,
     private val eventHandledRepository: EventHandledRepository,

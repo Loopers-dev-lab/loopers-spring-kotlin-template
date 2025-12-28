@@ -4,7 +4,7 @@ import com.loopers.application.user.UserInfo
 import com.loopers.application.user.UserRegisterRequest
 import com.loopers.domain.user.Gender
 import java.time.LocalDate
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 class UserV1Dto {
     data class RegisterRequest(val name: String, val email: String, val gender: Gender, val birthDate: LocalDate) {
@@ -22,7 +22,7 @@ class UserV1Dto {
         val email: String,
         val gender: String,
         val birthDate: LocalDate,
-        val createdAt: ZonedDateTime,
+        val createdAt: LocalDateTime,
     ) {
         companion object {
             fun from(info: UserInfo): UserResponse = UserResponse(

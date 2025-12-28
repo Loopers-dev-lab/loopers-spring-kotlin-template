@@ -13,7 +13,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.context.ApplicationEventPublisher
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 class LikeEventHandlerTest {
     private val productLikeCountService = mockk<ProductLikeCountService>()
@@ -38,7 +38,7 @@ class LikeEventHandlerTest {
             val event = LikeAddedEvent(
                 userId = 1L,
                 productId = 100L,
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             every { productLikeCountService.increment(100L) } returns 5L
@@ -74,7 +74,7 @@ class LikeEventHandlerTest {
             val event = LikeAddedEvent(
                 userId = 1L,
                 productId = 100L,
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             every { productLikeCountService.increment(100L) } throws RuntimeException("Redis 오류")
@@ -92,7 +92,7 @@ class LikeEventHandlerTest {
             val event = LikeAddedEvent(
                 userId = 1L,
                 productId = 100L,
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             every { productLikeCountService.increment(100L) } returns 5L
@@ -111,7 +111,7 @@ class LikeEventHandlerTest {
             val event = LikeAddedEvent(
                 userId = 1L,
                 productId = 100L,
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             every { productLikeCountService.increment(100L) } returns 5L
@@ -154,7 +154,7 @@ class LikeEventHandlerTest {
             val event = LikeRemovedEvent(
                 userId = 1L,
                 productId = 100L,
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             every { productLikeCountService.decrement(100L) } returns 4L
@@ -190,7 +190,7 @@ class LikeEventHandlerTest {
             val event = LikeRemovedEvent(
                 userId = 1L,
                 productId = 100L,
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             every { productLikeCountService.decrement(100L) } throws RuntimeException("Redis 오류")

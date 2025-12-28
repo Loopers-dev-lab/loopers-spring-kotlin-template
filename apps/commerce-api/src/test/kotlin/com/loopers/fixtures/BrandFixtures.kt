@@ -1,7 +1,7 @@
 package com.loopers.fixtures
 
 import com.loopers.domain.brand.Brand
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicLong
 
 private val brandNameCounter = AtomicLong(0)
@@ -20,8 +20,8 @@ fun createTestBrand(
     id: Long? = null,
     name: String? = null,
     description: String? = "테스트 설명",
-    createdAt: ZonedDateTime = ZonedDateTime.now(),
-    updatedAt: ZonedDateTime = ZonedDateTime.now(),
+    createdAt: LocalDateTime = LocalDateTime.now(),
+    updatedAt: LocalDateTime = LocalDateTime.now(),
 ): Brand {
     val brandName = name ?: "테스트브랜드${brandNameCounter.incrementAndGet()}"
     val brand = Brand(

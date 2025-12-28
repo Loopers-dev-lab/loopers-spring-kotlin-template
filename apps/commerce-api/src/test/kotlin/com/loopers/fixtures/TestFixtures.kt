@@ -27,7 +27,7 @@ import com.loopers.infrastructure.product.StockJpaRepository
 import com.loopers.infrastructure.user.UserJpaRepository
 import org.springframework.stereotype.Component
 import java.time.LocalDate
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -133,8 +133,8 @@ class TestFixtures(
  */
 fun <T : BaseEntity> T.withId(
     id: Long,
-    createdAt: ZonedDateTime = ZonedDateTime.now(),
-    updatedAt: ZonedDateTime = ZonedDateTime.now(),
+    createdAt: LocalDateTime = LocalDateTime.now(),
+    updatedAt: LocalDateTime = LocalDateTime.now(),
 ): T {
     val superclass = this::class.java.superclass
 

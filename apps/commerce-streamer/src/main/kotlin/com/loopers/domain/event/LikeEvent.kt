@@ -1,6 +1,6 @@
 package com.loopers.domain.event
 
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -11,7 +11,7 @@ data class LikeAddedEvent(
     val eventId: UUID,
     val userId: Long,
     val productId: Long,
-    val createdAt: ZonedDateTime = ZonedDateTime.now(),
+    val createdAt: LocalDateTime = LocalDateTime.now(),
 )
 
 /**
@@ -22,5 +22,5 @@ data class LikeRemovedEvent(
     val eventId: UUID,
     val userId: Long,
     val productId: Long,
-    val createdAt: ZonedDateTime = ZonedDateTime.now(),
+    val createdAt: LocalDateTime = LocalDateTime.now(),
 )

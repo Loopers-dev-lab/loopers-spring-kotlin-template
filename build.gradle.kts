@@ -22,13 +22,13 @@ plugins {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
 kotlin {
     compilerOptions {
-        jvmToolchain(25)
+        jvmToolchain(21)
         freeCompilerArgs.addAll("-Xjsr305=strict")
     }
 }

@@ -6,7 +6,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -57,7 +57,7 @@ class EventHandled(
      * 처리 완료 시각
      */
     @Column(name = "handled_at", nullable = false)
-    val handledAt: ZonedDateTime = ZonedDateTime.now(),
+    val handledAt: LocalDateTime = LocalDateTime.now(),
 
     /**
      * 처리자 (consumer group id 등)

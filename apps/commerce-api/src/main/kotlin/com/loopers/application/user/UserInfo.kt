@@ -2,7 +2,7 @@ package com.loopers.application.user
 
 import com.loopers.domain.user.User
 import java.time.LocalDate
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 data class UserInfo(
     val id: Long,
@@ -10,7 +10,7 @@ data class UserInfo(
     val email: String,
     val gender: String,
     val birthDate: LocalDate,
-    val createdAt: ZonedDateTime,
+    val createdAt: LocalDateTime,
 ) {
     companion object {
         fun from(user: User): UserInfo = UserInfo(

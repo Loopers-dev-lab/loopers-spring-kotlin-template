@@ -3,7 +3,7 @@ package com.loopers.infrastructure.event
 import com.loopers.domain.event.EventHandled
 import com.loopers.domain.event.EventHandledRepository
 import org.springframework.stereotype.Repository
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.UUID
 
 @Repository
@@ -13,7 +13,6 @@ class EventHandledRepositoryImpl(private val jpaRepository: EventHandledJpaRepos
 
     override fun existsByEventId(eventId: UUID): Boolean = jpaRepository.existsByEventId(eventId.toString())
 
-    override fun deleteHandledEventsBefore(handledBefore: ZonedDateTime): Int = jpaRepository.deleteByHandledAtBefore(
-        handledBefore,
-    )
+    override fun deleteHandledEventsBefore(handledBefore: LocalDateTime): Int =
+        jpaRepository.deleteByHandledAtBefore(handledBefore)
 }

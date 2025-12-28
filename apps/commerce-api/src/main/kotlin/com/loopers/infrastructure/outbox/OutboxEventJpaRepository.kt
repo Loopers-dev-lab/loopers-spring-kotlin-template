@@ -11,7 +11,7 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.jpa.repository.QueryHints
 import org.springframework.data.repository.query.Param
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 interface OutboxEventJpaRepository : JpaRepository<OutboxEvent, Long> {
 
@@ -65,7 +65,7 @@ interface OutboxEventJpaRepository : JpaRepository<OutboxEvent, Long> {
     )
     fun findByStatusAndCreatedAtBefore(
         @Param("status") status: OutboxEventStatus,
-        @Param("createdBefore") createdBefore: ZonedDateTime,
+        @Param("createdBefore") createdBefore: LocalDateTime,
     ): List<OutboxEvent>
 
     /**
@@ -81,6 +81,6 @@ interface OutboxEventJpaRepository : JpaRepository<OutboxEvent, Long> {
     )
     fun deleteByStatusAndPublishedAtBefore(
         @Param("status") status: OutboxEventStatus,
-        @Param("publishedBefore") publishedBefore: ZonedDateTime,
+        @Param("publishedBefore") publishedBefore: LocalDateTime,
     ): Int
 }

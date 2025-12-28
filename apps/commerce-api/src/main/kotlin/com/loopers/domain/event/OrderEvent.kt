@@ -2,7 +2,7 @@ package com.loopers.domain.event
 
 import com.loopers.domain.order.Order
 import com.loopers.domain.payment.Payment
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -16,7 +16,7 @@ data class OrderCreatedEvent(
     val amount: Long,
     val couponId: Long?,
     val items: List<OrderItemInfo>,
-    val createdAt: ZonedDateTime,
+    val createdAt: LocalDateTime,
 ) {
     companion object {
         fun from(order: Order, couponId: Long?): OrderCreatedEvent = OrderCreatedEvent(
@@ -55,7 +55,7 @@ data class PaymentCompletedEvent(
     val userId: Long,
     val amount: Long,
     val transactionKey: String?,
-    val completedAt: ZonedDateTime,
+    val completedAt: LocalDateTime,
 ) {
     companion object {
         fun from(payment: Payment): PaymentCompletedEvent {
@@ -63,7 +63,7 @@ data class PaymentCompletedEvent(
                 payment.updatedAt
             } catch (e: UninitializedPropertyAccessException) {
                 // updatedAt이 초기화되지 않은 경우(테스트 등) 현재 시각 사용
-                ZonedDateTime.now()
+                LocalDateTime.now()
             }
 
             return PaymentCompletedEvent(
@@ -88,7 +88,7 @@ data class PaymentFailedEvent(
     val userId: Long,
     val amount: Long,
     val reason: String?,
-    val failedAt: ZonedDateTime,
+    val failedAt: LocalDateTime,
 ) {
     companion object {
         fun from(payment: Payment): PaymentFailedEvent {
@@ -96,7 +96,7 @@ data class PaymentFailedEvent(
                 payment.updatedAt
             } catch (e: UninitializedPropertyAccessException) {
                 // updatedAt이 초기화되지 않은 경우(테스트 등) 현재 시각 사용
-                ZonedDateTime.now()
+                LocalDateTime.now()
             }
 
             return PaymentFailedEvent(

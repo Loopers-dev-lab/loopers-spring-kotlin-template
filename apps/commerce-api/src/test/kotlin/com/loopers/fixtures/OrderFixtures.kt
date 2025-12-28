@@ -5,7 +5,7 @@ import com.loopers.domain.order.OrderItem
 import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 /**
  * Order 엔티티를 위한 테스트 픽스처 함수
@@ -31,8 +31,8 @@ fun createTestOrder(
             priceAtOrder = Price(BigDecimal("100000"), Currency.KRW),
         ),
     ),
-    createdAt: ZonedDateTime = ZonedDateTime.now(),
-    updatedAt: ZonedDateTime = ZonedDateTime.now(),
+    createdAt: LocalDateTime = LocalDateTime.now(),
+    updatedAt: LocalDateTime = LocalDateTime.now(),
 ): Order = Order(
         userId = userId,
         items = items,

@@ -79,7 +79,7 @@ class OutboxRelayScheduler(
     @Transactional
     fun cleanupOldPublishedEvents() {
         try {
-            val sevenDaysAgo = java.time.ZonedDateTime.now().minusDays(7)
+            val sevenDaysAgo = java.time.LocalDateTime.now().minusDays(7)
             val deletedCount = outboxEventRepository.deletePublishedEventsBefore(sevenDaysAgo)
 
             if (deletedCount > 0) {

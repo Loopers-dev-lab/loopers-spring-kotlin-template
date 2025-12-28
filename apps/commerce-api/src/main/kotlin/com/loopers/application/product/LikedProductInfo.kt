@@ -4,7 +4,7 @@ import com.loopers.application.brand.BrandInfo
 import com.loopers.domain.like.Like
 import com.loopers.domain.product.Product
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 data class LikedProductInfo(
     val productId: Long,
@@ -12,7 +12,7 @@ data class LikedProductInfo(
     val price: BigDecimal,
     val currency: String,
     val brand: BrandInfo,
-    val likedAt: ZonedDateTime,
+    val likedAt: LocalDateTime,
 ) {
     companion object {
         fun from(

@@ -12,10 +12,8 @@ spring:
       auto-offset-reset: earliest # 처음부터 읽기
       # 역직렬화
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
-        # JSON 역직렬화 설정 (보안을 위해 특정 패키지만 허용)
-        spring.json.trusted.packages: "com.loopers.domain.event,com.loopers.domain,java.time,java.util"
         # 세션 타임아웃
         session.timeout.ms: 30000 # 30초
         # 하트비트 간격
@@ -56,6 +54,8 @@ spring:
   kafka:
     # Docker Compose Kafka 사용 (docker/infra-compose.yml)
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
+    consumer:
+      auto-offset-reset: latest # 테스트에서는 최신 메시지만 읽기
 
 ---
 spring:

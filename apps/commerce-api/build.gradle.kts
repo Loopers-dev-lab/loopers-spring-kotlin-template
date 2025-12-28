@@ -14,6 +14,7 @@ dependencies {
     // add-ons
     implementation(project(":modules:jpa"))
     implementation(project(":modules:redis"))
+    implementation(project(":modules:kafka"))
     implementation(project(":libs:domain-core"))
     implementation(project(":supports:jackson"))
     implementation(project(":supports:logging"))

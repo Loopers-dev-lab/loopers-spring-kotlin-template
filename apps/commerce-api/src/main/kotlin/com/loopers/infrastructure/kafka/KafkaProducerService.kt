@@ -3,7 +3,6 @@ package com.loopers.infrastructure.kafka
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.slf4j.LoggerFactory
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.SendResult
 import org.springframework.stereotype.Service
@@ -14,8 +13,7 @@ import java.util.concurrent.CompletableFuture
  * Outbox Relay에서 사용하여 실제로 Kafka로 메시지 전송
  */
 @Service
-@ConditionalOnBean(KafkaTemplate::class)
-class KafkaProducerService(private val kafkaTemplate: KafkaTemplate<String, String>) {
+class KafkaProducerService(private val kafkaTemplate: KafkaTemplate<Any, Any>) {
     private val logger = LoggerFactory.getLogger(KafkaProducerService::class.java)
 
     /**
@@ -31,11 +29,11 @@ class KafkaProducerService(private val kafkaTemplate: KafkaTemplate<String, Stri
         key: String,
         message: String,
         eventType: String,
-    ): CompletableFuture<SendResult<String, String>> {
+    ): CompletableFuture<SendResult<Any, Any>> {
         logger.debug("Kafka 메시지 전송 시작: topic=$topic, key=$key, eventType=$eventType")
 
         // ProducerRecord 생성 및 eventType 헤더 추가
-        val record = ProducerRecord<String, String>(topic, null, key, message)
+        val record = ProducerRecord<Any, Any>(topic, null, key, message)
         record.headers().add(RecordHeader("eventType", eventType.toByteArray()))
 
         val future = kafkaTemplate.send(record)
@@ -44,8 +42,8 @@ class KafkaProducerService(private val kafkaTemplate: KafkaTemplate<String, Stri
             if (ex == null) {
                 logger.debug(
                     "Kafka 메시지 전송 성공: topic=$topic, key=$key, eventType=$eventType, " +
-                        "partition=${result.recordMetadata.partition()}, " +
-                        "offset=${result.recordMetadata.offset()}",
+                            "partition=${result.recordMetadata.partition()}, " +
+                            "offset=${result.recordMetadata.offset()}",
                 )
             } else {
                 logger.error("Kafka 메시지 전송 실패: topic=$topic, key=$key, eventType=$eventType", ex)

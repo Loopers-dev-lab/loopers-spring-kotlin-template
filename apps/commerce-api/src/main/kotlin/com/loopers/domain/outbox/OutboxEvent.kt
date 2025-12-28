@@ -8,7 +8,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.Index
 import jakarta.persistence.Lob
 import jakarta.persistence.Table
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 /**
  * Transactional Outbox Pattern을 위한 이벤트 저장소
@@ -77,7 +77,7 @@ class OutboxEvent(
      * 마지막 시도 시각
      */
     @Column
-    var lastAttemptAt: ZonedDateTime? = null,
+    var lastAttemptAt: LocalDateTime? = null,
 
     /**
      * 에러 메시지
@@ -89,7 +89,7 @@ class OutboxEvent(
      * 처리 완료 시각
      */
     @Column
-    var publishedAt: ZonedDateTime? = null,
+    var publishedAt: LocalDateTime? = null,
 ) : BaseEntity() {
 
     /**
@@ -97,8 +97,8 @@ class OutboxEvent(
      */
     fun markAsPublished() {
         this.status = OutboxEventStatus.PUBLISHED
-        this.publishedAt = ZonedDateTime.now()
-        this.lastAttemptAt = ZonedDateTime.now()
+        this.publishedAt = LocalDateTime.now()
+        this.lastAttemptAt = LocalDateTime.now()
     }
 
     /**
@@ -107,7 +107,7 @@ class OutboxEvent(
     fun markAsFailed(errorMessage: String, maxRetryCount: Int) {
         this.errorMessage = errorMessage.take(1000) // 최대 1000자
         this.retryCount++
-        this.lastAttemptAt = ZonedDateTime.now()
+        this.lastAttemptAt = LocalDateTime.now()
 
         // 최대 재시도 횟수를 초과한 경우에만 FAILED 상태로 변경
         if (this.retryCount >= maxRetryCount) {
@@ -125,7 +125,7 @@ class OutboxEvent(
      * 재시도 처리 시작
      */
     fun startRetry() {
-        this.lastAttemptAt = ZonedDateTime.now()
+        this.lastAttemptAt = LocalDateTime.now()
     }
 
     /**
@@ -133,7 +133,7 @@ class OutboxEvent(
      */
     fun markAsProcessing() {
         this.status = OutboxEventStatus.PROCESSING
-        this.lastAttemptAt = ZonedDateTime.now()
+        this.lastAttemptAt = LocalDateTime.now()
     }
 
     /**

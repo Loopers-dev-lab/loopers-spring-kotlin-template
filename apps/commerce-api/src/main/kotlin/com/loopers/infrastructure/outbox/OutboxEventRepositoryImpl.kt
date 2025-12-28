@@ -6,7 +6,7 @@ import com.loopers.domain.outbox.OutboxEventStatus
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 @Repository
 class OutboxEventRepositoryImpl(private val jpaRepository: OutboxEventJpaRepository) : OutboxEventRepository {
@@ -34,14 +34,14 @@ class OutboxEventRepositoryImpl(private val jpaRepository: OutboxEventJpaReposit
     }
 
     override fun findFailedEventsOlderThan(
-        createdBefore: ZonedDateTime,
+        createdBefore: LocalDateTime,
     ): List<OutboxEvent> = jpaRepository.findByStatusAndCreatedAtBefore(
         OutboxEventStatus.FAILED,
         createdBefore,
     )
 
     override fun deletePublishedEventsBefore(
-        publishedBefore: ZonedDateTime,
+        publishedBefore: LocalDateTime,
     ): Int = jpaRepository.deleteByStatusAndPublishedAtBefore(
         OutboxEventStatus.PUBLISHED,
         publishedBefore,

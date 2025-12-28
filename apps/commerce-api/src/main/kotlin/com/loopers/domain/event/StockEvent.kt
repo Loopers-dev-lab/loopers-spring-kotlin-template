@@ -1,19 +1,19 @@
 package com.loopers.domain.event
 
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
  * 재고 소진 이벤트
  * 상품의 재고가 0이 되었을 때 발행
  */
-data class StockDepletedEvent(val eventId: UUID, val productId: Long, val previousQuantity: Int, val createdAt: ZonedDateTime) {
+data class StockDepletedEvent(val eventId: UUID, val productId: Long, val previousQuantity: Int, val createdAt: LocalDateTime) {
     companion object {
         fun create(productId: Long, previousQuantity: Int): StockDepletedEvent = StockDepletedEvent(
                 eventId = UUID.randomUUID(),
                 productId = productId,
                 previousQuantity = previousQuantity,
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
     }
 }
@@ -27,7 +27,7 @@ data class StockLowEvent(
     val productId: Long,
     val currentQuantity: Int,
     val threshold: Int,
-    val createdAt: ZonedDateTime,
+    val createdAt: LocalDateTime,
 ) {
     companion object {
         fun create(productId: Long, currentQuantity: Int, threshold: Int): StockLowEvent = StockLowEvent(
@@ -35,7 +35,7 @@ data class StockLowEvent(
                 productId = productId,
                 currentQuantity = currentQuantity,
                 threshold = threshold,
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
     }
 }

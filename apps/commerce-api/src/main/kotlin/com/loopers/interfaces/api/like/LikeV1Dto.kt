@@ -2,7 +2,7 @@ package com.loopers.interfaces.api.like
 
 import com.loopers.application.product.LikedProductInfo
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 class LikeV1Dto {
     data class LikedProductResponse(
@@ -11,7 +11,7 @@ class LikeV1Dto {
         val price: BigDecimal,
         val currency: String,
         val brand: BrandSummary,
-        val likedAt: ZonedDateTime,
+        val likedAt: LocalDateTime,
     ) {
         companion object {
             fun from(

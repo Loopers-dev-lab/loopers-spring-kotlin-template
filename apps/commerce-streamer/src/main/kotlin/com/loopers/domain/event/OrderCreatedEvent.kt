@@ -1,6 +1,6 @@
 package com.loopers.domain.event
 
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -14,7 +14,7 @@ data class OrderCreatedEvent(
     val amount: Long,
     val couponId: Long?,
     val items: List<OrderItemInfo>,
-    val createdAt: ZonedDateTime,
+    val createdAt: LocalDateTime,
 ) {
     /**
      * 주문 상품 정보

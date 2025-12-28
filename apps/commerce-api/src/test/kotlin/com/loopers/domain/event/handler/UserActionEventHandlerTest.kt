@@ -6,7 +6,7 @@ import com.loopers.infrastructure.analytics.client.AnalyticsClient
 import io.mockk.mockk
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 class UserActionEventHandlerTest {
     private val analyticsClient = mockk<AnalyticsClient>(relaxed = true)
@@ -23,7 +23,7 @@ class UserActionEventHandlerTest {
             targetType = "PRODUCT",
             targetId = 100L,
             metadata = mapOf("source" to "homepage"),
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
 
         // when & then (예외가 발생하지 않아야 함)
@@ -40,7 +40,7 @@ class UserActionEventHandlerTest {
                 actionType = actionType,
                 targetType = "TARGET",
                 targetId = 100L,
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             // 예외가 발생하지 않아야 함
@@ -58,7 +58,7 @@ class UserActionEventHandlerTest {
             targetType = "PRODUCT",
             targetId = 100L,
             metadata = null,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
 
         // when & then (예외가 발생하지 않아야 함)
@@ -80,7 +80,7 @@ class UserActionEventHandlerTest {
                 "paymentMethod" to "CARD",
                 "couponId" to 200L,
             ),
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
 
         // when & then (예외가 발생하지 않아야 함)
