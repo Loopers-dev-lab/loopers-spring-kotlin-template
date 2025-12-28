@@ -1,5 +1,6 @@
 package com.loopers.batch
 
+import com.loopers.batch.productmetrics.ranking.ProductMonthlyRankingJobConfig
 import com.loopers.batch.productmetrics.ranking.ProductWeeklyRankingJobConfig
 import org.springframework.batch.core.Job
 import org.springframework.batch.core.JobParametersBuilder
@@ -22,6 +23,9 @@ class BatchJobController(
     private val jobLauncher: JobLauncher,
     @Qualifier(ProductWeeklyRankingJobConfig.JOB_NAME)
     private val productWeeklyRankingJob: Job,
+
+    @Qualifier(ProductMonthlyRankingJobConfig.JOB_NAME)
+    private val productMonthlyRankingJob: Job,
 ) {
 
     /**
@@ -55,6 +59,38 @@ class BatchJobController(
                 "status" to execution.status.name,
                 "weekStart" to weekStart,
                 "weekEnd" to weekEnd,
+                "startTime" to execution.startTime,
+            ),
+        )
+    }
+
+    /**
+     * 월별 상품 랭킹 배치 실행
+     *
+     * @param yearMonth 월 (yyyy-MM 형식, 필수)
+     *
+     * 예시:
+     * - POST /api/v1/batch/monthly-ranking?yearMonth=2025-01
+     */
+    @PostMapping("/monthly-ranking")
+    fun runMonthlyRanking(
+        @RequestParam yearMonth: String,
+    ): ResponseEntity<Map<String, Any>> {
+        // Job 파라미터 생성
+        val params = JobParametersBuilder()
+            .addString("yearMonth", yearMonth)
+            .addLong("timestamp", System.currentTimeMillis())
+            .toJobParameters()
+
+        // Job 실행
+        val execution = jobLauncher.run(productMonthlyRankingJob, params)
+
+        return ResponseEntity.ok(
+            mapOf(
+                "jobName" to ProductMonthlyRankingJobConfig.JOB_NAME,
+                "jobId" to execution.jobId,
+                "status" to execution.status.name,
+                "yearMonth" to yearMonth,
                 "startTime" to execution.startTime,
             ),
         )
