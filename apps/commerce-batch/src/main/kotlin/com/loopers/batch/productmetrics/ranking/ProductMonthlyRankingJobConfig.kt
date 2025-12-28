@@ -19,7 +19,7 @@ import org.springframework.transaction.PlatformTransactionManager
  * - Step: PRODUCT_MONTHLY_RANKING_STEP
  * - Chunk 크기: 1,000개
  * - 흐름: Reader -> Writer
- *   - Reader: 주간 랭킹 데이터를 월 단위로 집계하여 RankedProduct 반환
+ *   - Reader: product_metrics를 월 단위로 집계하여 RankedProduct 반환
  *   - Writer: Top 100을 ProductMonthlyRankingRepository에 저장
  */
 @Configuration

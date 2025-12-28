@@ -2,9 +2,9 @@ package com.loopers.batch.productmetrics.batch.ranking
 
 import com.loopers.IntegrationTest
 import com.loopers.batch.productmetrics.ranking.ProductMonthlyRankingJobConfig
+import com.loopers.domain.metrics.ProductMetrics
+import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository
 import com.loopers.domain.ranking.ProductMonthlyRankingRepository
-import com.loopers.domain.ranking.ProductWeeklyRanking
-import com.loopers.domain.ranking.ProductWeeklyRankingRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -28,10 +28,10 @@ class ProductMonthlyRankingJobTest : IntegrationTest() {
     private lateinit var job: Job
 
     @Autowired
-    private lateinit var weeklyRankingRepository: ProductWeeklyRankingRepository
+    private lateinit var monthlyRankingRepository: ProductMonthlyRankingRepository
 
     @Autowired
-    private lateinit var monthlyRankingRepository: ProductMonthlyRankingRepository
+    private lateinit var productMetricsJpaRepository: ProductMetricsJpaRepository
 
     private val monthPeriod = YearMonth.now()
     private val monthStart = monthPeriod.atDay(1)
@@ -44,34 +44,22 @@ class ProductMonthlyRankingJobTest : IntegrationTest() {
     @Test
     @DisplayName("전체 배치 흐름이 정상적으로 동작한다")
     fun testCompleteJobExecution() {
-        // given: 10개 상품의 주간 랭킹 데이터 준비 (2주)
-        val week1Start = monthStart
-        val week1End = week1Start.plusDays(6)
-        val week2Start = week1End.plusDays(1)
-        val week2End = week2Start.plusDays(6)
+        // given: 10개 상품의 월간 메트릭 데이터 준비 (2일)
+        val firstDay = monthStart
+        val secondDay = monthStart.plusDays(7)
 
-        val weeklyRankings = mutableListOf<ProductWeeklyRanking>()
+        val metrics = mutableListOf<ProductMetrics>()
         (1L..10L).forEach { productId ->
-            weeklyRankings.add(
-                ProductWeeklyRanking.create(
-                    ranking = productId.toInt(),
-                    productId = productId,
-                    score = productId * 10.0,
-                    weekStart = week1Start,
-                    weekEnd = week1End,
-                ),
-            )
-            weeklyRankings.add(
-                ProductWeeklyRanking.create(
-                    ranking = productId.toInt(),
-                    productId = productId,
-                    score = productId * 5.0,
-                    weekStart = week2Start,
-                    weekEnd = week2End,
-                ),
-            )
+            val day1 = ProductMetrics.create(productId, firstDay).apply {
+                viewCount = productId * 10
+            }
+            val day2 = ProductMetrics.create(productId, secondDay).apply {
+                viewCount = productId * 5
+            }
+            metrics.add(day1)
+            metrics.add(day2)
         }
-        weeklyRankingRepository.saveAll(weeklyRankings)
+        productMetricsJpaRepository.saveAll(metrics)
 
         // when: Job 실행
         val jobParameters = JobParametersBuilder()
@@ -106,20 +94,13 @@ class ProductMonthlyRankingJobTest : IntegrationTest() {
     @Test
     @DisplayName("150개 상품 중 Top 100만 저장한다")
     fun testSavesOnlyTop100() {
-        // given: 150개 상품 주간 랭킹 데이터
-        val weekStart = monthStart
-        val weekEnd = weekStart.plusDays(6)
-
-        val weeklyRankings = (1L..150L).map { productId ->
-            ProductWeeklyRanking.create(
-                ranking = productId.toInt(),
-                productId = productId,
-                score = (150 - productId).toDouble(),
-                weekStart = weekStart,
-                weekEnd = weekEnd,
-            )
+        // given: 150개 상품 월간 메트릭 데이터
+        val metrics = (1L..150L).map { productId ->
+            ProductMetrics.create(productId, monthStart).apply {
+                viewCount = 150 - productId
+            }
         }
-        weeklyRankingRepository.saveAll(weeklyRankings)
+        productMetricsJpaRepository.saveAll(metrics)
 
         // when: Job 실행
         val jobParameters = JobParametersBuilder()
@@ -147,19 +128,12 @@ class ProductMonthlyRankingJobTest : IntegrationTest() {
     @DisplayName("여러 번 실행해도 Top 100만 유지된다")
     fun testMultipleExecutionsKeepTop100() {
         // given: 첫 번째 실행용 데이터 (50개)
-        val weekStart = monthStart
-        val weekEnd = weekStart.plusDays(6)
-
         val firstBatch = (1L..50L).map { productId ->
-            ProductWeeklyRanking.create(
-                ranking = productId.toInt(),
-                productId = productId,
-                score = productId.toDouble(),
-                weekStart = weekStart,
-                weekEnd = weekEnd,
-            )
+            ProductMetrics.create(productId, monthStart).apply {
+                viewCount = productId
+            }
         }
-        weeklyRankingRepository.saveAll(firstBatch)
+        productMetricsJpaRepository.saveAll(firstBatch)
 
         // when: 첫 번째 Job 실행
         val jobParameters1 = JobParametersBuilder()
@@ -172,15 +146,11 @@ class ProductMonthlyRankingJobTest : IntegrationTest() {
 
         // 추가 데이터 저장 (51~150)
         val secondBatch = (51L..150L).map { productId ->
-            ProductWeeklyRanking.create(
-                ranking = productId.toInt(),
-                productId = productId,
-                score = (productId * 10).toDouble(),
-                weekStart = weekStart.plusDays(7),
-                weekEnd = weekEnd.plusDays(7),
-            )
+            ProductMetrics.create(productId, monthStart.plusDays(7)).apply {
+                viewCount = productId * 10
+            }
         }
-        weeklyRankingRepository.saveAll(secondBatch)
+        productMetricsJpaRepository.saveAll(secondBatch)
 
         // when: 두 번째 Job 실행
         val jobParameters2 = JobParametersBuilder()
@@ -223,18 +193,10 @@ class ProductMonthlyRankingJobTest : IntegrationTest() {
     @DisplayName("monthPeriod가 정확하게 저장된다")
     fun testStoresCorrectMonthPeriod() {
         // given: 테스트 데이터
-        val weekStart = monthStart
-        val weekEnd = weekStart.plusDays(6)
-        weeklyRankingRepository.saveAll(
-            listOf(
-                ProductWeeklyRanking.create(
-                    ranking = 1,
-                    productId = 1L,
-                    score = 100.0,
-                    weekStart = weekStart,
-                    weekEnd = weekEnd,
-                ),
-            ),
+        productMetricsJpaRepository.save(
+            ProductMetrics.create(1L, monthStart).apply {
+                viewCount = 100
+            },
         )
 
         // when: Job 실행

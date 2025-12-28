@@ -16,7 +16,7 @@ import javax.sql.DataSource
 /**
  * 월간 상품 메트릭 Reader
  *
- * 주간 랭킹 데이터를 월 단위로 합산하여 productId별 점수를 반환
+ * product_metrics를 월 단위로 집계하여 productId별 점수를 반환
  */
 @Configuration
 class ProductMonthlyRankingReader {
@@ -26,23 +26,29 @@ class ProductMonthlyRankingReader {
     fun monthlyRankingReader(
         dataSource: DataSource,
         @Value("#{jobParameters['yearMonth']}") yearMonth: String,
+        @Value("\${batch.ranking.weights.view}") viewWeight: Double,
+        @Value("\${batch.ranking.weights.like}") likeWeight: Double,
+        @Value("\${batch.ranking.weights.sold}") soldWeight: Double,
     ): JdbcPagingItemReader<RankedProduct> {
         val month = YearMonth.parse(yearMonth)
         val monthStart = month.atDay(1)
         val monthEnd = month.atEndOfMonth()
 
-        // 주간 집계 MV를 월 범위로 덮어 합산
+        // 월 범위 내 일자별 메트릭을 합산
         val selectClause = """
             SELECT
                 product_id,
-                SUM(score) as final_score
+                SUM(
+                    view_count * $viewWeight +
+                    like_count * $likeWeight +
+                    sold_count * $soldWeight
+                ) as final_score
         """.trimIndent()
 
-        val fromClause = "FROM mv_product_rank_weekly"
+        val fromClause = "FROM product_metrics"
 
         val whereClause = """
-            WHERE week_start <= :monthEnd
-              AND week_end >= :monthStart
+            WHERE metric_date BETWEEN :monthStart AND :monthEnd
             GROUP BY product_id
         """.trimIndent()
 
