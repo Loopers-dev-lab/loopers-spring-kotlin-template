@@ -68,6 +68,9 @@ class ProductRankMonthly(
 ) : BaseEntity() {
 
     init {
+        // Validate yearMonth format and value
+        stringToYearMonth(yearMonth)
+
         require(rank >= 1) { "Rank must be positive: $rank" }
         require(periodStart <= periodEnd) {
             "Period start ($periodStart) must not be after period end ($periodEnd)"
@@ -83,10 +86,7 @@ class ProductRankMonthly(
                 "Invalid yearMonth format: $yearMonth. Expected yyyyMM format."
             }
             return try {
-                YearMonth.of(
-                    yearMonth.substring(0, 4).toInt(),
-                    yearMonth.substring(4, 6).toInt(),
-                )
+                YearMonth.parse(yearMonth, YEAR_MONTH_FORMATTER)
             } catch (e: DateTimeException) {
                 throw IllegalArgumentException("Invalid yearMonth value: $yearMonth", e)
             }
