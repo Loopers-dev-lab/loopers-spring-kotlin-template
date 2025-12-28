@@ -8,6 +8,7 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * 주간 랭킹 집계 테이블 (TOP 100)
@@ -66,6 +67,6 @@ class ProductRankWeekly(
 ) : BaseEntity() {
 
     companion object {
-        fun yearWeekToString(date: LocalDate): String = date.format(DateTimeFormatter.ofPattern("yyyy'W'ww"))
+        fun yearWeekToString(date: LocalDate): String = date.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
     }
 }

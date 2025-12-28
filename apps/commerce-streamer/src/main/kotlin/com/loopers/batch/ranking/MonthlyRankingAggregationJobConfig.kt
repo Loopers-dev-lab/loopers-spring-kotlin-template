@@ -42,7 +42,8 @@ class MonthlyRankingAggregationJobConfig(
 
     companion object {
         const val JOB_NAME = "monthlyRankingAggregationJob"
-        const val STEP_NAME = "monthlyRankingAggregationStep"
+        const val DELETE_STEP_NAME = "monthlyRankingDeleteStep"
+        const val AGGREGATE_STEP_NAME = "monthlyRankingAggregateStep"
         const val CHUNK_SIZE = 100
         const val TOP_N = 100
     }
@@ -50,12 +51,38 @@ class MonthlyRankingAggregationJobConfig(
     @Bean
     fun monthlyRankingAggregationJob(): Job = JobBuilder(JOB_NAME, jobRepository)
             .incrementer(RunIdIncrementer())
-            .start(monthlyRankingAggregationStep())
+            .start(monthlyRankingDeleteStep(null))
+            .next(monthlyRankingAggregateStep())
             .build()
 
+    /**
+     * Step 1: 기존 데이터 삭제 (멱등성 보장)
+     */
     @Bean
     @JobScope
-    fun monthlyRankingAggregationStep(): Step = StepBuilder(STEP_NAME, jobRepository)
+    fun monthlyRankingDeleteStep(
+        @Value("#{jobParameters['targetYearMonth']}") targetYearMonthStr: String?,
+    ): Step {
+        val targetYearMonth = targetYearMonthStr?.let {
+            ProductRankMonthly.stringToYearMonth(it)
+        } ?: YearMonth.now().minusMonths(1)
+        val yearMonth = ProductRankMonthly.yearMonthToString(targetYearMonth)
+
+        return StepBuilder(DELETE_STEP_NAME, jobRepository)
+                .tasklet({ _, _ ->
+                    productRankMonthlyRepository.deleteByYearMonth(yearMonth)
+                    logger.info("월간 랭킹 기존 데이터 삭제 완료: yearMonth=$yearMonth")
+                    null // null is interpreted as FINISHED
+                }, transactionManager)
+                .build()
+    }
+
+    /**
+     * Step 2: 집계 및 저장
+     */
+    @Bean
+    @JobScope
+    fun monthlyRankingAggregateStep(): Step = StepBuilder(AGGREGATE_STEP_NAME, jobRepository)
             .chunk<MonthlyRankingAggregate, ProductRankMonthly>(CHUNK_SIZE, transactionManager)
             .reader(monthlyRankingReader(null))
             .processor(monthlyRankingProcessor())
@@ -134,9 +161,6 @@ class MonthlyRankingAggregationJobConfig(
             if (items.isEmpty()) return@ItemWriter
 
             val yearMonth = items.first().yearMonth
-
-            // 기존 데이터 삭제 (멱등성 보장)
-            productRankMonthlyRepository.deleteByYearMonth(yearMonth)
 
             // 신규 데이터 저장
             productRankMonthlyRepository.saveAll(items.toList())

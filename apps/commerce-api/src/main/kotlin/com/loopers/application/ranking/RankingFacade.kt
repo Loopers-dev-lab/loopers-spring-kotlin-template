@@ -7,6 +7,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Component
 class RankingFacade(private val rankingService: RankingService) {
@@ -20,7 +21,7 @@ class RankingFacade(private val rankingService: RankingService) {
         val timestamp = date ?: when (window) {
             TimeWindow.DAILY -> LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
             TimeWindow.HOURLY -> LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHH"))
-            TimeWindow.WEEKLY -> LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy'W'ww"))
+            TimeWindow.WEEKLY -> LocalDate.now().format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
             TimeWindow.MONTHLY -> YearMonth.now().format(DateTimeFormatter.ofPattern("yyyyMM"))
         }
 

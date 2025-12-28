@@ -24,6 +24,9 @@ spring:
       - kafka.yml
       - logging.yml
       - monitoring.yml
+  batch:
+    jdbc:
+      initialize-schema: always
 
 demo-kafka:
   test:

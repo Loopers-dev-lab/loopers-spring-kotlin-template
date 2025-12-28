@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.transaction.PlatformTransactionManager
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * 주간 랭킹 집계 배치 Job
@@ -42,7 +43,8 @@ class WeeklyRankingAggregationJobConfig(
 
     companion object {
         const val JOB_NAME = "weeklyRankingAggregationJob"
-        const val STEP_NAME = "weeklyRankingAggregationStep"
+        const val DELETE_STEP_NAME = "weeklyRankingDeleteStep"
+        const val AGGREGATE_STEP_NAME = "weeklyRankingAggregateStep"
         const val CHUNK_SIZE = 100
         const val TOP_N = 100
     }
@@ -50,12 +52,36 @@ class WeeklyRankingAggregationJobConfig(
     @Bean
     fun weeklyRankingAggregationJob(): Job = JobBuilder(JOB_NAME, jobRepository)
             .incrementer(RunIdIncrementer())
-            .start(weeklyRankingAggregationStep())
+            .start(weeklyRankingDeleteStep(null))
+            .next(weeklyRankingAggregateStep())
             .build()
 
+    /**
+     * Step 1: 기존 데이터 삭제 (멱등성 보장)
+     */
     @Bean
     @JobScope
-    fun weeklyRankingAggregationStep(): Step = StepBuilder(STEP_NAME, jobRepository)
+    fun weeklyRankingDeleteStep(
+        @Value("#{jobParameters['targetDate']}") targetDateStr: String?,
+    ): Step {
+        val targetDate = targetDateStr?.let { LocalDate.parse(it) } ?: LocalDate.now().minusDays(1)
+        val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
+
+        return StepBuilder(DELETE_STEP_NAME, jobRepository)
+                .tasklet({ _, _ ->
+                    productRankWeeklyRepository.deleteByYearWeek(yearWeek)
+                    logger.info("주간 랭킹 기존 데이터 삭제 완료: yearWeek=$yearWeek")
+                    null // null is interpreted as FINISHED
+                }, transactionManager)
+                .build()
+    }
+
+    /**
+     * Step 2: 집계 및 저장
+     */
+    @Bean
+    @JobScope
+    fun weeklyRankingAggregateStep(): Step = StepBuilder(AGGREGATE_STEP_NAME, jobRepository)
             .chunk<WeeklyRankingAggregate, ProductRankWeekly>(CHUNK_SIZE, transactionManager)
             .reader(weeklyRankingReader(null))
             .processor(weeklyRankingProcessor())
@@ -134,9 +160,6 @@ class WeeklyRankingAggregationJobConfig(
             if (items.isEmpty()) return@ItemWriter
 
             val yearWeek = items.first().yearWeek
-
-            // 기존 데이터 삭제 (멱등성 보장)
-            productRankWeeklyRepository.deleteByYearWeek(yearWeek)
 
             // 신규 데이터 저장
             productRankWeeklyRepository.saveAll(items.toList())
