@@ -398,8 +398,8 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:19092 ./gradlew :apps:commerce-streamer:bootRu
 
 애플리케이션 실행 확인:
 
-- API 서버: http://localhost:8080
-- Actuator Health: http://localhost:8080/actuator/health
+- API 서버: <http://localhost:8080>
+- Actuator Health: <http://localhost:8080/actuator/health>
 
 ### 5. 모니터링 (선택사항)
 
