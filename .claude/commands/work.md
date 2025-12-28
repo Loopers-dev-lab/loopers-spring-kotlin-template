@@ -2,4 +2,6 @@
 description: Execute next milestone using worker agent
 ---
 
-Launch worker agent to execute the next unchecked milestone.
+1. Read plan.md
+2. Find the first unchecked milestone (look for `- [ ] Milestone N:`)
+3. Launch worker agent: "Execute Milestone N"
