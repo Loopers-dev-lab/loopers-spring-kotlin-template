@@ -6,6 +6,10 @@ import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductRepository
+import com.loopers.domain.ranking.ProductRankMonthly
+import com.loopers.domain.ranking.ProductRankMonthlyRepository
+import com.loopers.domain.ranking.ProductRankWeekly
+import com.loopers.domain.ranking.ProductRankWeeklyRepository
 import com.loopers.domain.ranking.RankingKey
 import com.loopers.domain.ranking.RankingRepository
 import com.loopers.domain.ranking.RankingScope
@@ -28,6 +32,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.test.context.ContextConfiguration
+import org.springframework.test.context.jdbc.Sql
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -36,11 +41,14 @@ import java.time.format.DateTimeFormatter
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
 @ContextConfiguration(initializers = [RedisTestContainersConfig::class])
+@Sql(scripts = ["/ranking-tables.sql"], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class RankingV1ApiE2ETest @Autowired constructor(
     private val testRestTemplate: TestRestTemplate,
     private val rankingRepository: RankingRepository,
     private val productRepository: ProductRepository,
     private val brandRepository: BrandRepository,
+    private val productRankWeeklyRepository: ProductRankWeeklyRepository,
+    private val productRankMonthlyRepository: ProductRankMonthlyRepository,
     private val redisTemplate: RedisTemplate<String, String>,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
@@ -275,5 +283,146 @@ class RankingV1ApiE2ETest @Autowired constructor(
         val body = apiResponse.data!!
         Assertions.assertThat(body.rankings).isEmpty()
         Assertions.assertThat(body.totalCount).isEqualTo(0)
+    }
+
+    @Test
+    @DisplayName("주간 랭킹 조회 - 상품 정보 포함")
+    fun `should get weekly rankings with product info`() {
+        // given: 주간 랭킹 데이터 생성
+        val yearWeek = "2025W01"
+        val periodStart = LocalDate.of(2024, 12, 30)
+        val periodEnd = LocalDate.of(2025, 1, 5)
+
+        val weeklyRankings = listOf(
+            ProductRankWeekly(
+                yearWeek = yearWeek,
+                productId = product1.id,
+                score = 10.0,
+                rank = 1,
+                periodStart = periodStart,
+                periodEnd = periodEnd,
+            ),
+            ProductRankWeekly(
+                yearWeek = yearWeek,
+                productId = product2.id,
+                score = 8.5,
+                rank = 2,
+                periodStart = periodStart,
+                periodEnd = periodEnd,
+            ),
+            ProductRankWeekly(
+                yearWeek = yearWeek,
+                productId = product3.id,
+                score = 7.2,
+                rank = 3,
+                periodStart = periodStart,
+                periodEnd = periodEnd,
+            ),
+        )
+
+        productRankWeeklyRepository.saveAll(weeklyRankings)
+
+        // when
+        val responseType = object : ParameterizedTypeReference<ApiResponse<RankingV1Dto.RankingPageResponse>>() {}
+        val response = testRestTemplate.exchange(
+            "/api/v1/rankings?window=WEEKLY&date=$yearWeek&page=1&size=20",
+            HttpMethod.GET,
+            null,
+            responseType,
+        )
+
+        // then
+        Assertions.assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
+
+        val apiResponse = response.body!!
+        Assertions.assertThat(apiResponse.meta.result).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+
+        val body = apiResponse.data!!
+        Assertions.assertThat(body.window).isEqualTo(TimeWindow.WEEKLY)
+        Assertions.assertThat(body.timestamp).isEqualTo(yearWeek)
+        Assertions.assertThat(body.page).isEqualTo(1)
+        Assertions.assertThat(body.size).isEqualTo(20)
+        Assertions.assertThat(body.totalCount).isEqualTo(3)
+
+        // 랭킹 순서 검증
+        Assertions.assertThat(body.rankings).hasSize(3)
+        Assertions.assertThat(body.rankings[0].rank).isEqualTo(1)
+        Assertions.assertThat(body.rankings[0].product.id).isEqualTo(product1.id)
+        Assertions.assertThat(body.rankings[0].product.name).isEqualTo("상품 1")
+        Assertions.assertThat(body.rankings[0].score).isEqualTo(10.0)
+
+        Assertions.assertThat(body.rankings[1].rank).isEqualTo(2)
+        Assertions.assertThat(body.rankings[1].product.id).isEqualTo(product2.id)
+
+        Assertions.assertThat(body.rankings[2].rank).isEqualTo(3)
+        Assertions.assertThat(body.rankings[2].product.id).isEqualTo(product3.id)
+
+        // cleanup
+        productRankWeeklyRepository.deleteByYearWeek(yearWeek)
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 상품 정보 포함")
+    fun `should get monthly rankings with product info`() {
+        // given: 월간 랭킹 데이터 생성
+        val yearMonth = "202501"
+        val periodStart = LocalDate.of(2025, 1, 1)
+        val periodEnd = LocalDate.of(2025, 1, 31)
+
+        val monthlyRankings = listOf(
+            ProductRankMonthly(
+                yearMonth = yearMonth,
+                productId = product1.id,
+                score = 15.0,
+                rank = 1,
+                periodStart = periodStart,
+                periodEnd = periodEnd,
+            ),
+            ProductRankMonthly(
+                yearMonth = yearMonth,
+                productId = product2.id,
+                score = 12.5,
+                rank = 2,
+                periodStart = periodStart,
+                periodEnd = periodEnd,
+            ),
+        )
+
+        productRankMonthlyRepository.saveAll(monthlyRankings)
+
+        // when
+        val responseType = object : ParameterizedTypeReference<ApiResponse<RankingV1Dto.RankingPageResponse>>() {}
+        val response = testRestTemplate.exchange(
+            "/api/v1/rankings?window=MONTHLY&date=$yearMonth&page=1&size=20",
+            HttpMethod.GET,
+            null,
+            responseType,
+        )
+
+        // then
+        Assertions.assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
+
+        val apiResponse = response.body!!
+        Assertions.assertThat(apiResponse.meta.result).isEqualTo(ApiResponse.Metadata.Result.SUCCESS)
+
+        val body = apiResponse.data!!
+        Assertions.assertThat(body.window).isEqualTo(TimeWindow.MONTHLY)
+        Assertions.assertThat(body.timestamp).isEqualTo(yearMonth)
+        Assertions.assertThat(body.page).isEqualTo(1)
+        Assertions.assertThat(body.size).isEqualTo(20)
+        Assertions.assertThat(body.totalCount).isEqualTo(2)
+
+        // 랭킹 순서 검증
+        Assertions.assertThat(body.rankings).hasSize(2)
+        Assertions.assertThat(body.rankings[0].rank).isEqualTo(1)
+        Assertions.assertThat(body.rankings[0].product.id).isEqualTo(product1.id)
+        Assertions.assertThat(body.rankings[0].product.name).isEqualTo("상품 1")
+        Assertions.assertThat(body.rankings[0].score).isEqualTo(15.0)
+
+        Assertions.assertThat(body.rankings[1].rank).isEqualTo(2)
+        Assertions.assertThat(body.rankings[1].product.id).isEqualTo(product2.id)
+
+        // cleanup
+        productRankMonthlyRepository.deleteByYearMonth(yearMonth)
     }
 }

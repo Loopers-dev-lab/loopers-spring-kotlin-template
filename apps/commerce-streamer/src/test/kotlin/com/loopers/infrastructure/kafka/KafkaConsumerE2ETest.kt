@@ -10,6 +10,7 @@ import com.loopers.infrastructure.event.EventHandledJpaRepository
 import com.loopers.infrastructure.product.ProductMetricsJpaRepository
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
@@ -24,7 +25,7 @@ import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.test.context.ActiveProfiles
 import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.Properties
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -56,6 +57,12 @@ import java.util.concurrent.TimeUnit
 @ActiveProfiles("test")
 class KafkaConsumerE2ETest @Autowired constructor(
     private val jsonMapper: JsonMapper,
+    private val kafkaTemplate: KafkaTemplate<Any, Any>,
+    private val kafkaEventConsumer: KafkaEventConsumer,
+    private val productMetricsRepository: ProductMetricsRepository,
+    private val eventHandledRepository: EventHandledRepository,
+    private val productMetricsJpaRepository: ProductMetricsJpaRepository,
+    private val eventHandledJpaRepository: EventHandledJpaRepository,
 ) {
 
     companion object {
@@ -75,21 +82,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
         private const val PRODUCT_ID_9 = 900L
     }
 
-    @Autowired(required = false)
-    private var kafkaTemplate: KafkaTemplate<String, String>? = null
-
-    @Autowired(required = false)
-    private var productMetricsRepository: ProductMetricsRepository? = null
-
-    @Autowired(required = false)
-    private var eventHandledRepository: EventHandledRepository? = null
-
-    @Autowired(required = false)
-    private var productMetricsJpaRepository: ProductMetricsJpaRepository? = null
-
-    @Autowired(required = false)
-    private var eventHandledJpaRepository: EventHandledJpaRepository? = null
-
     @Value("\${spring.kafka.bootstrap-servers}")
     private lateinit var bootstrapServers: String
 
@@ -100,6 +92,9 @@ class KafkaConsumerE2ETest @Autowired constructor(
             println("⚠️  Kafka가 실행 중이지 않습니다. 테스트를 건너뜁니다.")
             println("   Kafka 실행: cd docker && docker-compose -f infra-compose.yml up -d kafka")
             println("   환경 변수: export KAFKA_BOOTSTRAP_SERVERS=localhost:19092")
+        } else {
+            println("✅ KafkaTemplate 주입 성공")
+            println("✅ KafkaEventConsumer 주입: ${if (kafkaEventConsumer != null) "성공" else "실패 - Consumer가 빈으로 등록되지 않음"}")
         }
     }
 
@@ -110,8 +105,15 @@ class KafkaConsumerE2ETest @Autowired constructor(
         eventHandledJpaRepository?.deleteAll()
     }
 
-    private fun sendEvent(topic: String, key: String, payload: String) {
-        kafkaTemplate?.send(topic, key, payload)
+    private fun sendEvent(topic: String, key: String, payload: String, eventType: String? = null) {
+        val record = ProducerRecord<Any, Any>(
+            topic,
+            null, // partition
+            key,
+            payload,
+            eventType?.let { listOf(org.apache.kafka.common.header.internals.RecordHeader("eventType", it.toByteArray())) } ?: emptyList(),
+        )
+        kafkaTemplate?.send(record)
             ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
@@ -177,14 +179,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
     }
 
     @Test
-    fun `Kafka가 실행 중이지 않으면 KafkaTemplate 빈이 생성되지 않는다`() {
-        // 이 테스트는 Kafka 없이 실행될 때만 의미가 있음
-        if (System.getenv("KAFKA_BOOTSTRAP_SERVERS") == null) {
-            assertThat(kafkaTemplate).isNull()
-        }
-    }
-
-    @Test
     fun `Consumer가 LikeAddedEvent를 수신하여 ProductMetrics를 업데이트한다`() {
         // given: Kafka가 실행 중이어야 함
         assumeTrue(kafkaTemplate != null && productMetricsRepository != null, "Kafka is not running")
@@ -193,12 +187,12 @@ class KafkaConsumerE2ETest @Autowired constructor(
             eventId = UUID.randomUUID(),
             userId = 1L,
             productId = PRODUCT_ID_1,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
         val payload = jsonMapper.writeValueAsString(event)
 
         // when: Kafka로 메시지 전송
-        sendEvent("catalog-events", PRODUCT_ID_1.toString(), payload)
+        sendEvent("catalog-events", PRODUCT_ID_1.toString(), payload, "LikeAddedEvent")
 
         // then: Consumer가 메시지를 처리하고 ProductMetrics 업데이트
         awaitMetricsUpdate(PRODUCT_ID_1) { metrics ->
@@ -217,9 +211,9 @@ class KafkaConsumerE2ETest @Autowired constructor(
             eventId = UUID.randomUUID(),
             userId = 1L,
             productId = PRODUCT_ID_2,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
-        sendEvent("catalog-events", PRODUCT_ID_2.toString(), jsonMapper.writeValueAsString(addEvent))
+        sendEvent("catalog-events", PRODUCT_ID_2.toString(), jsonMapper.writeValueAsString(addEvent), "LikeAddedEvent")
 
         // 좋아요가 추가될 때까지 대기
         awaitMetricsUpdate(PRODUCT_ID_2) { metrics ->
@@ -231,9 +225,9 @@ class KafkaConsumerE2ETest @Autowired constructor(
             eventId = UUID.randomUUID(),
             userId = 1L,
             productId = PRODUCT_ID_2,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
-        sendEvent("catalog-events", PRODUCT_ID_2.toString(), jsonMapper.writeValueAsString(removeEvent))
+        sendEvent("catalog-events", PRODUCT_ID_2.toString(), jsonMapper.writeValueAsString(removeEvent), "LikeRemovedEvent")
 
         // then: 좋아요 수가 감소함
         awaitMetricsUpdate(PRODUCT_ID_2) { metrics ->
@@ -261,12 +255,12 @@ class KafkaConsumerE2ETest @Autowired constructor(
                     priceAtOrder = 25000,
                 ),
             ),
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
         val payload = jsonMapper.writeValueAsString(event)
 
         // when: Kafka로 메시지 전송
-        sendEvent("order-events", orderId.toString(), payload)
+        sendEvent("order-events", orderId.toString(), payload, "OrderCreatedEvent")
 
         // then: Consumer가 메시지를 처리하고 판매량 집계
         awaitMetricsUpdate(PRODUCT_ID_3) { metrics ->
@@ -289,13 +283,13 @@ class KafkaConsumerE2ETest @Autowired constructor(
             eventId = eventId,
             userId = 1L,
             productId = PRODUCT_ID_4,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
         val payload = jsonMapper.writeValueAsString(event)
 
         // when: 같은 메시지를 3번 전송
         repeat(3) {
-            sendEvent("catalog-events", PRODUCT_ID_4.toString(), payload)
+            sendEvent("catalog-events", PRODUCT_ID_4.toString(), payload, "LikeAddedEvent")
         }
 
         // then: Consumer가 처리하고 ProductMetrics는 1번만 증가
@@ -336,12 +330,12 @@ class KafkaConsumerE2ETest @Autowired constructor(
                     priceAtOrder = 20000,
                 ),
             ),
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
         val payload = jsonMapper.writeValueAsString(event)
 
         // when: Kafka로 메시지 전송
-        sendEvent("order-events", orderId.toString(), payload)
+        sendEvent("order-events", orderId.toString(), payload, "OrderCreatedEvent")
 
         // then: 두 상품 모두 판매량이 집계됨
         awaitMetricsUpdate(PRODUCT_ID_5) { metrics ->
@@ -372,9 +366,9 @@ class KafkaConsumerE2ETest @Autowired constructor(
             eventId = UUID.randomUUID(),
             userId = 1L,
             productId = PRODUCT_ID_7,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
-        sendEvent("catalog-events", PRODUCT_ID_7.toString(), jsonMapper.writeValueAsString(normalEvent))
+        sendEvent("catalog-events", PRODUCT_ID_7.toString(), jsonMapper.writeValueAsString(normalEvent), "LikeAddedEvent")
 
         // then: 알 수 없는 이벤트는 무시되고, 정상 이벤트는 처리됨
         awaitMetricsUpdate(PRODUCT_ID_7) { metrics ->
@@ -396,25 +390,25 @@ class KafkaConsumerE2ETest @Autowired constructor(
             eventId = UUID.randomUUID(),
             userId = userId,
             productId = PRODUCT_ID_8,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
-        sendEvent("catalog-events", PRODUCT_ID_8.toString(), jsonMapper.writeValueAsString(event1))
+        sendEvent("catalog-events", PRODUCT_ID_8.toString(), jsonMapper.writeValueAsString(event1), "LikeAddedEvent")
 
         val event2 = LikeRemovedEvent(
             eventId = UUID.randomUUID(),
             userId = userId,
             productId = PRODUCT_ID_8,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
-        sendEvent("catalog-events", PRODUCT_ID_8.toString(), jsonMapper.writeValueAsString(event2))
+        sendEvent("catalog-events", PRODUCT_ID_8.toString(), jsonMapper.writeValueAsString(event2), "LikeRemovedEvent")
 
         val event3 = LikeAddedEvent(
             eventId = UUID.randomUUID(),
             userId = userId,
             productId = PRODUCT_ID_8,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
-        sendEvent("catalog-events", PRODUCT_ID_8.toString(), jsonMapper.writeValueAsString(event3))
+        sendEvent("catalog-events", PRODUCT_ID_8.toString(), jsonMapper.writeValueAsString(event3), "LikeAddedEvent")
 
         // then: 최종 상태는 이벤트 순서를 반영 (0 + 1 - 1 + 1 = 1)
         awaitMetricsUpdate(PRODUCT_ID_8) { metrics ->
@@ -447,9 +441,9 @@ class KafkaConsumerE2ETest @Autowired constructor(
                         priceAtOrder = 10000,
                     ),
                 ),
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
-            sendEvent("order-events", (3000L + i).toString(), jsonMapper.writeValueAsString(event))
+            sendEvent("order-events", (3000L + i).toString(), jsonMapper.writeValueAsString(event), "OrderCreatedEvent")
         }
 
         // then: 최종 집계 결과 검증 - 5개의 이벤트가 모두 정확하게 집계됨
@@ -468,8 +462,8 @@ class KafkaConsumerE2ETest @Autowired constructor(
         val invalidPayload = """{"invalid": "malformed json"""
         val key = "dlq-test-key-1"
 
-        // when: 파싱할 수 없는 잘못된 JSON 전송
-        sendEvent("catalog-events", key, invalidPayload)
+        // when: 파싱할 수 없는 잘못된 JSON 전송 (eventType을 명시하여 파싱 시도하도록 함)
+        sendEvent("catalog-events", key, invalidPayload, "LikeAddedEvent")
 
         // then: 재시도 후 DLQ로 라우팅됨
         awaitDlqMessage("catalog-events-dlq", key)
@@ -496,9 +490,9 @@ class KafkaConsumerE2ETest @Autowired constructor(
             eventId = UUID.randomUUID(),
             userId = 1L,
             productId = PRODUCT_ID_1,
-            createdAt = ZonedDateTime.now(),
+            createdAt = LocalDateTime.now(),
         )
-        sendEvent("catalog-events", PRODUCT_ID_1.toString(), jsonMapper.writeValueAsString(normalEvent))
+        sendEvent("catalog-events", PRODUCT_ID_1.toString(), jsonMapper.writeValueAsString(normalEvent), "LikeAddedEvent")
 
         awaitMetricsUpdate(PRODUCT_ID_1) { metrics ->
             assertThat(metrics).isNotNull
