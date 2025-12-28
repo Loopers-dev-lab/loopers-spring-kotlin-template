@@ -35,37 +35,17 @@ class ProductWeeklyRankingWriter(
             return
         }
 
+        // Job 파라미터를 주차 범위로 파싱
         val start = LocalDate.parse(weekStart)
         val end = LocalDate.parse(weekEnd)
 
-        // 기존 랭킹 데이터 로드
-        val existingRankings = repository.findByWeekStartAndWeekEnd(start, end)
-        val existingScores = existingRankings.associate { it.productId to it.score.toDouble() }
-
-        // 기존 데이터와 새 데이터 병합 (productId별로 점수 합산)
-        val mergedScores = mutableMapOf<Long, Double>()
-
-        // 기존 데이터 추가
-        existingScores.forEach { (productId, score) ->
-            mergedScores[productId] = score
-        }
-
-        // 새 데이터 추가 (이미 있으면 합산)
-        items.forEach { rankedProduct ->
-            mergedScores[rankedProduct.productId] =
-                mergedScores.getOrDefault(rankedProduct.productId, 0.0) + rankedProduct.finalScore
-        }
-
-        // Top 100 추출 (점수 내림차순)
-        val top100 = mergedScores
-            .map { (productId, score) -> RankedProduct(productId, score) }
+        // 점수 기준 Top 100만 유지
+        val top100 = items
             .sortedByDescending { it.finalScore }
             .take(100)
 
-        // 기존 데이터 삭제 (Top 100으로 교체하기 위해)
-        if (existingRankings.isNotEmpty()) {
-            repository.deleteByWeekStartAndWeekEnd(start, end)
-        }
+        // 동일 주차 데이터는 삭제 후 재적재하여 멱등성 확보
+        repository.deleteByWeekStartAndWeekEnd(start, end)
 
         // 엔티티로 변환 (순위 포함)
         val entities = top100.mapIndexed { index, rankedProduct ->

@@ -40,7 +40,7 @@ class ProductWeeklyRankingJobConfig(
 
     @Bean(name = [STEP_NAME])
     fun productWeeklyRankingStep(
-        productWeeklyRankingReader: JdbcPagingItemReader<RankedProduct>,
+        @Qualifier("weeklyRankingReader") productWeeklyRankingReader: JdbcPagingItemReader<RankedProduct>,
         productWeeklyRankingWriter: ProductWeeklyRankingWriter,
     ): Step {
         return StepBuilder(STEP_NAME, jobRepository)

@@ -54,6 +54,7 @@ class ProductWeeklyRankingReader {
 
         val fromClause = "FROM product_metrics"
 
+        // 주간 범위는 job 파라미터로 주입된 날짜를 그대로 사용
         val whereClause = """
             WHERE metric_date BETWEEN :weekStart AND :weekEnd
             GROUP BY product_id
@@ -81,6 +82,7 @@ class ProductWeeklyRankingReader {
             )
             .parameterValues(
                 mapOf(
+                    // 문자열 파라미터를 LocalDate로 변환해 SQL 바인딩
                     "weekStart" to LocalDate.parse(weekStart),
                     "weekEnd" to LocalDate.parse(weekEnd),
                 ),
