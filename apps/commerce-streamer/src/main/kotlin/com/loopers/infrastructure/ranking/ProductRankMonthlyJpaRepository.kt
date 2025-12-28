@@ -1,0 +1,38 @@
+package com.loopers.infrastructure.ranking
+
+import com.loopers.domain.ranking.ProductRankMonthly
+import com.loopers.domain.ranking.ProductRankMonthlyRepository
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
+import org.springframework.stereotype.Repository
+
+interface ProductRankMonthlyJpaRepository : JpaRepository<ProductRankMonthly, Long> {
+    @Modifying
+    @Query("DELETE FROM ProductRankMonthly p WHERE p.yearMonth = :yearMonth")
+    fun deleteByYearMonth(yearMonth: String)
+
+    fun findByYearMonth(yearMonth: String): List<ProductRankMonthly>
+}
+
+@Repository
+class ProductRankMonthlyRepositoryImpl(private val jpaRepository: ProductRankMonthlyJpaRepository) :
+    ProductRankMonthlyRepository {
+
+    override fun save(entity: ProductRankMonthly): ProductRankMonthly = jpaRepository.save(entity)
+
+    override fun saveAll(entities: List<ProductRankMonthly>): List<ProductRankMonthly> = jpaRepository.saveAll(entities)
+
+    override fun deleteByYearMonth(yearMonth: String) {
+        jpaRepository.deleteByYearMonth(yearMonth)
+    }
+
+    override fun findByYearMonth(yearMonth: String): List<ProductRankMonthly> = jpaRepository.findByYearMonth(yearMonth)
+
+    override fun findTopByYearMonthOrderByRank(
+        yearMonth: String,
+        limit: Int,
+    ): List<ProductRankMonthly> = jpaRepository.findByYearMonth(yearMonth)
+            .sortedBy { it.rank }
+            .take(limit)
+}

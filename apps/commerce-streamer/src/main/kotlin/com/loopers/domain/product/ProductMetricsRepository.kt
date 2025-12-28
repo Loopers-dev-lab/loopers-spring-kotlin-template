@@ -13,4 +13,10 @@ interface ProductMetricsRepository {
      * Kafka 이벤트 처리 시 동시성 제어를 위해 사용
      */
     fun findOrCreateByProductIdWithLock(productId: Long): ProductMetrics
+
+    /**
+     * 여러 상품 ID로 ProductMetrics 조회
+     * 일간 랭킹 영구 저장 시 사용
+     */
+    fun findAllByProductIdIn(productIds: List<Long>): List<ProductMetrics>
 }

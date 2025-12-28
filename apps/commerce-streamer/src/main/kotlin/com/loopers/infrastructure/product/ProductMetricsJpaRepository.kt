@@ -24,4 +24,9 @@ interface ProductMetricsJpaRepository : JpaRepository<ProductMetrics, Long> {
     )
     @Query("SELECT pm FROM ProductMetrics pm WHERE pm.productId = :productId")
     fun findByProductIdWithLock(productId: Long): ProductMetrics?
+
+    /**
+     * 여러 상품 ID로 ProductMetrics 조회
+     */
+    fun findAllByProductIdIn(productIds: List<Long>): List<ProductMetrics>
 }

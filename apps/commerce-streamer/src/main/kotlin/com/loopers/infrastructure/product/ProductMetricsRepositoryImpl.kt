@@ -27,4 +27,7 @@ class ProductMetricsRepositoryImpl(private val jpaRepository: ProductMetricsJpaR
         // 존재하지 않으면 생성 후 저장 (동일 트랜잭션 내에서)
         return jpaRepository.save(ProductMetrics.create(productId))
     }
+
+    override fun findAllByProductIdIn(productIds: List<Long>): List<ProductMetrics> =
+        jpaRepository.findAllByProductIdIn(productIds)
 }
