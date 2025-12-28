@@ -25,6 +25,9 @@ class ProductMonthlyRankingWriter(
 ) : ItemWriter<RankedProduct> {
 
     private val log = LoggerFactory.getLogger(ProductMonthlyRankingWriter::class.java)
+    // State kept across chunks to build a single Top 100 list.
+    private var initialized = false
+    private var rankCounter = 0
 
     @Transactional
     override fun write(chunk: Chunk<out RankedProduct>) {
@@ -37,21 +40,36 @@ class ProductMonthlyRankingWriter(
         // Job 파라미터를 월 단위로 파싱
         val monthPeriod = YearMonth.parse(yearMonth)
 
-        // 점수 기준 Top 100만 유지
-        val top100 = items
-            .sortedByDescending { it.finalScore }
-            .take(100)
+        if (!initialized) {
+            // 동일 월 데이터는 삭제 후 재적재하여 멱등성 확보
+            repository.deleteByMonthPeriod(monthPeriod)
+            initialized = true
+        }
 
-        // 동일 월 데이터는 삭제 후 재적재하여 멱등성 확보
-        repository.deleteByMonthPeriod(monthPeriod)
+        // Reader가 점수 내림차순 정렬을 보장하므로 Top 100까지만 순차 저장.
+        if (rankCounter >= 100) {
+            return
+        }
 
-        val entities = top100.mapIndexed { index, rankedProduct ->
-            ProductMonthlyRanking.create(
-                ranking = index + 1,
-                productId = rankedProduct.productId,
-                score = rankedProduct.finalScore,
-                monthPeriod = monthPeriod,
+        val entities = mutableListOf<ProductMonthlyRanking>()
+        for (rankedProduct in items) {
+            if (rankCounter >= 100) {
+                break
+            }
+
+            rankCounter += 1
+            entities.add(
+                ProductMonthlyRanking.create(
+                    ranking = rankCounter,
+                    productId = rankedProduct.productId,
+                    score = rankedProduct.finalScore,
+                    monthPeriod = monthPeriod,
+                ),
             )
+        }
+
+        if (entities.isEmpty()) {
+            return
         }
 
         repository.saveAll(entities)

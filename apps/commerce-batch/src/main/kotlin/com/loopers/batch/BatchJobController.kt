@@ -31,6 +31,10 @@ class BatchJobController(
     /**
      * 주간 상품 랭킹 배치 실행
      *
+     * 실행 시점(월~일 기준):
+     * - 해당 주간이 끝난 뒤(일요일 종료 이후), 집계 데이터가 모두 적재된 다음 실행
+     * - 일반적으로 다음 주 월요일 00:00 이후 실행 권장
+     *
      * @param weekStart 주 시작일 (yyyy-MM-dd 형식, 필수)
      * @param weekEnd 주 종료일 (yyyy-MM-dd 형식, 필수)
      *
@@ -66,6 +70,10 @@ class BatchJobController(
 
     /**
      * 월별 상품 랭킹 배치 실행
+     *
+     * 실행 시점:
+     * - 해당 월이 끝난 뒤, 그 월을 포함하는 마지막 주간 랭킹이 생성된 다음 실행
+     * - 일반적으로 다음 달 1일 00:00 이후 실행 권장
      *
      * @param yearMonth 월 (yyyy-MM 형식, 필수)
      *

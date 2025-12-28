@@ -40,13 +40,13 @@ class ProductWeeklyRankingReader {
                 SUM(
                     (view_count * $viewWeight + like_count * $likeWeight + sold_count * $soldWeight) *
                     CASE
-                        WHEN DATEDIFF(CURDATE(), metric_date) = 1 THEN 1.0
-                        WHEN DATEDIFF(CURDATE(), metric_date) = 2 THEN 0.9
-                        WHEN DATEDIFF(CURDATE(), metric_date) = 3 THEN 0.8
-                        WHEN DATEDIFF(CURDATE(), metric_date) = 4 THEN 0.4
-                        WHEN DATEDIFF(CURDATE(), metric_date) = 5 THEN 0.3
-                        WHEN DATEDIFF(CURDATE(), metric_date) = 6 THEN 0.2
-                        WHEN DATEDIFF(CURDATE(), metric_date) = 7 THEN 0.1
+                        WHEN DATEDIFF(:weekEnd, metric_date) = 0 THEN 1.0
+                        WHEN DATEDIFF(:weekEnd, metric_date) = 1 THEN 0.9
+                        WHEN DATEDIFF(:weekEnd, metric_date) = 2 THEN 0.8
+                        WHEN DATEDIFF(:weekEnd, metric_date) = 3 THEN 0.4
+                        WHEN DATEDIFF(:weekEnd, metric_date) = 4 THEN 0.3
+                        WHEN DATEDIFF(:weekEnd, metric_date) = 5 THEN 0.2
+                        WHEN DATEDIFF(:weekEnd, metric_date) = 6 THEN 0.1
                         ELSE 0.0
                     END
                 ) as final_score

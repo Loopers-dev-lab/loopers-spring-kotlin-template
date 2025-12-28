@@ -26,6 +26,9 @@ class ProductWeeklyRankingWriter(
 ) : ItemWriter<RankedProduct> {
 
     private val log = LoggerFactory.getLogger(ProductWeeklyRankingWriter::class.java)
+    // State kept across chunks to build a single Top 100 list.
+    private var initialized = false
+    private var rankCounter = 0
 
     @Transactional
     override fun write(chunk: Chunk<out RankedProduct>) {
@@ -39,23 +42,38 @@ class ProductWeeklyRankingWriter(
         val start = LocalDate.parse(weekStart)
         val end = LocalDate.parse(weekEnd)
 
-        // 점수 기준 Top 100만 유지
-        val top100 = items
-            .sortedByDescending { it.finalScore }
-            .take(100)
+        if (!initialized) {
+            // 동일 주차 데이터는 삭제 후 재적재하여 멱등성 확보
+            repository.deleteByWeekStartAndWeekEnd(start, end)
+            initialized = true
+        }
 
-        // 동일 주차 데이터는 삭제 후 재적재하여 멱등성 확보
-        repository.deleteByWeekStartAndWeekEnd(start, end)
+        // Reader가 점수 내림차순 정렬을 보장하므로 Top 100까지만 순차 저장.
+        if (rankCounter >= 100) {
+            return
+        }
 
         // 엔티티로 변환 (순위 포함)
-        val entities = top100.mapIndexed { index, rankedProduct ->
-            ProductWeeklyRanking.create(
-                ranking = index + 1,
-                productId = rankedProduct.productId,
-                score = rankedProduct.finalScore,
-                weekStart = start,
-                weekEnd = end,
+        val entities = mutableListOf<ProductWeeklyRanking>()
+        for (rankedProduct in items) {
+            if (rankCounter >= 100) {
+                break
+            }
+
+            rankCounter += 1
+            entities.add(
+                ProductWeeklyRanking.create(
+                    ranking = rankCounter,
+                    productId = rankedProduct.productId,
+                    score = rankedProduct.finalScore,
+                    weekStart = start,
+                    weekEnd = end,
+                ),
             )
+        }
+
+        if (entities.isEmpty()) {
+            return
         }
 
         repository.saveAll(entities)
