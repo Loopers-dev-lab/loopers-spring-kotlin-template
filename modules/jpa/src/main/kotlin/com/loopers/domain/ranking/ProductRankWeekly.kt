@@ -30,7 +30,7 @@ import java.util.Locale
 )
 class ProductRankWeekly(
     /**
-     * 연도-주차 (yyyy'W'ww, 예: 2025W01)
+     * 연도-주차 (YYYY'W'ww, 예: 2025W01)
      */
     @Column(name = "`year_week`", nullable = false, length = 7)
     val yearWeek: String,

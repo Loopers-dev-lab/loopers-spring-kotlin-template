@@ -24,9 +24,6 @@ spring:
       - kafka.yml
       - logging.yml
       - monitoring.yml
-  batch:
-    jdbc:
-      initialize-schema: always
 
 demo-kafka:
   test:
@@ -43,6 +40,9 @@ spring:
   config:
     activate:
       on-profile: local, test
+  batch:
+    jdbc:
+      initialize-schema: always
 
 ---
 spring:
@@ -60,7 +60,10 @@ spring:
 spring:
   config:
     activate:
-      on-profile: prd
+      on-profile: prod
+  batch:
+    jdbc:
+      initialize-schema: never
 
 springdoc:
   api-docs:

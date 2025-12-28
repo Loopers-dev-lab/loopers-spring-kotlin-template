@@ -2,6 +2,7 @@ package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRankMonthly
 import com.loopers.domain.ranking.ProductRankMonthlyRepository
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -15,6 +16,8 @@ interface ProductRankMonthlyJpaRepository : JpaRepository<ProductRankMonthly, Lo
     fun deleteByYearMonth(yearMonth: String)
 
     fun findByYearMonth(yearMonth: String): List<ProductRankMonthly>
+
+    fun findByYearMonth(yearMonth: String, pageable: Pageable): List<ProductRankMonthly>
 }
 
 @Repository
@@ -34,7 +37,8 @@ class ProductRankMonthlyRepositoryImpl(private val jpaRepository: ProductRankMon
     override fun findTopByYearMonthOrderByRank(
         yearMonth: String,
         limit: Int,
-    ): List<ProductRankMonthly> = jpaRepository.findByYearMonth(yearMonth)
-            .sortedBy { it.rank }
-            .take(limit)
+    ): List<ProductRankMonthly> = jpaRepository.findByYearMonth(
+        yearMonth,
+        org.springframework.data.domain.PageRequest.of(0, limit, org.springframework.data.domain.Sort.by("rank")),
+    )
 }
