@@ -9,6 +9,7 @@ import jakarta.persistence.UniqueConstraint
 import java.time.DateTimeException
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 
 /**
  * 월간 랭킹 집계 테이블 (TOP 100)
@@ -51,7 +52,7 @@ class ProductRankMonthly(
      * 월간 순위 (1부터 시작)
      */
     @Column(name = "`rank`", nullable = false)
-    var rank: Int,
+    val rank: Int,
 
     /**
      * 집계 시작일
@@ -66,8 +67,16 @@ class ProductRankMonthly(
     val periodEnd: LocalDate,
 ) : BaseEntity() {
 
+    init {
+        require(rank >= 1) { "Rank must be positive: $rank" }
+        require(periodStart <= periodEnd) {
+            "Period start ($periodStart) must not be after period end ($periodEnd)"
+        }
+    }
+
     companion object {
-        fun yearMonthToString(yearMonth: YearMonth): String = yearMonth.toString().replace("-", "")
+        private val YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM")
+        fun yearMonthToString(yearMonth: YearMonth): String = yearMonth.format(YEAR_MONTH_FORMATTER)
 
         fun stringToYearMonth(yearMonth: String): YearMonth {
             require(yearMonth.length == 6 && yearMonth.all { it.isDigit() }) {
