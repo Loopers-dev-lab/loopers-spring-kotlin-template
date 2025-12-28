@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1/products")
-class ProductV1Controller(private val productFacade: ProductFacade) : ProductV1ApiSpec {
+class ProductV1Controller(
+    private val productFacade: ProductFacade,
+) : ProductV1ApiSpec {
     @GetMapping
     override fun getProducts(
         @RequestParam(required = false) brandId: Long?,

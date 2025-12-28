@@ -17,11 +17,17 @@ import kotlin.properties.Delegates
 @SpringBootTest
 @ActiveProfiles("test")
 @DisplayName("Coupon 동시성 테스트")
-class CouponConcurrencyTest @Autowired constructor(
-    private val couponService: CouponService,
-    private val userCouponRepository: UserCouponRepository,
-    private val testFixtures: TestFixtures,
-) {
+class CouponConcurrencyTest {
+
+    @Autowired
+    private lateinit var couponService: CouponService
+
+    @Autowired
+    private lateinit var userCouponRepository: UserCouponRepository
+
+    @Autowired
+    private lateinit var testFixtures: TestFixtures
+
     private var userId by Delegates.notNull<Long>()
     private lateinit var coupon: Coupon
     private lateinit var userCoupon: UserCoupon

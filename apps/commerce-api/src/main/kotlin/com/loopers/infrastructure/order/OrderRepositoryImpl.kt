@@ -8,7 +8,9 @@ import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Repository
 
 @Repository
-class OrderRepositoryImpl(private val orderJpaRepository: OrderJpaRepository) : OrderRepository {
+class OrderRepositoryImpl(
+    private val orderJpaRepository: OrderJpaRepository,
+) : OrderRepository {
     override fun findById(id: Long): Order? = orderJpaRepository.findByIdOrNull(id)
 
     override fun findByIdWithLock(id: Long): Order? = orderJpaRepository.findByIdWithLock(id)

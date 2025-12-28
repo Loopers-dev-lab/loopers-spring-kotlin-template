@@ -14,7 +14,11 @@ import java.math.RoundingMode
 
 @Entity
 @Table(name = "coupons")
-class Coupon(name: String, discountType: CouponType, discountValue: BigDecimal) : BaseEntity() {
+class Coupon(
+    name: String,
+    discountType: CouponType,
+    discountValue: BigDecimal,
+) : BaseEntity() {
     @Column(nullable = false, length = 100)
     var name: String = name
         protected set
@@ -46,7 +50,6 @@ class Coupon(name: String, discountType: CouponType, discountValue: BigDecimal) 
     fun calculateDiscount(orderAmount: Money): Money {
         val discountAmount = when (discountType) {
             CouponType.FIXED_AMOUNT -> discountValue
-
             CouponType.PERCENTAGE ->
                 orderAmount.amount
                     .multiply(discountValue)

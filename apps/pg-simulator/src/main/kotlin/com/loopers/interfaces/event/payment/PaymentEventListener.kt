@@ -8,7 +8,9 @@ import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
 @Component
-class PaymentEventListener(private val paymentApplicationService: PaymentApplicationService) {
+class PaymentEventListener(
+    private val paymentApplicationService: PaymentApplicationService,
+) {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handle(event: PaymentEvent.PaymentCreated) {

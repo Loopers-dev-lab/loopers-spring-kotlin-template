@@ -1,6 +1,6 @@
 package com.loopers.domain.product
 
-import tools.jackson.core.type.TypeReference
+import com.fasterxml.jackson.core.type.TypeReference
 import java.time.Duration
 
 interface ProductCacheRepository {

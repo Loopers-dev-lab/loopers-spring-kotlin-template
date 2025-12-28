@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1/points")
-class PointV1Controller(private val pointFacade: PointFacade) : PointV1ApiSpec {
+class PointV1Controller(
+    private val pointFacade: PointFacade,
+) : PointV1ApiSpec {
     @PostMapping("/charge")
     override fun chargePoint(
         @RequestHeader("X-USER-ID") userId: Long,

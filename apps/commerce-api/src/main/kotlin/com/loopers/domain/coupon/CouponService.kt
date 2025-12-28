@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-class CouponService(private val userCouponRepository: UserCouponRepository) {
+class CouponService(
+    private val userCouponRepository: UserCouponRepository,
+) {
 
     /**
      * 사용자 쿠폰을 조회하고 사용 처리한다 (비관적 락 사용)

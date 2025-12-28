@@ -8,20 +8,36 @@ import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 
 object PaymentV1Dto {
-    data class CardPaymentRequest(val orderId: Long, val amount: Long, val cardType: String, val cardNo: String)
+    data class CardPaymentRequest(
+        val orderId: Long,
+        val amount: Long,
+        val cardType: String,
+        val cardNo: String,
+    )
 
-    data class PaymentResponse(val paymentId: Long, val transactionKey: String, val status: String, val amount: Long) {
+    data class PaymentResponse(
+        val paymentId: Long,
+        val transactionKey: String,
+        val status: String,
+        val amount: Long,
+    ) {
         companion object {
-            fun from(info: PaymentInfo): PaymentResponse = PaymentResponse(
+            fun from(info: PaymentInfo): PaymentResponse {
+                return PaymentResponse(
                     paymentId = info.paymentId,
                     transactionKey = info.transactionKey,
                     status = info.status,
                     amount = info.amount,
                 )
+            }
         }
     }
 
-    data class PaymentCallbackRequest(val transactionKey: String, val status: String, val reason: String?) {
+    data class PaymentCallbackRequest(
+        val transactionKey: String,
+        val status: String,
+        val reason: String?,
+    ) {
         fun toApplicationRequest(): com.loopers.application.payment.PaymentCallbackRequest {
             // TransactionStatusDto를 안전하게 파싱
             val transactionStatus = try {
@@ -54,7 +70,8 @@ object PaymentV1Dto {
         val cardNo: String?,
     ) {
         companion object {
-            fun from(info: PaymentDetailInfo): PaymentDetailResponse = PaymentDetailResponse(
+            fun from(info: PaymentDetailInfo): PaymentDetailResponse {
+                return PaymentDetailResponse(
                     paymentId = info.paymentId,
                     userId = info.userId,
                     orderId = info.orderId,
@@ -66,6 +83,7 @@ object PaymentV1Dto {
                     cardType = info.cardType,
                     cardNo = info.cardNo,
                 )
+            }
         }
     }
 }

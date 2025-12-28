@@ -35,7 +35,8 @@ class RankingV1Dto {
         val totalCount: Long,
     ) {
         companion object {
-            fun from(info: RankingPageInfo): RankingPageResponse = RankingPageResponse(
+            fun from(info: RankingPageInfo): RankingPageResponse {
+                return RankingPageResponse(
                     rankings = info.rankings.map { RankingItemResponse.from(it) },
                     window = info.window,
                     timestamp = info.timestamp,
@@ -43,6 +44,7 @@ class RankingV1Dto {
                     size = info.size,
                     totalCount = info.totalCount,
                 )
+            }
         }
     }
 
@@ -66,11 +68,13 @@ class RankingV1Dto {
         val product: RankingProductResponse,
     ) {
         companion object {
-            fun from(info: RankingItemInfo): RankingItemResponse = RankingItemResponse(
+            fun from(info: RankingItemInfo): RankingItemResponse {
+                return RankingItemResponse(
                     rank = info.rank,
                     score = info.score,
                     product = RankingProductResponse.from(info.product),
                 )
+            }
         }
     }
 
@@ -86,7 +90,8 @@ class RankingV1Dto {
         val likeCount: Long,
     ) {
         companion object {
-            fun from(info: RankingProductInfo): RankingProductResponse = RankingProductResponse(
+            fun from(info: RankingProductInfo): RankingProductResponse {
+                return RankingProductResponse(
                     id = info.id,
                     name = info.name,
                     price = info.price,
@@ -94,6 +99,7 @@ class RankingV1Dto {
                     brand = info.brand,
                     likeCount = info.likeCount,
                 )
+            }
         }
     }
 }

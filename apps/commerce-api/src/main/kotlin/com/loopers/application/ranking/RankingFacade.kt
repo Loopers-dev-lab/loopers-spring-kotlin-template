@@ -8,7 +8,9 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 @Component
-class RankingFacade(private val rankingService: RankingService) {
+class RankingFacade(
+    private val rankingService: RankingService,
+) {
     fun getRankingPage(
         window: TimeWindow,
         date: String?,

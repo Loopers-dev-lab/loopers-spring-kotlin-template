@@ -58,7 +58,14 @@ class ProductV1Dto {
         }
     }
 
-    data class BrandSummary(val id: Long, val name: String)
+    data class BrandSummary(
+        val id: Long,
+        val name: String,
+    )
 
-    data class BrandDetail(val id: Long, val name: String, val description: String?)
+    data class BrandDetail(
+        val id: Long,
+        val name: String,
+        val description: String?,
+    )
 }

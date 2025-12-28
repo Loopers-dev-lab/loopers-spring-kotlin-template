@@ -13,7 +13,7 @@ fun getGitHash(): String {
 /** --- project configurations --- */
 plugins {
     kotlin("jvm")
-    id("com.google.devtools.ksp") apply false
+    kotlin("kapt")
     kotlin("plugin.spring") apply false
     id("org.springframework.boot") apply false
     id("io.spring.dependency-management")
@@ -22,13 +22,13 @@ plugins {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
 kotlin {
     compilerOptions {
-        jvmToolchain(25)
+        jvmToolchain(21)
         freeCompilerArgs.addAll("-Xjsr305=strict")
     }
 }
@@ -45,6 +45,7 @@ allprojects {
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "org.jetbrains.kotlin.kapt")
     apply(plugin = "org.jetbrains.kotlin.plugin.spring")
     apply(plugin = "org.springframework.boot")
     apply(plugin = "io.spring.dependency-management")
@@ -54,7 +55,6 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom("org.springframework.cloud:spring-cloud-dependencies:${project.properties["springCloudDependenciesVersion"]}")
-            mavenBom("tools.jackson:jackson-bom:${project.properties["jacksonVersion"]}")
         }
     }
 
@@ -66,7 +66,8 @@ subprojects {
         // Spring
         implementation("org.springframework.boot:spring-boot-starter")
         // Serialize
-        implementation("tools.jackson.module:jackson-module-kotlin")
+        implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+        implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
         // Test
         testRuntimeOnly("org.junit.platform:junit-platform-launcher")
         // testcontainers:mysql 이 jdbc 사용함
@@ -80,7 +81,7 @@ subprojects {
         // Testcontainers
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
         testImplementation("org.testcontainers:testcontainers")
-        testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+        testImplementation("org.testcontainers:junit-jupiter")
     }
 
     tasks.withType(Jar::class) { enabled = true }
@@ -120,9 +121,6 @@ subprojects {
 
     configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
         version.set(properties["ktLintVersion"] as String)
-        filter {
-            exclude { it.file.path.contains("build${File.separator}generated") }
-        }
     }
 }
 

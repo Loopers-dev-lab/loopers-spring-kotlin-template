@@ -14,9 +14,9 @@ class UserInfoArgumentResolver : HandlerMethodArgumentResolver {
         private const val KEY_USER_ID = "X-USER-ID"
     }
 
-    override fun supportsParameter(parameter: MethodParameter): Boolean = UserInfo::class.java.isAssignableFrom(
-        parameter.parameterType,
-    )
+    override fun supportsParameter(parameter: MethodParameter): Boolean {
+        return UserInfo::class.java.isAssignableFrom(parameter.parameterType)
+    }
 
     override fun resolveArgument(
         parameter: MethodParameter,

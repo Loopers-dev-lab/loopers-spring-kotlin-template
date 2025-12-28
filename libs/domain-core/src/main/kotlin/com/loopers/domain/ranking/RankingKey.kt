@@ -10,17 +10,23 @@ import java.time.format.DateTimeFormatter
  *
  * 시간의 양자화(Time Quantization)를 통해 랭킹 데이터를 시간 단위로 분리 관리
  */
-data class RankingKey(val scope: RankingScope, val window: TimeWindow, val timestamp: LocalDateTime) {
+data class RankingKey(
+    val scope: RankingScope,
+    val window: TimeWindow,
+    val timestamp: LocalDateTime,
+) {
     /**
      * Redis ZSET 키 생성
      *
      * 예: ranking:all:daily:20250906
      *     ranking:all:hourly:2025090614
      */
-    fun toRedisKey(): String = when (window) {
+    fun toRedisKey(): String {
+        return when (window) {
             TimeWindow.DAILY -> "ranking:${scope.value}:daily:${timestamp.format(DAILY_FORMAT)}"
             TimeWindow.HOURLY -> "ranking:${scope.value}:hourly:${timestamp.format(HOURLY_FORMAT)}"
         }
+    }
 
     companion object {
         private val DAILY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd")
@@ -29,36 +35,39 @@ data class RankingKey(val scope: RankingScope, val window: TimeWindow, val times
         /**
          * 일간 랭킹 키 생성
          */
-        fun daily(scope: RankingScope, date: LocalDate): RankingKey = RankingKey(
+        fun daily(scope: RankingScope, date: LocalDate): RankingKey {
+            return RankingKey(
                 scope = scope,
                 window = TimeWindow.DAILY,
                 timestamp = date.atStartOfDay(),
             )
+        }
 
         /**
          * 시간별 랭킹 키 생성
          */
-        fun hourly(scope: RankingScope, dateTime: LocalDateTime): RankingKey = RankingKey(
+        fun hourly(scope: RankingScope, dateTime: LocalDateTime): RankingKey {
+            return RankingKey(
                 scope = scope,
                 window = TimeWindow.HOURLY,
                 timestamp = dateTime.withMinute(0).withSecond(0).withNano(0),
             )
+        }
 
         /**
          * 현재 일간 랭킹 키
          */
-        fun currentDaily(
-            scope: RankingScope,
-            zoneId: ZoneId = ZoneId.systemDefault(),
-        ): RankingKey = daily(scope, LocalDate.now(zoneId))
+        fun currentDaily(scope: RankingScope, zoneId: ZoneId = ZoneId.systemDefault()): RankingKey {
+            return daily(scope, LocalDate.now(zoneId))
+        }
+
 
         /**
          * 현재 시간별 랭킹 키
          */
-        fun currentHourly(
-            scope: RankingScope,
-            zoneId: ZoneId = ZoneId.systemDefault(),
-        ): RankingKey = hourly(scope, LocalDateTime.now(zoneId))
+        fun currentHourly(scope: RankingScope, zoneId: ZoneId = ZoneId.systemDefault()): RankingKey {
+            return hourly(scope, LocalDateTime.now(zoneId))
+        }
     }
 }
 

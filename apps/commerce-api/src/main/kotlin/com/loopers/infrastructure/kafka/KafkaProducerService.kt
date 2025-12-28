@@ -15,7 +15,9 @@ import java.util.concurrent.CompletableFuture
  */
 @Service
 @ConditionalOnBean(KafkaTemplate::class)
-class KafkaProducerService(private val kafkaTemplate: KafkaTemplate<String, String>) {
+class KafkaProducerService(
+    private val kafkaTemplate: KafkaTemplate<String, String>,
+) {
     private val logger = LoggerFactory.getLogger(KafkaProducerService::class.java)
 
     /**

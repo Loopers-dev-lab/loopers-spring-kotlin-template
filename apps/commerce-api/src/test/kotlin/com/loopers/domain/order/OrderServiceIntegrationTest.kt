@@ -29,16 +29,31 @@ import java.time.LocalDate
 
 @SpringBootTest
 @Transactional
-class OrderServiceIntegrationTest @Autowired constructor(
-    private val orderFacade: OrderFacade,
-    private val userRepository: UserRepository,
-    private val brandRepository: BrandRepository,
-    private val productRepository: ProductRepository,
-    private val stockRepository: StockRepository,
-    private val pointRepository: PointRepository,
-    private val orderRepository: OrderRepository,
-    private val orderService: OrderService,
-) {
+class OrderServiceIntegrationTest {
+    @Autowired
+    private lateinit var orderFacade: OrderFacade
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var brandRepository: BrandRepository
+
+    @Autowired
+    private lateinit var productRepository: ProductRepository
+
+    @Autowired
+    private lateinit var stockRepository: StockRepository
+
+    @Autowired
+    private lateinit var pointRepository: PointRepository
+
+    @Autowired
+    private lateinit var orderRepository: OrderRepository
+
+    @Autowired
+    private lateinit var orderService: OrderService
+
     private lateinit var user: User
     private lateinit var brand: Brand
     private lateinit var product1: Product
@@ -191,6 +206,37 @@ class OrderServiceIntegrationTest @Autowired constructor(
         assertThat(savedOrder.items[0].productName).isEqualTo("통합테스트상품1")
         assertThat(savedOrder.items[0].priceAtOrder.amount).isEqualTo(BigDecimal("100000")) // 주문 당시 가격
         assertThat(savedOrder.items[0].brandName).isEqualTo("통합테스트브랜드")
+    }
+
+    @Test
+    fun `주문을 취소하면 재고가 복구된다`() {
+        // given
+        val request = OrderCreateRequest(
+            items = listOf(
+                OrderItemRequest(productId = product1.id, quantity = 2),
+                OrderItemRequest(productId = product2.id, quantity = 3),
+            ),
+        )
+        val orderInfo = orderFacade.createOrder(user.id, request)
+
+        // 재고 차감 확인
+        val stockAfterOrder1 = requireNotNull(stockRepository.findByProductId(product1.id))
+        val stockAfterOrder2 = requireNotNull(stockRepository.findByProductId(product2.id))
+        assertThat(stockAfterOrder1.quantity).isEqualTo(98) // 100 - 2
+        assertThat(stockAfterOrder2.quantity).isEqualTo(97) // 100 - 3
+
+        // when
+        orderService.cancelOrder(orderInfo.orderId, user.id)
+
+        // then
+        val cancelledOrder = requireNotNull(orderRepository.findById(orderInfo.orderId))
+        assertThat(cancelledOrder.status).isEqualTo(OrderStatus.CANCELLED)
+
+        // 재고 복구 확인
+        val stockAfterCancel1 = requireNotNull(stockRepository.findByProductId(product1.id))
+        val stockAfterCancel2 = requireNotNull(stockRepository.findByProductId(product2.id))
+        assertThat(stockAfterCancel1.quantity).isEqualTo(100) // 98 + 2
+        assertThat(stockAfterCancel2.quantity).isEqualTo(100) // 97 + 3
     }
 
     @Test

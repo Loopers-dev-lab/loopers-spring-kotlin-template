@@ -1,6 +1,6 @@
 package com.loopers.domain.product
 
-import tools.jackson.core.type.TypeReference
+import com.fasterxml.jackson.core.type.TypeReference
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
@@ -9,7 +9,10 @@ import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import java.time.Duration
 
-data class ProductDetailData(val product: Product, val stock: Stock)
+data class ProductDetailData(
+    val product: Product,
+    val stock: Stock,
+)
 
 @Service
 class ProductQueryService(
@@ -73,12 +76,10 @@ class ProductQueryService(
             is CacheResult.Hit -> {
                 return syncLikeCounts(cacheResult.value)
             }
-
             is CacheResult.Miss -> {
                 // Cache miss - DB 조회 후 캐싱
                 true
             }
-
             is CacheResult.Error -> {
                 // Cache error - 로깅 후 캐싱 없이 DB 에 fall back
                 logger.warn("Cache error occurred, falling back to DB: cacheKey=$cacheKey", cacheResult.exception)

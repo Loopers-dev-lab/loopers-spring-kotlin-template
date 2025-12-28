@@ -1,8 +1,8 @@
 package com.loopers.domain.like
 
-import com.loopers.fixtures.TestFixtures
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestProduct
+import com.loopers.fixtures.TestFixtures
 import com.loopers.testcontainers.RedisTestContainersConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -21,11 +21,17 @@ import kotlin.properties.Delegates
 @ActiveProfiles("test")
 @ContextConfiguration(initializers = [RedisTestContainersConfig::class])
 @DisplayName("Like 동시성 테스트")
-class LikeConcurrencyTest @Autowired constructor(
-    private val likeService: LikeService,
-    private val likeQueryService: LikeQueryService,
-    private val testFixtures: TestFixtures,
-) {
+class LikeConcurrencyTest {
+
+    @Autowired
+    private lateinit var likeService: LikeService
+
+    @Autowired
+    private lateinit var likeQueryService: LikeQueryService
+
+    @Autowired
+    private lateinit var testFixtures: TestFixtures
+
     private var productId by Delegates.notNull<Long>()
     private val userIds = mutableListOf<Long>()
 

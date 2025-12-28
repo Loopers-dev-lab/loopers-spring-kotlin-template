@@ -15,7 +15,9 @@ import org.springframework.web.server.ResponseStatusException
  */
 @RestController
 @RequestMapping("/api/v1/rankings")
-class RankingV1Controller(private val rankingFacade: RankingFacade) : RankingV1ApiSpec {
+class RankingV1Controller(
+    private val rankingFacade: RankingFacade,
+) : RankingV1ApiSpec {
 
     /**
      * 랭킹 페이지 조회

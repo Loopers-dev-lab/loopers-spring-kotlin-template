@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component
  * 유저의 행동을 로깅하고 추적
  */
 @Component
-class UserActionEventHandler(private val analyticsClient: AnalyticsClient) {
+class UserActionEventHandler(
+    private val analyticsClient: AnalyticsClient,
+) {
     private val logger = LoggerFactory.getLogger(UserActionEventHandler::class.java)
 
     /**

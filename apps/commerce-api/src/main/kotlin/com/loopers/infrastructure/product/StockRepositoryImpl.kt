@@ -5,7 +5,9 @@ import com.loopers.domain.product.StockRepository
 import org.springframework.stereotype.Repository
 
 @Repository
-class StockRepositoryImpl(private val stockJpaRepository: StockJpaRepository) : StockRepository {
+class StockRepositoryImpl(
+    private val stockJpaRepository: StockJpaRepository,
+) : StockRepository {
     override fun findByProductId(
         productId: Long,
     ): Stock? = stockJpaRepository.findByProductId(productId)

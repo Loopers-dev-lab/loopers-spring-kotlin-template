@@ -70,7 +70,11 @@ object PaymentDto {
         }
     }
 
-    data class TransactionResponse(val transactionKey: String, val status: TransactionStatusResponse, val reason: String?) {
+    data class TransactionResponse(
+        val transactionKey: String,
+        val status: TransactionStatusResponse,
+        val reason: String?,
+    ) {
         companion object {
             fun from(transactionInfo: TransactionInfo): TransactionResponse =
                 TransactionResponse(
@@ -81,7 +85,10 @@ object PaymentDto {
         }
     }
 
-    data class OrderResponse(val orderId: String, val transactions: List<TransactionResponse>) {
+    data class OrderResponse(
+        val orderId: String,
+        val transactions: List<TransactionResponse>,
+    ) {
         companion object {
             fun from(orderInfo: OrderInfo): OrderResponse =
                 OrderResponse(

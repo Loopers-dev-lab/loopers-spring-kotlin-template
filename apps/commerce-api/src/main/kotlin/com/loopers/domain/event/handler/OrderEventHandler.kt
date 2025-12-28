@@ -179,7 +179,7 @@ class OrderEventHandler(
             val order = orderRepository.findById(event.orderId)
                 ?: throw CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다: ${event.orderId}")
 
-            /*
+            /**
              * 주문 상태를 PENDING으로 유지하여 사용자가 재시도할 수 있도록 함
              * 또는 완전히 취소 처리할 수도 있음 (비즈니스 정책에 따라)
              * 현재 정책: 주문 상태를 변경하지 않고 유지 (사용자 재시도 가능)

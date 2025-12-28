@@ -7,7 +7,9 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-class PointService(private val pointRepository: PointRepository) {
+class PointService(
+    private val pointRepository: PointRepository,
+) {
     @Transactional
     fun validateUserPoint(userId: Long, totalAmount: Money) {
         val point = pointRepository.findByUserIdWithLock(userId)
@@ -37,6 +39,8 @@ class PointService(private val pointRepository: PointRepository) {
         return pointRepository.save(point)
     }
 
-    fun getPoint(userId: Long): Point = pointRepository.findByUserId(userId)
+    fun getPoint(userId: Long): Point {
+        return pointRepository.findByUserId(userId)
             ?: throw CoreException(ErrorType.NOT_FOUND, "포인트 정보를 찾을 수 없습니다: $userId")
+    }
 }

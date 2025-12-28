@@ -7,8 +7,9 @@ import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Repository
 
 @Repository
-class ProductLikeCountRedisRepositoryImpl(private val redisTemplate: RedisTemplate<String, String>) :
-    ProductLikeCountRedisRepository {
+class ProductLikeCountRedisRepositoryImpl(
+    private val redisTemplate: RedisTemplate<String, String>,
+) : ProductLikeCountRedisRepository {
     companion object {
         private const val LIKE_COUNT_KEY_PREFIX = "product:like:count:"
 

@@ -14,7 +14,10 @@ import java.time.format.DateTimeParseException
  */
 @Service
 @Transactional(readOnly = true)
-class RankingService(private val rankingRepository: RankingRepository, private val productRepository: ProductRepository) {
+class RankingService(
+    private val rankingRepository: RankingRepository,
+    private val productRepository: ProductRepository,
+) {
     private val logger = LoggerFactory.getLogger(RankingService::class.java)
 
     /**
@@ -41,7 +44,6 @@ class RankingService(private val rankingRepository: RankingRepository, private v
                     val date = LocalDate.parse(timestamp, DateTimeFormatter.ofPattern("yyyyMMdd"))
                     RankingKey.daily(RankingScope.ALL, date)
                 }
-
                 TimeWindow.HOURLY -> {
                     val dateTime = LocalDateTime.parse(timestamp, DateTimeFormatter.ofPattern("yyyyMMddHH"))
                     RankingKey.hourly(RankingScope.ALL, dateTime)
@@ -104,6 +106,6 @@ class RankingService(private val rankingRepository: RankingRepository, private v
      */
     fun findProductsByIds(productIds: List<Long>): Map<Long, com.loopers.domain.product.Product> {
         val products = productRepository.findAllById(productIds)
-        return products.associateBy { it.id }
+        return products.associateBy { it.id!! }
     }
 }

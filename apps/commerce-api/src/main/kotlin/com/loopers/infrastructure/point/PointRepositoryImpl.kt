@@ -5,7 +5,9 @@ import com.loopers.domain.point.PointRepository
 import org.springframework.stereotype.Repository
 
 @Repository
-class PointRepositoryImpl(private val pointJpaRepository: PointJpaRepository) : PointRepository {
+class PointRepositoryImpl(
+    private val pointJpaRepository: PointJpaRepository,
+) : PointRepository {
     override fun findByUserId(
         userId: Long,
     ): Point? = pointJpaRepository.findByUserId(userId)

@@ -14,9 +14,10 @@ import org.springframework.test.context.ActiveProfiles
 
 @SpringBootTest
 @ActiveProfiles("test")
-class LikeServiceTest @Autowired constructor(
-    private val likeService: LikeService,
-) {
+class LikeServiceTest {
+    @Autowired
+    private lateinit var likeService: LikeService
+
     @MockkBean
     private lateinit var likeRepository: LikeRepository
 

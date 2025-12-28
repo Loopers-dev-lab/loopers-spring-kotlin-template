@@ -17,7 +17,7 @@ import java.time.Duration
  */
 @Repository
 class RankingRedisRepository(
-    @param:Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
+    @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
     private val redisTemplate: RedisTemplate<String, String>,
 ) : RankingRepository {
     private val logger = LoggerFactory.getLogger(RankingRedisRepository::class.java)

@@ -16,7 +16,9 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1/orders")
-class OrderV1Controller(private val orderFacade: OrderFacade) : OrderV1ApiSpec {
+class OrderV1Controller(
+    private val orderFacade: OrderFacade,
+) : OrderV1ApiSpec {
     @PostMapping
     override fun createOrder(
         @RequestHeader("X-USER-ID") userId: Long,

@@ -1,6 +1,6 @@
 package com.loopers.domain.product
 
-import tools.jackson.core.type.TypeReference
+import com.fasterxml.jackson.core.type.TypeReference
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestProduct
 import com.loopers.support.error.CoreException

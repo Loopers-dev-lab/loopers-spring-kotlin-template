@@ -7,24 +7,26 @@ import org.springframework.transaction.annotation.Transactional
 import kotlin.jvm.optionals.getOrNull
 
 @Component
-class PaymentCoreRepository(private val paymentJpaRepository: PaymentJpaRepository) : PaymentRepository {
+class PaymentCoreRepository(
+    private val paymentJpaRepository: PaymentJpaRepository,
+) : PaymentRepository {
     @Transactional
-    override fun save(payment: Payment): Payment = paymentJpaRepository.save(payment)
+    override fun save(payment: Payment): Payment {
+        return paymentJpaRepository.save(payment)
+    }
 
     @Transactional(readOnly = true)
-    override fun findByTransactionKey(
-        transactionKey: String,
-    ): Payment? = paymentJpaRepository.findById(transactionKey).getOrNull()
+    override fun findByTransactionKey(transactionKey: String): Payment? {
+        return paymentJpaRepository.findById(transactionKey).getOrNull()
+    }
 
     @Transactional(readOnly = true)
-    override fun findByTransactionKey(
-        userId: String,
-        transactionKey: String,
-    ): Payment? = paymentJpaRepository.findByUserIdAndTransactionKey(userId, transactionKey)
+    override fun findByTransactionKey(userId: String, transactionKey: String): Payment? {
+        return paymentJpaRepository.findByUserIdAndTransactionKey(userId, transactionKey)
+    }
 
-    override fun findByOrderId(userId: String, orderId: String): List<Payment> = paymentJpaRepository.findByUserIdAndOrderId(
-        userId,
-        orderId,
-    )
+    override fun findByOrderId(userId: String, orderId: String): List<Payment> {
+        return paymentJpaRepository.findByUserIdAndOrderId(userId, orderId)
             .sortedByDescending { it.updatedAt }
+    }
 }

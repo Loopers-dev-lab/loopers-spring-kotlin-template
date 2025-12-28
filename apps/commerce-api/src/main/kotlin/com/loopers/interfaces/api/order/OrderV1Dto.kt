@@ -10,7 +10,9 @@ import com.loopers.application.order.OrderCreateRequest as AppOrderCreateRequest
 import com.loopers.application.order.OrderItemRequest as AppOrderItemRequest
 
 class OrderV1Dto {
-    data class OrderCreateRequest(val items: List<OrderItemRequest>) {
+    data class OrderCreateRequest(
+        val items: List<OrderItemRequest>,
+    ) {
         fun toApplicationRequest(): AppOrderCreateRequest = AppOrderCreateRequest(
             items = items.map {
                 AppOrderItemRequest(
@@ -21,7 +23,10 @@ class OrderV1Dto {
         )
     }
 
-    data class OrderItemRequest(val productId: Long, val quantity: Int)
+    data class OrderItemRequest(
+        val productId: Long,
+        val quantity: Int,
+    )
 
     data class OrderCreateResponse(
         val orderId: Long,

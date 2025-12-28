@@ -10,7 +10,10 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class LikeFacade(private val likeService: LikeService, private val productRepository: ProductRepository) {
+class LikeFacade(
+    private val likeService: LikeService,
+    private val productRepository: ProductRepository,
+) {
     @Transactional
     fun addLike(userId: Long, productId: Long) {
         if (!productRepository.existsById(productId)) {

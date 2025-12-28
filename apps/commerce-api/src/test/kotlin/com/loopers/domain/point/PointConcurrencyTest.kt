@@ -19,10 +19,14 @@ import kotlin.properties.Delegates
 @SpringBootTest
 @ActiveProfiles("test")
 @DisplayName("Point 동시성 테스트")
-class PointConcurrencyTest @Autowired constructor(
-    private val pointService: PointService,
-    private val testFixtures: TestFixtures,
-) {
+class PointConcurrencyTest {
+
+    @Autowired
+    private lateinit var pointService: PointService
+
+    @Autowired
+    private lateinit var testFixtures: TestFixtures
+
     private var userId by Delegates.notNull<Long>()
 
     @BeforeEach

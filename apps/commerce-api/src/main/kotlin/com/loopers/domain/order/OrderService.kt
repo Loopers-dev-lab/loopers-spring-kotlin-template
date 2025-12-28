@@ -12,7 +12,10 @@ import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-class OrderService(private val orderRepository: OrderRepository, private val stockService: StockService) {
+class OrderService(
+    private val orderRepository: OrderRepository,
+    private val stockService: StockService,
+) {
     fun createOrder(userId: Long, orderItems: List<OrderItem>): Order {
         val order = Order(userId = userId, items = orderItems)
         return orderRepository.save(order)

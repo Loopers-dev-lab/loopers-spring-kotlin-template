@@ -20,11 +20,17 @@ import org.springframework.transaction.annotation.Transactional
 @ContextConfiguration(initializers = [RedisTestContainersConfig::class])
 @Transactional
 @DisplayName("ProductLikeCountService 테스트")
-class ProductLikeCountServiceTest @Autowired constructor(
-    private val productLikeCountService: ProductLikeCountService,
-    private val testFixtures: TestFixtures,
-    private val redisTemplate: RedisTemplate<String, String>,
-) {
+class ProductLikeCountServiceTest {
+
+    @Autowired
+    private lateinit var productLikeCountService: ProductLikeCountService
+
+    @Autowired
+    private lateinit var testFixtures: TestFixtures
+
+    @Autowired
+    private lateinit var redisTemplate: RedisTemplate<String, String>
+
     private var productId: Long = 0
 
     @BeforeEach

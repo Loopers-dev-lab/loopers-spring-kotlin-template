@@ -22,7 +22,7 @@ class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val pgClient: PgClient,
     private val eventPublisher: ApplicationEventPublisher,
-    @param:Value("\${pg.callback-url:http://localhost:8080}") private val callbackBaseUrl: String,
+    @Value("\${pg.callback-url:http://localhost:8080}") private val callbackBaseUrl: String,
 ) {
     private val logger = LoggerFactory.getLogger(PaymentService::class.java)
 
@@ -148,7 +148,6 @@ class PaymentService(
                 // 결제 완료 이벤트 발행
                 eventPublisher.publishEvent(PaymentCompletedEvent.from(payment))
             }
-
             TransactionStatusDto.FAILED -> {
                 payment.fail(reason ?: "결제 실패")
                 logger.warn("결제 실패: transactionKey=$transactionKey, reason=$reason")
@@ -156,7 +155,6 @@ class PaymentService(
                 // 결제 실패 이벤트 발행
                 eventPublisher.publishEvent(PaymentFailedEvent.from(payment))
             }
-
             TransactionStatusDto.PENDING -> {
                 logger.info("결제 대기 중: transactionKey=$transactionKey")
             }
@@ -216,8 +214,12 @@ class PaymentService(
         }
     }
 
-    fun getPaymentByTransactionKey(transactionKey: String): Payment = paymentRepository.findByTransactionKey(transactionKey)
+    fun getPaymentByTransactionKey(transactionKey: String): Payment {
+        return paymentRepository.findByTransactionKey(transactionKey)
             ?: throw CoreException(ErrorType.NOT_FOUND, "거래 키에 해당하는 결제를 찾을 수 없습니다.")
+    }
 
-    fun getPaymentsByOrderId(orderId: Long): List<Payment> = paymentRepository.findByOrderId(orderId)
+    fun getPaymentsByOrderId(orderId: Long): List<Payment> {
+        return paymentRepository.findByOrderId(orderId)
+    }
 }

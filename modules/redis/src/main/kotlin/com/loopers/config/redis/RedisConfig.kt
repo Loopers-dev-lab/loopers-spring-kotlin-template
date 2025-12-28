@@ -14,7 +14,9 @@ import org.springframework.data.redis.serializer.StringRedisSerializer
 
 @Configuration
 @EnableConfigurationProperties(RedisProperties::class)
-class RedisConfig(private val redisProperties: RedisProperties) {
+class RedisConfig(
+    private val redisProperties: RedisProperties,
+) {
     companion object {
         private const val CONNECTION_MASTER = "redisConnectionMaster"
         const val REDIS_TEMPLATE_MASTER = "redisTemplateMaster"
@@ -42,15 +44,19 @@ class RedisConfig(private val redisProperties: RedisProperties) {
     @Bean
     fun defaultRedisTemplate(
         lettuceConnectionFactory: LettuceConnectionFactory,
-    ): RedisTemplate<*, *> = RedisTemplate<String, String>()
+    ): RedisTemplate<*, *> {
+        return RedisTemplate<String, String>()
             .defaultRedisTemplate(lettuceConnectionFactory)
+    }
 
     @Qualifier(REDIS_TEMPLATE_MASTER)
     @Bean
     fun masterRedisTemplate(
         @Qualifier(CONNECTION_MASTER) lettuceConnectionFactory: LettuceConnectionFactory,
-    ): RedisTemplate<*, *> = RedisTemplate<String, String>()
+    ): RedisTemplate<*, *> {
+        return RedisTemplate<String, String>()
             .defaultRedisTemplate(lettuceConnectionFactory)
+    }
 
     private fun lettuceConnectionFactory(
         database: Int,

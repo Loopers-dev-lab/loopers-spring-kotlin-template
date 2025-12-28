@@ -16,8 +16,5 @@ ktlint_standard_function-signature = disabled
 ktlint_standard_import-ordering = disabled
 ktlint_standard_indent = disabled
 
-[**/build/generated/**]
-ktlint_disabled = true
-
 [*Test.kt]
 max_line_length = off

@@ -8,7 +8,10 @@ import jakarta.persistence.Table
 
 @Entity
 @Table(name = "example")
-class ExampleModel(name: String, description: String) : BaseEntity() {
+class ExampleModel(
+    name: String,
+    description: String,
+) : BaseEntity() {
     var name: String = name
         protected set
 

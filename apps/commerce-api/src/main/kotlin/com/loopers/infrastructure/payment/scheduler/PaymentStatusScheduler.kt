@@ -6,7 +6,9 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
 @Component
-class PaymentStatusScheduler(private val paymentService: PaymentService) {
+class PaymentStatusScheduler(
+    private val paymentService: PaymentService,
+) {
     private val logger = LoggerFactory.getLogger(PaymentStatusScheduler::class.java)
 
     /**

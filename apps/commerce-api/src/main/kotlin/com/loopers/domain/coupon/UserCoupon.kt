@@ -13,7 +13,10 @@ import java.time.LocalDateTime
 
 @Entity
 @Table(name = "user_coupons")
-class UserCoupon(userId: Long, coupon: Coupon) : BaseEntity() {
+class UserCoupon(
+    userId: Long,
+    coupon: Coupon,
+) : BaseEntity() {
     @Column(nullable = false)
     var userId: Long = userId
         protected set

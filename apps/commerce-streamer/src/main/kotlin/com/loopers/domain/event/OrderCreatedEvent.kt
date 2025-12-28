@@ -4,6 +4,10 @@ import java.time.ZonedDateTime
 import java.util.UUID
 
 /**
+ * 주문 관련 이벤트
+ */
+
+/**
  * 주문 생성 이벤트
  * 주문이 생성되었을 때 발행
  */
@@ -19,5 +23,10 @@ data class OrderCreatedEvent(
     /**
      * 주문 상품 정보
      */
-    data class OrderItemInfo(val productId: Long, val productName: String, val quantity: Int, val priceAtOrder: Long)
+    data class OrderItemInfo(
+        val productId: Long,
+        val productName: String,
+        val quantity: Int,
+        val priceAtOrder: Long,
+    )
 }

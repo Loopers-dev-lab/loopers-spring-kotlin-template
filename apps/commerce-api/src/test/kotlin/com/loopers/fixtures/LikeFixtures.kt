@@ -19,7 +19,9 @@ fun createTestLike(
     productId: Long,
     createdAt: ZonedDateTime = ZonedDateTime.now(),
     updatedAt: ZonedDateTime = ZonedDateTime.now(),
-): Like = Like(
+): Like {
+    return Like(
         userId = userId,
         productId = productId,
     ).withId(id, createdAt, updatedAt)
+}

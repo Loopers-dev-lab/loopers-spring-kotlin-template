@@ -26,7 +26,11 @@ import jakarta.persistence.Table
         Index(name = "idx_like_count", columnList = "like_count DESC"),
     ],
 )
-class Product(name: String, price: Price, brand: Brand) : BaseEntity() {
+class Product(
+    name: String,
+    price: Price,
+    brand: Brand,
+) : BaseEntity() {
     @Column(nullable = false, length = 200)
     var name: String = name
         protected set

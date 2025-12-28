@@ -21,13 +21,22 @@ import java.time.LocalDate
 
 @SpringBootTest
 @Transactional
-class LikeQueryServiceIntegrationTest @Autowired constructor(
-    private val likeQueryService: LikeQueryService,
-    private val likeRepository: LikeRepository,
-    private val userRepository: UserRepository,
-    private val brandRepository: BrandRepository,
-    private val productRepository: ProductRepository,
-) {
+class LikeQueryServiceIntegrationTest {
+    @Autowired
+    private lateinit var likeQueryService: LikeQueryService
+
+    @Autowired
+    private lateinit var likeRepository: LikeRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var brandRepository: BrandRepository
+
+    @Autowired
+    private lateinit var productRepository: ProductRepository
+
     private lateinit var user: User
     private lateinit var brand: Brand
     private lateinit var products: List<Product>

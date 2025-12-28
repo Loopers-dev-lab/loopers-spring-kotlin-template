@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1/users")
-class UserV1Controller(private val userFacade: UserFacade) : UserV1ApiSpec {
+class UserV1Controller(
+    private val userFacade: UserFacade,
+) : UserV1ApiSpec {
     @PostMapping
     override fun registerUser(
         @RequestBody @Valid request: UserV1Dto.RegisterRequest,

@@ -67,11 +67,13 @@ class UserCouponTest {
         assertThat(usedCoupon.canUse()).isFalse()
     }
 
-    private fun createFixedAmountCoupon(): Coupon = Coupon(
+    private fun createFixedAmountCoupon(): Coupon {
+        return Coupon(
             name = "5000원 할인 쿠폰",
             discountType = CouponType.FIXED_AMOUNT,
             discountValue = BigDecimal("5000"),
         )
+    }
 
     private fun createUserCoupon(isUsed: Boolean = false): UserCoupon {
         val userCoupon = UserCoupon(

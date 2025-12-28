@@ -9,7 +9,9 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class DatabaseCleanUp(@PersistenceContext private val entityManager: EntityManager) : InitializingBean {
+class DatabaseCleanUp(
+    @PersistenceContext private val entityManager: EntityManager,
+) : InitializingBean {
     private val tableNames = mutableListOf<String>()
 
     override fun afterPropertiesSet() {
