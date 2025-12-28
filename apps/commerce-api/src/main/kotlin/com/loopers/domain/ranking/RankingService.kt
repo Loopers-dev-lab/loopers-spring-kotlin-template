@@ -14,14 +14,23 @@ import java.time.format.DateTimeParseException
  */
 @Service
 @Transactional(readOnly = true)
-class RankingService(private val rankingRepository: RankingRepository, private val productRepository: ProductRepository) {
+class RankingService(
+    private val rankingRepository: RankingRepository,
+    private val productRepository: ProductRepository,
+    private val productRankWeeklyRepository: ProductRankWeeklyRepository,
+    private val productRankMonthlyRepository: ProductRankMonthlyRepository,
+) {
     private val logger = LoggerFactory.getLogger(RankingService::class.java)
 
     /**
      * Top-N 랭킹 조회 (페이징)
      *
-     * @param window 시간 윈도우 (DAILY, HOURLY)
-     * @param timestamp 조회할 시점 (DAILY: yyyyMMdd, HOURLY: yyyyMMddHH)
+     * @param window 시간 윈도우 (DAILY, HOURLY, WEEKLY, MONTHLY)
+     * @param timestamp 조회할 시점
+     *   - DAILY: yyyyMMdd (예: 20250906)
+     *   - HOURLY: yyyyMMddHH (예: 2025090614)
+     *   - WEEKLY: yyyyWww (예: 2025W01)
+     *   - MONTHLY: yyyyMM (예: 202501)
      * @param page 페이지 번호 (1부터 시작)
      * @param size 페이지 크기
      * @return 랭킹 목록과 전체 개수
@@ -35,6 +44,22 @@ class RankingService(private val rankingRepository: RankingRepository, private v
         require(page >= 1) { "페이지 번호는 1 이상이어야 합니다: page=$page" }
         require(size > 0) { "페이지 크기는 0보다 커야 합니다: size=$size" }
 
+        return when (window) {
+            TimeWindow.DAILY, TimeWindow.HOURLY -> getTopNFromRedis(window, timestamp, page, size)
+            TimeWindow.WEEKLY -> getTopNFromWeeklyDB(timestamp, page, size)
+            TimeWindow.MONTHLY -> getTopNFromMonthlyDB(timestamp, page, size)
+        }
+    }
+
+    /**
+     * Redis에서 랭킹 조회 (DAILY, HOURLY)
+     */
+    private fun getTopNFromRedis(
+        window: TimeWindow,
+        timestamp: String,
+        page: Int,
+        size: Int,
+    ): Pair<List<Ranking>, Long> {
         val key = try {
             when (window) {
                 TimeWindow.DAILY -> {
@@ -46,11 +71,14 @@ class RankingService(private val rankingRepository: RankingRepository, private v
                     val dateTime = LocalDateTime.parse(timestamp, DateTimeFormatter.ofPattern("yyyyMMddHH"))
                     RankingKey.hourly(RankingScope.ALL, dateTime)
                 }
+
+                else -> throw IllegalArgumentException("Redis 기반 랭킹은 DAILY, HOURLY만 지원합니다")
             }
         } catch (e: DateTimeParseException) {
             val expectedFormat = when (window) {
                 TimeWindow.DAILY -> "yyyyMMdd (예: 20250906)"
                 TimeWindow.HOURLY -> "yyyyMMddHH (예: 2025090614)"
+                else -> "unknown"
             }
             throw IllegalArgumentException(
                 "잘못된 날짜/시간 형식입니다. 예상 형식: $expectedFormat, 입력값: $timestamp",
@@ -66,11 +94,95 @@ class RankingService(private val rankingRepository: RankingRepository, private v
         val totalCount = rankingRepository.getCount(key)
 
         logger.debug(
-            "랭킹 조회 완료: window=$window, timestamp=$timestamp, " +
+            "랭킹 조회 완료 (Redis): window=$window, timestamp=$timestamp, " +
                 "page=$page, size=$size, count=${rankings.size}, totalCount=$totalCount",
         )
 
         return rankings to totalCount
+    }
+
+    /**
+     * DB에서 주간 랭킹 조회
+     */
+    private fun getTopNFromWeeklyDB(
+        timestamp: String,
+        page: Int,
+        size: Int,
+    ): Pair<List<Ranking>, Long> {
+        // timestamp 형식: yyyyWww (예: 2025W01)
+        val yearWeek = try {
+            require(timestamp.length == 7 && timestamp[4] == 'W') {
+                "주간 랭킹 형식은 yyyyWww 형식이어야 합니다 (예: 2025W01)"
+            }
+            timestamp
+        } catch (e: Exception) {
+            throw IllegalArgumentException("잘못된 주간 형식입니다: $timestamp", e)
+        }
+
+        // DB에서 조회
+        val allRankings = productRankWeeklyRepository.findByYearWeek(yearWeek)
+
+        val start = (page - 1) * size
+        val pagedRankings = allRankings
+            .sortedBy { it.rank }
+            .drop(start)
+            .take(size)
+            .map {
+                Ranking(
+                    productId = it.productId,
+                    score = RankingScore(it.score),
+                    rank = it.rank,
+                )
+            }
+
+        logger.debug(
+            "랭킹 조회 완료 (주간 DB): yearWeek=$yearWeek, " +
+                "page=$page, size=$size, count=${pagedRankings.size}, totalCount=${allRankings.size}",
+        )
+
+        return pagedRankings to allRankings.size.toLong()
+    }
+
+    /**
+     * DB에서 월간 랭킹 조회
+     */
+    private fun getTopNFromMonthlyDB(
+        timestamp: String,
+        page: Int,
+        size: Int,
+    ): Pair<List<Ranking>, Long> {
+        // timestamp 형식: yyyyMM (예: 202501)
+        val yearMonth = try {
+            require(timestamp.length == 6) {
+                "월간 랭킹 형식은 yyyyMM 형식이어야 합니다 (예: 202501)"
+            }
+            timestamp
+        } catch (e: Exception) {
+            throw IllegalArgumentException("잘못된 월간 형식입니다: $timestamp", e)
+        }
+
+        // DB에서 조회
+        val allRankings = productRankMonthlyRepository.findByYearMonth(yearMonth)
+
+        val start = (page - 1) * size
+        val pagedRankings = allRankings
+            .sortedBy { it.rank }
+            .drop(start)
+            .take(size)
+            .map {
+                Ranking(
+                    productId = it.productId,
+                    score = RankingScore(it.score),
+                    rank = it.rank,
+                )
+            }
+
+        logger.debug(
+            "랭킹 조회 완료 (월간 DB): yearMonth=$yearMonth, " +
+                "page=$page, size=$size, count=${pagedRankings.size}, totalCount=${allRankings.size}",
+        )
+
+        return pagedRankings to allRankings.size.toLong()
     }
 
     /**
@@ -83,7 +195,13 @@ class RankingService(private val rankingRepository: RankingRepository, private v
     fun getProductRanking(productId: Long, window: TimeWindow): Ranking? {
         val key = when (window) {
             TimeWindow.DAILY -> RankingKey.currentDaily(RankingScope.ALL)
+
             TimeWindow.HOURLY -> RankingKey.currentHourly(RankingScope.ALL)
+
+            TimeWindow.WEEKLY, TimeWindow.MONTHLY -> {
+                // 주간/월간은 현재 랭킹 개념이 없으므로 null 반환
+                return null
+            }
         }
 
         val rank = rankingRepository.getRank(key, productId) ?: return null
