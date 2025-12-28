@@ -69,11 +69,17 @@ class ProductRankMonthly(
         fun yearMonthToString(yearMonth: YearMonth): String = yearMonth.toString().replace("-", "")
 
         fun stringToYearMonth(yearMonth: String): YearMonth {
-            require(yearMonth.length == 6) { "Invalid yearMonth format: $yearMonth" }
-            return YearMonth.of(
-                yearMonth.substring(0, 4).toInt(),
-                yearMonth.substring(4, 6).toInt(),
-            )
+            require(yearMonth.length == 6 && yearMonth.all { it.isDigit() }) {
+                "Invalid yearMonth format: $yearMonth. Expected yyyyMM format."
+            }
+            return try {
+                YearMonth.of(
+                    yearMonth.substring(0, 4).toInt(),
+                    yearMonth.substring(4, 6).toInt(),
+                )
+            } catch (e: java.time.DateTimeException) {
+                throw IllegalArgumentException("Invalid yearMonth value: $yearMonth", e)
+            }
         }
     }
 }
