@@ -26,7 +26,7 @@ class RankingRedisRepositoryOrderingTest : IntegrationTest() {
         val score = 10.0
 
         listOf(1L, 2L, 3L).forEach { productId ->
-            redisTemplate.opsForZSet().add(key, productId.toString(), score)
+            redisTemplate.opsForZSet().add(key, toMember(productId), score)
         }
 
         // when
@@ -47,7 +47,7 @@ class RankingRedisRepositoryOrderingTest : IntegrationTest() {
         val score = 5.0
 
         listOf(1L, 2L, 3L).forEach { productId ->
-            redisTemplate.opsForZSet().add(key, productId.toString(), score)
+            redisTemplate.opsForZSet().add(key, toMember(productId), score)
         }
 
         // when
@@ -59,5 +59,9 @@ class RankingRedisRepositoryOrderingTest : IntegrationTest() {
         assertThat(rank3).isEqualTo(0L)
         assertThat(rank2).isEqualTo(1L)
         assertThat(rank1).isEqualTo(2L)
+    }
+
+    private fun toMember(productId: Long): String {
+        return productId.toString().padStart(15, '0')
     }
 }

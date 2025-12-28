@@ -12,10 +12,12 @@ import org.springframework.data.domain.Pageable
 interface RankingV1ApiSpec {
     @Operation(
         summary = "랭킹 페이지 조회",
-        description = "일자별 상품 랭킹 페이지를 조회합니다.",
+        description = "기간과 날짜 기준 상품 랭킹 페이지를 조회합니다.",
     )
     fun getRankings(
-        @Parameter(description = "랭킹 날짜 (yyyyMMdd)")
+        @Parameter(description = "랭킹 기간 (daily, weekly, monthly)", schema = Schema(defaultValue = "daily"))
+        period: String,
+        @Parameter(description = "랭킹 기준 날짜 (yyyyMMdd), weekly는 해당 주, monthly는 해당 월 기준")
         date: String,
         @Parameter(description = "페이지 번호 (0부터 시작)", schema = Schema(defaultValue = "0"))
         pageable: Pageable,
