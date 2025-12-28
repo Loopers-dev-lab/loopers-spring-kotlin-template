@@ -4,7 +4,7 @@ spring:
       enabled: false # 서버 재시작시 배치 자동실행 방지
       name: ${job.name:NONE}
     jdbc:
-      initialize-schema: never
+      initialize-schema: always
   main:
     web-application-type: none
   application:
@@ -16,6 +16,14 @@ spring:
       - jpa.yml
       - logging.yml
       - monitoring.yml
+
+# 배치 랭킹 가중치 설정
+batch:
+  ranking:
+    weights:
+      view: 0.1    # 조회수 가중치
+      like: 0.2   # 좋아요 가중치
+      sold: 0.7   # 판매수 가중치
 
 ---
 spring:
