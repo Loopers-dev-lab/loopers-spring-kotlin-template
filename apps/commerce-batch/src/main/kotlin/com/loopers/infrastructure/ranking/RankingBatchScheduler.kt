@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Properties
 
@@ -18,6 +19,10 @@ import java.util.Properties
 @Component
 class RankingBatchScheduler(private val jobOperator: JobOperator, private val jobRepository: JobRepository) {
     private val logger = LoggerFactory.getLogger(RankingBatchScheduler::class.java)
+
+    companion object {
+        private val SCHEDULER_ZONE = ZoneId.of("Asia/Seoul")
+    }
 
     /**
      * 주간 랭킹 집계 배치 실행
@@ -31,7 +36,7 @@ class RankingBatchScheduler(private val jobOperator: JobOperator, private val jo
     fun runWeeklyRankingAggregation() {
         try {
             // 어제(토요일)를 기준으로 지난 주 집계
-            val targetDate = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).minusDays(1)
+            val targetDate = LocalDate.now(SCHEDULER_ZONE).minusDays(1)
 
             val jobParameters = Properties().apply {
                 setProperty("targetDate", targetDate.toString())
@@ -61,7 +66,7 @@ class RankingBatchScheduler(private val jobOperator: JobOperator, private val jo
     fun runMonthlyRankingAggregation() {
         try {
             // 지난 달 집계
-            val targetYearMonth = YearMonth.now(java.time.ZoneId.of("Asia/Seoul")).minusMonths(1)
+            val targetYearMonth = YearMonth.now(SCHEDULER_ZONE).minusMonths(1)
             val targetYearMonthStr = targetYearMonth.format(DateTimeFormatter.ofPattern("yyyyMM"))
 
             val jobParameters = Properties().apply {

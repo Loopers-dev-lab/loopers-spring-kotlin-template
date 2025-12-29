@@ -122,11 +122,19 @@ class RankingService(
             val week = timestamp.substring(5, 7).toIntOrNull()
                 ?: throw IllegalArgumentException("유효하지 않은 주차입니다: ${timestamp.substring(5, 7)}")
 
-            require(year in 1..9999) {
-                "연도는 1부터 9999 사이여야 합니다: $year"
+            require(year in 1970..2040) {
+                "연도는 1970부터 2040 사이여야 합니다: $year"
             }
             require(week in 1..53) {
                 "주차는 1부터 53 사이여야 합니다: $week"
+            }
+            try {
+                LocalDate.parse(
+                    "${year}W${week.toString().padStart(2, '0')}-1",
+                    DateTimeFormatter.ISO_WEEK_DATE,
+                )
+            } catch (e: DateTimeParseException) {
+                throw IllegalArgumentException("해당 연도에 $week 주차가 존재하지 않습니다: $year", e)
             }
 
             timestamp
@@ -174,8 +182,8 @@ class RankingService(
             val month = timestamp.substring(4, 6).toIntOrNull()
                 ?: throw IllegalArgumentException("유효하지 않은 월입니다: ${timestamp.substring(4, 6)}")
 
-            require(year in 1..9999) {
-                "연도는 1부터 9999 사이여야 합니다: $year"
+            require(year in 1970..2040) {
+                "연도는 1970부터 2040 사이여야 합니다: $year"
             }
             require(month in 1..12) {
                 "월은 1부터 12 사이여야 합니다: $month"

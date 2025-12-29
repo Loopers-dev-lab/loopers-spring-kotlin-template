@@ -405,9 +405,11 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:19092 ./gradlew :apps:commerce-streamer:bootRu
 ./gradlew :apps:commerce-batch:bootRun
 
 # 주간 랭킹 배치 수동 실행
+# targetDate 형식: YYYY-MM-DD (예: 2025-12-29)
 ./gradlew :apps:commerce-batch:bootRun --args='--spring.batch.job.name=weeklyRankingAggregationJob targetDate=2025-12-29'
 
-# 월간 랭킹 배치 수동 실행  
+# 월간 랭킹 배치 수동 실행
+# targetYearMonth 형식: YYYYMM (예: 202412)
 ./gradlew :apps:commerce-batch:bootRun --args='--spring.batch.job.name=monthlyRankingAggregationJob targetYearMonth=202412'
 ```
 
