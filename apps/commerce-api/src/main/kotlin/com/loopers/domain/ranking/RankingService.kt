@@ -2,6 +2,7 @@ package com.loopers.domain.ranking
 
 import com.loopers.domain.product.ProductRepository
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -120,27 +121,23 @@ class RankingService(
         }
 
         // DB에서 조회
-        val allRankings = productRankWeeklyRepository.findByYearWeek(yearWeek)
-
-        val start = (page - 1) * size
-        val pagedRankings = allRankings
-            .sortedBy { it.rank }
-            .drop(start)
-            .take(size)
+        val pageResult = productRankWeeklyRepository.findByYearWeekOrderByRankAsc(yearWeek, PageRequest.of(page - 1, size))
+        val pagedRankings = pageResult
             .map {
                 Ranking(
                     productId = it.productId,
                     score = RankingScore(it.score),
                     rank = it.rank,
                 )
-            }
+            }.toList()
+        val totalCount = pageResult.totalElements
 
         logger.debug(
             "랭킹 조회 완료 (주간 DB): yearWeek=$yearWeek, " +
-                    "page=$page, size=$size, count=${pagedRankings.size}, totalCount=${allRankings.size}",
+                    "page=$page, size=$size, count=${pagedRankings.size}, totalCount=$totalCount",
         )
 
-        return pagedRankings to allRankings.size.toLong()
+        return pagedRankings to totalCount
     }
 
     /**
@@ -162,27 +159,23 @@ class RankingService(
         }
 
         // DB에서 조회
-        val allRankings = productRankMonthlyRepository.findByYearMonth(yearMonth)
-
-        val start = (page - 1) * size
-        val pagedRankings = allRankings
-            .sortedBy { it.rank }
-            .drop(start)
-            .take(size)
+        val pageResult = productRankMonthlyRepository.findByYearMonthOrderByRankAsc(yearMonth, PageRequest.of(page - 1, size))
+        val pagedRankings = pageResult
             .map {
                 Ranking(
                     productId = it.productId,
                     score = RankingScore(it.score),
                     rank = it.rank,
                 )
-            }
+            }.toList()
+        val totalCount = pageResult.totalElements
 
         logger.debug(
             "랭킹 조회 완료 (월간 DB): yearMonth=$yearMonth, " +
-                    "page=$page, size=$size, count=${pagedRankings.size}, totalCount=${allRankings.size}",
+                    "page=$page, size=$size, count=${pagedRankings.size}, totalCount=$totalCount",
         )
 
-        return pagedRankings to allRankings.size.toLong()
+        return pagedRankings to totalCount
     }
 
     /**

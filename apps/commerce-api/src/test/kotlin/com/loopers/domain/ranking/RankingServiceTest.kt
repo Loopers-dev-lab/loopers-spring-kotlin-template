@@ -10,6 +10,8 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 
 @DisplayName("RankingService 단위 테스트")
 class RankingServiceTest {
@@ -221,7 +223,8 @@ class RankingServiceTest {
             },
         )
 
-        every { productRankWeeklyRepository.findByYearWeek(timestamp) } returns weeklyRankings
+        val pageResult = PageImpl(weeklyRankings, PageRequest.of(0, size), 3)
+        every { productRankWeeklyRepository.findByYearWeekOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
 
         // when
         val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
@@ -233,7 +236,7 @@ class RankingServiceTest {
         assertThat(result[0].score.value).isEqualTo(10.0)
         assertThat(totalCount).isEqualTo(3)
 
-        verify(exactly = 1) { productRankWeeklyRepository.findByYearWeek(timestamp) }
+        verify(exactly = 1) { productRankWeeklyRepository.findByYearWeekOrderByRankAsc(timestamp, PageRequest.of(0, size)) }
     }
 
     @Test
@@ -258,7 +261,8 @@ class RankingServiceTest {
             },
         )
 
-        every { productRankMonthlyRepository.findByYearMonth(timestamp) } returns monthlyRankings
+        val pageResult = PageImpl(monthlyRankings, PageRequest.of(0, size), 2)
+        every { productRankMonthlyRepository.findByYearMonthOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
 
         // when
         val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
@@ -270,7 +274,7 @@ class RankingServiceTest {
         assertThat(result[0].score.value).isEqualTo(15.0)
         assertThat(totalCount).isEqualTo(2)
 
-        verify(exactly = 1) { productRankMonthlyRepository.findByYearMonth(timestamp) }
+        verify(exactly = 1) { productRankMonthlyRepository.findByYearMonthOrderByRankAsc(timestamp, PageRequest.of(0, size)) }
     }
 
     @Test

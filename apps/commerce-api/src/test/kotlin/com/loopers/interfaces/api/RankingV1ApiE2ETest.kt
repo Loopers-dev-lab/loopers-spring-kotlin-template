@@ -106,6 +106,10 @@ class RankingV1ApiE2ETest @Autowired constructor(
         val dailyKey = RankingKey.currentDaily(RankingScope.ALL)
         redisTemplate.delete(dailyKey.toRedisKey())
 
+        // 주간/월간 랭킹 데이터 정리 (테스트 실패 시에도 정리되도록)
+        productRankWeeklyRepository.deleteAll()
+        productRankMonthlyRepository.deleteAll()
+
         // DB 데이터 정리
         databaseCleanUp.truncateAllTables()
     }
