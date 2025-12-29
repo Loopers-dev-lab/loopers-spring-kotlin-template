@@ -3,27 +3,20 @@ package com.loopers.infrastructure.ranking
 import com.loopers.batch.ranking.MonthlyRankingAggregationJobConfig
 import com.loopers.batch.ranking.WeeklyRankingAggregationJobConfig
 import org.slf4j.LoggerFactory
-import org.springframework.batch.core.job.Job
-import org.springframework.batch.core.job.parameters.JobParametersBuilder
-import org.springframework.batch.core.launch.JobLauncher
-import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.batch.core.launch.JobOperator
+import org.springframework.batch.core.repository.JobRepository
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.util.Properties
 
 /**
  * 랭킹 배치 Job 실행 스케줄러
  */
 @Component
-class RankingBatchScheduler(
-    private val jobLauncher: JobLauncher,
-    @Qualifier(WeeklyRankingAggregationJobConfig.JOB_NAME)
-    private val weeklyJob: Job,
-    @Qualifier(MonthlyRankingAggregationJobConfig.JOB_NAME)
-    private val monthlyJob: Job,
-) {
+class RankingBatchScheduler(private val jobOperator: JobOperator, private val jobRepository: JobRepository) {
     private val logger = LoggerFactory.getLogger(RankingBatchScheduler::class.java)
 
     /**
@@ -40,21 +33,23 @@ class RankingBatchScheduler(
             // 어제(토요일)를 기준으로 지난 주 집계
             val targetDate = LocalDate.now().minusDays(1)
 
-            val jobParameters = JobParametersBuilder()
-                .addString("targetDate", targetDate.toString())
-                .addLong("timestamp", System.currentTimeMillis())
-                .toJobParameters()
+            val jobParameters = Properties().apply {
+                setProperty("targetDate", targetDate.toString())
+                setProperty("timestamp", System.currentTimeMillis().toString())
+            }
 
             logger.info("주간 랭킹 집계 배치 시작: targetDate=$targetDate")
 
-            val execution = jobLauncher.run(weeklyJob, jobParameters)
+            val executionId = jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters)
+            val execution = jobRepository.getJobExecution(executionId)
 
             logger.info(
                 "주간 랭킹 집계 배치 완료: " +
-                        "status=${execution.status}, exitCode=${execution.exitStatus.exitCode}",
+                        "status=${execution?.status}, exitCode=${execution?.exitStatus?.exitCode}",
             )
         } catch (e: Exception) {
             logger.error("주간 랭킹 집계 배치 실행 실패", e)
+            // TODO: 운영 환경에서 알림 발송
         }
     }
 
@@ -73,21 +68,23 @@ class RankingBatchScheduler(
             val targetYearMonth = YearMonth.now().minusMonths(1)
             val targetYearMonthStr = targetYearMonth.format(DateTimeFormatter.ofPattern("yyyyMM"))
 
-            val jobParameters = JobParametersBuilder()
-                .addString("targetYearMonth", targetYearMonthStr)
-                .addLong("timestamp", System.currentTimeMillis())
-                .toJobParameters()
+            val jobParameters = Properties().apply {
+                setProperty("targetYearMonth", targetYearMonthStr)
+                setProperty("timestamp", System.currentTimeMillis().toString())
+            }
 
             logger.info("월간 랭킹 집계 배치 시작: targetYearMonth=$targetYearMonthStr")
 
-            val execution = jobLauncher.run(monthlyJob, jobParameters)
+            val executionId = jobOperator.start(MonthlyRankingAggregationJobConfig.JOB_NAME, jobParameters)
+            val execution = jobRepository.getJobExecution(executionId)
 
             logger.info(
                 "월간 랭킹 집계 배치 완료: " +
-                        "status=${execution.status}, exitCode=${execution.exitStatus.exitCode}",
+                        "status=${execution?.status}, exitCode=${execution?.exitStatus?.exitCode}",
             )
         } catch (e: Exception) {
             logger.error("월간 랭킹 집계 배치 실행 실패", e)
+            // TODO: 운영 환경에서 알림 발송
         }
     }
 }
