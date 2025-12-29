@@ -1,6 +1,9 @@
 spring:
   application:
     name: commerce-batch-test
+  jpa:
+    hibernate:
+      ddl-auto: create  # Ensure ranking tables are created in tests
   batch:
     jdbc:
       initialize-schema: always
