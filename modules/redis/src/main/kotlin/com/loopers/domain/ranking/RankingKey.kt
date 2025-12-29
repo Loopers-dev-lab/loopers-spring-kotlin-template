@@ -20,14 +20,14 @@ data class RankingKey(val scope: RankingScope, val window: TimeWindow, val times
      * 주의: WEEKLY, MONTHLY는 DB에 저장되므로 Redis 키를 사용하지 않음
      */
     fun toRedisKey(): String = when (window) {
-            TimeWindow.DAILY -> "ranking:${scope.value}:daily:${timestamp.format(DAILY_FORMAT)}"
+        TimeWindow.DAILY -> "ranking:${scope.value}:daily:${timestamp.format(DAILY_FORMAT)}"
 
-            TimeWindow.HOURLY -> "ranking:${scope.value}:hourly:${timestamp.format(HOURLY_FORMAT)}"
+        TimeWindow.HOURLY -> "ranking:${scope.value}:hourly:${timestamp.format(HOURLY_FORMAT)}"
 
-            TimeWindow.WEEKLY, TimeWindow.MONTHLY -> throw UnsupportedOperationException(
-                "WEEKLY와 MONTHLY 랭킹은 Redis가 아닌 DB에 저장됩니다",
-            )
-        }
+        TimeWindow.WEEKLY, TimeWindow.MONTHLY -> throw UnsupportedOperationException(
+            "WEEKLY와 MONTHLY 랭킹은 Redis가 아닌 DB에 저장됩니다",
+        )
+    }
 
     companion object {
         private val DAILY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd")
@@ -37,19 +37,19 @@ data class RankingKey(val scope: RankingScope, val window: TimeWindow, val times
          * 일간 랭킹 키 생성
          */
         fun daily(scope: RankingScope, date: LocalDate): RankingKey = RankingKey(
-                scope = scope,
-                window = TimeWindow.DAILY,
-                timestamp = date.atStartOfDay(),
-            )
+            scope = scope,
+            window = TimeWindow.DAILY,
+            timestamp = date.atStartOfDay(),
+        )
 
         /**
          * 시간별 랭킹 키 생성
          */
         fun hourly(scope: RankingScope, dateTime: LocalDateTime): RankingKey = RankingKey(
-                scope = scope,
-                window = TimeWindow.HOURLY,
-                timestamp = dateTime.withMinute(0).withSecond(0).withNano(0),
-            )
+            scope = scope,
+            window = TimeWindow.HOURLY,
+            timestamp = dateTime.withMinute(0).withSecond(0).withNano(0),
+        )
 
         /**
          * 현재 일간 랭킹 키
@@ -96,10 +96,10 @@ enum class TimeWindow(val ttlDays: Int) {
     /**
      * 주간 집계 (DB 저장, TTL 없음)
      */
-    WEEKLY(ttlDays = 0),
+    WEEKLY(ttlDays = -1),
 
     /**
      * 월간 집계 (DB 저장, TTL 없음)
      */
-    MONTHLY(ttlDays = 0),
+    MONTHLY(ttlDays = -1),
 }

@@ -4,13 +4,13 @@ import com.loopers.domain.ranking.ProductRankDailyRepository
 import com.loopers.domain.ranking.ProductRankWeekly
 import com.loopers.domain.ranking.ProductRankWeeklyRepository
 import org.slf4j.LoggerFactory
-import org.springframework.batch.core.job.Job
-import org.springframework.batch.core.step.Step
 import org.springframework.batch.core.configuration.annotation.JobScope
 import org.springframework.batch.core.configuration.annotation.StepScope
+import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.job.parameters.RunIdIncrementer
 import org.springframework.batch.core.repository.JobRepository
+import org.springframework.batch.core.step.Step
 import org.springframework.batch.core.step.builder.StepBuilder
 import org.springframework.batch.infrastructure.item.ItemProcessor
 import org.springframework.batch.infrastructure.item.ItemReader
@@ -51,10 +51,10 @@ class WeeklyRankingAggregationJobConfig(
 
     @Bean
     fun weeklyRankingAggregationJob(): Job = JobBuilder(JOB_NAME, jobRepository)
-            .incrementer(RunIdIncrementer())
-            .start(weeklyRankingDeleteStep(null))
-            .next(weeklyRankingAggregateStep())
-            .build()
+        .incrementer(RunIdIncrementer())
+        .start(weeklyRankingDeleteStep(null))
+        .next(weeklyRankingAggregateStep())
+        .build()
 
     /**
      * Step 1: 기존 데이터 삭제 (멱등성 보장)
@@ -68,12 +68,15 @@ class WeeklyRankingAggregationJobConfig(
         val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
 
         return StepBuilder(DELETE_STEP_NAME, jobRepository)
-                .tasklet({ _, _ ->
+            .tasklet(
+                { _, _ ->
                     productRankWeeklyRepository.deleteByYearWeek(yearWeek)
                     logger.info("주간 랭킹 기존 데이터 삭제 완료: yearWeek=$yearWeek")
                     null // null is interpreted as FINISHED
-                }, transactionManager)
-                .build()
+                },
+                transactionManager,
+            )
+            .build()
     }
 
     /**
@@ -82,11 +85,12 @@ class WeeklyRankingAggregationJobConfig(
     @Bean
     @JobScope
     fun weeklyRankingAggregateStep(): Step = StepBuilder(AGGREGATE_STEP_NAME, jobRepository)
-            .chunk<WeeklyRankingAggregate, ProductRankWeekly>(CHUNK_SIZE, transactionManager)
-            .reader(weeklyRankingReader(null))
-            .processor(weeklyRankingProcessor())
-            .writer(weeklyRankingWriter())
-            .build()
+        .chunk<WeeklyRankingAggregate, ProductRankWeekly>(CHUNK_SIZE)
+        .reader(weeklyRankingReader(null))
+        .processor(weeklyRankingProcessor())
+        .writer(weeklyRankingWriter())
+        .transactionManager(transactionManager)
+        .build()
 
     /**
      * Reader: product_rank_daily에서 지난 7일 데이터 읽기
@@ -138,17 +142,17 @@ class WeeklyRankingAggregationJobConfig(
     @Bean
     @StepScope
     fun weeklyRankingProcessor(): ItemProcessor<WeeklyRankingAggregate, ProductRankWeekly> = ItemProcessor { aggregate ->
-            val yearWeek = aggregate.endDate.format(DateTimeFormatter.ofPattern("yyyy'W'ww"))
+        val yearWeek = aggregate.endDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
 
-            ProductRankWeekly(
-                yearWeek = yearWeek,
-                productId = aggregate.productId,
-                score = aggregate.avgScore,
-                rank = aggregate.rank,
-                periodStart = aggregate.startDate,
-                periodEnd = aggregate.endDate,
-            )
-        }
+        ProductRankWeekly(
+            yearWeek = yearWeek,
+            productId = aggregate.productId,
+            score = aggregate.avgScore,
+            rank = aggregate.rank,
+            periodStart = aggregate.startDate,
+            periodEnd = aggregate.endDate,
+        )
+    }
 
     /**
      * Writer: mv_product_rank_weekly 테이블에 저장

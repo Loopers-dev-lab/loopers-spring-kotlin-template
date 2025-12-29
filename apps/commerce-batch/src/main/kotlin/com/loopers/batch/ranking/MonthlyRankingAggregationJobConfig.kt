@@ -83,10 +83,11 @@ class MonthlyRankingAggregationJobConfig(
     @Bean
     @JobScope
     fun monthlyRankingAggregateStep(): Step = StepBuilder(AGGREGATE_STEP_NAME, jobRepository)
-            .chunk<MonthlyRankingAggregate, ProductRankMonthly>(CHUNK_SIZE, transactionManager)
+            .chunk<MonthlyRankingAggregate, ProductRankMonthly>(CHUNK_SIZE)
             .reader(monthlyRankingReader(null))
             .processor(monthlyRankingProcessor())
             .writer(monthlyRankingWriter())
+            .transactionManager(transactionManager)
             .build()
 
     /**
