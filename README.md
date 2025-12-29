@@ -34,24 +34,15 @@ TDD, 동시성 제어, 성능 최적화, 이벤트 기반 아키텍처, 분산 �
 ## 주차별 PR 링크
 
 - [01주차 (2025.10.26-2025.11.01) : **테스트 가능한 구조**](https://github.com/ghojeong/loopers-round-1/pull/1)
-- [02주차 (2025.11.02-2025.11.08) : **이커머스 설계
-  **](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/19)
-- [03주차 (2025.11.09-2025.11.15) : **도메인 모델링
-  **](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/25)
-- [04주차 (2025.11.16-2025.11.22) : **트랜잭션과 락
-  **](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/31)
-- [05주차 (2025.11.23-2025.11.29) : **조회 성능 최적화
-  **](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/41)
-- [06주차 (2025.11.30-2025.12.06) : **외부 시스템 연동
-  **](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/48)
-- [07주차 (2025.12.07-2025.12.13) : **이벤트 기반 아키텍처
-  **](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/54)
-- [08주차 (2025.12.14-2025.12.20) : **카프카 분산 메시징
-  **](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/64)
-- [09주차 (2025.12.21-2025.12.27) : **상품 인기 랭킹
-  **](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/70)
-- [10주차 (2025.12.28-2026.01.03) : **주간/월간 인기 랭킹 배치
-  **](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/76)
+- [02주차 (2025.11.02-2025.11.08) : **이커머스 설계**](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/19)
+- [03주차 (2025.11.09-2025.11.15) : **도메인 모델링**](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/25)
+- [04주차 (2025.11.16-2025.11.22) : **트랜잭션과 락**](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/31)
+- [05주차 (2025.11.23-2025.11.29) : **조회 성능 최적화**](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/41)
+- [06주차 (2025.11.30-2025.12.06) : **외부 시스템 연동**](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/48)
+- [07주차 (2025.12.07-2025.12.13) : **이벤트 기반 아키텍처**](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/54)
+- [08주차 (2025.12.14-2025.12.20) : **카프카 분산 메시징**](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/64)
+- [09주차 (2025.12.21-2025.12.27) : **상품 인기 랭킹**](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/70)
+- [10주차 (2025.12.28-2026.01.03) : **주간/월간 인기 랭킹 배치**](https://github.com/Loopers-dev-lab/loopers-spring-kotlin-template/pull/76)
 
 ---
 
@@ -307,13 +298,13 @@ data class Price(
 
 ### 동시성 제어 전략
 
-| 도메인             |        전략        |                     이유 |
-|:----------------|:----------------:|-----------------------:|
-| 재고 (Stock)      |      비관적 락       |            음수 재고 절대 방지 |
-| 포인트 (Point)     |      비관적 락       |            음수 잔액 절대 방지 |
-| 쿠폰 (UserCoupon) |      비관적 락       |            중복 사용 절대 방지 |
-| 좋아요 (Like)      | UniqueConstraint | 중복만 막으면 됨, Gap Lock 회피 |
-| 좋아요 카운트         |   Redis Atomic   |            동시성 안전 + 성능 |
+| 도메인 | 전략 | 이유 |
+|:--------|:------:|------:|
+| 재고 (Stock) | 비관적 락 | 음수 재고 절대 방지 |
+| 포인트 (Point) | 비관적 락 | 음수 잔액 절대 방지 |
+| 쿠폰 (UserCoupon) | 비관적 락 | 중복 사용 절대 방지 |
+| 좋아요 (Like) | UniqueConstraint | 중복만 막으면 됨, Gap Lock 회피 |
+| 좋아요 카운트 | Redis Atomic | 동시성 안전 + 성능 |
 
 ---
 
