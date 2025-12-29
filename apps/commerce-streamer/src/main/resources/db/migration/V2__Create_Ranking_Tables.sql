@@ -52,6 +52,7 @@ CREATE TABLE mv_product_rank_weekly
 -- 주간 랭킹 인덱스
 CREATE INDEX idx_product_rank_weekly_year_week ON mv_product_rank_weekly (year_week DESC);
 CREATE INDEX idx_product_rank_weekly_year_week_rank ON mv_product_rank_weekly (year_week, `rank`);
+CREATE INDEX idx_product_rank_weekly_product_id ON mv_product_rank_weekly (product_id);
 
 -- 월간 랭킹 집계 테이블 (TOP 100)
 -- 매월 1일 02:00에 배치로 집계
@@ -76,3 +77,4 @@ CREATE TABLE mv_product_rank_monthly
 -- 월간 랭킹 인덱스
 CREATE INDEX idx_product_rank_monthly_year_month ON mv_product_rank_monthly (year_month DESC);
 CREATE INDEX idx_product_rank_monthly_year_month_rank ON mv_product_rank_monthly (year_month, `rank`);
+CREATE INDEX idx_product_rank_monthly_product_id ON mv_product_rank_monthly (product_id);

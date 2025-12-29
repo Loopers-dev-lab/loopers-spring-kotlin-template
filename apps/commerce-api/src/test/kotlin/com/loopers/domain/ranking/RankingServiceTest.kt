@@ -294,4 +294,118 @@ class RankingServiceTest {
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("잘못된 월간 형식입니다")
     }
+
+    @Test
+    @DisplayName("주간 랭킹 조회 - 경계값: 유효한 주차 53")
+    fun `should accept valid week number 53`() {
+        // given
+        val window = TimeWindow.WEEKLY
+        val timestamp = "2025W53"
+        val page = 1
+        val size = 20
+
+        val pageResult = PageImpl(emptyList<ProductRankWeekly>(), PageRequest.of(0, size), 0)
+        every { productRankWeeklyRepository.findByYearWeekOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
+
+        // when
+        val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
+
+        // then
+        assertThat(result).isEmpty()
+        assertThat(totalCount).isEqualTo(0)
+    }
+
+    @Test
+    @DisplayName("주간 랭킹 조회 - 경계값: 잘못된 주차 00")
+    fun `should throw exception for invalid week number 00`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.WEEKLY, "2025W00", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 주간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("주간 랭킹 조회 - 경계값: 잘못된 주차 54")
+    fun `should throw exception for invalid week number 54`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.WEEKLY, "2025W54", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 주간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("주간 랭킹 조회 - 경계값: 숫자가 아닌 주차")
+    fun `should throw exception for non-numeric week`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.WEEKLY, "2025WAA", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 주간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 잘못된 월 00")
+    fun `should throw exception for invalid month 00`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.MONTHLY, "202500", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 월간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 잘못된 월 13")
+    fun `should throw exception for invalid month 13`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.MONTHLY, "202513", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 월간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 유효한 월 01")
+    fun `should accept valid month 01`() {
+        // given
+        val window = TimeWindow.MONTHLY
+        val timestamp = "202501"
+        val page = 1
+        val size = 20
+
+        val pageResult = PageImpl(emptyList<ProductRankMonthly>(), PageRequest.of(0, size), 0)
+        every { productRankMonthlyRepository.findByYearMonthOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
+
+        // when
+        val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
+
+        // then
+        assertThat(result).isEmpty()
+        assertThat(totalCount).isEqualTo(0)
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 유효한 월 12")
+    fun `should accept valid month 12`() {
+        // given
+        val window = TimeWindow.MONTHLY
+        val timestamp = "202512"
+        val page = 1
+        val size = 20
+
+        val pageResult = PageImpl(emptyList<ProductRankMonthly>(), PageRequest.of(0, size), 0)
+        every { productRankMonthlyRepository.findByYearMonthOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
+
+        // when
+        val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
+
+        // then
+        assertThat(result).isEmpty()
+        assertThat(totalCount).isEqualTo(0)
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 숫자가 아닌 월")
+    fun `should throw exception for non-numeric month`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.MONTHLY, "2025AA", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 월간 형식입니다")
+    }
 }

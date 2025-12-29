@@ -19,8 +19,6 @@ interface ProductRankMonthlyJpaRepository : JpaRepository<ProductRankMonthly, Lo
 
     fun findByYearMonth(yearMonth: String): List<ProductRankMonthly>
 
-    fun findByYearMonth(yearMonth: String, pageable: Pageable): List<ProductRankMonthly>
-
     fun findByYearMonthOrderByRankAsc(yearMonth: String, pageable: Pageable): Page<ProductRankMonthly>
 
     @Query("SELECT p FROM ProductRankMonthly p WHERE p.yearMonth = :yearMonth ORDER BY p.rank")

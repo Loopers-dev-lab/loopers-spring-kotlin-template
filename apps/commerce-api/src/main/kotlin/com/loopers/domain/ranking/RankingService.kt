@@ -115,6 +115,20 @@ class RankingService(
             require(timestamp.length == 7 && timestamp[4] == 'W') {
                 "주간 랭킹 형식은 yyyyWww 형식이어야 합니다 (예: 2025W01)"
             }
+
+            // 연도와 주차 추출 및 검증
+            val year = timestamp.substring(0, 4).toIntOrNull()
+                ?: throw IllegalArgumentException("유효하지 않은 연도입니다: ${timestamp.substring(0, 4)}")
+            val week = timestamp.substring(5, 7).toIntOrNull()
+                ?: throw IllegalArgumentException("유효하지 않은 주차입니다: ${timestamp.substring(5, 7)}")
+
+            require(year in 1..9999) {
+                "연도는 1부터 9999 사이여야 합니다: $year"
+            }
+            require(week in 1..53) {
+                "주차는 1부터 53 사이여야 합니다: $week"
+            }
+
             timestamp
         } catch (e: Exception) {
             throw IllegalArgumentException("잘못된 주간 형식입니다: $timestamp", e)
@@ -153,6 +167,20 @@ class RankingService(
             require(timestamp.length == 6) {
                 "월간 랭킹 형식은 yyyyMM 형식이어야 합니다 (예: 202501)"
             }
+
+            // 연도와 월 추출 및 검증
+            val year = timestamp.substring(0, 4).toIntOrNull()
+                ?: throw IllegalArgumentException("유효하지 않은 연도입니다: ${timestamp.substring(0, 4)}")
+            val month = timestamp.substring(4, 6).toIntOrNull()
+                ?: throw IllegalArgumentException("유효하지 않은 월입니다: ${timestamp.substring(4, 6)}")
+
+            require(year in 1..9999) {
+                "연도는 1부터 9999 사이여야 합니다: $year"
+            }
+            require(month in 1..12) {
+                "월은 1부터 12 사이여야 합니다: $month"
+            }
+
             timestamp
         } catch (e: Exception) {
             throw IllegalArgumentException("잘못된 월간 형식입니다: $timestamp", e)

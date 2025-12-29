@@ -403,6 +403,12 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:19092 ./gradlew :apps:commerce-streamer:bootRu
 
 # Batch 서버 실행 (독립 실행 가능)
 ./gradlew :apps:commerce-batch:bootRun
+
+# 주간 랭킹 배치 수동 실행
+./gradlew :apps:commerce-batch:bootRun --args='--spring.batch.job.name=weeklyRankingAggregationJob targetDate=2025-12-29'
+
+# 월간 랭킹 배치 수동 실행  
+./gradlew :apps:commerce-batch:bootRun --args='--spring.batch.job.name=monthlyRankingAggregationJob targetYearMonth=202412'
 ```
 
 애플리케이션 실행 확인:
