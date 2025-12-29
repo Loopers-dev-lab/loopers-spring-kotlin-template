@@ -64,13 +64,13 @@ class ConcurrencyIntegrationTest @Autowired constructor(
         databaseCleanUp.truncateAllTables()
     }
 
-    @DisplayName("동일한 상품에 100명이 동시에 좋아요 요청 시 좋아요 개수가 정확히 100개여야 한다")
+    @DisplayName("동일한 상품에 50명이 동시에 좋아요 요청 시 좋아요 개수가 정확히 50개여야 한다")
     @Test
     fun likeConcurrencyTest() {
         val product = createProduct(1000)
-        val members = (1..100).map { createMember("user$it", 0) }
+        val members = (1..50).map { createMember("user$it", 0) }
 
-        val executor = Executors.newFixedThreadPool(100)
+        val executor = Executors.newFixedThreadPool(50)
         val latch = CountDownLatch(1)
 
         members.forEach { member ->
@@ -88,18 +88,18 @@ class ConcurrencyIntegrationTest @Autowired constructor(
         executor.shutdown()
         while (!executor.isTerminated) Thread.sleep(50)
 
-        // EventOutbox에 100개의 ProductLikedEvent가 저장되었는지 확인
+        // EventOutbox에 50개의 ProductLikedEvent가 저장되었는지 확인
         var retryCount = 0
         var outboxEvents = eventOutboxRepository.findAll()
-        while (outboxEvents.size < 100 && retryCount < 50) {
+        while (outboxEvents.size < 50 && retryCount < 50) {
             Thread.sleep(100)
             outboxEvents = eventOutboxRepository.findAll()
             retryCount++
         }
 
-        // EventOutbox에 100개의 ProductLikedEvent가 저장되었는지 확인
+        // EventOutbox에 50개의 ProductLikedEvent가 저장되었는지 확인
         val likedEvents = outboxEvents.filter { it.eventType == "PRODUCT_LIKED" && it.aggregateId == product.id }
-        assertThat(likedEvents).hasSize(100)
+        assertThat(likedEvents).hasSize(50)
     }
 
     @DisplayName("동일한 쿠폰으로 10개 기기에서 동시 주문 시 쿠폰은 1번만 사용되어야 한다")

@@ -22,6 +22,9 @@ class ProductV1Controller(
     private val productFacade: ProductFacade,
     private val eventPublisher: ApplicationEventPublisher,
 ) : ProductV1ApiSpec {
+    /**
+     * 상품 목록 조회 (랭킹 정보 없음)
+     */
     @GetMapping
     override fun getProducts(
         @RequestHeader(value = "X-USER-ID", required = false) memberId: String?,
@@ -42,29 +45,37 @@ class ProductV1Controller(
                 brandId = brandId,
                 sortType = sort.name, // Enum을 String으로 변환
                 page = page,
-                browsedAt = Instant.now()
-            )
+                browsedAt = Instant.now(),
+            ),
         )
 
         return result
     }
 
+    /**
+     * 상품 상세 조회 (랭킹 정보 포함)
+     */
     @GetMapping("/{productId}")
     override fun getProduct(
         @RequestHeader(value = "X-USER-ID", required = false) memberId: String?,
         @PathVariable productId: Long,
     ): ApiResponse<ProductV1Dto.ProductResponse> {
-        val result = productFacade.getProduct(productId)
-            .let { ProductV1Dto.ProductResponse.from(it) }
-            .let { ApiResponse.success(it) }
+        // 상품 정보 + 랭킹 정보 조회
+        val productWithRanking = productFacade.getProductWithRanking(productId)
+
+        val result = ProductV1Dto.ProductResponse.fromWithRanking(
+            info = productWithRanking.product,
+            rank = productWithRanking.rank,
+            score = productWithRanking.score,
+        ).let { ApiResponse.success(it) }
 
         eventPublisher.publishEvent(
             ProductViewedEvent(
                 aggregateId = productId,
                 productId = productId,
                 memberId = memberId,
-                viewedAt = Instant.now()
-            )
+                viewedAt = Instant.now(),
+            ),
         )
 
         return result

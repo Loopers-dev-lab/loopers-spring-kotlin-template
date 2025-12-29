@@ -15,7 +15,7 @@ spring:
     # Producer 설정
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer  # payload가 이미 JSON 문자열이므로 StringSerializer 사용
       acks: all       # 모든 ISR 복제본이 메시지를 받아야 ACK (데이터 유실 방지)
       retries: 3      # 재시도 횟수
       properties:
@@ -29,11 +29,16 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
         enable.auto.commit: false   # 자동 커밋 비활성화 (수동 ACK)
-        auto.offset.reset: earliest # 신규 컨슈머는 과거부터 소비
+        auto.offset.reset: latest   # 오프셋 없을 시 최신부터 소비
 
     # Listener 설정
     listener:
       ack-mode: manual  # 수동 ACK 모드
+
+    # 토픽 설정
+    topics:
+      catalog-events: catalog-events
+      order-events: order-events
 
 ---
 spring.config.activate.on-profile: local, test
@@ -43,7 +48,7 @@ spring:
     bootstrap-servers: localhost:19092
     admin:
       properties:
-        bootstrap.servers: kafka:9092
+        bootstrap.servers: localhost:19092
 
 ---
 spring.config.activate.on-profile: dev
@@ -53,3 +58,4 @@ spring.config.activate.on-profile: qa
 
 ---
 spring.config.activate.on-profile: prd
+

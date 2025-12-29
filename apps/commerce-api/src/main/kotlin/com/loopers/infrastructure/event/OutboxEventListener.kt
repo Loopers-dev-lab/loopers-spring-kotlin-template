@@ -9,6 +9,7 @@ import com.loopers.domain.like.event.ProductUnlikedEvent
 import com.loopers.domain.order.event.OrderCreatedEvent
 import com.loopers.domain.payment.event.PaymentCompletedEvent
 import com.loopers.domain.payment.event.PaymentFailedEvent
+import com.loopers.domain.product.event.ProductBrowsedEvent
 import com.loopers.domain.product.event.ProductViewedEvent
 import com.loopers.domain.product.event.StockDecreasedEvent
 import org.slf4j.LoggerFactory
@@ -18,8 +19,11 @@ import org.springframework.transaction.event.TransactionalEventListener
 
 /**
  * Transactional Outbox Pattern 구현
- * - BEFORE_COMMIT: 비즈니스 로직과 같은 트랜재견
+ * - BEFORE_COMMIT: 비즈니스 로직과 같은 트랜잭션에서 저장
  * - 이벤트 유실 방지
+ *
+ * Note: @TransactionalEventListener(phase = BEFORE_COMMIT)는
+ * 이미 트랜잭션 컨텍스트 안에서 실행되므로 별도의 @Transactional 불필요
  */
 @Component
 class OutboxEventListener(
@@ -55,6 +59,7 @@ class OutboxEventListener(
             is ProductLikedEvent,
             is ProductUnlikedEvent,
             is ProductViewedEvent,
+            is ProductBrowsedEvent,
             is StockDecreasedEvent -> "product"
             is OrderCreatedEvent,
             is PaymentCompletedEvent,

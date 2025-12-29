@@ -58,8 +58,8 @@ spring:
 datasource:
   mysql-jpa:
     main:
-      maximum-pool-size: 10
-      minimum-idle: 5
+      maximum-pool-size: 50  # 동시성 테스트용 (MySQL max_connections 고려)
+      minimum-idle: 20
 
 ---
 spring.config.activate.on-profile: dev
