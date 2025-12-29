@@ -24,10 +24,10 @@ data class RankingPageInfo(
 data class RankingItemInfo(val rank: Int, val score: Double, val product: RankingProductInfo) {
     companion object {
         fun from(ranking: Ranking, product: Product): RankingItemInfo = RankingItemInfo(
-                rank = ranking.rank,
-                score = ranking.score.value,
-                product = RankingProductInfo.from(product),
-            )
+            rank = ranking.rank,
+            score = ranking.score.value,
+            product = RankingProductInfo.from(product),
+        )
     }
 }
 
@@ -44,12 +44,12 @@ data class RankingProductInfo(
 ) {
     companion object {
         fun from(product: Product): RankingProductInfo = RankingProductInfo(
-                id = product.id,
-                name = product.name,
-                price = product.price.amount,
-                currency = product.price.currency.name,
-                brand = BrandInfo.from(product.brand),
-                likeCount = product.likeCount,
-            )
+            id = product.id,
+            name = product.name,
+            price = product.price.amount,
+            currency = product.price.currency.name,
+            brand = BrandInfo.from(product.brand),
+            likeCount = product.likeCount,
+        )
     }
 }

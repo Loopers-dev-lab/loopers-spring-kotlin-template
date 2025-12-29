@@ -119,7 +119,8 @@ class OutboxEvent(
     /**
      * 재시도 가능 여부 확인
      */
-    fun canRetry(maxRetryCount: Int): Boolean = this.retryCount < maxRetryCount && this.status != OutboxEventStatus.PUBLISHED
+    fun canRetry(maxRetryCount: Int): Boolean =
+        this.retryCount < maxRetryCount && this.status != OutboxEventStatus.PUBLISHED
 
     /**
      * 재시도 처리 시작
@@ -155,13 +156,13 @@ class OutboxEvent(
             aggregateType: String,
             aggregateId: Long,
         ): OutboxEvent = OutboxEvent(
-                eventType = eventType,
-                topic = topic,
-                partitionKey = partitionKey,
-                payload = payload,
-                aggregateType = aggregateType,
-                aggregateId = aggregateId,
-            )
+            eventType = eventType,
+            topic = topic,
+            partitionKey = partitionKey,
+            payload = payload,
+            aggregateType = aggregateType,
+            aggregateId = aggregateId,
+        )
     }
 }
 

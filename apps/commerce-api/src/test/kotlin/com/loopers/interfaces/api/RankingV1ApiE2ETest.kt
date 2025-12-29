@@ -93,7 +93,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
         )
 
         // 일간 랭킹 데이터 생성
-        val dailyKey = RankingKey.Companion.currentDaily(RankingScope.ALL)
+        val dailyKey = RankingKey.currentDaily(RankingScope.ALL)
         rankingRepository.incrementScore(dailyKey, product1.id, RankingScore(10.0))
         rankingRepository.incrementScore(dailyKey, product2.id, RankingScore(8.5))
         rankingRepository.incrementScore(dailyKey, product3.id, RankingScore(7.2))
@@ -103,7 +103,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
     @AfterEach
     fun tearDown() {
         // Redis 데이터 정리
-        val dailyKey = RankingKey.Companion.currentDaily(RankingScope.ALL)
+        val dailyKey = RankingKey.currentDaily(RankingScope.ALL)
         redisTemplate.delete(dailyKey.toRedisKey())
 
         // DB 데이터 정리
@@ -226,7 +226,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
     @DisplayName("시간별 랭킹 조회")
     fun `should get hourly rankings`() {
         // given
-        val hourlyKey = RankingKey.Companion.currentHourly(RankingScope.ALL)
+        val hourlyKey = RankingKey.currentHourly(RankingScope.ALL)
         rankingRepository.incrementScore(hourlyKey, product1.id, RankingScore(5.0))
         rankingRepository.incrementScore(hourlyKey, product2.id, RankingScore(3.5))
         rankingRepository.setExpire(hourlyKey)

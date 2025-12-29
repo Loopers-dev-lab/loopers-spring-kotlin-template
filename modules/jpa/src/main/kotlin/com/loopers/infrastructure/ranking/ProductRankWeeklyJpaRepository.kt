@@ -18,7 +18,8 @@ interface ProductRankWeeklyJpaRepository : JpaRepository<ProductRankWeekly, Long
 }
 
 @Repository
-class ProductRankWeeklyRepositoryImpl(private val jpaRepository: ProductRankWeeklyJpaRepository) : ProductRankWeeklyRepository {
+class ProductRankWeeklyRepositoryImpl(private val jpaRepository: ProductRankWeeklyJpaRepository) :
+    ProductRankWeeklyRepository {
 
     override fun save(entity: ProductRankWeekly): ProductRankWeekly = jpaRepository.save(entity)
 
@@ -34,6 +35,6 @@ class ProductRankWeeklyRepositoryImpl(private val jpaRepository: ProductRankWeek
         yearWeek: String,
         limit: Int,
     ): List<ProductRankWeekly> = jpaRepository.findByYearWeek(yearWeek)
-            .sortedBy { it.rank }
-            .take(limit)
+        .sortedBy { it.rank }
+        .take(limit)
 }

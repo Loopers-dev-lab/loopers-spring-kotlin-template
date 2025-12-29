@@ -33,34 +33,34 @@ class KafkaTopicConfig {
      */
     @Bean
     fun catalogEventsTopic(): NewTopic = TopicBuilder.name(catalogEventsTopic)
-            .partitions(3) // 파티션 수
-            .replicas(1) // 복제본 수 (로컬 환경)
-            .build()
+        .partitions(3) // 파티션 수
+        .replicas(1) // 복제본 수 (로컬 환경)
+        .build()
 
     /**
      * order-events 토픽 생성
      */
     @Bean
     fun orderEventsTopic(): NewTopic = TopicBuilder.name(orderEventsTopic)
-            .partitions(3)
-            .replicas(1)
-            .build()
+        .partitions(3)
+        .replicas(1)
+        .build()
 
     /**
      * catalog-events DLQ 토픽 생성
      */
     @Bean
     fun catalogEventsDlqTopic(): NewTopic = TopicBuilder.name(catalogEventsDlqTopic)
-            .partitions(1)
-            .replicas(1)
-            .build()
+        .partitions(1)
+        .replicas(1)
+        .build()
 
     /**
      * order-events DLQ 토픽 생성
      */
     @Bean
     fun orderEventsDlqTopic(): NewTopic = TopicBuilder.name(orderEventsDlqTopic)
-            .partitions(1)
-            .replicas(1)
-            .build()
+        .partitions(1)
+        .replicas(1)
+        .build()
 }

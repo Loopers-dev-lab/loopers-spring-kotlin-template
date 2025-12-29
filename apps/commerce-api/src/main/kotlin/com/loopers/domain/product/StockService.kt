@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class StockService(private val stockRepository: StockRepository, private val eventPublisher: ApplicationEventPublisher) {
     fun getStockByProductId(productId: Long): Stock = stockRepository.findByProductId(productId)
-            ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: $productId")
+        ?: throw CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다: $productId")
 
     fun validateStockAvailability(stock: Stock, productName: String, requestedQuantity: Int) {
         if (!stock.isAvailable(requestedQuantity)) {

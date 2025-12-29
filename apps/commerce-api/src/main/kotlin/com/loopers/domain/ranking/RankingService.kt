@@ -95,7 +95,7 @@ class RankingService(
 
         logger.debug(
             "랭킹 조회 완료 (Redis): window=$window, timestamp=$timestamp, " +
-                "page=$page, size=$size, count=${rankings.size}, totalCount=$totalCount",
+                    "page=$page, size=$size, count=${rankings.size}, totalCount=$totalCount",
         )
 
         return rankings to totalCount
@@ -137,7 +137,7 @@ class RankingService(
 
         logger.debug(
             "랭킹 조회 완료 (주간 DB): yearWeek=$yearWeek, " +
-                "page=$page, size=$size, count=${pagedRankings.size}, totalCount=${allRankings.size}",
+                    "page=$page, size=$size, count=${pagedRankings.size}, totalCount=${allRankings.size}",
         )
 
         return pagedRankings to allRankings.size.toLong()
@@ -179,7 +179,7 @@ class RankingService(
 
         logger.debug(
             "랭킹 조회 완료 (월간 DB): yearMonth=$yearMonth, " +
-                "page=$page, size=$size, count=${pagedRankings.size}, totalCount=${allRankings.size}",
+                    "page=$page, size=$size, count=${pagedRankings.size}, totalCount=${allRankings.size}",
         )
 
         return pagedRankings to allRankings.size.toLong()

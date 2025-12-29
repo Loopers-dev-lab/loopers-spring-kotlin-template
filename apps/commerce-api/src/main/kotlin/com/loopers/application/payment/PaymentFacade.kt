@@ -66,11 +66,11 @@ data class PaymentRequest(val userId: Long, val orderId: Long, val amount: Long,
 data class PaymentInfo(val paymentId: Long, val transactionKey: String, val status: String, val amount: Long) {
     companion object {
         fun from(payment: Payment, transactionKey: String): PaymentInfo = PaymentInfo(
-                paymentId = requireNotNull(payment.id) { "Payment id must not be null when creating PaymentInfo" },
-                transactionKey = transactionKey,
-                status = payment.status.name,
-                amount = payment.amount,
-            )
+            paymentId = requireNotNull(payment.id) { "Payment id must not be null when creating PaymentInfo" },
+            transactionKey = transactionKey,
+            status = payment.status.name,
+            amount = payment.amount,
+        )
     }
 }
 
@@ -88,17 +88,17 @@ data class PaymentDetailInfo(
 ) {
     companion object {
         fun from(payment: Payment): PaymentDetailInfo = PaymentDetailInfo(
-                paymentId = requireNotNull(payment.id) { "Payment id must not be null when creating PaymentDetailInfo" },
-                userId = payment.userId,
-                orderId = payment.orderId,
-                transactionKey = payment.transactionKey,
-                paymentMethod = payment.paymentMethod.name,
-                amount = payment.amount,
-                status = payment.status.name,
-                failureReason = payment.failureReason,
-                cardType = payment.cardType,
-                cardNo = payment.cardNo,
-            )
+            paymentId = requireNotNull(payment.id) { "Payment id must not be null when creating PaymentDetailInfo" },
+            userId = payment.userId,
+            orderId = payment.orderId,
+            transactionKey = payment.transactionKey,
+            paymentMethod = payment.paymentMethod.name,
+            amount = payment.amount,
+            status = payment.status.name,
+            failureReason = payment.failureReason,
+            cardType = payment.cardType,
+            cardNo = payment.cardNo,
+        )
     }
 }
 

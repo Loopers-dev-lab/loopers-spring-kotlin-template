@@ -14,12 +14,12 @@ data class UserInfo(
 ) {
     companion object {
         fun from(user: User): UserInfo = UserInfo(
-                id = user.id,
-                name = user.name,
-                email = user.email,
-                gender = user.gender.name,
-                birthDate = user.birthDate,
-                createdAt = user.createdAt,
-            )
+            id = user.id,
+            name = user.name,
+            email = user.email,
+            gender = user.gender.name,
+            birthDate = user.birthDate,
+            createdAt = user.createdAt,
+        )
     }
 }

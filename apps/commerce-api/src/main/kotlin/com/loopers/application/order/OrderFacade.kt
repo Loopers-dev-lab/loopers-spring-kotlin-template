@@ -47,10 +47,8 @@ class OrderFacade(
         val discountAmount = calculateCouponDiscount(userId, request.couponId, totalMoney)
         val finalAmount = totalMoney - discountAmount
 
-        val paymentMethod = PaymentMethod.valueOf(request.paymentMethod)
-
         // 결제 방식에 따라 처리 순서 다름
-        when (paymentMethod) {
+        when (val paymentMethod = PaymentMethod.valueOf(request.paymentMethod)) {
             PaymentMethod.POINT -> {
                 // 포인트 결제: 포인트 검증 → 주문 생성 → 재고 차감 → 포인트 차감
                 pointService.validateUserPoint(userId, finalAmount)

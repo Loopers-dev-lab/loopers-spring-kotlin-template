@@ -1,12 +1,12 @@
 package com.loopers.domain.product
 
-import tools.jackson.core.type.TypeReference
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
+import tools.jackson.core.type.TypeReference
 import java.time.Duration
 
 data class ProductDetailData(val product: Product, val stock: Stock)

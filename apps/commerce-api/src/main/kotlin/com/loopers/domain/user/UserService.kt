@@ -38,8 +38,8 @@ class UserService(private val userRepository: UserRepository) {
     }
 
     fun getUser(userId: Long): User = userRepository.findById(userId)
-            ?: throw CoreException(
-                errorType = ErrorType.NOT_FOUND,
-                customMessage = "사용자를 찾을 수 없습니다: $userId",
-            )
+        ?: throw CoreException(
+            errorType = ErrorType.NOT_FOUND,
+            customMessage = "사용자를 찾을 수 없습니다: $userId",
+        )
 }

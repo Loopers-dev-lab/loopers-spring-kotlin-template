@@ -84,7 +84,7 @@ class ProductLikeCountService(
         } else {
             logger.warn(
                 "Redis initAndDecrementIfPositive returned null or KEY_NOT_FOUND, " +
-                    "falling back to DB: productId=$productId",
+                        "falling back to DB: productId=$productId",
             )
             decrementInDatabase(productId)
         }

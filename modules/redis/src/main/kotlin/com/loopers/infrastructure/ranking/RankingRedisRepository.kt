@@ -124,7 +124,7 @@ class RankingRedisRepository(
 
         logger.info(
             "랭킹 데이터 복사 완료 (콜드 스타트 방지): " +
-                "source=$sourceRedisKey, target=$targetRedisKey, weight=$weight, count=${items.size}",
+                    "source=$sourceRedisKey, target=$targetRedisKey, weight=$weight, count=${items.size}",
         )
     }
 }

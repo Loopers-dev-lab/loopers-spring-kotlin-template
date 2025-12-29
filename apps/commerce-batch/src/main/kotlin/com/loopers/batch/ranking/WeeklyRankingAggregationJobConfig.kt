@@ -161,7 +161,7 @@ class WeeklyRankingAggregationJobConfig(
     @StepScope
     fun weeklyRankingWriter(): ItemWriter<ProductRankWeekly> {
         return ItemWriter { items ->
-            if (items.isEmpty()) return@ItemWriter
+            if (items.isEmpty) return@ItemWriter
 
             val yearWeek = items.first().yearWeek
 

@@ -51,7 +51,7 @@ class RankingBatchScheduler(
 
             logger.info(
                 "주간 랭킹 집계 배치 완료: " +
-                    "status=${execution.status}, exitCode=${execution.exitStatus.exitCode}",
+                        "status=${execution.status}, exitCode=${execution.exitStatus.exitCode}",
             )
         } catch (e: Exception) {
             logger.error("주간 랭킹 집계 배치 실행 실패", e)
@@ -84,7 +84,7 @@ class RankingBatchScheduler(
 
             logger.info(
                 "월간 랭킹 집계 배치 완료: " +
-                    "status=${execution.status}, exitCode=${execution.exitStatus.exitCode}",
+                        "status=${execution.status}, exitCode=${execution.exitStatus.exitCode}",
             )
         } catch (e: Exception) {
             logger.error("월간 랭킹 집계 배치 실행 실패", e)

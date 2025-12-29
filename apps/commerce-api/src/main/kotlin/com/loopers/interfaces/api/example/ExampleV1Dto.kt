@@ -6,10 +6,10 @@ class ExampleV1Dto {
     data class ExampleResponse(val id: Long, val name: String, val description: String) {
         companion object {
             fun from(info: ExampleInfo): ExampleResponse = ExampleResponse(
-                    id = info.id,
-                    name = info.name,
-                    description = info.description,
-                )
+                id = info.id,
+                name = info.name,
+                description = info.description,
+            )
         }
     }
 }

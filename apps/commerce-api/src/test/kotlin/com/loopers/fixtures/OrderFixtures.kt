@@ -34,6 +34,6 @@ fun createTestOrder(
     createdAt: LocalDateTime = LocalDateTime.now(),
     updatedAt: LocalDateTime = LocalDateTime.now(),
 ): Order = Order(
-        userId = userId,
-        items = items,
-    ).withId(id, createdAt, updatedAt)
+    userId = userId,
+    items = items,
+).withId(id, createdAt, updatedAt)

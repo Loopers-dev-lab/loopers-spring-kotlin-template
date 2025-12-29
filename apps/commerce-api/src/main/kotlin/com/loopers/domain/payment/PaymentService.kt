@@ -216,7 +216,8 @@ class PaymentService(
         }
     }
 
-    fun getPaymentByTransactionKey(transactionKey: String): Payment = paymentRepository.findByTransactionKey(transactionKey)
+    fun getPaymentByTransactionKey(transactionKey: String): Payment =
+        paymentRepository.findByTransactionKey(transactionKey)
             ?: throw CoreException(ErrorType.NOT_FOUND, "거래 키에 해당하는 결제를 찾을 수 없습니다.")
 
     fun getPaymentsByOrderId(orderId: Long): List<Payment> = paymentRepository.findByOrderId(orderId)

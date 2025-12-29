@@ -43,14 +43,14 @@ class RedisConfig(private val redisProperties: RedisProperties) {
     fun defaultRedisTemplate(
         lettuceConnectionFactory: LettuceConnectionFactory,
     ): RedisTemplate<*, *> = RedisTemplate<String, String>()
-            .defaultRedisTemplate(lettuceConnectionFactory)
+        .defaultRedisTemplate(lettuceConnectionFactory)
 
     @Qualifier(REDIS_TEMPLATE_MASTER)
     @Bean
     fun masterRedisTemplate(
         @Qualifier(CONNECTION_MASTER) lettuceConnectionFactory: LettuceConnectionFactory,
     ): RedisTemplate<*, *> = RedisTemplate<String, String>()
-            .defaultRedisTemplate(lettuceConnectionFactory)
+        .defaultRedisTemplate(lettuceConnectionFactory)
 
     private fun lettuceConnectionFactory(
         database: Int,

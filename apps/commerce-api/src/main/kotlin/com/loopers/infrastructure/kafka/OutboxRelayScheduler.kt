@@ -64,7 +64,7 @@ class OutboxRelayScheduler(
 
             logger.info(
                 "Outbox Relay 완료: 성공=$successCount, 실패=$failCount, " +
-                    "총=${pendingEvents.size}",
+                        "총=${pendingEvents.size}",
             )
         } catch (e: Exception) {
             logger.error("Outbox Relay 실행 중 오류 발생", e)

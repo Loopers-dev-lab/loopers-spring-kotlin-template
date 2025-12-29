@@ -36,13 +36,13 @@ class RankingV1Dto {
     ) {
         companion object {
             fun from(info: RankingPageInfo): RankingPageResponse = RankingPageResponse(
-                    rankings = info.rankings.map { RankingItemResponse.from(it) },
-                    window = info.window,
-                    timestamp = info.timestamp,
-                    page = info.page,
-                    size = info.size,
-                    totalCount = info.totalCount,
-                )
+                rankings = info.rankings.map { RankingItemResponse.from(it) },
+                window = info.window,
+                timestamp = info.timestamp,
+                page = info.page,
+                size = info.size,
+                totalCount = info.totalCount,
+            )
         }
     }
 
@@ -67,10 +67,10 @@ class RankingV1Dto {
     ) {
         companion object {
             fun from(info: RankingItemInfo): RankingItemResponse = RankingItemResponse(
-                    rank = info.rank,
-                    score = info.score,
-                    product = RankingProductResponse.from(info.product),
-                )
+                rank = info.rank,
+                score = info.score,
+                product = RankingProductResponse.from(info.product),
+            )
         }
     }
 
@@ -87,13 +87,13 @@ class RankingV1Dto {
     ) {
         companion object {
             fun from(info: RankingProductInfo): RankingProductResponse = RankingProductResponse(
-                    id = info.id,
-                    name = info.name,
-                    price = info.price,
-                    currency = info.currency,
-                    brand = info.brand,
-                    likeCount = info.likeCount,
-                )
+                id = info.id,
+                name = info.name,
+                price = info.price,
+                currency = info.currency,
+                brand = info.brand,
+                likeCount = info.likeCount,
+            )
         }
     }
 }

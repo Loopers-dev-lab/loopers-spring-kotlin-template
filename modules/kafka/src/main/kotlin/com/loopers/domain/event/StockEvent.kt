@@ -10,11 +10,11 @@ import java.util.UUID
 data class StockDepletedEvent(val eventId: UUID, val productId: Long, val previousQuantity: Int, val createdAt: LocalDateTime) {
     companion object {
         fun create(productId: Long, previousQuantity: Int): StockDepletedEvent = StockDepletedEvent(
-                eventId = UUID.randomUUID(),
-                productId = productId,
-                previousQuantity = previousQuantity,
-                createdAt = LocalDateTime.now(),
-            )
+            eventId = UUID.randomUUID(),
+            productId = productId,
+            previousQuantity = previousQuantity,
+            createdAt = LocalDateTime.now(),
+        )
     }
 }
 
@@ -31,11 +31,11 @@ data class StockLowEvent(
 ) {
     companion object {
         fun create(productId: Long, currentQuantity: Int, threshold: Int): StockLowEvent = StockLowEvent(
-                eventId = UUID.randomUUID(),
-                productId = productId,
-                currentQuantity = currentQuantity,
-                threshold = threshold,
-                createdAt = LocalDateTime.now(),
-            )
+            eventId = UUID.randomUUID(),
+            productId = productId,
+            currentQuantity = currentQuantity,
+            threshold = threshold,
+            createdAt = LocalDateTime.now(),
+        )
     }
 }

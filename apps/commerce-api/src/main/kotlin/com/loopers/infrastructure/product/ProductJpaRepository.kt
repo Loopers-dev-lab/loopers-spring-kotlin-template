@@ -19,7 +19,7 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
         SELECT p FROM Product p
         ORDER BY p.likeCount DESC, p.id DESC
     """,
-    countQuery = """
+        countQuery = """
         SELECT COUNT(p) FROM Product p
     """,
     )
@@ -31,7 +31,7 @@ interface ProductJpaRepository : JpaRepository<Product, Long> {
         WHERE p.brand.id = :brandId
         ORDER BY p.likeCount DESC, p.id DESC
     """,
-    countQuery = """
+        countQuery = """
         SELECT COUNT(p) FROM Product p
         WHERE p.brand.id = :brandId
     """,

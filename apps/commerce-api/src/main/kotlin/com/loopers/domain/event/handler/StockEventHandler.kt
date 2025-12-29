@@ -34,7 +34,7 @@ class StockEventHandler(
     fun handleStockDepleted(event: StockDepletedEvent) {
         logger.info(
             "재고 소진 처리 시작: productId=${event.productId}, " +
-                "previousQuantity=${event.previousQuantity}",
+                    "previousQuantity=${event.previousQuantity}",
         )
 
         // 1. 캐시 무효화 (실패해도 계속 진행)
@@ -61,7 +61,7 @@ class StockEventHandler(
             // Outbox 저장 실패는 치명적이므로 로그를 남기고 재시도 필요
             logger.error(
                 "Outbox 이벤트 저장 실패: productId=${event.productId}, " +
-                    "이벤트가 Kafka로 발행되지 않을 수 있습니다",
+                        "이벤트가 Kafka로 발행되지 않을 수 있습니다",
                 e,
             )
             // TODO: 실패한 이벤트를 별도 테이블에 저장하거나 알림 발송

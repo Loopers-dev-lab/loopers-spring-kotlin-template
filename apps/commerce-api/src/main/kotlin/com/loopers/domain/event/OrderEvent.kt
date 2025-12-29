@@ -20,14 +20,14 @@ data class OrderCreatedEvent(
 ) {
     companion object {
         fun from(order: Order, couponId: Long?): OrderCreatedEvent = OrderCreatedEvent(
-                eventId = UUID.randomUUID(),
-                orderId = requireNotNull(order.id) { "Order id must not be null when creating OrderCreatedEvent" },
-                userId = order.userId,
-                amount = order.totalAmount.amount.toLong(),
-                couponId = couponId,
-                items = order.items.map { OrderItemInfo.from(it) },
-                createdAt = order.createdAt,
-            )
+            eventId = UUID.randomUUID(),
+            orderId = requireNotNull(order.id) { "Order id must not be null when creating OrderCreatedEvent" },
+            userId = order.userId,
+            amount = order.totalAmount.amount.toLong(),
+            couponId = couponId,
+            items = order.items.map { OrderItemInfo.from(it) },
+            createdAt = order.createdAt,
+        )
     }
 
     /**
@@ -36,11 +36,11 @@ data class OrderCreatedEvent(
     data class OrderItemInfo(val productId: Long, val productName: String, val quantity: Int, val priceAtOrder: Long) {
         companion object {
             fun from(orderItem: com.loopers.domain.order.OrderItem): OrderItemInfo = OrderItemInfo(
-                    productId = orderItem.productId,
-                    productName = orderItem.productName,
-                    quantity = orderItem.quantity,
-                    priceAtOrder = orderItem.priceAtOrder.amount.toLong(),
-                )
+                productId = orderItem.productId,
+                productName = orderItem.productName,
+                quantity = orderItem.quantity,
+                priceAtOrder = orderItem.priceAtOrder.amount.toLong(),
+            )
         }
     }
 }

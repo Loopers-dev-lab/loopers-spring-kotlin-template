@@ -29,7 +29,7 @@ services:
         "--latency-monitor-threshold", "100", # 특정 command 가 지정 시간(ms) 이상 걸리면 monitor 기록
       ]
     healthcheck:
-      test: ["CMD", "redis-cli", "-p", "6379", "PING"]
+      test: [ "CMD", "redis-cli", "-p", "6379", "PING" ]
       interval: 5s
       timeout: 2s
       retries: 10
@@ -54,7 +54,7 @@ services:
         "--latency-monitor-threshold", "100",
       ]
     healthcheck:
-      test: ["CMD", "redis-cli", "-p", "6379", "PING"]
+      test: [ "CMD", "redis-cli", "-p", "6379", "PING" ]
       interval: 5s
       timeout: 2s
       retries: 10
@@ -83,7 +83,7 @@ services:
     volumes:
       - kafka-data:/bitnami/kafka
     healthcheck:
-      test: ["CMD", "bash", "-c", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      test: [ "CMD", "bash", "-c", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10

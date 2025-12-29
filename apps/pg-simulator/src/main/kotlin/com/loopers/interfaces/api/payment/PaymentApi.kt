@@ -1,8 +1,8 @@
 package com.loopers.interfaces.api.payment
 
 import com.loopers.application.payment.PaymentApplicationService
-import com.loopers.interfaces.api.ApiResponse
 import com.loopers.domain.user.UserInfo
+import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.springframework.web.bind.annotation.GetMapping
@@ -44,14 +44,14 @@ class PaymentApi(private val paymentApplicationService: PaymentApplicationServic
         userInfo,
         transactionKey,
     )
-            .let { PaymentDto.TransactionDetailResponse.from(it) }
-            .let { ApiResponse.success(it) }
+        .let { PaymentDto.TransactionDetailResponse.from(it) }
+        .let { ApiResponse.success(it) }
 
     @GetMapping
     fun getTransactionsByOrder(
         userInfo: UserInfo,
         @RequestParam("orderId", required = false) orderId: String,
     ): ApiResponse<PaymentDto.OrderResponse> = paymentApplicationService.findTransactionsByOrderId(userInfo, orderId)
-            .let { PaymentDto.OrderResponse.from(it) }
-            .let { ApiResponse.success(it) }
+        .let { PaymentDto.OrderResponse.from(it) }
+        .let { ApiResponse.success(it) }
 }

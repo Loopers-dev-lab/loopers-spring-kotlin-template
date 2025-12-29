@@ -20,6 +20,6 @@ fun createTestLike(
     createdAt: LocalDateTime = LocalDateTime.now(),
     updatedAt: LocalDateTime = LocalDateTime.now(),
 ): Like = Like(
-        userId = userId,
-        productId = productId,
-    ).withId(id, createdAt, updatedAt)
+    userId = userId,
+    productId = productId,
+).withId(id, createdAt, updatedAt)

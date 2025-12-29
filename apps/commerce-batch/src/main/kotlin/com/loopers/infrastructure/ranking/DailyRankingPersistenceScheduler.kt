@@ -94,12 +94,12 @@ class DailyRankingPersistenceScheduler(
         ranking: Ranking,
         metrics: ProductMetrics?,
     ): ProductRankDaily = ProductRankDaily(
-            rankingDate = rankingDate,
-            productId = ranking.productId,
-            score = ranking.score.value,
-            rank = ranking.rank,
-            likeCount = metrics?.likeCount ?: 0,
-            viewCount = metrics?.viewCount ?: 0,
-            salesCount = metrics?.salesCount ?: 0,
-        )
+        rankingDate = rankingDate,
+        productId = ranking.productId,
+        score = ranking.score.value,
+        rank = ranking.rank,
+        likeCount = metrics?.likeCount ?: 0,
+        viewCount = metrics?.viewCount ?: 0,
+        salesCount = metrics?.salesCount ?: 0,
+    )
 }

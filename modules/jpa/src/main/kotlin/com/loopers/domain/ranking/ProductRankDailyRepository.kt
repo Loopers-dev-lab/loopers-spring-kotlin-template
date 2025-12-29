@@ -10,5 +10,6 @@ interface ProductRankDailyRepository {
         startDate: LocalDate,
         endDate: LocalDate,
     ): List<ProductRankDaily>
+
     fun findByRankingDate(date: LocalDate): List<ProductRankDaily>
 }

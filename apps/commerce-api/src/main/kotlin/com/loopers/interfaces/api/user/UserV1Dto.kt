@@ -9,11 +9,11 @@ import java.time.LocalDateTime
 class UserV1Dto {
     data class RegisterRequest(val name: String, val email: String, val gender: Gender, val birthDate: LocalDate) {
         fun toCommand(): UserRegisterRequest = UserRegisterRequest(
-                name = name,
-                email = email,
-                gender = gender,
-                birthDate = birthDate,
-            )
+            name = name,
+            email = email,
+            gender = gender,
+            birthDate = birthDate,
+        )
     }
 
     data class UserResponse(
@@ -26,13 +26,13 @@ class UserV1Dto {
     ) {
         companion object {
             fun from(info: UserInfo): UserResponse = UserResponse(
-                    id = info.id,
-                    name = info.name,
-                    email = info.email,
-                    gender = info.gender,
-                    birthDate = info.birthDate,
-                    createdAt = info.createdAt,
-                )
+                id = info.id,
+                name = info.name,
+                email = info.email,
+                gender = info.gender,
+                birthDate = info.birthDate,
+                createdAt = info.createdAt,
+            )
         }
     }
 }

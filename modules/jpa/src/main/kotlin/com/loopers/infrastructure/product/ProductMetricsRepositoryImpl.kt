@@ -13,8 +13,8 @@ class ProductMetricsRepositoryImpl(private val jpaRepository: ProductMetricsJpaR
     override fun findByProductId(productId: Long): ProductMetrics? = jpaRepository.findByProductId(productId)
 
     override fun findOrCreateByProductId(productId: Long): ProductMetrics = findByProductId(productId) ?: run {
-            jpaRepository.save(ProductMetrics.create(productId))
-        }
+        jpaRepository.save(ProductMetrics.create(productId))
+    }
 
     @Transactional
     override fun findOrCreateByProductIdWithLock(productId: Long): ProductMetrics {
