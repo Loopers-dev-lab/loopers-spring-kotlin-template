@@ -101,12 +101,11 @@ class WeeklyRankingAggregationJobConfig(
         @Value("#{jobParameters['targetDate']}") targetDateStr: String?,
     ): ItemReader<WeeklyRankingAggregate> {
         // targetDate: 집계 대상 주의 일요일 (주의 마지막 날)
+        // 일요일 01:00 실행 시, 직전 완료된 주의 일요일(어제)을 targetDate로 설정
         val targetDate = targetDateStr?.let { LocalDate.parse(it) } ?: LocalDate.now().minusDays(1)
-
         // 지난 7일 (월요일~일요일)
         val endDate = targetDate
         val startDate = targetDate.minusDays(6)
-
         logger.info("주간 랭킹 Reader 초기화: startDate=$startDate, endDate=$endDate")
 
         // DB에서 7일치 데이터 조회
