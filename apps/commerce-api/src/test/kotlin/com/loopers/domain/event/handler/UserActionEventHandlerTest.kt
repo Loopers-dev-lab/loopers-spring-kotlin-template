@@ -34,7 +34,7 @@ class UserActionEventHandlerTest {
     @Test
     fun handleUserAction_logsAllActionTypes() {
         // given & when & then
-        UserActionType.values().forEach { actionType ->
+        UserActionType.entries.forEach { actionType ->
             val event = UserActionEvent(
                 userId = 1L,
                 actionType = actionType,

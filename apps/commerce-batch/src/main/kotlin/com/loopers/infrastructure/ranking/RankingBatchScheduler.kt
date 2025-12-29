@@ -4,7 +4,6 @@ import com.loopers.batch.ranking.MonthlyRankingAggregationJobConfig
 import com.loopers.batch.ranking.WeeklyRankingAggregationJobConfig
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.launch.JobOperator
-import org.springframework.batch.core.repository.JobRepository
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.LocalDate
@@ -17,7 +16,7 @@ import java.util.Properties
  * 랭킹 배치 Job 실행 스케줄러
  */
 @Component
-class RankingBatchScheduler(private val jobOperator: JobOperator, private val jobRepository: JobRepository) {
+class RankingBatchScheduler(private val jobOperator: JobOperator) {
     private val logger = LoggerFactory.getLogger(RankingBatchScheduler::class.java)
 
     companion object {

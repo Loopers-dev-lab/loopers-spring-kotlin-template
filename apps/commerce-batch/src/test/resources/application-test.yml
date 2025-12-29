@@ -3,9 +3,34 @@ spring:
     name: commerce-batch-test
   jpa:
     hibernate:
-      ddl-auto: create  # Ensure ranking tables are created in tests
+      ddl-auto: create  # Let Hibernate create all tables from JPA entities
+    properties:
+      hibernate:
+        format_sql: true
+        globally_quoted_identifiers: true  # Quote all identifiers to handle MySQL reserved words
+    show-sql: false  # Reduce log noise
   batch:
     jdbc:
-      initialize-schema: always
+      initialize-schema: always  # Spring Batch tables auto-created
   flyway:
-    enabled: false
+    enabled: false  # Disable Flyway - use Hibernate instead
+  kafka:
+    # Kafka 설정 (테스트에서는 실제 연결 안 함)
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
+    consumer:
+      group-id: commerce-batch-test-consumer-group
+      enable-auto-commit: false
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# Kafka Topic 설정
+kafka:
+  topics:
+    catalog-events: test-catalog-events
+    order-events: test-order-events
+    catalog-events-dlq: test-catalog-events-dlq
+    order-events-dlq: test-order-events-dlq

@@ -82,7 +82,7 @@ class KafkaConsumerE2ETest @Autowired constructor(
         private const val PRODUCT_ID_9 = 900L
     }
 
-    @Value("\${spring.kafka.bootstrap-servers}")
+    @Value($$"${spring.kafka.bootstrap-servers}")
     private lateinit var bootstrapServers: String
 
     @BeforeEach
@@ -180,9 +180,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `Consumer가 LikeAddedEvent를 수신하여 ProductMetrics를 업데이트한다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(kafkaTemplate != null && productMetricsRepository != null, "Kafka is not running")
-
         val event = LikeAddedEvent(
             eventId = UUID.randomUUID(),
             userId = 1L,
@@ -203,9 +200,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `Consumer가 LikeRemovedEvent를 수신하여 ProductMetrics를 감소시킨다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(kafkaTemplate != null && productMetricsRepository != null, "Kafka is not running")
-
         // 먼저 좋아요 추가
         val addEvent = LikeAddedEvent(
             eventId = UUID.randomUUID(),
@@ -237,9 +231,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `Consumer가 OrderCreatedEvent를 수신하여 판매량을 집계한다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(kafkaTemplate != null && productMetricsRepository != null, "Kafka is not running")
-
         val orderId = 1000L
         val event = OrderCreatedEvent(
             eventId = UUID.randomUUID(),
@@ -272,12 +263,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `중복 메시지를 재전송해도 멱등성이 보장된다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(
-            kafkaTemplate != null && eventHandledRepository != null && productMetricsRepository != null,
-            "Kafka is not running",
-        )
-
         val eventId = UUID.randomUUID()
         val event = LikeAddedEvent(
             eventId = eventId,
@@ -306,9 +291,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `여러 상품의 주문을 동시에 처리할 수 있다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(kafkaTemplate != null && productMetricsRepository != null, "Kafka is not running")
-
         val orderId = 2000L
         val event = OrderCreatedEvent(
             eventId = UUID.randomUUID(),
@@ -353,9 +335,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `알 수 없는 이벤트 타입은 무시된다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(kafkaTemplate != null && productMetricsRepository != null, "Kafka is not running")
-
         val unknownPayload = """{"unknown":"event"}"""
 
         // when: 알 수 없는 이벤트 전송
@@ -379,9 +358,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `동일 productId의 이벤트 시퀀스는 파티션 순서가 보장된다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(kafkaTemplate != null && productMetricsRepository != null, "Kafka is not running")
-
         val userId = 1L
 
         // when: 동일 productId로 빠르게 이벤트 시퀀스 전송 (LikeAdded -> LikeRemoved -> LikeAdded)
@@ -419,9 +395,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `동일 상품에 대한 동시 주문 이벤트를 안전하게 처리한다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(kafkaTemplate != null && productMetricsRepository != null, "Kafka is not running")
-
         val productId = PRODUCT_ID_9
 
         // when: 서로 다른 orderId로 동일 상품에 대한 여러 주문 이벤트를 빠르게 전송

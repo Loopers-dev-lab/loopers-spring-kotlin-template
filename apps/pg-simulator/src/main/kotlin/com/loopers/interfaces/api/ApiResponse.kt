@@ -12,8 +12,6 @@ data class ApiResponse<T>(val meta: Metadata, val data: T?) {
     }
 
     companion object {
-        fun success(): ApiResponse<Any> = ApiResponse(Metadata.success(), null)
-
         fun <T> success(data: T? = null) = ApiResponse(Metadata.success(), data)
 
         fun fail(errorCode: String, errorMessage: String): ApiResponse<Any?> =

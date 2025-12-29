@@ -29,7 +29,7 @@ object PaymentV1Dto {
             } catch (e: IllegalArgumentException) {
                 throw CoreException(
                     ErrorType.BAD_REQUEST,
-                    "유효하지 않은 결제 상태입니다: $status. 허용된 값: ${TransactionStatusDto.values().joinToString()}",
+                    "유효하지 않은 결제 상태입니다: $status. 허용된 값: ${TransactionStatusDto.entries.joinToString()}",
                 )
             }
 

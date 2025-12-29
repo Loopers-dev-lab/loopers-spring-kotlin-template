@@ -22,7 +22,7 @@ class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val pgClient: PgClient,
     private val eventPublisher: ApplicationEventPublisher,
-    @param:Value("\${pg.callback-url:http://localhost:8080}") private val callbackBaseUrl: String,
+    @param:Value($$"${pg.callback-url:http://localhost:8080}") private val callbackBaseUrl: String,
 ) {
     private val logger = LoggerFactory.getLogger(PaymentService::class.java)
 
@@ -57,10 +57,10 @@ class PaymentService(
         val cardType = try {
             CardTypeDto.valueOf(payment.cardType)
         } catch (e: IllegalArgumentException) {
-            logger.warn("유효하지 않은 카드 타입: ${payment.cardType}, 허용된 값: ${CardTypeDto.values().joinToString()}")
+            logger.warn("유효하지 않은 카드 타입: ${payment.cardType}, 허용된 값: ${CardTypeDto.entries.joinToString()}")
             throw CoreException(
                 ErrorType.BAD_REQUEST,
-                "유효하지 않은 카드 타입입니다: ${payment.cardType}. 허용된 값: ${CardTypeDto.values().joinToString()}",
+                "유효하지 않은 카드 타입입니다: ${payment.cardType}. 허용된 값: ${CardTypeDto.entries.joinToString()}",
             )
         }
 
@@ -87,14 +87,6 @@ class PaymentService(
 
         logger.info("PG 결제 요청 성공: transactionKey=${response.data.transactionKey}")
         return response.data.transactionKey
-    }
-
-    private fun requestPgPaymentFallback(payment: Payment, throwable: Throwable): String {
-        logger.error("PG 결제 요청 실패 (Fallback 실행): orderId=${payment.orderId}, error=${throwable.message}", throwable)
-        throw CoreException(
-            ErrorType.INTERNAL_ERROR,
-            "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
-        )
     }
 
     @Transactional

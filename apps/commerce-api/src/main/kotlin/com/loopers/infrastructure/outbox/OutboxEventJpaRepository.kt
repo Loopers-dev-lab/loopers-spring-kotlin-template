@@ -16,21 +16,6 @@ import java.time.LocalDateTime
 interface OutboxEventJpaRepository : JpaRepository<OutboxEvent, Long> {
 
     /**
-     * PENDING 상태의 이벤트를 생성 시각 순으로 조회
-     */
-    @Query(
-        """
-        SELECT e FROM OutboxEvent e
-        WHERE e.status = :status
-        ORDER BY e.createdAt ASC
-        """,
-    )
-    fun findByStatusOrderByCreatedAtAsc(
-        @Param("status") status: OutboxEventStatus,
-        pageable: Pageable,
-    ): List<OutboxEvent>
-
-    /**
      * PENDING 상태의 이벤트를 비관적 락과 SKIP LOCKED로 조회
      * 동시에 실행되는 여러 스케줄러가 같은 이벤트를 가져가지 않도록 보장
      */
