@@ -316,14 +316,21 @@ data class Price(
 Root
 ├── apps (Spring Boot Applications)
 │   ├── commerce-api (메인 API 서버)
-│   ├── commerce-streamer (Kafka Consumer)
+│   ├── commerce-streamer (Kafka Consumer, 실시간 이벤트 처리)
+│   ├── commerce-batch (Spring Batch 배치 처리) ← 독립 모듈
 │   └── pg-simulator (PG 결제 시뮬레이터)
-├── modules (재사용 가능한 설정)
-│   ├── jpa (JPA 설정, Auditing)
-│   ├── redis (Redis 설정, Cache)
-│   └── kafka (Kafka 설정)
-├── libs (도메인 라이브러리)
-│   └── domain-core (공통 도메인 로직)
+├── modules (재사용 가능한 설정 및 공유 엔티티)
+│   ├── jpa (JPA 설정, Auditing, 공유 엔티티)
+│   │   ├── BaseEntity (모든 엔티티의 기본 클래스)
+│   │   ├── ProductRankWeekly/Monthly (주간/월간 랭킹 집계)
+│   │   └── Repository 인터페이스 (ProductRankWeekly/MonthlyRepository)
+│   ├── redis (Redis 설정, Cache, 랭킹 시스템)
+│   │   ├── 랭킹 도메인 (Ranking, RankingKey, RankingScore, RankingScope)
+│   │   ├── RankingRepository 인터페이스
+│   │   └── RankingRedisRepository 구현체
+│   └── kafka (Kafka 설정, 공유 이벤트)
+│       ├── 이벤트 도메인 (LikeEvent, StockEvent)
+│       └── KafkaTopicConfig (토픽 설정)
 └── supports (부가 기능)
     ├── jackson (JSON 직렬화)
     ├── logging (Structured Logging)
@@ -393,12 +400,16 @@ docker-compose -f ./docker/infra-compose.yml ps
 
 # Kafka Consumer 실행 (별도 터미널)
 KAFKA_BOOTSTRAP_SERVERS=localhost:19092 ./gradlew :apps:commerce-streamer:bootRun
+
+# Batch 서버 실행 (독립 실행 가능)
+./gradlew :apps:commerce-batch:bootRun
 ```
 
 애플리케이션 실행 확인:
 
 - API 서버: <http://localhost:8080>
 - Actuator Health: <http://localhost:8080/actuator/health>
+- Batch 서버: <http://localhost:8082> (포트 변경 필요 시)
 
 ### 5. 모니터링 (선택사항)
 
@@ -445,4 +456,11 @@ docker-compose -f ./docker/monitoring-compose.yml up -d
 ```bash
 # Kafka Consumer 통합 테스트 (infra-compose.yml 실행 필수)
 KAFKA_BOOTSTRAP_SERVERS=localhost:19092 ./gradlew :apps:commerce-streamer:test
+```
+
+#### Batch 테스트
+
+```bash
+# Batch 모듈 테스트 (infra-compose.yml 실행 필수)
+./gradlew :apps:commerce-batch:test
 ```

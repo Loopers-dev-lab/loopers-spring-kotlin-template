@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: commerce-batch-test
+  batch:
+    jdbc:
+      initialize-schema: always
+  flyway:
+    enabled: false

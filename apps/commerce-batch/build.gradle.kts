@@ -23,6 +23,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    // Spring Batch
+    implementation("org.springframework.boot:spring-boot-starter-batch")
+    testImplementation("org.springframework.batch:spring-batch-test")
+
     // Flyway for database migrations
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-mysql")
