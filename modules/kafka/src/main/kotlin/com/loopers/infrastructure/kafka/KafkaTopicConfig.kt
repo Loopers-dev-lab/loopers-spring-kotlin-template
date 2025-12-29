@@ -16,16 +16,16 @@ import org.springframework.kafka.core.KafkaTemplate
 @ConditionalOnBean(KafkaTemplate::class)
 class KafkaTopicConfig {
 
-    @Value($$"${kafka.topics.catalog-events}")
+    @Value("\${kafka.topics.catalog-events}")
     private lateinit var catalogEventsTopic: String
 
-    @Value($$"${kafka.topics.order-events}")
+    @Value("\${kafka.topics.order-events}")
     private lateinit var orderEventsTopic: String
 
-    @Value($$"${kafka.topics.catalog-events-dlq}")
+    @Value("\${kafka.topics.catalog-events-dlq}")
     private lateinit var catalogEventsDlqTopic: String
 
-    @Value($$"${kafka.topics.order-events-dlq}")
+    @Value("\${kafka.topics.order-events-dlq}")
     private lateinit var orderEventsDlqTopic: String
 
     /**

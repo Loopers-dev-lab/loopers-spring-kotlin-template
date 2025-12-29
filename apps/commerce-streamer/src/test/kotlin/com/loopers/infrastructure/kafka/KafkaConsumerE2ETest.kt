@@ -82,7 +82,7 @@ class KafkaConsumerE2ETest @Autowired constructor(
         private const val PRODUCT_ID_9 = 900L
     }
 
-    @Value($$"${spring.kafka.bootstrap-servers}")
+    @Value("\${spring.kafka.bootstrap-servers}")
     private lateinit var bootstrapServers: String
 
     @BeforeEach

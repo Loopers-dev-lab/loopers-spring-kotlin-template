@@ -28,7 +28,7 @@ class OutboxRelayScheduler(
 ) {
     private val logger = LoggerFactory.getLogger(OutboxRelayScheduler::class.java)
 
-    @Value($$"${kafka.outbox.relay.batch-size:100}")
+    @Value("\${kafka.outbox.relay.batch-size:100}")
     private var batchSize: Int = 100
 
     /**
@@ -36,8 +36,8 @@ class OutboxRelayScheduler(
      * fixedDelay와 initialDelay는 kafka.yml에서 설정
      */
     @Scheduled(
-        fixedDelayString = $$"${kafka.outbox.relay.fixed-delay:5000}",
-        initialDelayString = $$"${kafka.outbox.relay.initial-delay:10000}",
+        fixedDelayString = "\${kafka.outbox.relay.fixed-delay:5000}",
+        initialDelayString = "\${kafka.outbox.relay.initial-delay:10000}",
     )
     fun relayPendingEvents() {
         try {

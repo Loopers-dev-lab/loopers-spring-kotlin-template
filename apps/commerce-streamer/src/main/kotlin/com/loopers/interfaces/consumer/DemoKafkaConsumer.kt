@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component
 @Component
 class DemoKafkaConsumer {
     @KafkaListener(
-        topics = [$$"${demo-kafka.test.topic-name}"],
+        topics = ["\${demo-kafka.test.topic-name}"],
         containerFactory = KafkaConfig.BATCH_LISTENER,
     )
     fun demoListener(

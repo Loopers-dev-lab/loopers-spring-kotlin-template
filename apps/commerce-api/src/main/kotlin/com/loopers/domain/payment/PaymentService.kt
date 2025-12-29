@@ -22,7 +22,7 @@ class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val pgClient: PgClient,
     private val eventPublisher: ApplicationEventPublisher,
-    @param:Value($$"${pg.callback-url:http://localhost:8080}") private val callbackBaseUrl: String,
+    @param:Value("\${pg.callback-url:http://localhost:8080}") private val callbackBaseUrl: String,
 ) {
     private val logger = LoggerFactory.getLogger(PaymentService::class.java)
 

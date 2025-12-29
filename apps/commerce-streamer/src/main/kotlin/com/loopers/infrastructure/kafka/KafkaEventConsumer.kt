@@ -49,8 +49,8 @@ class KafkaEventConsumer(
      * LikeAddedEvent, LikeRemovedEvent 등을 처리
      */
     @KafkaListener(
-        topics = [$$"${kafka.topics.catalog-events}"],
-        groupId = $$"${spring.kafka.consumer.group-id}",
+        topics = ["\${kafka.topics.catalog-events}"],
+        groupId = "\${spring.kafka.consumer.group-id}",
         containerFactory = "kafkaListenerContainerFactory",
     )
     @Transactional
@@ -90,8 +90,8 @@ class KafkaEventConsumer(
      * OrderCreatedEvent 등을 처리
      */
     @KafkaListener(
-        topics = [$$"${kafka.topics.order-events}"],
-        groupId = $$"${spring.kafka.consumer.group-id}",
+        topics = ["\${kafka.topics.order-events}"],
+        groupId = "\${spring.kafka.consumer.group-id}",
         containerFactory = "kafkaListenerContainerFactory",
     )
     @Transactional

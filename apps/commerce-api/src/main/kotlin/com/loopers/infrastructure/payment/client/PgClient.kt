@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam
 
 @FeignClient(
     name = "pg-client",
-    url = $$"${pg.base-url}",
+    url = "\${pg.base-url}",
     configuration = [PgClientConfig::class],
 )
 interface PgClient {
