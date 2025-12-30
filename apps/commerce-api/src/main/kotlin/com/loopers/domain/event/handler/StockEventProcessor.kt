@@ -48,13 +48,8 @@ class StockEventProcessor(
                     "previousQuantity=${event.previousQuantity}",
         )
 
-        // 1. 캐시 무효화 (실패해도 계속 진행)
-        try {
-            evictProductCache(event.productId)
-        } catch (e: Exception) {
-            logger.error("캐시 무효화 실패: productId=${event.productId}", e)
-            // 캐시 무효화 실패는 치명적이지 않으므로 계속 진행
-        }
+        // 1. 캐시 무효화 (실패해도 계속 진행 - 내부에서 예외 처리됨)
+        evictProductCache(event.productId)
 
         // 2. Outbox 테이블에 이벤트 저장 (Kafka 전송을 위해)
         // OutboxEventPublisher는 @Transactional이므로 자체 트랜잭션 보장

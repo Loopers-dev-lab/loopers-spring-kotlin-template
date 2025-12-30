@@ -25,6 +25,8 @@ class AsyncConfig(private val asyncEventFailureHandler: AsyncEventFailureHandler
         executor.maxPoolSize = 10
         executor.queueCapacity = 100
         executor.setThreadNamePrefix("async-event-")
+        executor.setWaitForTasksToCompleteOnShutdown(true)
+        executor.setAwaitTerminationSeconds(30)
         executor.initialize()
         return executor
     }
