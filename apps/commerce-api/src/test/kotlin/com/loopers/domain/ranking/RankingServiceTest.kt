@@ -10,6 +10,8 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 
@@ -315,22 +317,18 @@ class RankingServiceTest {
         assertThat(totalCount).isEqualTo(0)
     }
 
-    @Test
-    @DisplayName("주간 랭킹 조회 - 경계값: 잘못된 주차 00")
-    fun `should throw exception for invalid week number 00`() {
+    @ParameterizedTest
+    @CsvSource(
+        "2025W00, 잘못된 주간 형식입니다",
+        "2025W54, 잘못된 주간 형식입니다",
+        "2025WAA, 잘못된 주간 형식입니다",
+    )
+    @DisplayName("주간 랭킹 조회 - 잘못된 주차 형식")
+    fun `should throw exception for invalid week format`(timestamp: String, expectedMessage: String) {
         assertThatThrownBy {
-            rankingService.getTopN(TimeWindow.WEEKLY, "2025W00", 1, 20)
+            rankingService.getTopN(TimeWindow.WEEKLY, timestamp, 1, 20)
         }.isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("잘못된 주간 형식입니다")
-    }
-
-    @Test
-    @DisplayName("주간 랭킹 조회 - 경계값: 잘못된 주차 54")
-    fun `should throw exception for invalid week number 54`() {
-        assertThatThrownBy {
-            rankingService.getTopN(TimeWindow.WEEKLY, "2025W54", 1, 20)
-        }.isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("잘못된 주간 형식입니다")
+            .hasMessageContaining(expectedMessage)
     }
 
     @Test

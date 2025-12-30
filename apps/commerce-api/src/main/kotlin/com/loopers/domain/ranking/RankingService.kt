@@ -122,7 +122,9 @@ class RankingService(
             val week = timestamp.substring(5, 7).toIntOrNull()
                 ?: throw IllegalArgumentException("유효하지 않은 주차입니다: ${timestamp.substring(5, 7)}")
 
-            require(year in 1970..2040) {
+            val minYear = 1970
+            val maxYear = LocalDate.now().year + 50
+            require(year in minYear..maxYear) {
                 "연도는 1970부터 2040 사이여야 합니다: $year"
             }
             require(week in 1..53) {

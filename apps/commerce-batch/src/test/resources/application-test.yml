@@ -14,7 +14,7 @@ spring:
   flyway:
     enabled: false  # Disable Flyway - use Hibernate instead
   kafka:
-    # Kafka 설정 (테스트에서는 실제 연결 안 함)
+    # Kafka 설정 (통합 테스트용 - Testcontainers 또는 로컬 Kafka 사용)
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
     consumer:
       group-id: commerce-batch-test-consumer-group

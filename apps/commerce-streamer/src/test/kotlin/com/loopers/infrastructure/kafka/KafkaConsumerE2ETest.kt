@@ -11,6 +11,7 @@ import com.loopers.infrastructure.product.ProductMetricsJpaRepository
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
@@ -89,15 +90,18 @@ class KafkaConsumerE2ETest @Autowired constructor(
     }
 
     private fun sendEvent(topic: String, key: String, payload: String, eventType: String? = null) {
+        val headers = eventType?.let {
+            listOf(RecordHeader("eventType", it.toByteArray()))
+        } ?: emptyList()
         val record = ProducerRecord<Any, Any>(
             topic,
             null, // partition
             key,
             payload,
-            eventType?.let { listOf(org.apache.kafka.common.header.internals.RecordHeader("eventType", it.toByteArray())) } ?: emptyList(),
+            headers,
         )
         kafkaTemplate.send(record)
-            ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
     private fun awaitMetricsUpdate(

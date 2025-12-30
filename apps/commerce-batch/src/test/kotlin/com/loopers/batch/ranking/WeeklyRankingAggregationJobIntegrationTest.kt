@@ -1,6 +1,5 @@
 package com.loopers.batch.ranking
 
-import com.loopers.domain.ranking.ProductRankDaily
 import com.loopers.domain.ranking.ProductRankDailyRepository
 import com.loopers.domain.ranking.ProductRankWeeklyRepository
 import com.loopers.testcontainers.MySqlTestContainersConfig
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.batch.core.BatchStatus
-import org.springframework.batch.core.job.JobExecution
 import org.springframework.batch.core.launch.JobOperator
 import org.springframework.batch.core.repository.explore.JobExplorer
 import org.springframework.beans.factory.annotation.Autowired
@@ -38,83 +36,15 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
     private val productRankWeeklyRepository: ProductRankWeeklyRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
+    private val helper = RankingJobTestHelper(jobExplorer, productRankDailyRepository)
 
     @AfterEach
     fun tearDown() {
-        // DB 정리
-        try {
-            productRankWeeklyRepository.deleteAll()
-        } catch (e: Exception) {
-            // ignore if table doesn't exist
-        }
         try {
             databaseCleanUp.truncateAllTables()
         } catch (e: Exception) {
             // ignore if table doesn't exist
-        }
-    }
-
-    /**
-     * JobOperator로 실행한 Job의 실행 결과 조회
-     */
-    private fun getJobExecution(executionId: Long): JobExecution {
-        val jobTimeoutMs = 30_000L
-        val pollIntervalMs = 100L
-
-        // Job 완료까지 대기 (최대 30초)
-        val maxRetries = (jobTimeoutMs / pollIntervalMs).toInt()
-        var waitCount = 0
-        while (waitCount < maxRetries) {
-            val execution = jobExplorer.getJobExecution(executionId)
-            if (execution != null && execution.status != BatchStatus.STARTED && execution.status != BatchStatus.STARTING) {
-                return execution
-            }
-            Thread.sleep(pollIntervalMs)
-            waitCount++
-        }
-        throw IllegalStateException("Job execution timeout: executionId=$executionId")
-    }
-
-    /**
-     * 동일한 점수로 여러 날의 일간 랭킹 데이터를 생성하는 헬퍼 메서드
-     */
-    private fun createDailyRankings(
-        startDate: LocalDate,
-        daysCount: Int,
-        productId: Long,
-        score: Double,
-        rank: Int,
-    ) {
-        for (day in 0 until daysCount) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = startDate.plusDays(day.toLong()),
-                    productId = productId,
-                    score = score,
-                    rank = rank,
-                ),
-            )
-        }
-    }
-
-    /**
-     * 날짜별로 다른 점수로 일간 랭킹 데이터를 생성하는 헬퍼 메서드
-     */
-    private fun createDailyRankings(
-        startDate: LocalDate,
-        productId: Long,
-        scoresPerDay: List<Double>,
-        rank: Int,
-    ) {
-        scoresPerDay.forEachIndexed { day, score ->
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = startDate.plusDays(day.toLong()),
-                    productId = productId,
-                    score = score,
-                    rank = rank,
-                ),
-            )
+            println("tearDown warning: ${e.message}")
         }
     }
 
@@ -125,13 +55,13 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         val startDate = targetDate.minusDays(6) // 월요일
 
         // 상품 1: 매일 100점 (7일 평균 = 100)
-        createDailyRankings(startDate, 7, 1L, 100.0, 1)
+        helper.createDailyRankings(startDate, 7, 1L, 100.0, 1)
 
         // 상품 2: 매일 90점 (7일 평균 = 90)
-        createDailyRankings(startDate, 7, 2L, 90.0, 2)
+        helper.createDailyRankings(startDate, 7, 2L, 90.0, 2)
 
         // 상품 3: 5일만 등장 (점수 80, 평균 = 80)
-        createDailyRankings(startDate, 5, 3L, 80.0, 3)
+        helper.createDailyRankings(startDate, 5, 3L, 80.0, 3)
 
         // when: 주간 랭킹 집계 배치 실행
         val jobParameters = Properties().apply {
@@ -140,7 +70,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         }
 
         val executionId = jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters)
-        val jobExecution = getJobExecution(executionId)
+        val jobExecution = helper.getJobExecution(executionId)
 
         // then: Job이 성공적으로 완료되어야 함
         assertThat(jobExecution.status).isEqualTo(BatchStatus.COMPLETED)
@@ -174,7 +104,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         val startDate = targetDate.minusDays(6)
 
         for (productId in 1L..150L) {
-            createDailyRankings(
+            helper.createDailyRankings(
                 startDate = startDate,
                 daysCount = 7,
                 productId = productId,
@@ -190,7 +120,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         }
 
         val executionId = jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters)
-        val jobExecution = getJobExecution(executionId)
+        val jobExecution = helper.getJobExecution(executionId)
 
         // then: TOP 100까지만 저장되어야 함
         assertThat(jobExecution.status).isEqualTo(BatchStatus.COMPLETED)
@@ -213,14 +143,14 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         val startDate = targetDate.minusDays(6)
 
         // 초기 데이터
-        createDailyRankings(startDate, 7, 1L, 100.0, 1)
+        helper.createDailyRankings(startDate, 7, 1L, 100.0, 1)
 
         val jobParameters1 = Properties().apply {
             setProperty("targetDate", targetDate.toString())
             setProperty("timestamp", System.currentTimeMillis().toString())
         }
         val executionId1 = jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters1)
-        getJobExecution(executionId1)
+        helper.getJobExecution(executionId1)
         val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
         val firstRun = productRankWeeklyRepository.findTopByYearWeekOrderByRank(yearWeek, 100)
         assertThat(firstRun).hasSize(1)
@@ -233,8 +163,8 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         }
 
         // 새로운 데이터 추가
-        createDailyRankings(startDate, 7, 1L, 80.0, 2)
-        createDailyRankings(startDate, 7, 2L, 120.0, 1)
+        helper.createDailyRankings(startDate, 7, 1L, 80.0, 2)
+        helper.createDailyRankings(startDate, 7, 2L, 120.0, 1)
 
         val jobParameters2 = Properties().apply {
             setProperty("targetDate", targetDate.toString())
@@ -242,7 +172,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         }
 
         val executionId2 = jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters2)
-        getJobExecution(executionId2)
+        helper.getJobExecution(executionId2)
 
         // then: 새로운 데이터로 덮어써져야 함
         val secondRun = productRankWeeklyRepository.findTopByYearWeekOrderByRank(yearWeek, 100)
@@ -269,7 +199,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         }
 
         val executionId = jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters)
-        val jobExecution = getJobExecution(executionId)
+        val jobExecution = helper.getJobExecution(executionId)
 
         // then: Job은 성공하지만 데이터는 저장되지 않음
         assertThat(jobExecution.status).isEqualTo(BatchStatus.COMPLETED)
@@ -288,7 +218,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         // 월: 100, 화: 90, 수: 110, 목: 95, 금: 105, 토: 100, 일: 100
         // 평균 = (100 + 90 + 110 + 95 + 105 + 100 + 100) / 7 = 700 / 7 = 100.0
         val scores = listOf(100.0, 90.0, 110.0, 95.0, 105.0, 100.0, 100.0)
-        createDailyRankings(startDate, 1L, scores, 1)
+        helper.createDailyRankings(startDate, 1L, scores, 1)
 
         // when: 주간 랭킹 집계
         val jobParameters = Properties().apply {
@@ -297,7 +227,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         }
 
         val executionId = jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters)
-        getJobExecution(executionId)
+        helper.getJobExecution(executionId)
 
         // then: 평균 점수가 정확히 계산되어야 함
         val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
