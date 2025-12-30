@@ -65,7 +65,7 @@ class WeeklyRankingAggregationJobConfig(
         @Value("#{jobParameters['targetDate']}") targetDateStr: String?,
     ): Step {
         val targetDate = targetDateStr?.let { LocalDate.parse(it) } ?: LocalDate.now().minusDays(1)
-        val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
+        val yearWeek = ProductRankWeekly.yearWeekToString(targetDate)
 
         return StepBuilder(DELETE_STEP_NAME, jobRepository)
             .tasklet(
@@ -141,7 +141,7 @@ class WeeklyRankingAggregationJobConfig(
     @Bean
     @StepScope
     fun weeklyRankingProcessor(): ItemProcessor<WeeklyRankingAggregate, ProductRankWeekly> = ItemProcessor { aggregate ->
-        val yearWeek = aggregate.endDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
+        val yearWeek = ProductRankWeekly.yearWeekToString(aggregate.endDate)
 
         ProductRankWeekly(
             yearWeek = yearWeek,

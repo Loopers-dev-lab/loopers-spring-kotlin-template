@@ -1,6 +1,7 @@
 package com.loopers.batch.ranking
 
 import com.loopers.domain.ranking.ProductRankDailyRepository
+import com.loopers.domain.ranking.ProductRankWeekly
 import com.loopers.domain.ranking.ProductRankWeeklyRepository
 import com.loopers.testcontainers.MySqlTestContainersConfig
 import com.loopers.utils.DatabaseCleanUp
@@ -78,7 +79,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         assertThat(jobExecution.status).isEqualTo(BatchStatus.COMPLETED)
 
         // 주간 랭킹 확인
-        val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
+        val yearWeek = ProductRankWeekly.yearWeekToString(targetDate)
         val weeklyRankings = productRankWeeklyRepository.findTopByYearWeekOrderByRank(yearWeek, 100)
 
         assertThat(weeklyRankings).hasSize(3)
@@ -127,7 +128,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         // then: TOP 100까지만 저장되어야 함
         assertThat(jobExecution.status).isEqualTo(BatchStatus.COMPLETED)
 
-        val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
+        val yearWeek = ProductRankWeekly.yearWeekToString(targetDate)
         val weeklyRankings = productRankWeeklyRepository.findTopByYearWeekOrderByRank(yearWeek, 100)
 
         assertThat(weeklyRankings).hasSize(100)
@@ -153,7 +154,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         }
         val executionId1 = jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters1)
         helper.getJobExecution(executionId1)
-        val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
+        val yearWeek = ProductRankWeekly.yearWeekToString(targetDate)
         val firstRun = productRankWeeklyRepository.findTopByYearWeekOrderByRank(yearWeek, 100)
         assertThat(firstRun).hasSize(1)
         assertThat(firstRun[0].score).isEqualTo(100.0)
@@ -206,7 +207,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         // then: Job은 성공하지만 데이터는 저장되지 않음
         assertThat(jobExecution.status).isEqualTo(BatchStatus.COMPLETED)
 
-        val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
+        val yearWeek = ProductRankWeekly.yearWeekToString(targetDate)
         val weeklyRankings = productRankWeeklyRepository.findTopByYearWeekOrderByRank(yearWeek, 100)
         assertThat(weeklyRankings).isEmpty()
     }
@@ -232,7 +233,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         helper.getJobExecution(executionId)
 
         // then: 평균 점수가 정확히 계산되어야 함
-        val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
+        val yearWeek = ProductRankWeekly.yearWeekToString(targetDate)
         val weeklyRankings = productRankWeeklyRepository.findTopByYearWeekOrderByRank(yearWeek, 100)
 
         assertThat(weeklyRankings).hasSize(1)

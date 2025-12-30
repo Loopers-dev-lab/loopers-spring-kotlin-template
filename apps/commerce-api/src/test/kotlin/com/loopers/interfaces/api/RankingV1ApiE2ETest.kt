@@ -118,7 +118,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
     @DisplayName("일간 랭킹 조회 - 상품 정보 포함")
     fun `should get daily rankings with product info`() {
         // given
-        val today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+        val today = RankingKey.dateToString(LocalDate.now())
 
         // when
         val responseType = object : ParameterizedTypeReference<ApiResponse<RankingV1Dto.RankingPageResponse>>() {}
@@ -235,8 +235,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
         rankingRepository.incrementScore(hourlyKey, product2.id, RankingScore(3.5))
         rankingRepository.setExpire(hourlyKey)
 
-        val currentHour = LocalDateTime.now()
-            .format(DateTimeFormatter.ofPattern("yyyyMMddHH"))
+        val currentHour = RankingKey.dateTimeToString(LocalDateTime.now())
 
         // when
         val responseType = object : ParameterizedTypeReference<ApiResponse<RankingV1Dto.RankingPageResponse>>() {}
@@ -266,8 +265,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
     @DisplayName("랭킹 데이터가 없는 날짜 조회 - 빈 결과")
     fun `should get empty rankings for date without data`() {
         // given
-        val futureDate = LocalDate.now().plusDays(7)
-            .format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+        val futureDate = RankingKey.dateToString(LocalDate.now().plusDays(7))
 
         // when
         val responseType = object : ParameterizedTypeReference<ApiResponse<RankingV1Dto.RankingPageResponse>>() {}

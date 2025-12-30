@@ -24,8 +24,8 @@ class RankingService(
     private val logger = LoggerFactory.getLogger(RankingService::class.java)
 
     companion object {
-        private val MIN_YEAR = 1970
-        private val MAX_YEAR = LocalDate.now().year + 50
+        private const val MIN_YEAR = 1970
+        private const val MAX_YEAR = 2050
     }
 
     /**
@@ -69,12 +69,12 @@ class RankingService(
         val key = try {
             when (window) {
                 TimeWindow.DAILY -> {
-                    val date = LocalDate.parse(timestamp, DateTimeFormatter.ofPattern("yyyyMMdd"))
+                    val date = RankingKey.parseDate(timestamp)
                     RankingKey.daily(RankingScope.ALL, date)
                 }
 
                 TimeWindow.HOURLY -> {
-                    val dateTime = LocalDateTime.parse(timestamp, DateTimeFormatter.ofPattern("yyyyMMddHH"))
+                    val dateTime = RankingKey.parseDateTime(timestamp)
                     RankingKey.hourly(RankingScope.ALL, dateTime)
                 }
 
@@ -111,10 +111,10 @@ class RankingService(
      * 엔티티를 Ranking으로 변환하는 헬퍼 함수
      */
     private fun toRanking(productId: Long, score: Double, rank: Int): Ranking = Ranking(
-            productId = productId,
-            score = RankingScore(score),
-            rank = rank,
-        )
+        productId = productId,
+        score = RankingScore(score),
+        rank = rank,
+    )
 
     /**
      * DB에서 주간 랭킹 조회

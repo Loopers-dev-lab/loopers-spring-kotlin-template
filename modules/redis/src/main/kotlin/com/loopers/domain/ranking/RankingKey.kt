@@ -34,6 +34,26 @@ data class RankingKey(val scope: RankingScope, val window: TimeWindow, val times
         private val HOURLY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHH")
 
         /**
+         * LocalDate를 yyyyMMdd 포맷 문자열로 변환
+         */
+        fun dateToString(date: LocalDate): String = date.format(DAILY_FORMAT)
+
+        /**
+         * LocalDateTime을 yyyyMMddHH 포맷 문자열로 변환
+         */
+        fun dateTimeToString(dateTime: LocalDateTime): String = dateTime.format(HOURLY_FORMAT)
+
+        /**
+         * yyyyMMdd 포맷 문자열을 LocalDate로 파싱
+         */
+        fun parseDate(dateString: String): LocalDate = LocalDate.parse(dateString, DAILY_FORMAT)
+
+        /**
+         * yyyyMMddHH 포맷 문자열을 LocalDateTime으로 파싱
+         */
+        fun parseDateTime(dateTimeString: String): LocalDateTime = LocalDateTime.parse(dateTimeString, HOURLY_FORMAT)
+
+        /**
          * 일간 랭킹 키 생성
          */
         fun daily(scope: RankingScope, date: LocalDate): RankingKey = RankingKey(

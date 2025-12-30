@@ -2,6 +2,7 @@ package com.loopers.infrastructure.ranking
 
 import com.loopers.batch.ranking.MonthlyRankingAggregationJobConfig
 import com.loopers.batch.ranking.WeeklyRankingAggregationJobConfig
+import com.loopers.domain.ranking.ProductRankMonthly
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.launch.JobOperator
 import org.springframework.scheduling.annotation.Scheduled
@@ -9,7 +10,6 @@ import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Properties
 
 /**
@@ -66,7 +66,7 @@ class RankingBatchScheduler(private val jobOperator: JobOperator) {
         try {
             // 지난 달 집계
             val targetYearMonth = YearMonth.now(SCHEDULER_ZONE).minusMonths(1)
-            val targetYearMonthStr = targetYearMonth.format(DateTimeFormatter.ofPattern("yyyyMM"))
+            val targetYearMonthStr = ProductRankMonthly.yearMonthToString(targetYearMonth)
 
             val jobParameters = Properties().apply {
                 setProperty("targetYearMonth", targetYearMonthStr)

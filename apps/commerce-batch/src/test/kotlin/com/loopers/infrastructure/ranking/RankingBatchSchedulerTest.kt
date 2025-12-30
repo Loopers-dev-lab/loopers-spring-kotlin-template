@@ -2,6 +2,7 @@ package com.loopers.infrastructure.ranking
 
 import com.loopers.batch.ranking.MonthlyRankingAggregationJobConfig
 import com.loopers.batch.ranking.WeeklyRankingAggregationJobConfig
+import com.loopers.domain.ranking.ProductRankMonthly
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -16,7 +17,6 @@ import org.springframework.batch.core.launch.JobOperator
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Properties
 
 /**
@@ -77,7 +77,7 @@ class RankingBatchSchedulerTest {
 
         // targetYearMonth는 지난 달
         val expectedYearMonth = YearMonth.now(ZoneId.of("Asia/Seoul")).minusMonths(1)
-        val expectedYearMonthStr = expectedYearMonth.format(DateTimeFormatter.ofPattern("yyyyMM"))
+        val expectedYearMonthStr = ProductRankMonthly.yearMonthToString(expectedYearMonth)
         assertThat(capturedParams.getProperty("targetYearMonth")).isEqualTo(expectedYearMonthStr)
     }
 

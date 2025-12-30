@@ -16,7 +16,7 @@ TDD, 동시성 제어, 성능 최적화, 이벤트 기반 아키텍처, 분산 �
 
 ### 기술 스택
 
-- **언어**: Kotlin 2.2.10
+- **언어**: Kotlin 2.3.0
 - **프레임워크**: Spring Boot 4.0.1, Spring Data JPA
 - **클라우드**: Spring Cloud 2025.1.0
 - **데이터베이스**: MySQL 8.0, Flyway (마이그레이션)
@@ -27,7 +27,7 @@ TDD, 동시성 제어, 성능 최적화, 이벤트 기반 아키텍처, 분산 �
 - **API 문서**: SpringDoc OpenAPI 3.0.0
 - **결제 연동**: 외부 PG사 연동 (Resilience4j)
 - **모니터링**: Prometheus + Grafana
-- **테스트**: JUnit 5, MockK 5.0.1, Mockito 5.21.0, Instancio 5.5.1
+- **테스트**: JUnit 5, MockK 5.0.1, Mockito 5.21.0
 
 ---
 
@@ -210,7 +210,9 @@ TDD, 동시성 제어, 성능 최적화, 이벤트 기반 아키텍처, 분산 �
 
 - **외부 PG 연동**: Timeout, Retry, Circuit Breaker 패턴 적용
 - **장애 대응**: Fallback 메커니즘으로 안정성 확보
-- **결제 상태 관리**: 스케줄러로 주기적 상태 동기화
+- **결제 상태 관리**: PENDING → PROCESSING → COMPLETED/FAILED/TIMEOUT
+- **실패 추적**: failureReason으로 실패 원인 기록
+- **상태 동기화**: 스케줄러로 주기적 상태 확인
 
 ### 6. 랭킹 시스템 (Ranking)
 
@@ -276,6 +278,14 @@ ItemWriter (Materialized View 저장)
 - **Value Object**: Price, Money (불변, 자체 검증)
 - **Entity**: Product, Order, Stock (ID 식별, 상태 관리)
 - **Aggregate Root**: Order와 OrderItem의 일관성 보장
+- **특수 엔티티**: Point, Stock 는 부속 데이터 (Shared Primary Key 패턴)
+
+**Point/Stock이 BaseEntity를 상속하지 않는 이유:**
+
+1. **Shared Primary Key 패턴**: FK를 PK로 직접 사용 (User 1:1 Point, Product 1:1 Stock)
+2. **부속 데이터 특성**: 부모 엔티티의 생명주기에 종속되어 독립적인 ID 불필요
+3. **Soft Delete 불필요**: 부모 엔티티 삭제 시 CASCADE로 함께 삭제
+4. **성능 최적화**: PK 인덱스 하나로 충분, 별도 UNIQUE 인덱스 불필요
 
 **Value Object 예시:**
 
@@ -321,7 +331,7 @@ Root
 │   └── pg-simulator (PG 결제 시뮬레이터)
 ├── modules (재사용 가능한 설정 및 공유 엔티티)
 │   ├── jpa (JPA 설정, Auditing, 공유 엔티티)
-│   │   ├── BaseEntity (모든 엔티티의 기본 클래스)
+│   │   ├── BaseEntity (대부분 엔티티의 기본 클래스, Point/Stock 제외)
 │   │   ├── ProductRankWeekly/Monthly (주간/월간 랭킹 집계)
 │   │   └── Repository 인터페이스 (ProductRankWeekly/MonthlyRepository)
 │   ├── redis (Redis 설정, Cache, 랭킹 시스템)
@@ -364,7 +374,7 @@ com.loopers.commerce
 
 ### 1. 사전 요구사항
 
-- Java 21
+- Java 25
 - Docker & Docker Compose
 - Gradle 9.2.1
 

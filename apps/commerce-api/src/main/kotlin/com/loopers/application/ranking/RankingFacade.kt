@@ -1,13 +1,14 @@
 package com.loopers.application.ranking
 
+import com.loopers.domain.ranking.ProductRankMonthly
+import com.loopers.domain.ranking.ProductRankWeekly
+import com.loopers.domain.ranking.RankingKey
 import com.loopers.domain.ranking.RankingService
 import com.loopers.domain.ranking.TimeWindow
 import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Component
 class RankingFacade(private val rankingService: RankingService) {
@@ -19,10 +20,10 @@ class RankingFacade(private val rankingService: RankingService) {
     ): RankingPageInfo {
         // 날짜 파라미터가 없으면 현재 날짜/시간 사용
         val timestamp = date ?: when (window) {
-            TimeWindow.DAILY -> LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
-            TimeWindow.HOURLY -> LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHH"))
-            TimeWindow.WEEKLY -> LocalDate.now().format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
-            TimeWindow.MONTHLY -> YearMonth.now().format(DateTimeFormatter.ofPattern("yyyyMM"))
+            TimeWindow.DAILY -> RankingKey.dateToString(LocalDate.now())
+            TimeWindow.HOURLY -> RankingKey.dateTimeToString(LocalDateTime.now())
+            TimeWindow.WEEKLY -> ProductRankWeekly.yearWeekToString(LocalDate.now())
+            TimeWindow.MONTHLY -> ProductRankMonthly.yearMonthToString(YearMonth.now())
         }
 
         // 랭킹 조회
