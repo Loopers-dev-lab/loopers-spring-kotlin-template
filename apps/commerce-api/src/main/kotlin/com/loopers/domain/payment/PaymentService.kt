@@ -89,6 +89,14 @@ class PaymentService(
         return response.data.transactionKey
     }
 
+    private fun requestPgPaymentFallback(payment: Payment, throwable: Throwable): String {
+        logger.error("PG 결제 요청 실패 (Fallback 실행): orderId=${payment.orderId}, error=${throwable.message}", throwable)
+        throw CoreException(
+            ErrorType.INTERNAL_ERROR,
+            "결제 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
+        )
+    }
+
     @Transactional
     fun updatePaymentWithTransaction(paymentId: Long, transactionKey: String) {
         val payment = paymentRepository.findById(paymentId)

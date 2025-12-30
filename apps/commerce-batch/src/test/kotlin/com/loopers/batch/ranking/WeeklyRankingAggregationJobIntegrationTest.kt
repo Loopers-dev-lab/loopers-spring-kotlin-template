@@ -220,9 +220,8 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
             setProperty("targetDate", targetDate.toString())
             setProperty("timestamp", System.currentTimeMillis().toString())
         }
-
-        jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters1)
-
+        val executionId1 = jobOperator.start(WeeklyRankingAggregationJobConfig.JOB_NAME, jobParameters1)
+        getJobExecution(executionId1)
         val yearWeek = targetDate.format(DateTimeFormatter.ofPattern("YYYY'W'ww", Locale.KOREA))
         val firstRun = productRankWeeklyRepository.findTopByYearWeekOrderByRank(yearWeek, 100)
         assertThat(firstRun).hasSize(1)

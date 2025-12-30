@@ -1,6 +1,7 @@
 package com.loopers
 
 import com.loopers.testcontainers.MySqlTestContainersConfig
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -26,7 +27,11 @@ class CommerceBatchApplicationTest @Autowired constructor(
     @Test
     fun `필수 Bean들이 등록되어 있다`() {
         // then: Batch Job 관련 Bean들이 등록되어 있어야 함
-        assert(applicationContext.containsBean("weeklyRankingAggregationJob"))
-        assert(applicationContext.containsBean("monthlyRankingAggregationJob"))
+        assertTrue(applicationContext.containsBean("weeklyRankingAggregationJob")) {
+            "weeklyRankingAggregationJob Bean이 등록되어 있어야 합니다"
+        }
+        assertTrue(applicationContext.containsBean("monthlyRankingAggregationJob")) {
+            "monthlyRankingAggregationJob Bean이 등록되어 있어야 합니다"
+        }
     }
 }

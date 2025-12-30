@@ -16,7 +16,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assumptions.assumeTrue
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
@@ -39,8 +38,6 @@ import java.util.concurrent.TimeUnit
  * 1. cd docker && docker-compose -f infra-compose.yml up -d kafka
  * 2. export KAFKA_BOOTSTRAP_SERVERS=localhost:19092
  * 3. ./gradlew :apps:commerce-streamer:test --tests "KafkaConsumerE2ETest"
- *
- * Kafka가 실행 중이지 않으면 이 테스트는 skip됩니다.
  *
  * ## 테스트 커버리지
  * - 기본 이벤트 처리: LikeAdded, LikeRemoved, OrderCreated
@@ -85,24 +82,11 @@ class KafkaConsumerE2ETest @Autowired constructor(
     @Value("\${spring.kafka.bootstrap-servers}")
     private lateinit var bootstrapServers: String
 
-    @BeforeEach
-    fun setUp() {
-        // Kafka가 없으면 테스트 skip
-        if (kafkaTemplate == null) {
-            println("⚠️  Kafka가 실행 중이지 않습니다. 테스트를 건너뜁니다.")
-            println("   Kafka 실행: cd docker && docker-compose -f infra-compose.yml up -d kafka")
-            println("   환경 변수: export KAFKA_BOOTSTRAP_SERVERS=localhost:19092")
-        } else {
-            println("✅ KafkaTemplate 주입 성공")
-            println("✅ KafkaEventConsumer 주입: ${if (kafkaEventConsumer != null) "성공" else "실패 - Consumer가 빈으로 등록되지 않음"}")
-        }
-    }
-
     @AfterEach
     fun cleanup() {
         // 테스트 데이터 정리
-        productMetricsJpaRepository?.deleteAll()
-        eventHandledJpaRepository?.deleteAll()
+        productMetricsJpaRepository.deleteAll()
+        eventHandledJpaRepository.deleteAll()
     }
 
     private fun sendEvent(topic: String, key: String, payload: String, eventType: String? = null) {
@@ -113,7 +97,7 @@ class KafkaConsumerE2ETest @Autowired constructor(
             payload,
             eventType?.let { listOf(org.apache.kafka.common.header.internals.RecordHeader("eventType", it.toByteArray())) } ?: emptyList(),
         )
-        kafkaTemplate?.send(record)
+        kafkaTemplate.send(record)
             ?.get(KAFKA_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
@@ -125,7 +109,7 @@ class KafkaConsumerE2ETest @Autowired constructor(
             .atMost(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .pollInterval(AWAIT_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
             .untilAsserted {
-                val metrics = productMetricsRepository?.findByProductId(productId)
+                val metrics = productMetricsRepository.findByProductId(productId)
                 assertion(metrics)
             }
     }
@@ -285,7 +269,7 @@ class KafkaConsumerE2ETest @Autowired constructor(
         }
 
         // EventHandled 테이블 확인 - 한 번만 기록됨
-        val eventHandled = eventHandledRepository?.existsByEventId(eventId)
+        val eventHandled = eventHandledRepository.existsByEventId(eventId)
         assertThat(eventHandled).isTrue
     }
 
