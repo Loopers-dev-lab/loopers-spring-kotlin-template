@@ -1,6 +1,6 @@
 package com.loopers.batch.productmetrics.ranking
 
-import com.loopers.domain.ranking.dto.RankedProduct
+import com.loopers.domain.ranking.dto.ProductWeeklyMetricsAggregate
 import org.springframework.batch.core.configuration.annotation.StepScope
 import org.springframework.batch.item.database.JdbcPagingItemReader
 import org.springframework.batch.item.database.Order
@@ -16,9 +16,8 @@ import javax.sql.DataSource
 /**
  * 주간 상품 메트릭 Reader
  *
- * productId별로 7일치 데이터를 집계하여 날짜별 감쇠 가중치를 적용한 점수 반환
- * - JdbcPagingItemReader 사용으로 메모리 효율적 처리
- * - productId별로 하나의 레코드만 반환하여 Chunk 경계 문제 해결
+ * product_metrics에서 주간 범위의 날짜별 메트릭 데이터를 집계하여 반환
+ * 각 날짜의 데이터를 product_id와 주간 종료일로부터의 일수로 집계
  */
 @Configuration
 class ProductWeeklyRankingReader {
@@ -29,44 +28,37 @@ class ProductWeeklyRankingReader {
         dataSource: DataSource,
         @Value("#{jobParameters['weekStart']}") weekStart: String,
         @Value("#{jobParameters['weekEnd']}") weekEnd: String,
-        @Value("\${batch.ranking.weights.view:1}") viewWeight: Double,
-        @Value("\${batch.ranking.weights.like:5}") likeWeight: Double,
-        @Value("\${batch.ranking.weights.sold:10}") soldWeight: Double,
-    ): JdbcPagingItemReader<RankedProduct> {
-        // SQL에서 날짜별 감쇠 가중치 적용하여 productId별 점수 집계
+    ): JdbcPagingItemReader<ProductWeeklyMetricsAggregate> {
+        /**
+         * DATEDIFF(:weekEnd, metric_date) as days_from_end:  시간 가중치 계산용 (최근 날짜일수록 작은 값)
+         */
         val selectClause = """
             SELECT
                 product_id,
-                SUM(
-                    (view_count * $viewWeight + like_count * $likeWeight + sold_count * $soldWeight) *
-                    CASE
-                        WHEN DATEDIFF(:weekEnd, metric_date) = 0 THEN 1.0
-                        WHEN DATEDIFF(:weekEnd, metric_date) = 1 THEN 0.9
-                        WHEN DATEDIFF(:weekEnd, metric_date) = 2 THEN 0.8
-                        WHEN DATEDIFF(:weekEnd, metric_date) = 3 THEN 0.4
-                        WHEN DATEDIFF(:weekEnd, metric_date) = 4 THEN 0.3
-                        WHEN DATEDIFF(:weekEnd, metric_date) = 5 THEN 0.2
-                        WHEN DATEDIFF(:weekEnd, metric_date) = 6 THEN 0.1
-                        ELSE 0.0
-                    END
-                ) as final_score
+                DATEDIFF(:weekEnd, metric_date) as days_from_end, 
+                SUM(view_count) as view_count,
+                SUM(like_count) as like_count,
+                SUM(sold_count) as sold_count
         """.trimIndent()
 
         val fromClause = "FROM product_metrics"
 
-        // 주간 범위는 job 파라미터로 주입된 날짜를 그대로 사용
         val whereClause = "WHERE metric_date BETWEEN :weekStart AND :weekEnd"
 
-        val sortKey = mapOf("final_score" to Order.DESCENDING)
+        // product_id와 days_from_end로 정렬
+        val sortKey = mapOf("product_id" to Order.ASCENDING, "days_from_end" to Order.ASCENDING)
 
         val rowMapper = RowMapper { rs, _ ->
-            RankedProduct(
+            ProductWeeklyMetricsAggregate(
                 productId = rs.getLong("product_id"),
-                finalScore = rs.getDouble("final_score"),
+                daysFromEnd = rs.getInt("days_from_end"),
+                viewCount = rs.getLong("view_count"),
+                likeCount = rs.getLong("like_count"),
+                soldCount = rs.getLong("sold_count"),
             )
         }
 
-        return JdbcPagingItemReaderBuilder<RankedProduct>()
+        return JdbcPagingItemReaderBuilder<ProductWeeklyMetricsAggregate>()
             .name("productWeeklyRankingReader")
             .dataSource(dataSource)
             .queryProvider(
@@ -74,20 +66,19 @@ class ProductWeeklyRankingReader {
                     setSelectClause(selectClause)
                     setFromClause(fromClause)
                     setWhereClause(whereClause)
-                    setGroupClause("product_id")
+                    groupClause = "product_id, days_from_end"
                     sortKeys = sortKey
                 },
             )
             .parameterValues(
                 mapOf(
-                    // 문자열 파라미터를 LocalDate로 변환해 SQL 바인딩
                     "weekStart" to LocalDate.parse(weekStart),
                     "weekEnd" to LocalDate.parse(weekEnd),
                 ),
             )
-            .pageSize(100) // 100개씩 페이징
+            .pageSize(100)
             .rowMapper(rowMapper)
-            .saveState(true) // Job 재시작 지원
+            .saveState(true)
             .build()
     }
 }

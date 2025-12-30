@@ -45,6 +45,7 @@ class ProductWeeklyRankingJobTest : IntegrationTest() {
     @DisplayName("전체 배치 흐름이 정상적으로 동작한다")
     fun testCompleteJobExecution() {
         // given: 10개 상품의 주간 데이터 준비
+        // 점수 계산: (view * 0.1 + like * 0.2 + sold * 0.7) * 날짜별 감쇠 가중치
         val yesterday = LocalDate.now().minusDays(1)
 
         (1L..10L).forEach { productId ->
@@ -52,9 +53,9 @@ class ProductWeeklyRankingJobTest : IntegrationTest() {
                 val date = yesterday.minusDays(daysAgo.toLong())
                 if (date in weekStart..weekEnd) {
                     val metrics = ProductMetrics.create(productId, date)
-                    metrics.viewCount = (productId * 10)
-                    metrics.likeCount = productId
-                    metrics.soldCount = (productId / 2)
+                    metrics.viewCount = (productId * 100)
+                    metrics.likeCount = (productId * 50)
+                    metrics.soldCount = (productId * 20)
                     productMetricsJpaRepository.save(metrics)
                 }
             }
@@ -88,6 +89,11 @@ class ProductWeeklyRankingJobTest : IntegrationTest() {
         for (i in 0 until sortedByRanking.size - 1) {
             assertThat(sortedByRanking[i].score).isGreaterThanOrEqualTo(sortedByRanking[i + 1].score)
         }
+
+        // 가중치 적용 시 productId가 클수록 점수가 높음
+        val top1 = rankings.find { it.ranking == 1 }
+        assertThat(top1).isNotNull
+        assertThat(top1!!.productId).isEqualTo(10L)
     }
 
     @Test
@@ -184,24 +190,24 @@ class ProductWeeklyRankingJobTest : IntegrationTest() {
     @Test
     @DisplayName("날짜별 감쇠 가중치가 적용된다")
     fun testAppliesDecayWeights() {
-        // given: 같은 상품의 어제 데이터와 7일 전 데이터
-        val productId = 1L
-        val yesterday = LocalDate.now().minusDays(1)
-        val sevenDaysAgo = LocalDate.now().minusDays(7)
+        // given: 두 상품의 서로 다른 날짜 데이터
+        // weekEnd가 기준일 (yesterday = weekEnd)
+        val productId1 = 1L
+        val productId2 = 2L
 
-        // 어제 데이터 (감쇠 가중치 1.0)
-        val metricsYesterday = ProductMetrics.create(productId, yesterday)
-        metricsYesterday.viewCount = 100
-        metricsYesterday.likeCount = 10
-        metricsYesterday.soldCount = 5
-        productMetricsJpaRepository.save(metricsYesterday)
+        // productId1: weekEnd (D+0, 감쇠 가중치 1.0)
+        val metricsD0 = ProductMetrics.create(productId1, weekEnd)
+        metricsD0.viewCount = 100
+        metricsD0.likeCount = 10
+        metricsD0.soldCount = 5
+        productMetricsJpaRepository.save(metricsD0)
 
-        // 7일 전 데이터 (감쇠 가중치 0.1) - 같은 메트릭 값
-        val metricsSevenDays = ProductMetrics.create(productId + 1, sevenDaysAgo)
-        metricsSevenDays.viewCount = 100
-        metricsSevenDays.likeCount = 10
-        metricsSevenDays.soldCount = 5
-        productMetricsJpaRepository.save(metricsSevenDays)
+        // productId2: weekStart (D+6, 감쇠 가중치 0.1) - 같은 메트릭 값
+        val metricsD6 = ProductMetrics.create(productId2, weekStart)
+        metricsD6.viewCount = 100
+        metricsD6.likeCount = 10
+        metricsD6.soldCount = 5
+        productMetricsJpaRepository.save(metricsD6)
 
         // when: Job 실행
         val jobParameters = JobParametersBuilder()
@@ -216,13 +222,18 @@ class ProductWeeklyRankingJobTest : IntegrationTest() {
         assertThat(jobExecution.status).isEqualTo(BatchStatus.COMPLETED)
 
         val rankings = rankingRepository.findByWeekStartAndWeekEnd(weekStart, weekEnd)
-        val yesterdayRanking = rankings.find { it.productId == productId }
-        val sevenDaysRanking = rankings.find { it.productId == productId + 1 }
+        val ranking1 = rankings.find { it.productId == productId1 }
+        val ranking2 = rankings.find { it.productId == productId2 }
 
-        // 어제 데이터의 점수가 7일 전 데이터보다 높아야 함
-        if (yesterdayRanking != null && sevenDaysRanking != null) {
-            assertThat(yesterdayRanking.score).isGreaterThan(sevenDaysRanking.score)
-        }
+        assertThat(ranking1).isNotNull
+        assertThat(ranking2).isNotNull
+
+        // D+0 (감쇠 1.0)의 점수가 D+6 (감쇠 0.1)보다 약 10배 높아야 함
+        assertThat(ranking1!!.score).isGreaterThan(ranking2!!.score)
+
+        // 실제 점수 비율 확인 (약 10배 차이)
+        val ratio = ranking1.score / ranking2.score
+        assertThat(ratio).isBetween(9.0, 11.0)
     }
 
     @Test
@@ -254,8 +265,8 @@ class ProductWeeklyRankingJobTest : IntegrationTest() {
         val yesterday = LocalDate.now().minusDays(1)
         val metrics = ProductMetrics.create(1L, yesterday)
         metrics.viewCount = 100
-        metrics.likeCount = 10
-        metrics.soldCount = 5
+        metrics.likeCount = 50
+        metrics.soldCount = 20
         productMetricsJpaRepository.save(metrics)
 
         // when: Job 실행
