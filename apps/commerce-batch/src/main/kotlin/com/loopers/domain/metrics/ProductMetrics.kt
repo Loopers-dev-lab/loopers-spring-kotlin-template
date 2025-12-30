@@ -5,7 +5,6 @@ import jakarta.persistence.EmbeddedId
 import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
-import jakarta.persistence.Version
 import java.time.LocalDate
 import java.time.ZonedDateTime
 
@@ -38,42 +37,9 @@ class ProductMetrics(
     @Column(name = "sold_count", nullable = false)
     var soldCount: Long = 0,
 
-    @Version
-    @Column(name = "version", nullable = false)
-    var version: Long = 0,
-
     @Column(name = "updated_at", nullable = false)
     var updatedAt: ZonedDateTime = ZonedDateTime.now(),
 ) {
-    fun increaseLikeCount() {
-        this.likeCount++
-        this.updatedAt = ZonedDateTime.now()
-    }
-
-    fun decreaseLikeCount() {
-        if (this.likeCount > 0) {
-            this.likeCount--
-        }
-        this.updatedAt = ZonedDateTime.now()
-    }
-
-    fun increaseViewCount() {
-        this.viewCount++
-        this.updatedAt = ZonedDateTime.now()
-    }
-
-    fun increaseSoldCount(quantity: Int) {
-        this.soldCount += quantity
-        this.updatedAt = ZonedDateTime.now()
-    }
-
-    fun decreaseSoldCount(quantity: Int) {
-        if (this.soldCount >= quantity) {
-            this.soldCount -= quantity
-        }
-        this.updatedAt = ZonedDateTime.now()
-    }
-
     companion object {
         fun create(productId: Long, metricDate: LocalDate): ProductMetrics {
             return ProductMetrics(
