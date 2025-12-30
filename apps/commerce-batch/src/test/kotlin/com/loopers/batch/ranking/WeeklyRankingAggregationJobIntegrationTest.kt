@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.batch.core.BatchStatus
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.parameters.JobParametersBuilder
-import org.springframework.batch.core.launch.JobLauncher
+import org.springframework.batch.core.launch.JobOperator
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
@@ -32,9 +32,9 @@ import java.time.LocalDate
 @Import(MySqlTestContainersConfig::class)
 @DisplayName("주간 랭킹 집계 배치 통합 테스트")
 class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
-    private val jobLauncher: JobLauncher,
-    private val jobRepository: JobRepository,
-    @Qualifier("weeklyRankingAggregationJob") private val weeklyRankingAggregationJob: Job,
+    private val jobOperator: JobOperator,
+    jobRepository: JobRepository,
+    @param:Qualifier("weeklyRankingAggregationJob") private val weeklyRankingAggregationJob: Job,
     private val productRankDailyRepository: ProductRankDailyRepository,
     private val productRankWeeklyRepository: ProductRankWeeklyRepository,
     private val databaseCleanUp: DatabaseCleanUp,
@@ -73,7 +73,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution = jobLauncher.run(weeklyRankingAggregationJob, jobParameters)
+        val jobExecution = jobOperator.run(weeklyRankingAggregationJob, jobParameters)
         val completedExecution = helper.waitForCompletion(jobExecution)
 
         // then: Job이 성공적으로 완료되어야 함
@@ -123,7 +123,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution = jobLauncher.run(weeklyRankingAggregationJob, jobParameters)
+        val jobExecution = jobOperator.run(weeklyRankingAggregationJob, jobParameters)
         val completedExecution = helper.waitForCompletion(jobExecution)
 
         // then: TOP 100까지만 저장되어야 함
@@ -153,7 +153,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addString("targetDate", targetDate.toString())
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
-        val jobExecution1 = jobLauncher.run(weeklyRankingAggregationJob, jobParameters1)
+        val jobExecution1 = jobOperator.run(weeklyRankingAggregationJob, jobParameters1)
         helper.waitForCompletion(jobExecution1)
         val yearWeek = ProductRankWeekly.yearWeekToString(targetDate)
         val firstRun = productRankWeeklyRepository.findTopByYearWeekOrderByRank(yearWeek, 100)
@@ -175,7 +175,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis() + 1000)
             .toJobParameters()
 
-        val jobExecution2 = jobLauncher.run(weeklyRankingAggregationJob, jobParameters2)
+        val jobExecution2 = jobOperator.run(weeklyRankingAggregationJob, jobParameters2)
         helper.waitForCompletion(jobExecution2)
 
         // then: 새로운 데이터로 덮어써져야 함
@@ -202,7 +202,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution = jobLauncher.run(weeklyRankingAggregationJob, jobParameters)
+        val jobExecution = jobOperator.run(weeklyRankingAggregationJob, jobParameters)
         val completedExecution = helper.waitForCompletion(jobExecution)
 
         // then: Job은 성공하지만 데이터는 저장되지 않음
@@ -230,7 +230,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution = jobLauncher.run(weeklyRankingAggregationJob, jobParameters)
+        val jobExecution = jobOperator.run(weeklyRankingAggregationJob, jobParameters)
         helper.waitForCompletion(jobExecution)
 
         // then: 평균 점수가 정확히 계산되어야 함

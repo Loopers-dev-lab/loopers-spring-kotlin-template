@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.batch.core.BatchStatus
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.parameters.JobParametersBuilder
-import org.springframework.batch.core.launch.JobLauncher
+import org.springframework.batch.core.launch.JobOperator
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
@@ -33,9 +33,9 @@ import java.time.YearMonth
 @Import(MySqlTestContainersConfig::class)
 @DisplayName("월간 랭킹 집계 배치 통합 테스트")
 class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
-    private val jobLauncher: JobLauncher,
-    private val jobRepository: JobRepository,
-    @Qualifier("monthlyRankingAggregationJob") private val monthlyRankingAggregationJob: Job,
+    private val jobOperator: JobOperator,
+    jobRepository: JobRepository,
+    @param:Qualifier("monthlyRankingAggregationJob") private val monthlyRankingAggregationJob: Job,
     private val productRankDailyRepository: ProductRankDailyRepository,
     private val productRankMonthlyRepository: ProductRankMonthlyRepository,
     private val databaseCleanUp: DatabaseCleanUp,
@@ -79,7 +79,7 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution = jobLauncher.run(monthlyRankingAggregationJob, jobParameters)
+        val jobExecution = jobOperator.run(monthlyRankingAggregationJob, jobParameters)
         val completedExecution = helper.waitForCompletion(jobExecution)
 
         // then: Job이 성공적으로 완료되어야 함
@@ -130,7 +130,7 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution = jobLauncher.run(monthlyRankingAggregationJob, jobParameters)
+        val jobExecution = jobOperator.run(monthlyRankingAggregationJob, jobParameters)
         val completedExecution = helper.waitForCompletion(jobExecution)
 
         // then: TOP 100까지만 저장되어야 함
@@ -161,7 +161,7 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution1 = jobLauncher.run(monthlyRankingAggregationJob, jobParameters1)
+        val jobExecution1 = jobOperator.run(monthlyRankingAggregationJob, jobParameters1)
         helper.waitForCompletion(jobExecution1)
 
         val firstRun = productRankMonthlyRepository.findTopByYearMonthOrderByRank(targetYearMonthStr, 100)
@@ -181,7 +181,7 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis() + 1000)
             .toJobParameters()
 
-        val jobExecution2 = jobLauncher.run(monthlyRankingAggregationJob, jobParameters2)
+        val jobExecution2 = jobOperator.run(monthlyRankingAggregationJob, jobParameters2)
         helper.waitForCompletion(jobExecution2)
 
         // then: 새로운 데이터로 덮어써져야 함
@@ -209,7 +209,7 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution = jobLauncher.run(monthlyRankingAggregationJob, jobParameters)
+        val jobExecution = jobOperator.run(monthlyRankingAggregationJob, jobParameters)
         val completedExecution = helper.waitForCompletion(jobExecution)
 
         // then: Job은 성공하지만 데이터는 저장되지 않음
@@ -237,7 +237,7 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution = jobLauncher.run(monthlyRankingAggregationJob, jobParameters)
+        val jobExecution = jobOperator.run(monthlyRankingAggregationJob, jobParameters)
         helper.waitForCompletion(jobExecution)
 
         // then: 평균 점수가 정확히 계산되어야 함
@@ -267,7 +267,7 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
             .addLong("timestamp", System.currentTimeMillis())
             .toJobParameters()
 
-        val jobExecution = jobLauncher.run(monthlyRankingAggregationJob, jobParameters)
+        val jobExecution = jobOperator.run(monthlyRankingAggregationJob, jobParameters)
         helper.waitForCompletion(jobExecution)
 
         // then: 1월 데이터만 집계되어야 함
