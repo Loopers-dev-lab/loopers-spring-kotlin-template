@@ -413,9 +413,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `파싱 실패한 메시지는 재시도 후 DLQ로 라우팅된다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(kafkaTemplate != null, "Kafka is not running")
-
         val invalidPayload = """{"invalid": "malformed json"""
         val key = "dlq-test-key-1"
 
@@ -428,9 +425,6 @@ class KafkaConsumerE2ETest @Autowired constructor(
 
     @Test
     fun `eventType 헤더 없는 메시지는 경고 로그만 남기고 처리된다`() {
-        // given: Kafka가 실행 중이어야 함
-        assumeTrue(kafkaTemplate != null, "Kafka is not running")
-
         // eventType 헤더가 없는 메시지는 "알 수 없는 이벤트 타입" 분기로 처리됨
         // 이는 에러가 아니므로 DLQ로 가지 않고 정상 처리됨 (acknowledge)
 

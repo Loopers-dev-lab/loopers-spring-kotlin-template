@@ -79,6 +79,49 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
         throw IllegalStateException("Job execution timeout: executionId=$executionId")
     }
 
+    /**
+     * 동일한 점수로 여러 날의 일간 랭킹 데이터를 생성하는 헬퍼 메서드
+     */
+    private fun createDailyRankings(
+        startDate: LocalDate,
+        daysCount: Int,
+        productId: Long,
+        score: Double,
+        rank: Int,
+    ) {
+        for (day in 0 until daysCount) {
+            productRankDailyRepository.save(
+                ProductRankDaily(
+                    rankingDate = startDate.plusDays(day.toLong()),
+                    productId = productId,
+                    score = score,
+                    rank = rank,
+                ),
+            )
+        }
+    }
+
+    /**
+     * 날짜별로 다른 점수로 일간 랭킹 데이터를 생성하는 헬퍼 메서드
+     */
+    private fun createDailyRankings(
+        startDate: LocalDate,
+        productId: Long,
+        scoresPerDay: List<Double>,
+        rank: Int,
+    ) {
+        scoresPerDay.forEachIndexed { day, score ->
+            productRankDailyRepository.save(
+                ProductRankDaily(
+                    rankingDate = startDate.plusDays(day.toLong()),
+                    productId = productId,
+                    score = score,
+                    rank = rank,
+                ),
+            )
+        }
+    }
+
     @Test
     fun `한 달간의 일간 랭킹을 집계하여 월간 랭킹 TOP 100을 생성한다`() {
         // given: 2025년 1월 전체 데이터 (31일)
@@ -87,40 +130,13 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
         val endDate = targetYearMonth.atEndOfMonth()
 
         // 상품 1: 매일 100점 (31일 평균 = 100)
-        for (day in 1..31) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 1, day),
-                    productId = 1L,
-                    score = 100.0,
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 31, 1L, 100.0, 1)
 
         // 상품 2: 매일 90점 (31일 평균 = 90)
-        for (day in 1..31) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 1, day),
-                    productId = 2L,
-                    score = 90.0,
-                    rank = 2,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 31, 2L, 90.0, 2)
 
         // 상품 3: 15일만 등장 (점수 80, 평균 = 80)
-        for (day in 1..15) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 1, day),
-                    productId = 3L,
-                    score = 80.0,
-                    rank = 3,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 15, 3L, 80.0, 3)
 
         // when: 월간 랭킹 집계 배치 실행
         val targetYearMonthStr = ProductRankMonthly.yearMonthToString(targetYearMonth)
@@ -161,18 +177,16 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
     fun `TOP 100까지만 저장한다`() {
         // given: 150개 상품의 1월 전체 랭킹 데이터
         val targetYearMonth = YearMonth.of(2025, 1)
+        val startDate = targetYearMonth.atDay(1)
 
         for (productId in 1L..150L) {
-            for (day in 1..31) {
-                productRankDailyRepository.save(
-                    ProductRankDaily(
-                        rankingDate = LocalDate.of(2025, 1, day),
-                        productId = productId,
-                        score = (150 - productId).toDouble(), // 점수 내림차순
-                        rank = productId.toInt(),
-                    ),
-                )
-            }
+            createDailyRankings(
+                startDate = startDate,
+                daysCount = 31,
+                productId = productId,
+                score = (150 - productId).toDouble(), // 점수 내림차순
+                rank = productId.toInt(),
+            )
         }
 
         // when: 월간 랭킹 집계 배치 실행
@@ -203,18 +217,10 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
         // given: 첫 번째 실행
         val targetYearMonth = YearMonth.of(2025, 1)
         val targetYearMonthStr = ProductRankMonthly.yearMonthToString(targetYearMonth)
+        val startDate = targetYearMonth.atDay(1)
 
         // 초기 데이터
-        for (day in 1..31) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 1, day),
-                    productId = 1L,
-                    score = 100.0,
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 31, 1L, 100.0, 1)
 
         val jobParameters1 = Properties().apply {
             setProperty("targetYearMonth", targetYearMonthStr)
@@ -235,24 +241,8 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
         }
 
         // 새로운 데이터 추가
-        for (day in 1..31) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 1, day),
-                    productId = 1L,
-                    score = 80.0,
-                    rank = 2,
-                ),
-            )
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 1, day),
-                    productId = 2L,
-                    score = 120.0,
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 31, 1L, 80.0, 2)
+        createDailyRankings(startDate, 31, 2L, 120.0, 1)
 
         val jobParameters2 = Properties().apply {
             setProperty("targetYearMonth", targetYearMonthStr)
@@ -302,29 +292,12 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
         // given: 2월 (28일) 상품 점수가 날짜별로 다름
         val targetYearMonth = YearMonth.of(2025, 2)
         val targetYearMonthStr = ProductRankMonthly.yearMonthToString(targetYearMonth)
+        val startDate = targetYearMonth.atDay(1)
 
         // 첫 14일: 100점, 나중 14일: 120점
         // 평균 = (100 * 14 + 120 * 14) / 28 = 3080 / 28 = 110.0
-        for (day in 1..14) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 2, day),
-                    productId = 1L,
-                    score = 100.0,
-                    rank = 1,
-                ),
-            )
-        }
-        for (day in 15..28) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 2, day),
-                    productId = 1L,
-                    score = 120.0,
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 14, 1L, 100.0, 1)
+        createDailyRankings(startDate.plusDays(14), 14, 1L, 120.0, 1)
 
         // when: 월간 랭킹 집계
         val jobParameters = Properties().apply {
@@ -345,29 +318,14 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
     @Test
     fun `다른 월의 데이터는 집계에 포함되지 않는다`() {
         // given: 1월과 2월 데이터
+        val januaryStart = LocalDate.of(2025, 1, 1)
+        val februaryStart = LocalDate.of(2025, 2, 1)
+
         // 1월 데이터
-        for (day in 1..31) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 1, day),
-                    productId = 1L,
-                    score = 100.0,
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(januaryStart, 31, 1L, 100.0, 1)
 
         // 2월 데이터
-        for (day in 1..28) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = LocalDate.of(2025, 2, day),
-                    productId = 2L,
-                    score = 90.0,
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(februaryStart, 28, 2L, 90.0, 1)
 
         // when: 1월 월간 랭킹 집계
         val targetYearMonth = YearMonth.of(2025, 1)

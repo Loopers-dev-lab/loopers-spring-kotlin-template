@@ -300,7 +300,7 @@ class RankingServiceTest {
     fun `should accept valid week number 53`() {
         // given
         val window = TimeWindow.WEEKLY
-        val timestamp = "2025W53"
+        val timestamp = "2020W53" // 2020년은 53주가 존재하는 해
         val page = 1
         val size = 20
 

@@ -2,7 +2,6 @@ package com.loopers.interfaces.api.order
 
 import com.loopers.application.order.OrderFacade
 import com.loopers.interfaces.api.ApiResponse
-import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.web.bind.annotation.GetMapping
@@ -20,7 +19,7 @@ class OrderV1Controller(private val orderFacade: OrderFacade) : OrderV1ApiSpec {
     @PostMapping
     override fun createOrder(
         @RequestHeader("X-USER-ID") userId: Long,
-        @RequestBody @Valid request: OrderV1Dto.OrderCreateRequest,
+        @RequestBody request: OrderV1Dto.OrderCreateRequest,
     ): ApiResponse<OrderV1Dto.OrderCreateResponse> {
         val appRequest = request.toApplicationRequest()
         return orderFacade.createOrder(userId, appRequest)

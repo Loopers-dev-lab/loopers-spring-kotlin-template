@@ -130,7 +130,7 @@ class RankingService(
             }
             try {
                 LocalDate.parse(
-                    "${year}W${week.toString().padStart(2, '0')}-1",
+                    "$year-W${week.toString().padStart(2, '0')}-1",
                     DateTimeFormatter.ISO_WEEK_DATE,
                 )
             } catch (e: DateTimeParseException) {

@@ -45,21 +45,12 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         try {
             productRankWeeklyRepository.deleteAll()
         } catch (e: Exception) {
-            // 테이블이 없을 수 있으므로 무시
-        }
-        try {
-            // ProductRankDailyRepository에는 deleteAll이 없으므로 날짜별로 삭제
-            val today = LocalDate.now()
-            for (i in -30..30) {
-                productRankDailyRepository.deleteByRankingDate(today.plusDays(i.toLong()))
-            }
-        } catch (e: Exception) {
-            // 테이블이 없을 수 있으므로 무시
+            // ignore if table doesn't exist
         }
         try {
             databaseCleanUp.truncateAllTables()
         } catch (e: Exception) {
-            // 테이블이 없을 수 있으므로 무시
+            // ignore if table doesn't exist
         }
     }
 
@@ -67,17 +58,64 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
      * JobOperator로 실행한 Job의 실행 결과 조회
      */
     private fun getJobExecution(executionId: Long): JobExecution {
+        val jobTimeoutMs = 30_000L
+        val pollIntervalMs = 100L
+
         // Job 완료까지 대기 (최대 30초)
+        val maxRetries = (jobTimeoutMs / pollIntervalMs).toInt()
         var waitCount = 0
-        while (waitCount < 300) {
+        while (waitCount < maxRetries) {
             val execution = jobExplorer.getJobExecution(executionId)
             if (execution != null && execution.status != BatchStatus.STARTED && execution.status != BatchStatus.STARTING) {
                 return execution
             }
-            Thread.sleep(100)
+            Thread.sleep(pollIntervalMs)
             waitCount++
         }
         throw IllegalStateException("Job execution timeout: executionId=$executionId")
+    }
+
+    /**
+     * 동일한 점수로 여러 날의 일간 랭킹 데이터를 생성하는 헬퍼 메서드
+     */
+    private fun createDailyRankings(
+        startDate: LocalDate,
+        daysCount: Int,
+        productId: Long,
+        score: Double,
+        rank: Int,
+    ) {
+        for (day in 0 until daysCount) {
+            productRankDailyRepository.save(
+                ProductRankDaily(
+                    rankingDate = startDate.plusDays(day.toLong()),
+                    productId = productId,
+                    score = score,
+                    rank = rank,
+                ),
+            )
+        }
+    }
+
+    /**
+     * 날짜별로 다른 점수로 일간 랭킹 데이터를 생성하는 헬퍼 메서드
+     */
+    private fun createDailyRankings(
+        startDate: LocalDate,
+        productId: Long,
+        scoresPerDay: List<Double>,
+        rank: Int,
+    ) {
+        scoresPerDay.forEachIndexed { day, score ->
+            productRankDailyRepository.save(
+                ProductRankDaily(
+                    rankingDate = startDate.plusDays(day.toLong()),
+                    productId = productId,
+                    score = score,
+                    rank = rank,
+                ),
+            )
+        }
     }
 
     @Test
@@ -87,40 +125,13 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         val startDate = targetDate.minusDays(6) // 월요일
 
         // 상품 1: 매일 100점 (7일 평균 = 100)
-        for (day in 0..6) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = startDate.plusDays(day.toLong()),
-                    productId = 1L,
-                    score = 100.0,
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 7, 1L, 100.0, 1)
 
         // 상품 2: 매일 90점 (7일 평균 = 90)
-        for (day in 0..6) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = startDate.plusDays(day.toLong()),
-                    productId = 2L,
-                    score = 90.0,
-                    rank = 2,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 7, 2L, 90.0, 2)
 
         // 상품 3: 5일만 등장 (점수 80, 평균 = 80)
-        for (day in 0..4) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = startDate.plusDays(day.toLong()),
-                    productId = 3L,
-                    score = 80.0,
-                    rank = 3,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 5, 3L, 80.0, 3)
 
         // when: 주간 랭킹 집계 배치 실행
         val jobParameters = Properties().apply {
@@ -163,16 +174,13 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         val startDate = targetDate.minusDays(6)
 
         for (productId in 1L..150L) {
-            for (day in 0..6) {
-                productRankDailyRepository.save(
-                    ProductRankDaily(
-                        rankingDate = startDate.plusDays(day.toLong()),
-                        productId = productId,
-                        score = (150 - productId).toDouble(), // 점수 내림차순
-                        rank = productId.toInt(),
-                    ),
-                )
-            }
+            createDailyRankings(
+                startDate = startDate,
+                daysCount = 7,
+                productId = productId,
+                score = (150 - productId).toDouble(), // 점수 내림차순
+                rank = productId.toInt(),
+            )
         }
 
         // when: 주간 랭킹 집계 배치 실행
@@ -205,16 +213,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         val startDate = targetDate.minusDays(6)
 
         // 초기 데이터
-        for (day in 0..6) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = startDate.plusDays(day.toLong()),
-                    productId = 1L,
-                    score = 100.0,
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 7, 1L, 100.0, 1)
 
         val jobParameters1 = Properties().apply {
             setProperty("targetDate", targetDate.toString())
@@ -234,24 +233,8 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         }
 
         // 새로운 데이터 추가
-        for (day in 0..6) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = startDate.plusDays(day.toLong()),
-                    productId = 1L,
-                    score = 80.0,
-                    rank = 2,
-                ),
-            )
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = startDate.plusDays(day.toLong()),
-                    productId = 2L,
-                    score = 120.0,
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 7, 1L, 80.0, 2)
+        createDailyRankings(startDate, 7, 2L, 120.0, 1)
 
         val jobParameters2 = Properties().apply {
             setProperty("targetDate", targetDate.toString())
@@ -305,17 +288,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
         // 월: 100, 화: 90, 수: 110, 목: 95, 금: 105, 토: 100, 일: 100
         // 평균 = (100 + 90 + 110 + 95 + 105 + 100 + 100) / 7 = 700 / 7 = 100.0
         val scores = listOf(100.0, 90.0, 110.0, 95.0, 105.0, 100.0, 100.0)
-
-        for (day in 0..6) {
-            productRankDailyRepository.save(
-                ProductRankDaily(
-                    rankingDate = startDate.plusDays(day.toLong()),
-                    productId = 1L,
-                    score = scores[day],
-                    rank = 1,
-                ),
-            )
-        }
+        createDailyRankings(startDate, 1L, scores, 1)
 
         // when: 주간 랭킹 집계
         val jobParameters = Properties().apply {

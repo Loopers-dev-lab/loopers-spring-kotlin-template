@@ -2,13 +2,12 @@ spring:
   application:
     name: commerce-batch-test
   jpa:
+    show-sql: false
     hibernate:
       ddl-auto: create  # Let Hibernate create all tables from JPA entities
     properties:
       hibernate:
         format_sql: true
-        globally_quoted_identifiers: true  # Quote all identifiers to handle MySQL reserved words
-    show-sql: false  # Reduce log noise
   batch:
     jdbc:
       initialize-schema: always  # Spring Batch tables auto-created

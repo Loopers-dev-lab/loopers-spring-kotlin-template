@@ -23,7 +23,7 @@ import java.time.LocalDate
     ],
     indexes = [
         Index(name = "idx_product_rank_daily_date", columnList = "ranking_date DESC"),
-        Index(name = "idx_product_rank_daily_date_rank", columnList = "ranking_date, rank"),
+        Index(name = "idx_product_rank_daily_date_rank", columnList = "ranking_date, `rank`"),
         Index(name = "idx_product_rank_daily_product_id", columnList = "product_id"),
     ],
 )
@@ -49,7 +49,7 @@ class ProductRankDaily(
     /**
      * 순위 (1부터 시작)
      */
-    @Column(name = "rank", nullable = false)
+    @Column(name = "`rank`", nullable = false)
     val rank: Int,
 
     /**

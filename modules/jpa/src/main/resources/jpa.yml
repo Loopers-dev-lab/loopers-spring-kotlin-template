@@ -7,7 +7,7 @@ spring:
       ddl-auto: none
     properties:
       hibernate:
-        globally_quoted_identifiers: true 
+        format_sql: true
         default_batch_fetch_size: 100
         timezone.default_storage: NORMALIZE_UTC
         jdbc.time_zone: UTC
