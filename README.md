@@ -19,7 +19,7 @@ TDD, 동시성 제어, 성능 최적화, 이벤트 기반 아키텍처, 분산 �
 - **언어**: Kotlin 2.3.0
 - **프레임워크**: Spring Boot 4.0.1, Spring Data JPA
 - **클라우드**: Spring Cloud 2025.1.0
-- **데이터베이스**: MySQL 8.0, Flyway (마이그레이션)
+- **데이터베이스**: MySQL 8.0, Hibernate DDL (local/test), Flyway (배치 랭킹 테이블)
 - **캐싱**: Redis 7.0
 - **메시징**: Kafka 3.x
 - **배치**: Spring Batch
@@ -154,7 +154,7 @@ TDD, 동시성 제어, 성능 최적화, 이벤트 기반 아키텍처, 분산 �
 - **Spring Batch**: Chunk-Oriented Processing
 - **Materialized View**: 집계 결과를 별도 테이블에 저장
 - **Delete-then-Insert**: 멱등성 보장
-- **Flyway**: 스키마 마이그레이션
+- **Flyway**: 랭킹 테이블 스키마 마이그레이션 (배치 앱 전용)
 
 ---
 
@@ -401,6 +401,21 @@ docker-compose -f ./docker/infra-compose.yml ps
 - Redis: `localhost:6379`
 - Kafka: `localhost:19092` (외부 접속용)
 - Zookeeper: `localhost:2181`
+
+**데이터베이스 스키마 관리:**
+
+이 프로젝트는 환경별로 다른 스키마 관리 전략을 사용합니다:
+
+- **Local/Test 환경**: Hibernate auto-DDL (`ddl-auto: create`)
+  - JPA 엔티티로부터 자동으로 테이블 생성
+  - 개발 편의성을 위해 매번 스키마를 새로 생성
+- **Production 환경**: 수동 스키마 관리 (`ddl-auto: none`)
+  - 프로덕션에서는 DDL 자동 생성 비활성화
+  - 스키마는 별도로 관리 필요
+- **Batch 랭킹 테이블**: Flyway 마이그레이션
+  - `apps/commerce-batch/src/main/resources/db/migration/` 참고
+  - V2: ProductRankDaily, ProductRankWeekly, ProductRankMonthly
+  - V3: ProductMetrics
 
 ### 4. 애플리케이션 실행
 

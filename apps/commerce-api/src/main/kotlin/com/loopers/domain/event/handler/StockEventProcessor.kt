@@ -4,7 +4,8 @@ import com.loopers.domain.event.StockDepletedEvent
 import com.loopers.domain.outbox.OutboxEventPublisher
 import com.loopers.domain.product.ProductCacheRepository
 import org.slf4j.LoggerFactory
-import org.springframework.dao.DataAccessException
+import org.springframework.dao.RecoverableDataAccessException
+import org.springframework.dao.TransientDataAccessException
 import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Retryable
 import org.springframework.scheduling.annotation.Async
@@ -31,14 +32,17 @@ class StockEventProcessor(
      * 2. Outbox 이벤트 저장 (실패 시 자동 재시도, 최대 3회)
      *
      * 재시도 정책:
-     * - 대상 예외: DataAccessException (DB 연결 오류, 락 타임아웃 등)
+     * - 대상 예외:
+     *   - TransientDataAccessException: DB 연결 오류, 락 타임아웃, 일시적 네트워크 문제 등
+     *   - RecoverableDataAccessException: 복구 가능한 데이터 액세스 오류
+     *   - 제외: 제약 조건 위반, 무결성 오류 등 영구적 오류 (재시도 불필요)
      * - 최대 시도: 3회
      * - 백오프: 초기 100ms, 2배씩 증가 (100ms -> 200ms)
-     * - 모든 재시도 실패 시: 예외가 @Async 스레드에서 삼켜지므로 로그만 남음
+     * - 모든 재시도 실패 시: AsyncEventFailureHandler가 처리하여 실패 이벤트 저장 및 알림 발송
      */
     @Async
     @Retryable(
-        retryFor = [DataAccessException::class],
+        retryFor = [TransientDataAccessException::class, RecoverableDataAccessException::class],
         maxAttempts = 3,
         backoff = Backoff(delay = 100, multiplier = 2.0),
     )
@@ -64,11 +68,13 @@ class StockEventProcessor(
             )
             logger.info("재고 소진 처리 완료: productId=${event.productId}")
         } catch (e: Exception) {
-            // Outbox 저장 실패 시 @Retryable에 의해 자동으로 재시도됨 (최대 3회)
+            // Outbox 저장 실패 시 일시적/복구 가능 오류인 경우 @Retryable에 의해 자동 재시도 (최대 3회)
+            // 영구적 오류(제약 조건 위반 등)는 재시도하지 않고 즉시 실패 처리
             // 모든 재시도 실패 시 예외를 다시 던져서 AsyncEventFailureHandler로 전달되어
             // 실패한 이벤트를 별도 저장하고 알림을 발송함
             logger.error(
-                "Outbox 이벤트 저장 실패 (재시도 포함): productId=${event.productId}, " +
+                "Outbox 이벤트 저장 실패: productId=${event.productId}, " +
+                        "exceptionType=${e::class.simpleName}, " +
                         "이벤트가 Kafka로 발행되지 않을 수 있습니다",
                 e,
             )

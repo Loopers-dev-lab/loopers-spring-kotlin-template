@@ -6,12 +6,15 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.AsyncConfigurer
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import java.util.concurrent.Executor
+import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy
 
 /**
  * 비동기 처리 설정
  *
  * - AsyncUncaughtExceptionHandler 등록: @Async 메서드 실행 중 예외 처리
  * - Thread Pool 설정: 비동기 작업을 위한 스레드 풀 구성
+ * - Queue 정책: 큐 용량(100) 초과 시 CallerRunsPolicy로 호출 스레드에서 실행
+ * - Graceful Shutdown: 종료 시 대기 중인 작업 완료 후 종료 (최대 30초 대기)
  */
 @Configuration
 class AsyncConfig(private val asyncEventFailureHandler: AsyncEventFailureHandler) : AsyncConfigurer {
@@ -25,6 +28,7 @@ class AsyncConfig(private val asyncEventFailureHandler: AsyncEventFailureHandler
         executor.maxPoolSize = 10
         executor.queueCapacity = 100
         executor.setThreadNamePrefix("async-event-")
+        executor.setRejectedExecutionHandler(CallerRunsPolicy())
         executor.setWaitForTasksToCompleteOnShutdown(true)
         executor.setAwaitTerminationSeconds(30)
         executor.initialize()
