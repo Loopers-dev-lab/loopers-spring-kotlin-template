@@ -1,7 +1,6 @@
 package com.loopers.application.ranking
 
 import com.loopers.application.ranking.dto.RankingResult
-import com.loopers.domain.ranking.RankingAggregator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingService
 import org.springframework.data.domain.Page
