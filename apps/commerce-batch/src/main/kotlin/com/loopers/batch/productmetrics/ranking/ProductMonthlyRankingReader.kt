@@ -1,6 +1,6 @@
 package com.loopers.batch.productmetrics.ranking
 
-import com.loopers.domain.ranking.dto.RankedProduct
+import com.loopers.domain.ranking.dto.ProductMonthlyMetricsAggregate
 import org.springframework.batch.core.configuration.annotation.StepScope
 import org.springframework.batch.item.database.JdbcPagingItemReader
 import org.springframework.batch.item.database.Order
@@ -16,7 +16,7 @@ import javax.sql.DataSource
 /**
  * 월간 상품 메트릭 Reader
  *
- * product_metrics를 월 단위로 집계하여 productId별 점수를 반환
+ * product_metrics를 월 단위로 집계하여 productId별 원본 메트릭을 반환
  */
 @Configuration
 class ProductMonthlyRankingReader {
@@ -26,39 +26,37 @@ class ProductMonthlyRankingReader {
     fun monthlyRankingReader(
         dataSource: DataSource,
         @Value("#{jobParameters['yearMonth']}") yearMonth: String,
-        @Value("\${batch.ranking.weights.view}") viewWeight: Double,
-        @Value("\${batch.ranking.weights.like}") likeWeight: Double,
-        @Value("\${batch.ranking.weights.sold}") soldWeight: Double,
-    ): JdbcPagingItemReader<RankedProduct> {
+    ): JdbcPagingItemReader<ProductMonthlyMetricsAggregate> {
         val month = YearMonth.parse(yearMonth)
         val monthStart = month.atDay(1)
         val monthEnd = month.atEndOfMonth()
 
-        // 월 범위 내 일자별 메트릭을 합산
+        // 월 범위 내 일자별 메트릭을 합산 (원본 값만)
         val selectClause = """
             SELECT
                 product_id,
-                SUM(
-                    view_count * $viewWeight +
-                    like_count * $likeWeight +
-                    sold_count * $soldWeight
-                ) as final_score
+                SUM(view_count) as total_view_count,
+                SUM(like_count) as total_like_count,
+                SUM(sold_count) as total_sold_count
         """.trimIndent()
 
         val fromClause = "FROM product_metrics"
 
         val whereClause = "WHERE metric_date BETWEEN :monthStart AND :monthEnd"
 
-        val sortKey = mapOf("final_score" to Order.DESCENDING)
+        // 임시 정렬 키 (Processor에서 점수 계산 후 재정렬됨)
+        val sortKey = mapOf("product_id" to Order.ASCENDING)
 
         val rowMapper = RowMapper { rs, _ ->
-            RankedProduct(
+            ProductMonthlyMetricsAggregate(
                 productId = rs.getLong("product_id"),
-                finalScore = rs.getDouble("final_score"),
+                totalViewCount = rs.getLong("total_view_count"),
+                totalLikeCount = rs.getLong("total_like_count"),
+                totalSoldCount = rs.getLong("total_sold_count"),
             )
         }
 
-        return JdbcPagingItemReaderBuilder<RankedProduct>()
+        return JdbcPagingItemReaderBuilder<ProductMonthlyMetricsAggregate>()
             .name("productMonthlyRankingReader")
             .dataSource(dataSource)
             .queryProvider(
@@ -66,7 +64,7 @@ class ProductMonthlyRankingReader {
                     setSelectClause(selectClause)
                     setFromClause(fromClause)
                     setWhereClause(whereClause)
-                    setGroupClause("product_id")
+                    groupClause = "product_id"
                     sortKeys = sortKey
                 },
             )

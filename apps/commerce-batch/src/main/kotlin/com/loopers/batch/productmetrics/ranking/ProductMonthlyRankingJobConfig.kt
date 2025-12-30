@@ -1,5 +1,6 @@
 package com.loopers.batch.productmetrics.ranking
 
+import com.loopers.domain.ranking.dto.ProductMonthlyMetricsAggregate
 import com.loopers.domain.ranking.dto.RankedProduct
 import org.springframework.batch.core.Job
 import org.springframework.batch.core.Step
@@ -17,10 +18,11 @@ import org.springframework.transaction.PlatformTransactionManager
  *
  * - Job: PRODUCT_MONTHLY_RANKING_JOB
  * - Step: PRODUCT_MONTHLY_RANKING_STEP
- * - Chunk 크기: 1,000개
- * - 흐름: Reader -> Writer
- *   - Reader: product_metrics를 월 단위로 집계하여 RankedProduct 반환
- *   - Writer: Top 100을 ProductMonthlyRankingRepository에 저장
+ * - Chunk 크기: 100개
+ * - 흐름: Reader -> Processor -> Writer
+ *   - Reader: product_metrics를 월 단위로 집계하여 원본 메트릭 반환
+ *   - Processor: 가중치 계산 (조회수 * 0.1 + 주문수 * 0.7 + 좋아요 * 0.2)
+ *   - Writer: 전체 데이터를 점수순 정렬하여 Top 100만 저장
  */
 @Configuration
 class ProductMonthlyRankingJobConfig(
@@ -40,12 +42,14 @@ class ProductMonthlyRankingJobConfig(
 
     @Bean(name = [STEP_NAME])
     fun productMonthlyRankingStep(
-        @Qualifier("monthlyRankingReader") productMonthlyRankingReader: JdbcPagingItemReader<RankedProduct>,
+        @Qualifier("monthlyRankingReader") productMonthlyRankingReader: JdbcPagingItemReader<ProductMonthlyMetricsAggregate>,
+        productMonthlyRankingProcessor: ProductMonthlyRankingProcessor,
         productMonthlyRankingWriter: ProductMonthlyRankingWriter,
     ): Step {
         return StepBuilder(STEP_NAME, jobRepository)
-            .chunk<RankedProduct, RankedProduct>(CHUNK_SIZE, transactionManager)
+            .chunk<ProductMonthlyMetricsAggregate, RankedProduct>(CHUNK_SIZE, transactionManager)
             .reader(productMonthlyRankingReader)
+            .processor(productMonthlyRankingProcessor)
             .writer(productMonthlyRankingWriter)
             .build()
     }
