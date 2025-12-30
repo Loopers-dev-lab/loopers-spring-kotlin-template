@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS product_metrics
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci
-    COMMENT = '상품별 집계 메트릭 테이블';
+COMMENT
+= '상품별 집계 메트릭 테이블';
 
 -- 상품 메트릭 인덱스
 CREATE INDEX IF NOT EXISTS idx_product_metrics_like_count ON product_metrics (like_count DESC);

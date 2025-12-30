@@ -7,22 +7,23 @@
 -- 매일 23:55에 Redis 데이터를 스냅샷하여 저장
 CREATE TABLE product_rank_daily
 (
-    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
-    ranking_date  DATE     NOT NULL COMMENT '랭킹 날짜 (해당 일자의 랭킹)',
-    product_id    BIGINT   NOT NULL COMMENT '상품 ID',
-    score         DOUBLE   NOT NULL COMMENT '랭킹 점수',
-    `rank`        INT      NOT NULL COMMENT '순위 (1부터 시작)',
-    like_count    BIGINT   NOT NULL DEFAULT 0 COMMENT '좋아요 수 (스냅샷)',
-    view_count    BIGINT   NOT NULL DEFAULT 0 COMMENT '조회 수 (스냅샷)',
-    sales_count   BIGINT   NOT NULL DEFAULT 0 COMMENT '판매량 (스냅샷)',
-    created_at    DATETIME NOT NULL COMMENT '생성 시점',
-    updated_at    DATETIME NOT NULL COMMENT '수정 시점',
-    deleted_at    DATETIME          DEFAULT NULL COMMENT '삭제 시점',
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ranking_date DATE     NOT NULL COMMENT '랭킹 날짜 (해당 일자의 랭킹)',
+    product_id   BIGINT   NOT NULL COMMENT '상품 ID',
+    score        DOUBLE   NOT NULL COMMENT '랭킹 점수',
+    `rank`       INT      NOT NULL COMMENT '순위 (1부터 시작)',
+    like_count   BIGINT   NOT NULL DEFAULT 0 COMMENT '좋아요 수 (스냅샷)',
+    view_count   BIGINT   NOT NULL DEFAULT 0 COMMENT '조회 수 (스냅샷)',
+    sales_count  BIGINT   NOT NULL DEFAULT 0 COMMENT '판매량 (스냅샷)',
+    created_at   DATETIME NOT NULL COMMENT '생성 시점',
+    updated_at   DATETIME NOT NULL COMMENT '수정 시점',
+    deleted_at   DATETIME          DEFAULT NULL COMMENT '삭제 시점',
     CONSTRAINT uk_product_rank_daily_date_product UNIQUE (ranking_date, product_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci
-    COMMENT = '일간 랭킹 영구 저장 테이블';
+COMMENT
+= '일간 랭킹 영구 저장 테이블';
 
 -- 일간 랭킹 인덱스
 CREATE INDEX idx_product_rank_daily_date ON product_rank_daily (ranking_date DESC);
@@ -42,12 +43,13 @@ CREATE TABLE mv_product_rank_weekly
     period_end   DATE       NOT NULL COMMENT '집계 종료일 (주의 일요일)',
     created_at   DATETIME   NOT NULL COMMENT '생성 시점',
     updated_at   DATETIME   NOT NULL COMMENT '수정 시점',
-    deleted_at   DATETIME            DEFAULT NULL COMMENT '삭제 시점',
+    deleted_at   DATETIME DEFAULT NULL COMMENT '삭제 시점',
     CONSTRAINT uk_product_rank_weekly_year_week_product UNIQUE (`year_week`, product_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci
-    COMMENT = '주간 랭킹 집계 테이블 (TOP 100)';
+COMMENT
+= '주간 랭킹 집계 테이블 (TOP 100)';
 
 -- 주간 랭킹 인덱스
 CREATE INDEX idx_product_rank_weekly_year_week ON mv_product_rank_weekly (`year_week` DESC);
@@ -67,12 +69,13 @@ CREATE TABLE mv_product_rank_monthly
     period_end   DATE       NOT NULL COMMENT '집계 종료일',
     created_at   DATETIME   NOT NULL COMMENT '생성 시점',
     updated_at   DATETIME   NOT NULL COMMENT '수정 시점',
-    deleted_at   DATETIME            DEFAULT NULL COMMENT '삭제 시점',
+    deleted_at   DATETIME DEFAULT NULL COMMENT '삭제 시점',
     CONSTRAINT uk_product_rank_monthly_year_month_product UNIQUE (`year_month`, product_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci
-    COMMENT = '월간 랭킹 집계 테이블 (TOP 100)';
+COMMENT
+= '월간 랭킹 집계 테이블 (TOP 100)';
 
 -- 월간 랭킹 인덱스
 CREATE INDEX idx_product_rank_monthly_year_month ON mv_product_rank_monthly (`year_month` DESC);
