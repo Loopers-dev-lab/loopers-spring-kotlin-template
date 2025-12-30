@@ -6,7 +6,6 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
@@ -157,7 +156,8 @@ class RankingService(
         }
 
         // DB에서 조회
-        val pageResult = productRankWeeklyRepository.findByYearWeekOrderByRankAsc(yearWeek, PageRequest.of(page - 1, size))
+        val pageResult =
+            productRankWeeklyRepository.findByYearWeekOrderByRankAsc(yearWeek, PageRequest.of(page - 1, size))
         val pagedRankings = pageResult
             .map { toRanking(it.productId, it.score, it.rank) }
             .toList()
@@ -204,7 +204,8 @@ class RankingService(
         }
 
         // DB에서 조회
-        val pageResult = productRankMonthlyRepository.findByYearMonthOrderByRankAsc(yearMonth, PageRequest.of(page - 1, size))
+        val pageResult =
+            productRankMonthlyRepository.findByYearMonthOrderByRankAsc(yearMonth, PageRequest.of(page - 1, size))
         val pagedRankings = pageResult
             .map { toRanking(it.productId, it.score, it.rank) }
             .toList()

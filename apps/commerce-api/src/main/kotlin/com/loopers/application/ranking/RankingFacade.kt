@@ -9,21 +9,26 @@ import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
+import java.time.ZoneId
 
 @Component
 class RankingFacade(private val rankingService: RankingService) {
+    companion object {
+        private val ZONE = ZoneId.of("Asia/Seoul")
+    }
+
     fun getRankingPage(
         window: TimeWindow,
         date: String?,
         page: Int,
         size: Int,
     ): RankingPageInfo {
-        // 날짜 파라미터가 없으면 현재 날짜/시간 사용
+        // 날짜 파라미터가 없으면 현재 날짜/시간 사용 (Asia/Seoul 기준)
         val timestamp = date ?: when (window) {
-            TimeWindow.DAILY -> RankingKey.dateToString(LocalDate.now())
-            TimeWindow.HOURLY -> RankingKey.dateTimeToString(LocalDateTime.now())
-            TimeWindow.WEEKLY -> ProductRankWeekly.yearWeekToString(LocalDate.now())
-            TimeWindow.MONTHLY -> ProductRankMonthly.yearMonthToString(YearMonth.now())
+            TimeWindow.DAILY -> RankingKey.dateToString(LocalDate.now(ZONE))
+            TimeWindow.HOURLY -> RankingKey.dateTimeToString(LocalDateTime.now(ZONE))
+            TimeWindow.WEEKLY -> ProductRankWeekly.yearWeekToString(LocalDate.now(ZONE))
+            TimeWindow.MONTHLY -> ProductRankMonthly.yearMonthToString(YearMonth.now(ZONE))
         }
 
         // 랭킹 조회

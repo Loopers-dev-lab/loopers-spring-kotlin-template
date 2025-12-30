@@ -162,7 +162,7 @@ class MonthlyRankingAggregationJobConfig(
     @StepScope
     fun monthlyRankingWriter(): ItemWriter<ProductRankMonthly> {
         return ItemWriter { items ->
-            if (items.isEmpty) return@ItemWriter
+            if (items.isEmpty()) return@ItemWriter
 
             val yearMonth = items.first().yearMonth
 

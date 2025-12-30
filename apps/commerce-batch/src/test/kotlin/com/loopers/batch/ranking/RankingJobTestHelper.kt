@@ -5,7 +5,7 @@ import com.loopers.domain.ranking.ProductRankDailyRepository
 import org.awaitility.Awaitility.await
 import org.springframework.batch.core.BatchStatus
 import org.springframework.batch.core.job.JobExecution
-import org.springframework.batch.core.repository.explore.JobExplorer
+import org.springframework.batch.core.repository.JobRepository
 import java.time.Duration
 import java.time.LocalDate
 
@@ -15,7 +15,7 @@ import java.time.LocalDate
  * 여러 랭킹 집계 Job 테스트에서 공통으로 사용하는 헬퍼 메서드를 제공합니다.
  */
 class RankingJobTestHelper(
-    private val jobExplorer: JobExplorer,
+    private val jobRepository: JobRepository,
     private val productRankDailyRepository: ProductRankDailyRepository,
 ) {
     /**
@@ -23,26 +23,25 @@ class RankingJobTestHelper(
      *
      * Job이 완료될 때까지 대기하며, 최대 30초까지 기다립니다.
      *
-     * @param executionId Job 실행 ID
-     * @return Job 실행 결과
+     * @param execution Job 실행 결과
+     * @return Job 실행 결과 (완료된 상태)
      * @throws IllegalStateException Job 실행이 30초 이내에 완료되지 않으면 예외 발생
      */
-    fun getJobExecution(executionId: Long): JobExecution {
-        val execution = jobExplorer.getJobExecution(executionId)
-
+    fun waitForCompletion(execution: JobExecution): JobExecution {
         // Job 완료까지 대기 (최대 30초)
         return await()
             .atMost(Duration.ofSeconds(30))
             .pollInterval(Duration.ofMillis(100))
             .until(
                 {
-                    execution != null &&
-                            execution.status != BatchStatus.STARTED &&
-                            execution.status != BatchStatus.STARTING
+                    val latestExecution = jobRepository.getJobExecution(execution.id)
+                    latestExecution != null &&
+                            latestExecution.status != BatchStatus.STARTED &&
+                            latestExecution.status != BatchStatus.STARTING
                 },
                 { it },
             )
-            .let { execution!! }
+            .let { jobRepository.getJobExecution(execution.id)!! }
     }
 
     /**

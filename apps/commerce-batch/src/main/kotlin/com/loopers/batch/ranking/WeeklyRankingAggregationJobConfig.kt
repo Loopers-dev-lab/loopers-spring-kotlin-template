@@ -21,8 +21,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.transaction.PlatformTransactionManager
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
  * 주간 랭킹 집계 배치 Job
@@ -140,18 +138,19 @@ class WeeklyRankingAggregationJobConfig(
      */
     @Bean
     @StepScope
-    fun weeklyRankingProcessor(): ItemProcessor<WeeklyRankingAggregate, ProductRankWeekly> = ItemProcessor { aggregate ->
-        val yearWeek = ProductRankWeekly.yearWeekToString(aggregate.endDate)
+    fun weeklyRankingProcessor(): ItemProcessor<WeeklyRankingAggregate, ProductRankWeekly> =
+        ItemProcessor { aggregate ->
+            val yearWeek = ProductRankWeekly.yearWeekToString(aggregate.endDate)
 
-        ProductRankWeekly(
-            yearWeek = yearWeek,
-            productId = aggregate.productId,
-            score = aggregate.avgScore,
-            rank = aggregate.rank,
-            periodStart = aggregate.startDate,
-            periodEnd = aggregate.endDate,
-        )
-    }
+            ProductRankWeekly(
+                yearWeek = yearWeek,
+                productId = aggregate.productId,
+                score = aggregate.avgScore,
+                rank = aggregate.rank,
+                periodStart = aggregate.startDate,
+                periodEnd = aggregate.endDate,
+            )
+        }
 
     /**
      * Writer: mv_product_rank_weekly 테이블에 저장
@@ -160,7 +159,7 @@ class WeeklyRankingAggregationJobConfig(
     @StepScope
     fun weeklyRankingWriter(): ItemWriter<ProductRankWeekly> {
         return ItemWriter { items ->
-            if (items.isEmpty) return@ItemWriter
+            if (items.isEmpty()) return@ItemWriter
 
             val yearWeek = items.first().yearWeek
 
