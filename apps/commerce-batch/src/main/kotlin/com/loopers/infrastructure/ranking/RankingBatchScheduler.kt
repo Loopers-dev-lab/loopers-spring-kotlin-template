@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRankMonthly
+import com.loopers.infrastructure.notification.BatchAlarmNotifier
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.parameters.JobParametersBuilder
@@ -20,11 +21,14 @@ class RankingBatchScheduler(
     private val jobOperator: JobOperator,
     @param:Qualifier("weeklyRankingAggregationJob") private val weeklyRankingAggregationJob: Job,
     @param:Qualifier("monthlyRankingAggregationJob") private val monthlyRankingAggregationJob: Job,
+    private val batchAlarmNotifier: BatchAlarmNotifier,
 ) {
     private val logger = LoggerFactory.getLogger(RankingBatchScheduler::class.java)
 
     companion object {
         private val SCHEDULER_ZONE = ZoneId.of("Asia/Seoul")
+        private const val WEEKLY_JOB_NAME = "주간 랭킹 집계 배치"
+        private const val MONTHLY_JOB_NAME = "월간 랭킹 집계 배치"
     }
 
     /**
@@ -53,7 +57,11 @@ class RankingBatchScheduler(
             logger.info("주간 랭킹 집계 배치 시작됨: executionId=${jobExecution.id}")
         } catch (e: Exception) {
             logger.error("주간 랭킹 집계 배치 실행 실패", e)
-            // TODO: 운영 환경에서 알림 발송
+            batchAlarmNotifier.notifyBatchFailure(
+                jobName = WEEKLY_JOB_NAME,
+                message = "주간 랭킹 집계 배치 실행 중 오류가 발생했습니다.",
+                error = e,
+            )
         }
     }
 
@@ -84,7 +92,11 @@ class RankingBatchScheduler(
             logger.info("월간 랭킹 집계 배치 시작됨: executionId=${jobExecution.id}")
         } catch (e: Exception) {
             logger.error("월간 랭킹 집계 배치 실행 실패", e)
-            // TODO: 운영 환경에서 알림 발송
+            batchAlarmNotifier.notifyBatchFailure(
+                jobName = MONTHLY_JOB_NAME,
+                message = "월간 랭킹 집계 배치 실행 중 오류가 발생했습니다.",
+                error = e,
+            )
         }
     }
 }

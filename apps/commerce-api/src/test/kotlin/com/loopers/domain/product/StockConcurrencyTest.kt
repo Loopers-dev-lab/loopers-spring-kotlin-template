@@ -61,7 +61,7 @@ class StockConcurrencyTest @Autowired constructor(
                     stockService.decreaseStock(productId, quantityPerOrder)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    logger.warn("재고 차감 실패: ${e.message}")
+                    logger.warn("재고 차감 실패: ${e.message}", e)
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
@@ -148,7 +148,7 @@ class StockConcurrencyTest @Autowired constructor(
                         decreaseCount.incrementAndGet()
                     }
                 } catch (e: Exception) {
-                    logger.warn("재고 작업 실패 (index=$index): ${e.message}")
+                    logger.warn("재고 작업 실패 (index=$index): ${e.message}", e)
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
