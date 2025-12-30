@@ -41,4 +41,4 @@ spring.config.activate.on-profile: dev
 spring.config.activate.on-profile: qa
 
 ---
-spring.config.activate.on-profile: prd
+spring.config.activate.on-profile: prod

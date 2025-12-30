@@ -78,4 +78,4 @@ spring:
 spring:
   config:
     activate:
-      on-profile: prd
+      on-profile: prod

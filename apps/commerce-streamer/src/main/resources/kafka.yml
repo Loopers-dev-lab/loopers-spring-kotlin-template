@@ -77,6 +77,6 @@ spring:
 spring:
   config:
     activate:
-      on-profile: prd
+      on-profile: prod
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:prod-kafka-1:9092,prod-kafka-2:9092}

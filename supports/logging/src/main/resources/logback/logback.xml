@@ -34,14 +34,14 @@
         </root>
     </springProfile>
 
-    <springProfile name="prd">
+    <springProfile name="prod">
         <include resource="appenders/json-console-appender.xml"/>
         <include resource="appenders/slack-appender.xml"/>
-        <include resource="properties/slack-log-prd.xml"/>
+        <include resource="properties/slack-log-prod.xml"/>
         <logger name="com.loopers" level="INFO"/>
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
-            <!-- /properties.slack-log-prd.xml 설정 후 활성화
+            <!-- /properties.slack-log-prod.xml 설정 후 활성화
             <appender-ref ref="ASYNC-SLACK"/>
              -->
         </root>

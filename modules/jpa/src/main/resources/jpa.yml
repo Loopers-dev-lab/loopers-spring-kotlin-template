@@ -104,7 +104,7 @@ datasource:
       password: application
 
 ---
-spring.config.activate.on-profile: prd
+spring.config.activate.on-profile: prod
 
 datasource:
   mysql-jpa:
