@@ -5,9 +5,6 @@ import com.loopers.domain.ranking.ProductWeeklyRankingRepository
 import org.springframework.stereotype.Repository
 import java.time.LocalDate
 
-/**
- * 주간 상품 랭킹 Repository 구현체
- */
 @Repository
 class ProductWeeklyRankingRepositoryImpl(
     private val productWeeklyRankingJpaRepository: ProductWeeklyRankingJpaRepository,

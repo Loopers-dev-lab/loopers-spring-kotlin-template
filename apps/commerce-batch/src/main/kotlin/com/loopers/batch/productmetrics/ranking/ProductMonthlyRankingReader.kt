@@ -47,10 +47,7 @@ class ProductMonthlyRankingReader {
 
         val fromClause = "FROM product_metrics"
 
-        val whereClause = """
-            WHERE metric_date BETWEEN :monthStart AND :monthEnd
-            GROUP BY product_id
-        """.trimIndent()
+        val whereClause = "WHERE metric_date BETWEEN :monthStart AND :monthEnd"
 
         val sortKey = mapOf("final_score" to Order.DESCENDING)
 
@@ -69,6 +66,7 @@ class ProductMonthlyRankingReader {
                     setSelectClause(selectClause)
                     setFromClause(fromClause)
                     setWhereClause(whereClause)
+                    setGroupClause("product_id")
                     sortKeys = sortKey
                 },
             )
@@ -79,7 +77,7 @@ class ProductMonthlyRankingReader {
                     "monthEnd" to monthEnd,
                 ),
             )
-            .pageSize(1000)
+            .pageSize(100)
             .rowMapper(rowMapper)
             .saveState(true)
             .build()

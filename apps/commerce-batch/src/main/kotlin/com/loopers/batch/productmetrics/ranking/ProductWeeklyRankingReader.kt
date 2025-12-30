@@ -55,10 +55,7 @@ class ProductWeeklyRankingReader {
         val fromClause = "FROM product_metrics"
 
         // 주간 범위는 job 파라미터로 주입된 날짜를 그대로 사용
-        val whereClause = """
-            WHERE metric_date BETWEEN :weekStart AND :weekEnd
-            GROUP BY product_id
-        """.trimIndent()
+        val whereClause = "WHERE metric_date BETWEEN :weekStart AND :weekEnd"
 
         val sortKey = mapOf("final_score" to Order.DESCENDING)
 
@@ -77,6 +74,7 @@ class ProductWeeklyRankingReader {
                     setSelectClause(selectClause)
                     setFromClause(fromClause)
                     setWhereClause(whereClause)
+                    setGroupClause("product_id")
                     sortKeys = sortKey
                 },
             )
@@ -87,7 +85,7 @@ class ProductWeeklyRankingReader {
                     "weekEnd" to LocalDate.parse(weekEnd),
                 ),
             )
-            .pageSize(1000) // 1000개씩 페이징
+            .pageSize(100) // 100개씩 페이징
             .rowMapper(rowMapper)
             .saveState(true) // Job 재시작 지원
             .build()

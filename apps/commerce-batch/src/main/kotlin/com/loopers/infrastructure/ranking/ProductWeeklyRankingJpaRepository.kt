@@ -7,9 +7,6 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.LocalDate
 
-/**
- * 주간 상품 랭킹 JPA Repository
- */
 interface ProductWeeklyRankingJpaRepository : JpaRepository<ProductWeeklyRanking, Long> {
 
     fun findByWeekStartAndWeekEnd(weekStart: LocalDate, weekEnd: LocalDate): List<ProductWeeklyRanking>

@@ -53,6 +53,6 @@ class ProductWeeklyRankingJobConfig(
     companion object {
         const val JOB_NAME = "PRODUCT_WEEKLY_RANKING_JOB"
         const val STEP_NAME = "PRODUCT_WEEKLY_RANKING_STEP"
-        const val CHUNK_SIZE = 1_000
+        const val CHUNK_SIZE = 100
     }
 }

@@ -5,9 +5,6 @@ import com.loopers.domain.ranking.ProductMonthlyRankingRepository
 import java.time.YearMonth
 import org.springframework.stereotype.Repository
 
-/**
- * 주간 상품 랭킹 Repository 구현체
- */
 @Repository
 class ProductMonthlyRankingRepositoryImpl(
     private val productMonthlyRankingJpaRepository: ProductMonthlyRankingJpaRepository,
