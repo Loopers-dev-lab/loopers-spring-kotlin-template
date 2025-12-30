@@ -27,13 +27,13 @@
 
 ## 2. 솔루션 대안 분석
 
-### 대안 1: commerce-streamer에서 집계 + Redis ZSET 직접 관리
+### 대안 1: commerce-streamer에서 집계 + Redis 직접 관리
 
-- **설명**: commerce-streamer가 Kafka에서 이벤트를 소비하여 Redis ZSET에 직접 Score를 업데이트한다. commerce-api의 Rankings 도메인은 Redis를 조회만 한다.
-- **문제 해결 방식**: 이벤트 발생 시 Redis ZSET의 해당 상품 Score를 Weight 기반으로 증감하고, Weight 변경 시 전체 Score를 재계산한다.
+- **설명**: commerce-streamer가 Kafka에서 이벤트를 소비하여 Redis에 직접 Score를 업데이트한다. commerce-api의 Rankings 도메인은 Redis를 조회만 한다.
+- **문제 해결 방식**: 이벤트 발생 시 Redis의 해당 상품 Score를 Weight 기반으로 증감하고, Weight 변경 시 전체 Score를 재계산한다.
 - **장점**:
     - 실시간성이 높음 (이벤트 발생 즉시 Score 반영)
-    - 조회 성능 최적화 (Redis ZSET O(log N))
+    - 조회 성능 최적화
     - 기존 Outbox → Kafka 파이프라인 활용
 - **단점**:
     - Score 재계산 시 원본 데이터 필요 (Redis에는 최종 Score만 존재)
@@ -58,12 +58,12 @@
 ### 대안 3: commerce-streamer에서 집계 + RDB 원본 + Redis 캐시 (하이브리드)
 
 - **설명**: commerce-streamer가 Kafka 이벤트를 소비하여 RDB에 행동 카운트를 저장하고, 주기적으로 Score를 계산하여 Redis에 캐싱한다. Pre-aggregated 패턴을 적용한다.
-- **문제 해결 방식**: commerce-streamer가 이벤트 소비 후 RDB에 카운트 저장하고, 스케줄러가 주기적으로 Score 계산하여 Redis ZSET을 갱신한다. Weight 변경 시 즉시 전체 재계산을 트리거한다.
+- **문제 해결 방식**: commerce-streamer가 이벤트 소비 후 RDB에 카운트 저장하고, 스케줄러가 주기적으로 Score 계산하여 Redis를 갱신한다. Weight 변경 시 즉시 전체 재계산을 트리거한다.
 - **장점**:
     - Weight 변경 시 재계산 용이 (원본 카운트 보존)
     - 이벤트 유실 시에도 RDB에서 복구 가능
     - Kafka 기반으로 인스턴스 간 동기화 문제 없음
-    - 조회 성능 최적화 (Redis ZSET)
+    - 조회 성능 최적화 (Redis 캐시)
 - **단점**:
     - 실시간성은 스케줄러 주기에 의존 (수 분 지연 허용하므로 OK)
     - 저장소 이중화 (RDB + Redis)
@@ -85,7 +85,7 @@
     - Weight 변경 시 전체 재계산이라는 요구사항을 RDB 원본 카운트로 쉽게 해결
     - 이벤트 유실 시에도 복구 가능한 안정성 확보
 3. 요구사항 충족
-    - 랭킹 조회 50ms 이하: Redis ZSET으로 해결
+    - 랭킹 조회 50ms 이하: Redis 캐시로 해결
     - 수 분 내 반영 허용: 스케줄러 주기로 충분
     - Weight 변경 후 재계산: 원본 카운트 기반으로 즉시 가능
 4. 기존 아키텍처 패턴과 일관성
@@ -106,36 +106,14 @@
 **2. 랭킹 집계 시스템 (commerce-streamer)**
 
 - Kafka에서 ProductViewed, LikeCreated, LikeCanceled, OrderPaid 이벤트 소비
-- RankingAggregationBuffer(메모리)에서 집계 후 주기적 flush
+- 메모리 버퍼에서 집계 후 주기적으로 RDB와 캐시에 반영
 - 1시간 단위 Tumbling Window 집계
 - 버킷 전환 시 이전 Score × 0.1을 base로 적용 (cold start 방지)
-- 증분 업데이트는 ZINCRBY, Weight 변경 시만 전체 ZADD
 
 **3. 데이터 저장소**
 
-- RDB: 시간 버킷별 상품 행동 카운트 (bucket_time, product_id, view_count, like_count, order_count), Weight 설정 (view_weight, like_weight, order_weight)
-- Redis: ZSET으로 상품 랭킹 저장 (key: ranking:products:{bucket}, member: productId, score: 계산된 인기도)
-
-#### 핵심 설계 결정
-
-**1. Tumbling Window + Decay Factor**
-
-- 1시간 단위 버킷으로 집계
-- 정시가 되면 새 버킷 시작
-- 새 버킷 시작 시: 이전 Score × 0.1을 base로 깔고 시작 (cold start 방지)
-- 이후 들어오는 이벤트는 현재 버킷에 × 1.0으로 반영
-
-**2. RankingAggregationBuffer**
-
-- 이벤트 수신 시 메모리 버퍼에 적재
-- 주기적으로 RDB flush + Redis ZINCRBY
-- 이벤트당 DB I/O 제거, 증분 업데이트로 성능 최적화
-
-**3. Weight 관리**
-
-- RDB에 Weight 저장 (영속성)
-- Score 계산 시마다 RDB에서 조회 (항상 최신 값 보장)
-- 별도 캐싱이나 이벤트 동기화 불필요
+- RDB: 시간 버킷별 상품 행동 카운트, Weight 설정 (source of truth)
+- Redis: 상품 랭킹 캐시 (Score 기준 정렬된 상품 목록)
 
 #### 데이터 흐름
 
@@ -145,36 +123,36 @@
 sequenceDiagram
     participant K as Kafka
     participant CS as 랭킹 집계 시스템<br/>(commerce-streamer)
-    participant BUF as RankingAggregationBuffer<br/>(메모리)
+    participant BUF as 집계 버퍼<br/>(메모리)
     participant DB as RDB
     participant R as Redis
 
-    K->>CS: 이벤트 수신 (ProductViewed/LikeCreated/OrderPaid)
+    K->>CS: 이벤트 수신 [Kafka Consumer]
     activate CS
-    CS->>BUF: 상품별 카운트 증가
+    CS->>BUF: 상품별 카운트 증가 [함수 호출]
     deactivate CS
 
-    Note over CS,R: 주기적 flush (예: 10초)
+    Note over CS,R: 주기적 flush (30초)
 
-    CS->>DB: 현재 버킷에 카운트 저장
+    CS->>DB: 현재 버킷에 카운트 저장 [함수 호출]
     activate CS
     activate DB
     DB-->>CS: 저장 완료
     deactivate DB
     
-    CS->>DB: Weight 설정 조회
+    CS->>DB: Weight 설정 조회 [함수 호출]
     activate DB
     DB-->>CS: Weight 반환
     deactivate DB
     
-    CS->>CS: 증분 Score 계산<br/>(Δview×W1 + Δlike×W2 + Δorder×W3)
+    CS->>CS: 증분 Score 계산
     
-    CS->>R: ZINCRBY (증분 Score 추가)
+    CS->>R: 증분 Score 반영 [Redis Client]
     activate R
     R-->>CS: 갱신 완료
     deactivate R
     
-    CS->>BUF: 버퍼 초기화
+    CS->>BUF: 버퍼 초기화 [함수 호출]
     deactivate CS
 ```
 
@@ -188,23 +166,25 @@ sequenceDiagram
 
     Note over CS: 정시 10분 전 (예: 14:50)
 
-    CS->>R: 현재 ZSET 전체 조회 (ZRANGE)
+    CS->>R: 현재 버킷 전체 Score 조회 [Redis Client]
     activate CS
     activate R
-    R-->>CS: 상품별 Score 목록
+    
+    alt 조회 성공
+        R-->>CS: 상품별 Score 목록
+    else 조회 실패
+        R-->>CS: 에러
+        CS->>DB: RDB에서 현재 버킷 카운트 조회 [함수 호출]
+        Note over CS: RDB 기반으로 Score 유추
+    end
     deactivate R
     
     CS->>CS: 이전 Score × 0.1 계산
     
-    CS->>R: 다음 버킷 ZSET 생성 (ZADD with decayed scores)
+    CS->>R: 다음 버킷 생성 (decayed scores) [Redis Client]
     activate R
     R-->>CS: 생성 완료
     deactivate R
-    
-    CS->>DB: 다음 시간 버킷 생성
-    activate DB
-    DB-->>CS: 생성 완료
-    deactivate DB
     deactivate CS
 
     Note over CS,R: 정시 도달 시 (15:00)<br/>새 버킷으로 자연스럽게 전환
@@ -222,17 +202,22 @@ sequenceDiagram
     C->>RS: 랭킹 조회 요청 (page, size)
     activate RS
     
-    RS->>R: ZREVRANGE (상위 N개 조회)
+    RS->>R: 상위 N개 상품 조회 [Redis Client]
     activate R
     R-->>RS: productId 목록 + score
     deactivate R
     
-    RS->>PS: 상품 정보 조회 (productIds)
+    RS->>PS: 상품 정보 조회 (productIds) [함수 호출]
     activate PS
-    PS-->>RS: 상품 정보 목록
-    deactivate PS
     
-    RS-->>C: 랭킹 목록 응답 (상품 정보 + 순위)
+    alt 상품 정보 조회 성공
+        PS-->>RS: 상품 정보 목록
+        RS-->>C: 랭킹 목록 응답 (상품 정보 + 순위)
+    else 상품 정보 조회 실패
+        PS-->>RS: 에러
+        RS-->>C: 랭킹 목록 응답 (productId + 순위만, 상품 정보 없음)
+    end
+    deactivate PS
     deactivate RS
 ```
 
@@ -248,13 +233,18 @@ sequenceDiagram
     C->>PS: 상품 상세 조회 (productId)
     activate PS
     
-    PS->>RS: 상품 순위 조회 (productId)
+    PS->>RS: 상품 순위 조회 (productId) [함수 호출]
     activate RS
-    RS->>R: ZREVRANK (순위 조회)
+    RS->>R: 순위 조회 [Redis Client]
     activate R
     R-->>RS: 순위 반환 (또는 null)
     deactivate R
-    RS-->>PS: 순위 반환
+    
+    alt 순위 조회 성공
+        RS-->>PS: 순위 반환
+    else 순위 조회 실패 (Redis 장애)
+        RS-->>PS: null 반환 (graceful degradation)
+    end
     deactivate RS
     
     PS-->>C: 상품 상세 + 순위 응답
@@ -263,18 +253,13 @@ sequenceDiagram
 
 **5. Weight 변경 및 재계산 흐름 (US-3)**
 
-Weight 변경 시 재계산 대상:
-- **이전 버킷**: 이미 지난 시간대이므로 재계산 불필요 (계산에만 사용)
-- **현재 버킷**: (현재 metric × 새 Weight) + (이전 metric × 새 Weight × 0.1)
-- **다음 버킷**: 스케줄러가 이미 생성했다면 (현재 버킷 점수 × 0.1)로 업데이트
-
 ```mermaid
 sequenceDiagram
     participant C as Admin Client
     participant API as Rankings 도메인<br/>(commerce-api)
+    participant DB as RDB
     participant K as Kafka
     participant CS as 랭킹 집계 시스템<br/>(commerce-streamer)
-    participant DB as RDB
     participant R as Redis
 
     C->>API: Weight 변경 요청
@@ -283,46 +268,74 @@ sequenceDiagram
     alt 유효성 검증 실패
         API-->>C: 에러 응답 (음수 등)
     else 유효성 검증 성공
-        API->>DB: Weight 설정 업데이트
+        API->>DB: Weight 설정 + Outbox 이벤트 저장 [함수 호출, 단일 트랜잭션]
         activate DB
-        DB-->>API: 업데이트 완료
+        DB-->>API: 저장 완료
         deactivate DB
         
-        API->>K: RankingWeightChangedEvent 발행
         API-->>C: 변경 완료 응답 (재계산은 비동기)
     end
     deactivate API
     
-    Note over K,CS: 비동기 재계산 (commerce-streamer)
+    Note over DB,K: Outbox Relay (별도 프로세스)
+    DB--)K: RankingWeightChangedEvent 발행 [Kafka Producer]
     
-    K->>CS: RankingWeightChangedEvent 수신
+    Note over K,CS: 비동기 재계산
+    
+    K->>CS: RankingWeightChangedEvent 수신 [Kafka Consumer]
     activate CS
     
-    CS->>DB: 새 Weight 조회
-    CS->>DB: 이전 버킷 metric 조회 (계산용)
-    CS->>DB: 현재 버킷 metric 조회
+    CS->>DB: 새 Weight + 버킷별 metric 조회 [함수 호출]
     
-    CS->>CS: 이전 점수 계산 (저장 X)<br/>previousScore = 이전 metric × Weight
+    CS->>CS: Score 재계산
     
-    CS->>CS: 현재 버킷 점수 계산<br/>currentScore = (현재 metric × Weight)<br/>+ (previousScore × 0.1)
-    
-    CS->>R: 현재 버킷 ZADD (전체 교체)
+    CS->>R: 현재/다음 버킷 전체 교체 [Redis Client]
     activate R
     R-->>CS: 갱신 완료
     deactivate R
     
-    CS->>R: 다음 버킷 존재 여부 확인
-    activate R
-    R-->>CS: 존재 여부 반환
-    deactivate R
-    
-    opt 다음 버킷 존재 시
-        CS->>CS: 다음 버킷 점수 계산<br/>nextScore = currentScore × 0.1
-        CS->>R: 다음 버킷 ZADD (전체 교체)
-        activate R
-        R-->>CS: 갱신 완료
-        deactivate R
-    end
-    
     deactivate CS
 ```
+
+### 3.3 시스템 간 통합
+
+| 통합 지점 | 통신 패턴 | 동기/비동기 | 실패 처리 | 근거 |
+|----------|----------|------------|----------|------|
+| Rankings → Product (상품 정보 조회) | 함수 호출 (in-process) | 동기 | 실패 시 productId + 순위만 반환 (graceful degradation) | 같은 모듈 내 도메인, 50ms 내 응답 가능, 기존 상품 캐시 활용 |
+| Product → Rankings (순위 조회) | 함수 호출 (in-process) | 동기 | 실패 시 rank = null 반환 | 같은 모듈, 순위 없어도 상품 상세는 유효 |
+| 행동 이벤트 → 집계 시스템 | Kafka Consumer (파티션 키: productId) | 비동기 | 재시도 3회 후 DLQ | 서비스 분리, 파티션 키로 같은 상품 이벤트 순서 보장 |
+| Weight 변경 → 재계산 트리거 | Outbox → Kafka | 비동기 | 재시도 3회 후 로그, 수동 재트리거 | 기존 Outbox 패턴 활용, 실패 시 Weight 재변경으로 복구 가능 |
+| 집계 시스템 → RDB | 함수 호출 (JPA) | 동기 | 재시도 3회, 실패 시 버퍼 유지 | 같은 프로세스, source of truth |
+| 집계 시스템 → Redis | Redis Client | 동기 | 실패 시 로그 후 버퍼 초기화, 누락 허용 | 캐시이므로 best-effort |
+
+### 3.4 데이터 일관성 정책
+
+| 저장소 관계 | Source of Truth | 일관성 정책 | 근거 |
+|------------|-----------------|------------|------|
+| RDB ↔ Redis | RDB (행동 카운트, Weight) | RDB 저장 성공 후 Redis 갱신. Redis 실패 시 계속 진행 (누락 허용) | 랭킹은 근사치 허용. 과집계보다 누락이 나음. Weight 변경 시 RDB 기반 전체 재계산으로 복구 |
+| Weight 변경 ↔ Score 재계산 | 최종 일관성 (수 분 내) | 이벤트 기반 비동기 재계산 | 관리자 작업이므로 즉시 반영 불필요. API 응답 속도 보장 |
+
+### 3.5 트랜잭션 경계
+
+| 작업 | 트랜잭션 범위 | 패턴 | 비고 |
+|------|--------------|------|------|
+| Weight 변경 | RDB Weight 저장 + Outbox 이벤트 저장 | Outbox (단일 DB 트랜잭션) | 기존 팀 패턴 활용, 이벤트 발행 보장 |
+| 행동 집계 flush | RDB Upsert (단일 트랜잭션) → Redis 갱신 (별도) | 2단계 (RDB 우선) | Redis 실패 시 RDB 롤백 안 함, 다음 Weight 변경 시 재계산으로 복구 |
+| 버킷 전환 | Redis 작업만 (RDB 트랜잭션 없음) | 단일 Redis 명령 | 실패 시 다음 스케줄에서 재시도 |
+
+### 3.6 이벤트 계약
+
+**소비하는 이벤트:**
+
+| 이벤트명 | 필수 필드 | 발행 주체 | 비고 |
+|---------|----------|----------|------|
+| ProductViewedEventV1 | productId, viewedAt | Product 도메인 | 이미 발행 중 |
+| LikeCreatedEventV1 | productId, likedAt | Like 도메인 | 이미 발행 중 |
+| LikeCanceledEventV1 | productId, canceledAt | Like 도메인 | 이미 발행 중 |
+| OrderPaidEventV1 | productId, quantity, unitPrice, paidAt | Order 도메인 | orderAmount = quantity × unitPrice로 계산 |
+
+**발행하는 이벤트:**
+
+| 이벤트명 | 필수 필드 | 발행 방식 | 소비 주체 |
+|---------|----------|----------|----------|
+| RankingWeightChangedEvent | weightId, viewWeight, likeWeight, orderWeight, changedAt | Outbox 패턴 | commerce-streamer (재계산 트리거) |

@@ -7,10 +7,10 @@ classDiagram
     class RankingWeight {
         <<Aggregate Root>>
         -Long id
-        -Long viewWeight
-        -Long likeWeight
-        -Long orderWeight
-        +update(viewWeight: Long, likeWeight: Long, orderWeight: Long)
+        -BigDecimal viewWeight
+        -BigDecimal likeWeight
+        -BigDecimal orderWeight
+        +update(viewWeight, likeWeight, orderWeight)
     }
 
     class ProductHourlyMetric {
@@ -21,12 +21,14 @@ classDiagram
         -Long viewCount
         -Long likeCount
         -Long orderCount
+        -BigDecimal orderAmount
     }
 
     class Score {
         <<Value Object>>
-        -Long value
-        +applyDecay(factor: Double) Score
+        -BigDecimal value
+        +applyDecay(factor: BigDecimal) Score
+        +add(other: Score) Score
     }
 
     class ProductRanking {
@@ -39,12 +41,12 @@ classDiagram
     class RankingScoreCalculator {
         <<Domain Service>>
         +calculate(metric: ProductHourlyMetric, weight: RankingWeight) Score
-        +calculateWithDecay(currentScore: Score, previousScore: Score, decayFactor: Double) Score
+        +calculateWithDecay(currentScore: Score, decayFactor: BigDecimal) Score
     }
 
     class RankingWeightRepository {
         <<Repository Interface>>
-        +find() RankingWeight?
+        +findLatest() RankingWeight?
         +save(weight: RankingWeight) RankingWeight
     }
 
@@ -102,15 +104,57 @@ classDiagram
 
 **Port Interface: ProductRankingReader / ProductRankingWriter**
 
-- 책임: Redis ZSET과의 통신 추상화
-- Reader: 랭킹 조회 (ZREVRANGE, ZREVRANK)
-- Writer: 랭킹 갱신 (ZINCRBY, ZADD)
+- 책임: 외부 캐시 저장소(Redis)와의 통신 추상화
+- Reader: 랭킹 조회
+- Writer: 랭킹 갱신
 
 **설계 의도:**
 
 - RankingWeight와 ProductHourlyMetric은 서로 직접 참조하지 않음. Score 계산이 필요할 때 RankingScoreCalculator가 둘을 조합
-- ProductHourlyMetricRepository.accumulate()는 Atomic Upsert(INSERT ... ON CONFLICT DO UPDATE)로 구현하여 동시성 이슈 없이 카운트 누적
-- Repository(RDB 영속화)와 Port(Redis 통신)를 분리하여 인프라 기술 추상화
+- Repository(RDB 영속화)와 Port(외부 캐시 통신)를 분리하여 인프라 기술 추상화
+
+### Value Object 불변식
+
+| Value Object | 불변식 | 비고 |
+|--------------|--------|------|
+| Score | value ≥ 0 | 음수 Score는 비즈니스적으로 무의미 |
+| ProductRanking | rank ≥ 1 | 순위는 1부터 시작 |
+| RankingWeight.viewWeight | 0 ≤ value ≤ 1 | 생성자/update 시 검증 |
+| RankingWeight.likeWeight | 0 ≤ value ≤ 1 | 생성자/update 시 검증 |
+| RankingWeight.orderWeight | 0 ≤ value ≤ 1 | 생성자/update 시 검증 |
+
+### Repository/Port 인터페이스
+
+도메인 관점에서 필요한 연산을 비즈니스 용어로 정의한다. 구현 상세(SQL, 캐시 명령어)는 detailed-design 참조.
+
+**RankingWeightRepository**
+
+| 메서드 | 비즈니스 의미 |
+|--------|-------------|
+| findLatest() | 현재 적용 중인 Weight 설정 조회 |
+| save(weight) | Weight 설정 저장 (Append-only) |
+
+**ProductHourlyMetricRepository**
+
+| 메서드 | 비즈니스 의미 |
+|--------|-------------|
+| accumulate(delta) | 단일 상품의 행동 카운트를 원자적으로 누적 |
+| accumulateAll(deltas) | 여러 상품의 행동 카운트를 일괄 누적 |
+| findAllByStatHour(statHour) | 특정 시간 버킷의 모든 상품 metric 조회 |
+
+**ProductRankingReader**
+
+| 메서드 | 비즈니스 의미 |
+|--------|-------------|
+| getTopRankings(limit, offset) | Score 기준 상위 N개 상품 랭킹 조회 |
+| getRankByProductId(productId) | 특정 상품의 현재 순위 조회 |
+
+**ProductRankingWriter**
+
+| 메서드 | 비즈니스 의미 |
+|--------|-------------|
+| incrementScore(productId, delta) | 특정 상품의 Score를 증분 갱신 |
+| replaceAll(rankings) | 전체 랭킹을 새 Score로 교체 |
 
 ---
 
@@ -140,11 +184,6 @@ classDiagram
 - 좋아요 취소 시 likeCount가 음수가 될 수 있음 (정상 케이스)
 - 예: 14시에 좋아요 → 15시에 취소 → 15시 버킷 likeCount = -1
 
-**Atomic Upsert 구현**
-
-- INSERT ... ON CONFLICT (product_id, stat_hour) DO UPDATE SET count = count + delta
-- 동시성 이슈 없이 카운트 누적
-
 ### 2.3 Score 계산 규칙
 
 **기본 Score 계산**
@@ -171,7 +210,26 @@ classDiagram
 - 이전 버킷의 Score에 0.1을 곱한 값을 base로 적용
 - 이후 해당 버킷에서 발생하는 이벤트는 × 1.0으로 반영
 
-### 2.4 랭킹 조회 규칙
+### 2.4 Domain Service 사용 규칙
+
+**RankingScoreCalculator 메서드 관계**
+
+| 상황 | 사용 메서드 | 설명 |
+|------|------------|------|
+| 주기적 flush 시 | calculate(metric, weight) | 현재 버킷 metric의 증분을 Score로 변환 |
+| 버킷 전환 시 | calculateWithDecay(prevScore, 0.1) | 이전 버킷 Score를 감쇠시켜 다음 버킷 초기값 생성 |
+| Weight 변경 시 재계산 | calculate() + calculateWithDecay() 조합 | 이전 버킷 metric으로 prevScore 계산 → decay 적용 → 현재 metric으로 최종 Score |
+
+**조합 예시 - Weight 변경 시 재계산:**
+
+```
+1. prevScore = calculate(이전 버킷 metric, 새 Weight)  // 저장 안 함
+2. decayedPrev = calculateWithDecay(prevScore, 0.1)
+3. currentScore = calculate(현재 버킷 metric, 새 Weight) + decayedPrev
+4. Redis에 currentScore 저장
+```
+
+### 2.5 랭킹 조회 규칙
 
 **순위 반환 규칙**
 
@@ -194,15 +252,34 @@ classDiagram
 
 ## 4. 도메인 이벤트
 
-현재 요구사항에서는 도메인 이벤트를 사용하지 않습니다.
+### 현재 사용 여부
+
+**사용함** - RankingWeightChangedEvent 1개
 
 **이유:**
 
-- Rankings 도메인은 다른 도메인 이벤트를 소비하는 쪽 (ProductViewedEventV1, LikeCreatedEventV1 등)
-- Weight 변경 → Score 재계산은 동기적 처리로 충분
-- YAGNI 원칙에 따라 필요할 때 추가
+- Weight 변경 → Score 재계산을 동기로 처리하면 API 응답 지연 발생 (상품 수에 비례)
+- 비동기 이벤트로 분리하여 API 응답 속도 보장
+- 기존 Outbox 패턴 활용으로 구현 부담 최소화
 
-**향후 도입 가능한 이벤트:**
+### 이벤트 목록
 
-- RankingWeightChangedEvent: 관리자 알림, 감사 로그 필요 시
-- RankingUpdatedEvent: 랭킹 변동을 외부 시스템(추천 엔진 등)에 알려야 할 때
+**발행 측:**
+
+| 이벤트명 | 발행 주체 | 트리거 조건 |
+|---------|---------|------------|
+| RankingWeightChangedEvent | RankingWeightService | Weight 설정 변경 성공 후 |
+
+**소비 측:**
+
+| 이벤트명 | 소비 주체 | 처리 내용 |
+|---------|---------|---------|
+| RankingWeightChangedEvent | RankingRecalculationConsumer (commerce-streamer) | 전체 Score 재계산 트리거 |
+
+**페이로드:**
+
+| 이벤트명 | 필드 | 설명 |
+|---------|-----|-----|
+| RankingWeightChangedEvent | weightId, viewWeight, likeWeight, orderWeight, changedAt | Weight 식별 및 새 설정값 |
+
+참고: 발행과 소비는 독립적으로 개발/테스트/배포될 수 있음. 이벤트 페이로드가 둘을 연결하는 계약.

@@ -170,7 +170,7 @@ flowchart TD
     LogSuccess --> End3([재계산 완료])
 ```
 
-### 1.5 랭킹 조회 플로우 (US-1, US-2)
+### 1.5 랭킹 조회 흐름 (US-1, US-2)
 
 랭킹 조회는 Redis ZSET 기반의 단순 조회이므로 별도 플로우차트 없이 설명합니다.
 
@@ -206,15 +206,6 @@ CREATE TABLE ranking_weight (
 - `updated_at`: 수정 시각 (Base Entity)
 - `deleted_at`: 삭제 시각 (Base Entity)
 
-**조회 방식:**
-
-```sql
-SELECT * FROM ranking_weight 
-WHERE deleted_at IS NULL 
-ORDER BY created_at DESC 
-LIMIT 1;
-```
-
 #### product_hourly_metric 테이블
 
 ```sql
@@ -246,14 +237,58 @@ CREATE TABLE product_hourly_metric (
 - `created_at`: 생성 시각
 - `updated_at`: 수정 시각
 
-### 2.2 인덱스 전략
+### 2.2 Repository 구현 상세
 
-`UK (stat_hour, product_id)` 유니크 제약조건 하나로 충분합니다.
+domain-modeling에서 정의된 Repository/Port 인터페이스의 구현 상세입니다.
 
-| 쿼리 패턴 | 인덱스 활용 |
-|----------|------------|
-| Atomic Upsert (ON CONFLICT) | UK 활용 |
-| Weight 변경 시 재계산 (WHERE stat_hour = ?) | UK 선두 컬럼 활용 |
+#### RankingWeightRepository
+
+| 메서드 | 구현 방식 | 성능 특성 |
+|--------|----------|----------|
+| findLatest() | SELECT ... ORDER BY created_at DESC LIMIT 1 | O(1), 인덱스 활용 |
+| save(weight) | INSERT (Append-only) | O(1) |
+
+**findLatest 구현:**
+```sql
+SELECT * FROM ranking_weight 
+WHERE deleted_at IS NULL 
+ORDER BY created_at DESC 
+LIMIT 1;
+```
+
+#### ProductHourlyMetricRepository
+
+| 메서드 | 구현 방식 | 성능 특성 |
+|--------|----------|----------|
+| accumulate(delta) | INSERT ... ON CONFLICT DO UPDATE | O(log n), UK 활용, row lock |
+| accumulateAll(deltas) | Batch INSERT ... ON CONFLICT | O(n log n), 배치 처리 |
+| findAllByStatHour(statHour) | SELECT ... WHERE stat_hour = ? | O(n), UK 선두 컬럼 활용 |
+
+**accumulate 구현 (Atomic Upsert):**
+```sql
+INSERT INTO product_hourly_metric (stat_hour, product_id, view_count, like_count, order_count, order_amount)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT (stat_hour, product_id) DO UPDATE SET
+    view_count = product_hourly_metric.view_count + EXCLUDED.view_count,
+    like_count = product_hourly_metric.like_count + EXCLUDED.like_count,
+    order_count = product_hourly_metric.order_count + EXCLUDED.order_count,
+    order_amount = product_hourly_metric.order_amount + EXCLUDED.order_amount,
+    updated_at = NOW();
+```
+
+#### ProductRankingReader (Redis)
+
+| 메서드 | Redis 명령어 | 성능 특성 |
+|--------|-------------|----------|
+| getTopRankings(limit, offset) | ZREVRANGE key offset offset+limit-1 WITHSCORES | O(log N + M), M=반환 개수 |
+| getRankByProductId(productId) | ZREVRANK key productId | O(log N) |
+
+#### ProductRankingWriter (Redis)
+
+| 메서드 | Redis 명령어 | 성능 특성 |
+|--------|-------------|----------|
+| incrementScore(productId, delta) | ZINCRBY key delta productId | O(log N) |
+| replaceAll(rankings) | DEL key + ZADD key score1 member1 ... | O(N), 파이프라인 사용 권장 |
 
 ### 2.3 Redis ZSET 설계
 
@@ -264,17 +299,114 @@ CREATE TABLE product_hourly_metric (
 | Member | productId (Long → String) |
 | Score | 계산된 인기도 |
 
-**Score 계산식:**
-
-```
-viewCount × viewWeight + likeCount × likeWeight + orderAmount × orderWeight
-```
-
 **TTL 2시간 설정 이유**: 현재 버킷과 이전 버킷(Decay 계산용)을 커버하고, 이후 자동 삭제되어 별도 정리 작업이 불필요합니다.
 
-## 3. 운영 계획
+### 2.4 인덱스 전략
 
-### 3.1 로깅 전략
+`UK (stat_hour, product_id)` 유니크 제약조건 하나로 충분합니다.
+
+| 쿼리 패턴 | 인덱스 활용 |
+|----------|------------|
+| Atomic Upsert (ON CONFLICT) | UK 활용 |
+| Weight 변경 시 재계산 (WHERE stat_hour = ?) | UK 선두 컬럼 활용 |
+
+## 3. 컴포넌트 상세 설계
+
+### 3.1 RankingAggregationBuffer
+
+**목적:** 이벤트 처리 시 즉시 DB 접근 대신 메모리에 집계 후 주기적 flush. 이벤트당 DB I/O를 제거하여 처리량 향상.
+
+**자료구조:**
+
+```kotlin
+class RankingAggregationBuffer {
+    // productId → 집계 카운트 (현재 버킷)
+    private val buffer: ConcurrentHashMap<Long, MetricDelta> = ConcurrentHashMap()
+    
+    data class MetricDelta(
+        val viewCount: AtomicLong = AtomicLong(0),
+        val likeCount: AtomicLong = AtomicLong(0),
+        val orderCount: AtomicLong = AtomicLong(0),
+        val orderAmount: AtomicReference<BigDecimal> = AtomicReference(BigDecimal.ZERO)
+    )
+    
+    fun incrementView(productId: Long) {
+        getOrCreate(productId).viewCount.incrementAndGet()
+    }
+    
+    fun incrementLike(productId: Long, delta: Int) {  // delta: +1 또는 -1
+        getOrCreate(productId).likeCount.addAndGet(delta.toLong())
+    }
+    
+    fun incrementOrder(productId: Long, count: Int, amount: BigDecimal) {
+        val metric = getOrCreate(productId)
+        metric.orderCount.addAndGet(count.toLong())
+        metric.orderAmount.updateAndGet { it.add(amount) }
+    }
+    
+    fun drainAll(): Map<Long, MetricDelta> {
+        val snapshot = HashMap(buffer)
+        buffer.clear()
+        return snapshot
+    }
+    
+    private fun getOrCreate(productId: Long): MetricDelta =
+        buffer.computeIfAbsent(productId) { MetricDelta() }
+}
+```
+
+**동시성 처리:**
+
+- ConcurrentHashMap: 여러 Kafka Consumer 스레드에서 동시 접근 허용
+- AtomicLong/AtomicReference: 개별 카운터의 원자적 증감 보장
+- drainAll(): clear() 전에 snapshot 생성하여 flush 중 유입 이벤트 유실 방지
+  - 주의: clear()와 snapshot 사이에 유입된 이벤트는 다음 flush로 밀림 (허용 가능)
+
+**생명주기:**
+
+| 이벤트 | 처리 |
+|--------|------|
+| 애플리케이션 시작 | 빈 ConcurrentHashMap 초기화 |
+| Kafka 이벤트 수신 | computeIfAbsent()로 MetricDelta 생성 또는 조회 → 원자적 증분 |
+| 주기적 flush (30초) | drainAll() → RDB Upsert → Redis ZINCRBY |
+| flush 실패 (RDB) | 버퍼 유지 (drainAll 결과를 다시 merge), 다음 주기에 재시도 |
+| flush 실패 (Redis) | 버퍼 초기화 (RDB에는 이미 저장됨), 누락 허용 |
+| 애플리케이션 종료 | graceful shutdown 시 마지막 flush 시도 |
+
+**flush 실패 시 복구 로직:**
+
+```kotlin
+fun flush() {
+    val snapshot = buffer.drainAll()
+    if (snapshot.isEmpty()) return
+    
+    try {
+        metricRepository.accumulateAll(snapshot.toDeltas())
+    } catch (e: Exception) {
+        // RDB 실패: snapshot을 버퍼에 다시 merge
+        snapshot.forEach { (productId, delta) ->
+            val current = buffer.getOrCreate(productId)
+            current.viewCount.addAndGet(delta.viewCount.get())
+            // ... 나머지 필드도 동일
+        }
+        throw e  // 상위에서 재시도 처리
+    }
+    
+    // RDB 성공 후 Redis 갱신 시도
+    try {
+        val weight = weightRepository.findLatest() ?: FALLBACK_WEIGHT
+        val scoreDeltas = calculateScoreDeltas(snapshot, weight)
+        rankingWriter.incrementScores(scoreDeltas)
+    } catch (e: Exception) {
+        // Redis 실패: 로그만 남기고 계속 진행 (RDB에 이미 저장됨)
+        log.error("Redis update failed, data may be inconsistent until next recalculation", e)
+    }
+}
+```
+
+## 4. 운영 계획
+
+### 4.1 로깅 전략
 
 | 상황 | 레벨 | 로그 메시지 예시 |
 |------|------|-----------------|
@@ -289,7 +421,7 @@ viewCount × viewWeight + likeCount × likeWeight + orderAmount × orderWeight
 | Score 재계산 완료 | INFO | `Score recalculation completed, productCount={}` |
 | Score 재계산 실패 | ERROR | `Score recalculation failed, manual re-trigger required` |
 
-### 3.2 주요 실패 시나리오 및 대응 계획
+### 4.2 주요 실패 시나리오 및 대응 계획
 
 | 실패 시나리오 | 대응 방안 | 기대 효과 |
 |--------------|----------|----------|
@@ -300,9 +432,9 @@ viewCount × viewWeight + likeCount × likeWeight + orderAmount × orderWeight
 | 버킷 전환 Redis 쓰기 실패 | 재시도 3회, 실패 시 로그 | 다음 스케줄에서 복구 |
 | Score 재계산 실패 | 로그 후 수동 재트리거 | Weight 재변경으로 복구 |
 
-## 4. 설계 결정 공유
+## 5. 설계 결정 공유
 
-### 4.1 주요 설계 결정 및 근거
+### 5.1 주요 설계 결정 및 근거
 
 | 설계 결정 | 근거 |
 |----------|------|
@@ -318,3 +450,4 @@ viewCount × viewWeight + likeCount × likeWeight + orderAmount × orderWeight
 | ZSET TTL 2시간 | 현재 버킷 + 이전 버킷 커버, 자동 정리로 관리 부담 최소화 |
 | 순위는 상품 캐시와 분리 조회 | 상품 캐시 TTL(60초)과 랭킹 갱신 주기(30초)가 다름, ZREVRANK O(log N)으로 별도 조회해도 충분히 빠름 |
 | ranking_weight Append-only | 변경 이력 추적으로 "어떤 Weight일 때 전환율이 좋았는지" 분석 가능, 롤백 용이 |
+| ConcurrentHashMap + AtomicLong | 락 없이 동시성 처리, Kafka Consumer 스레드 간 경합 최소화 |
