@@ -24,9 +24,8 @@ class DailyRankingPersistenceScheduler(
     private val productRankDailyRepository: ProductRankDailyRepository,
     private val productMetricsRepository: ProductMetricsRepository,
 ) {
-    private val logger = LoggerFactory.getLogger(DailyRankingPersistenceScheduler::class.java)
-
     companion object {
+        private val logger = LoggerFactory.getLogger(DailyRankingPersistenceScheduler::class.java)
         private const val MAX_RANK_TO_SAVE = 1000 // TOP 1000만 저장
     }
 

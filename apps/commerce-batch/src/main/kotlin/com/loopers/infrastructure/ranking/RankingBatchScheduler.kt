@@ -23,9 +23,8 @@ class RankingBatchScheduler(
     @param:Qualifier("monthlyRankingAggregationJob") private val monthlyRankingAggregationJob: Job,
     private val batchAlarmNotifier: BatchAlarmNotifier,
 ) {
-    private val logger = LoggerFactory.getLogger(RankingBatchScheduler::class.java)
-
     companion object {
+        private val logger = LoggerFactory.getLogger(RankingBatchScheduler::class.java)
         private val SCHEDULER_ZONE = ZoneId.of("Asia/Seoul")
         private const val WEEKLY_JOB_NAME = "주간 랭킹 집계 배치"
         private const val MONTHLY_JOB_NAME = "월간 랭킹 집계 배치"

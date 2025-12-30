@@ -27,7 +27,9 @@ class ProductDataGenerator @Autowired constructor(
     private val userRepository: UserRepository,
     private val likeRepository: LikeRepository,
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass)
+    companion object {
+        private val logger = LoggerFactory.getLogger(ProductDataGenerator::class.java)
+    }
 
     @Test
     @Transactional

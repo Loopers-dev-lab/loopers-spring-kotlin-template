@@ -39,7 +39,10 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
     private val productRankWeeklyRepository: ProductRankWeeklyRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass)
+    companion object {
+        private val logger = LoggerFactory.getLogger(WeeklyRankingAggregationJobIntegrationTest::class.java)
+    }
+
     private val helper = RankingJobTestHelper(jobRepository, productRankDailyRepository)
 
     @AfterEach

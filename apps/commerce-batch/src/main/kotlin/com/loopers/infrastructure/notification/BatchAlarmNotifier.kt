@@ -14,5 +14,5 @@ interface BatchAlarmNotifier {
      * @param message 알림 메시지
      * @param error 발생한 예외
      */
-    fun notifyBatchFailure(jobName: String, message: String, error: Exception)
+    fun notifyBatchFailure(jobName: String, message: String, error: Throwable)
 }

@@ -18,7 +18,9 @@ class StockEventHandler(
     private val productCacheRepository: ProductCacheRepository,
     private val outboxEventPublisher: OutboxEventPublisher,
 ) {
-    private val logger = LoggerFactory.getLogger(StockEventHandler::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(StockEventHandler::class.java)
+    }
 
     /**
      * 재고 소진 후 처리

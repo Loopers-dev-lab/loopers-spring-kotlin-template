@@ -20,7 +20,10 @@ class RankingRedisRepository(
     @param:Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
     private val redisTemplate: RedisTemplate<String, String>,
 ) : RankingRepository {
-    private val logger = LoggerFactory.getLogger(RankingRedisRepository::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(RankingRedisRepository::class.java)
+    }
+
     private val zSetOps: ZSetOperations<String, String> = redisTemplate.opsForZSet()
 
     override fun incrementScore(key: RankingKey, productId: Long, score: RankingScore): Double {

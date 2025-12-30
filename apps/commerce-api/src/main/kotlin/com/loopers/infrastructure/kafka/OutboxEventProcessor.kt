@@ -25,7 +25,9 @@ class OutboxEventProcessor(
     private val outboxEventRepository: OutboxEventRepository,
     private val kafkaProducerService: KafkaProducerService,
 ) {
-    private val logger = LoggerFactory.getLogger(OutboxEventProcessor::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(OutboxEventProcessor::class.java)
+    }
 
     @Value("\${kafka.outbox.relay.max-retry-count:3}")
     private var maxRetryCount: Int = 3

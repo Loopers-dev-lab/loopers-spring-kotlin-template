@@ -26,7 +26,9 @@ class OutboxRelayScheduler(
     private val outboxEventRepository: OutboxEventRepository,
     private val outboxEventProcessor: OutboxEventProcessor,
 ) {
-    private val logger = LoggerFactory.getLogger(OutboxRelayScheduler::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(OutboxRelayScheduler::class.java)
+    }
 
     @Value("\${kafka.outbox.relay.batch-size:100}")
     private var batchSize: Int = 100

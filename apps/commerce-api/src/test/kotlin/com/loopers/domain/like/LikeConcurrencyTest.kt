@@ -27,7 +27,10 @@ class LikeConcurrencyTest @Autowired constructor(
     private val likeQueryService: LikeQueryService,
     private val testFixtures: TestFixtures,
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass)
+    companion object {
+        private val logger = LoggerFactory.getLogger(LikeConcurrencyTest::class.java)
+    }
+
     private var productId by Delegates.notNull<Long>()
     private val userIds = mutableListOf<Long>()
 

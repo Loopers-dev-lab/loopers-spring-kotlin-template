@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/v1")
 class PaymentV1Controller(private val paymentFacade: PaymentFacade) : PaymentV1ApiSpec {
-    private val logger = LoggerFactory.getLogger(PaymentV1Controller::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(PaymentV1Controller::class.java)
+    }
 
     override fun requestCardPayment(
         userId: Long,

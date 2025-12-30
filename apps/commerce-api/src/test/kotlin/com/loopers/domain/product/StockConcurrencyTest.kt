@@ -23,7 +23,10 @@ class StockConcurrencyTest @Autowired constructor(
     private val stockService: StockService,
     private val testFixtures: TestFixtures,
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass)
+    companion object {
+        private val logger = LoggerFactory.getLogger(StockConcurrencyTest::class.java)
+    }
+
     private var productId by Delegates.notNull<Long>()
 
     @BeforeEach

@@ -17,14 +17,17 @@ import org.springframework.stereotype.Component
  */
 @Component
 class NoOpBatchAlarmNotifier : BatchAlarmNotifier {
-    private val logger = LoggerFactory.getLogger(NoOpBatchAlarmNotifier::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(NoOpBatchAlarmNotifier::class.java)
+    }
 
-    override fun notifyBatchFailure(jobName: String, message: String, error: Exception) {
+    override fun notifyBatchFailure(jobName: String, message: String, error: Throwable) {
         logger.warn(
             "배치 실패 알림 (NoOp): jobName={}, message={}, error={}",
             jobName,
             message,
             error.message,
+            error,
         )
         // TODO: 실제 알림 발송 구현
         // 예시:

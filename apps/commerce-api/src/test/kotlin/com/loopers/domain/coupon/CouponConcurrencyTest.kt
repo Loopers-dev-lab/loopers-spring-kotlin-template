@@ -23,7 +23,10 @@ class CouponConcurrencyTest @Autowired constructor(
     private val userCouponRepository: UserCouponRepository,
     private val testFixtures: TestFixtures,
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass)
+    companion object {
+        private val logger = LoggerFactory.getLogger(CouponConcurrencyTest::class.java)
+    }
+
     private var userId by Delegates.notNull<Long>()
     private lateinit var coupon: Coupon
     private lateinit var userCoupon: UserCoupon

@@ -15,7 +15,9 @@ import java.time.LocalDate
  */
 @Component
 class RankingScheduler(private val rankingRepository: RankingRepository) {
-    private val logger = LoggerFactory.getLogger(RankingScheduler::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(RankingScheduler::class.java)
+    }
 
     /**
      * 일간 랭킹 콜드 스타트 방지

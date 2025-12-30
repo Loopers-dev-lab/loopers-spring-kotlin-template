@@ -36,7 +36,9 @@ class OrderFacade(
     private val paymentFacade: PaymentFacade,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
-    private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
+    }
 
     @Transactional
     fun createOrder(userId: Long, request: OrderCreateRequest): OrderCreateInfo {

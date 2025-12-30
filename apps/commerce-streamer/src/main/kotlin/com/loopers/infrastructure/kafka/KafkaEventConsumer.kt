@@ -42,7 +42,9 @@ class KafkaEventConsumer(
     private val rankingRepository: RankingRepository,
     private val rankingWeightProperties: com.loopers.config.RankingWeightProperties,
 ) {
-    private val logger = LoggerFactory.getLogger(KafkaEventConsumer::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(KafkaEventConsumer::class.java)
+    }
 
     /**
      * catalog-events 토픽 리스너

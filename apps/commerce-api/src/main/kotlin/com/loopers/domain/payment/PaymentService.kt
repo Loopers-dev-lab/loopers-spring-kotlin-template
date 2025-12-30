@@ -24,7 +24,9 @@ class PaymentService(
     private val eventPublisher: ApplicationEventPublisher,
     @param:Value("\${pg.callback-url:http://localhost:8080}") private val callbackBaseUrl: String,
 ) {
-    private val logger = LoggerFactory.getLogger(PaymentService::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(PaymentService::class.java)
+    }
 
     @Transactional
     fun createPayment(

@@ -24,7 +24,10 @@ class PointConcurrencyTest @Autowired constructor(
     private val pointService: PointService,
     private val testFixtures: TestFixtures,
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass)
+    companion object {
+        private val logger = LoggerFactory.getLogger(PointConcurrencyTest::class.java)
+    }
+
     private var userId by Delegates.notNull<Long>()
 
     @BeforeEach

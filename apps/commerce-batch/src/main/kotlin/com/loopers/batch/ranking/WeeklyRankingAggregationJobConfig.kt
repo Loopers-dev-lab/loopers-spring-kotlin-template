@@ -37,9 +37,8 @@ class WeeklyRankingAggregationJobConfig(
     private val productRankDailyRepository: ProductRankDailyRepository,
     private val productRankWeeklyRepository: ProductRankWeeklyRepository,
 ) {
-    private val logger = LoggerFactory.getLogger(WeeklyRankingAggregationJobConfig::class.java)
-
     companion object {
+        private val logger = LoggerFactory.getLogger(WeeklyRankingAggregationJobConfig::class.java)
         const val JOB_NAME = "weeklyRankingAggregationJob"
         const val DELETE_STEP_NAME = "weeklyRankingDeleteStep"
         const val AGGREGATE_STEP_NAME = "weeklyRankingAggregateStep"

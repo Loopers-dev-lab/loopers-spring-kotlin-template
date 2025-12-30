@@ -20,9 +20,8 @@ class RankingService(
     private val productRankWeeklyRepository: ProductRankWeeklyRepository,
     private val productRankMonthlyRepository: ProductRankMonthlyRepository,
 ) {
-    private val logger = LoggerFactory.getLogger(RankingService::class.java)
-
     companion object {
+        private val logger = LoggerFactory.getLogger(RankingService::class.java)
         private const val MIN_YEAR = 1970
         private const val MAX_YEAR = 2050
     }

@@ -14,7 +14,9 @@ import java.util.concurrent.CompletableFuture
  */
 @Service
 class KafkaProducerService(private val kafkaTemplate: KafkaTemplate<Any, Any>) {
-    private val logger = LoggerFactory.getLogger(KafkaProducerService::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(KafkaProducerService::class.java)
+    }
 
     /**
      * 메시지를 Kafka로 전송

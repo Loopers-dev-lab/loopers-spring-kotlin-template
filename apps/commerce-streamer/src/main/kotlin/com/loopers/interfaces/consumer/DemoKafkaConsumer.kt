@@ -9,7 +9,9 @@ import org.springframework.stereotype.Component
 
 @Component
 class DemoKafkaConsumer {
-    private val logger = LoggerFactory.getLogger(javaClass)
+    companion object {
+        private val logger = LoggerFactory.getLogger(DemoKafkaConsumer::class.java)
+    }
 
     @KafkaListener(
         topics = ["\${demo-kafka.test.topic-name}"],
