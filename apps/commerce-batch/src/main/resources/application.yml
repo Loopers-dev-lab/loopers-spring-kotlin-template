@@ -6,7 +6,7 @@ spring:
     jdbc:
       initialize-schema: always
   main:
-    web-application-type: none
+    web-application-type: servlet
   application:
     name: commerce-batch
   profiles:
