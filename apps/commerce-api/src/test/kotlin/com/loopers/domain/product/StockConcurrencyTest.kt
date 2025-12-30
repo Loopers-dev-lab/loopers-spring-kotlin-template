@@ -14,6 +14,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.properties.Delegates
+import org.slf4j.LoggerFactory
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -22,6 +23,7 @@ class StockConcurrencyTest @Autowired constructor(
     private val stockService: StockService,
     private val testFixtures: TestFixtures,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private var productId by Delegates.notNull<Long>()
 
     @BeforeEach
@@ -59,7 +61,7 @@ class StockConcurrencyTest @Autowired constructor(
                     stockService.decreaseStock(productId, quantityPerOrder)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("재고 차감 실패: ${e.message}")
+                    logger.warn("재고 차감 실패: ${e.message}")
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
@@ -146,7 +148,7 @@ class StockConcurrencyTest @Autowired constructor(
                         decreaseCount.incrementAndGet()
                     }
                 } catch (e: Exception) {
-                    println("재고 작업 실패 (index=$index): ${e.message}")
+                    logger.warn("재고 작업 실패 (index=$index): ${e.message}")
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()

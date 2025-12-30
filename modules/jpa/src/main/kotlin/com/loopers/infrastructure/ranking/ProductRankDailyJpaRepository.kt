@@ -15,6 +15,11 @@ interface ProductRankDailyJpaRepository : JpaRepository<ProductRankDaily, Long> 
     @Query("DELETE FROM ProductRankDaily p WHERE p.rankingDate = :date")
     fun deleteByRankingDate(date: LocalDate)
 
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM ProductRankDaily p WHERE p.rankingDate >= :startDate AND p.rankingDate <= :endDate")
+    fun deleteByRankingDateBetween(startDate: LocalDate, endDate: LocalDate)
+
     fun findByRankingDateBetween(
         startDate: LocalDate,
         endDate: LocalDate,
@@ -32,6 +37,12 @@ class ProductRankDailyRepositoryImpl(private val jpaRepository: ProductRankDaily
 
     override fun deleteByRankingDate(date: LocalDate) {
         jpaRepository.deleteByRankingDate(date)
+    }
+
+    override fun deleteByYearMonth(yearMonth: java.time.YearMonth) {
+        val startDate = yearMonth.atDay(1)
+        val endDate = yearMonth.atEndOfMonth()
+        jpaRepository.deleteByRankingDateBetween(startDate, endDate)
     }
 
     override fun findByRankingDateBetween(

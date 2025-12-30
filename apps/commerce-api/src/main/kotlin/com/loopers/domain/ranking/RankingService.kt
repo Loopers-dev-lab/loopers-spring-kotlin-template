@@ -108,6 +108,15 @@ class RankingService(
     }
 
     /**
+     * 엔티티를 Ranking으로 변환하는 헬퍼 함수
+     */
+    private fun toRanking(productId: Long, score: Double, rank: Int): Ranking = Ranking(
+            productId = productId,
+            score = RankingScore(score),
+            rank = rank,
+        )
+
+    /**
      * DB에서 주간 랭킹 조회
      */
     private fun getTopNFromWeeklyDB(
@@ -150,13 +159,8 @@ class RankingService(
         // DB에서 조회
         val pageResult = productRankWeeklyRepository.findByYearWeekOrderByRankAsc(yearWeek, PageRequest.of(page - 1, size))
         val pagedRankings = pageResult
-            .map {
-                Ranking(
-                    productId = it.productId,
-                    score = RankingScore(it.score),
-                    rank = it.rank,
-                )
-            }.toList()
+            .map { toRanking(it.productId, it.score, it.rank) }
+            .toList()
         val totalCount = pageResult.totalElements
 
         logger.debug(
@@ -202,13 +206,8 @@ class RankingService(
         // DB에서 조회
         val pageResult = productRankMonthlyRepository.findByYearMonthOrderByRankAsc(yearMonth, PageRequest.of(page - 1, size))
         val pagedRankings = pageResult
-            .map {
-                Ranking(
-                    productId = it.productId,
-                    score = RankingScore(it.score),
-                    rank = it.rank,
-                )
-            }.toList()
+            .map { toRanking(it.productId, it.score, it.rank) }
+            .toList()
         val totalCount = pageResult.totalElements
 
         logger.debug(

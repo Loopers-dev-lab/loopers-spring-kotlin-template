@@ -8,6 +8,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.batch.core.BatchStatus
 import org.springframework.batch.core.launch.JobOperator
 import org.springframework.batch.core.repository.explore.JobExplorer
@@ -15,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
-import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -29,7 +29,6 @@ import java.util.Properties
 @SpringBootTest
 @ActiveProfiles("test")
 @Import(MySqlTestContainersConfig::class)
-@Transactional
 @DisplayName("주간 랭킹 집계 배치 통합 테스트")
 class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
     private val jobOperator: JobOperator,
@@ -38,6 +37,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
     private val productRankWeeklyRepository: ProductRankWeeklyRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private val helper = RankingJobTestHelper(jobExplorer, productRankDailyRepository)
 
     @AfterEach
@@ -46,7 +46,7 @@ class WeeklyRankingAggregationJobIntegrationTest @Autowired constructor(
             databaseCleanUp.truncateAllTables()
         } catch (e: Exception) {
             // ignore if table doesn't exist
-            println("tearDown warning: ${e.message}")
+            logger.warn("tearDown warning: ${e.message}")
         }
     }
 

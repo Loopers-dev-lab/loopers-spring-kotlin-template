@@ -13,6 +13,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.properties.Delegates
+import org.slf4j.LoggerFactory
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -22,6 +23,7 @@ class CouponConcurrencyTest @Autowired constructor(
     private val userCouponRepository: UserCouponRepository,
     private val testFixtures: TestFixtures,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private var userId by Delegates.notNull<Long>()
     private lateinit var coupon: Coupon
     private lateinit var userCoupon: UserCoupon
@@ -68,7 +70,7 @@ class CouponConcurrencyTest @Autowired constructor(
                     couponService.useUserCoupon(userId, userCoupon.id)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("쿠폰 사용 실패: ${e.message}")
+                    logger.warn("쿠폰 사용 실패: ${e.message}")
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
@@ -120,7 +122,7 @@ class CouponConcurrencyTest @Autowired constructor(
                     couponService.useUserCoupon(uid, uc.id)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("쿠폰 사용 실패 (userId=$uid): ${e.message}")
+                    logger.warn("쿠폰 사용 실패 (userId=$uid): ${e.message}")
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()

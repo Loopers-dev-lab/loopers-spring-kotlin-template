@@ -9,6 +9,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.batch.core.BatchStatus
 import org.springframework.batch.core.launch.JobOperator
 import org.springframework.batch.core.repository.explore.JobExplorer
@@ -16,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
-import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.YearMonth
 import java.util.Properties
@@ -29,7 +29,6 @@ import java.util.Properties
 @SpringBootTest
 @ActiveProfiles("test")
 @Import(MySqlTestContainersConfig::class)
-@Transactional
 @DisplayName("월간 랭킹 집계 배치 통합 테스트")
 class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
     private val jobOperator: JobOperator,
@@ -40,13 +39,17 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
 ) {
     private val helper = RankingJobTestHelper(jobExplorer, productRankDailyRepository)
 
+    companion object {
+        private val logger = LoggerFactory.getLogger(MonthlyRankingAggregationJobIntegrationTest::class.java)
+    }
+
     @AfterEach
     fun tearDown() {
         try {
             databaseCleanUp.truncateAllTables()
         } catch (e: Exception) {
-            // 테스트 환경에서 테이블이 없을 수 있음
-            println("tearDown warning: ${e.message}")
+            // 예상치 못한 정리 실패는 다음 테스트에 영향을 줄 수 있으므로 로깅
+            logger.warn("Failed to clean up database tables: ${e.message}", e)
         }
     }
 
@@ -164,9 +167,7 @@ class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
 
         // when: 데이터 변경 후 재실행
         // 기존 데이터 삭제
-        for (day in 1..31) {
-            productRankDailyRepository.deleteByRankingDate(LocalDate.of(2025, 1, day))
-        }
+        productRankDailyRepository.deleteByYearMonth(targetYearMonth)
 
         // 새로운 데이터 추가
         helper.createDailyRankings(startDate, 31, 1L, 80.0, 2)

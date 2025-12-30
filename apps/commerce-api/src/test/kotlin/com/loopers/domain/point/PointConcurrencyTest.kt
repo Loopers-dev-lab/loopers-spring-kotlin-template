@@ -15,6 +15,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.properties.Delegates
+import org.slf4j.LoggerFactory
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -23,6 +24,7 @@ class PointConcurrencyTest @Autowired constructor(
     private val pointService: PointService,
     private val testFixtures: TestFixtures,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private var userId by Delegates.notNull<Long>()
 
     @BeforeEach
@@ -58,7 +60,7 @@ class PointConcurrencyTest @Autowired constructor(
                     pointService.deductPoint(userId, deductAmount)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("포인트 차감 실패: ${e.message}")
+                    logger.warn("포인트 차감 실패: ${e.message}")
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
@@ -140,7 +142,7 @@ class PointConcurrencyTest @Autowired constructor(
                         deductCount.incrementAndGet()
                     }
                 } catch (e: Exception) {
-                    println("포인트 작업 실패 (index=$index): ${e.message}")
+                    logger.warn("포인트 작업 실패 (index=$index): ${e.message}")
                 } finally {
                     latch.countDown()
                 }
