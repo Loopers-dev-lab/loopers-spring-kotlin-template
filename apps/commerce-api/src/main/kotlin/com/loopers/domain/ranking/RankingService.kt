@@ -23,6 +23,11 @@ class RankingService(
 ) {
     private val logger = LoggerFactory.getLogger(RankingService::class.java)
 
+    companion object {
+        private val MIN_YEAR = 1970
+        private val MAX_YEAR = LocalDate.now().year + 50
+    }
+
     /**
      * Top-N 랭킹 조회 (페이징)
      *
@@ -122,10 +127,8 @@ class RankingService(
             val week = timestamp.substring(5, 7).toIntOrNull()
                 ?: throw IllegalArgumentException("유효하지 않은 주차입니다: ${timestamp.substring(5, 7)}")
 
-            val minYear = 1970
-            val maxYear = LocalDate.now().year + 50
-            require(year in minYear..maxYear) {
-                "연도는 1970부터 2040 사이여야 합니다: $year"
+            require(year in MIN_YEAR..MAX_YEAR) {
+                "연도는 $MIN_YEAR 부터 $MAX_YEAR 사이여야 합니다: $year"
             }
             require(week in 1..53) {
                 "주차는 1부터 53 사이여야 합니다: $week"
@@ -184,8 +187,8 @@ class RankingService(
             val month = timestamp.substring(4, 6).toIntOrNull()
                 ?: throw IllegalArgumentException("유효하지 않은 월입니다: ${timestamp.substring(4, 6)}")
 
-            require(year in 1970..2040) {
-                "연도는 1970부터 2040 사이여야 합니다: $year"
+            require(year in MIN_YEAR..MAX_YEAR) {
+                "연도는 $MIN_YEAR 부터 $MAX_YEAR 사이여야 합니다: $year"
             }
             require(month in 1..12) {
                 "월은 1부터 12 사이여야 합니다: $month"

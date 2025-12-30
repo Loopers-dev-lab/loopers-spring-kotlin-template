@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.YearMonth
 import java.util.Properties
@@ -28,6 +29,7 @@ import java.util.Properties
 @SpringBootTest
 @ActiveProfiles("test")
 @Import(MySqlTestContainersConfig::class)
+@Transactional
 @DisplayName("월간 랭킹 집계 배치 통합 테스트")
 class MonthlyRankingAggregationJobIntegrationTest @Autowired constructor(
     private val jobOperator: JobOperator,

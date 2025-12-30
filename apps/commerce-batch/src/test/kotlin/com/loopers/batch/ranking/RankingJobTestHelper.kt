@@ -2,9 +2,11 @@ package com.loopers.batch.ranking
 
 import com.loopers.domain.ranking.ProductRankDaily
 import com.loopers.domain.ranking.ProductRankDailyRepository
+import org.awaitility.Awaitility.await
 import org.springframework.batch.core.BatchStatus
 import org.springframework.batch.core.job.JobExecution
 import org.springframework.batch.core.repository.explore.JobExplorer
+import java.time.Duration
 import java.time.LocalDate
 
 /**
@@ -26,17 +28,21 @@ class RankingJobTestHelper(
      * @throws IllegalStateException Job 실행이 30초 이내에 완료되지 않으면 예외 발생
      */
     fun getJobExecution(executionId: Long): JobExecution {
+        val execution = jobExplorer.getJobExecution(executionId)
+
         // Job 완료까지 대기 (최대 30초)
-        var waitCount = 0
-        while (waitCount < 300) {
-            val execution = jobExplorer.getJobExecution(executionId)
-            if (execution != null && execution.status != BatchStatus.STARTED && execution.status != BatchStatus.STARTING) {
-                return execution
-            }
-            Thread.sleep(100)
-            waitCount++
-        }
-        throw IllegalStateException("Job execution timeout: executionId=$executionId")
+        return await()
+            .atMost(Duration.ofSeconds(30))
+            .pollInterval(Duration.ofMillis(100))
+            .until(
+                {
+                    execution != null &&
+                            execution.status != BatchStatus.STARTED &&
+                            execution.status != BatchStatus.STARTING
+                },
+                { it },
+            )
+            .let { execution!! }
     }
 
     /**
