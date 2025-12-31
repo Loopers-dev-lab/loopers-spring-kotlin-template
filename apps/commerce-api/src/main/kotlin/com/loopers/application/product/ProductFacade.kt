@@ -37,7 +37,7 @@ class ProductFacade(
         }
 
         val bucketKey = RankingKeyGenerator.currentBucketKey()
-        val rank = productRankingReader.getRankByProductId(bucketKey, id)
+        val rank = productRankingReader.findRankByProductId(bucketKey, id)
 
         eventPublisher.publishEvent(ProductViewedEventV1.create(id, userId))
 

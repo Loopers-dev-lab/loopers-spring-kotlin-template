@@ -14,31 +14,6 @@ class ProductRankingRedisReader(
 
     private val zSetOps = redisTemplate.opsForZSet()
 
-    override fun getTopRankings(bucketKey: String, offset: Long, limit: Long): List<ProductRanking> {
-        val end = offset + limit - 1
-
-        val result = zSetOps.reverseRangeWithScores(bucketKey, offset, end)
-            ?: return emptyList()
-
-        return result.mapIndexedNotNull { index, typedTuple ->
-            val productIdStr = typedTuple.value ?: return@mapIndexedNotNull null
-            val score = typedTuple.score ?: return@mapIndexedNotNull null
-
-            ProductRanking(
-                productId = productIdStr.toLongOrNull() ?: return@mapIndexedNotNull null,
-                rank = (offset + index + 1).toInt(),
-                score = BigDecimal.valueOf(score),
-            )
-        }
-    }
-
-    override fun getRankByProductId(bucketKey: String, productId: Long): Int? {
-        val rank = zSetOps.reverseRank(bucketKey, productId.toString())
-            ?: return null
-
-        return (rank + 1).toInt()
-    }
-
     override fun findTopRankings(query: RankingQuery): List<ProductRanking> {
         val limit = query.limitForHasNext()
         val end = query.offset + limit - 1

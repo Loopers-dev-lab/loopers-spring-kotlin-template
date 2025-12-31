@@ -4,7 +4,7 @@ import com.loopers.domain.product.ProductSaleStatus
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductView
 import com.loopers.domain.ranking.ProductRanking
-import com.loopers.domain.ranking.ProductRankingReader
+import com.loopers.domain.ranking.RankingQuery
 import com.loopers.domain.ranking.RankingService
 import com.loopers.domain.ranking.RankingWeight
 import com.loopers.support.values.Money
@@ -21,18 +21,18 @@ class RankingFacadeTest {
 
     private val rankingService: RankingService = mockk()
     private val productService: ProductService = mockk()
-    private val productRankingReader: ProductRankingReader = mockk()
-    private val rankingFacade = RankingFacade(rankingService, productService, productRankingReader)
+    private val rankingFacade = RankingFacade(rankingService, productService)
 
     @DisplayName("findRankings 테스트")
     @Nested
     inner class FindRankings {
 
-        @DisplayName("랭킹 조회 시 Redis에서 productId를 가져오고 상품 정보와 결합하여 반환한다")
+        @DisplayName("랭킹 조회 시 RankingService를 통해 랭킹을 가져오고 상품 정보와 결합하여 반환한다")
         @Test
-        fun `combines productIds with product details`() {
+        fun `combines rankings with product details`() {
             // given
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = "2025012614",
                 page = 0,
                 size = 10,
@@ -48,7 +48,7 @@ class RankingFacadeTest {
                 createProductView(productId = 3L, productName = "상품3", stockQuantity = 20, likeCount = 3L),
             )
 
-            every { productRankingReader.getTopRankings("ranking:products:2025012614", 0L, 11L) } returns rankings
+            every { rankingService.findRankings(any<RankingQuery>()) } returns rankings
             every { productService.findAllProductViewByIds(listOf(1L, 2L, 3L)) } returns productViews
 
             // when
@@ -69,12 +69,13 @@ class RankingFacadeTest {
         fun `returns empty list when rankings are empty`() {
             // given
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = "2025012614",
                 page = 0,
                 size = 10,
             )
 
-            every { productRankingReader.getTopRankings("ranking:products:2025012614", 0L, 11L) } returns emptyList()
+            every { rankingService.findRankings(any<RankingQuery>()) } returns emptyList()
 
             // when
             val result = rankingFacade.findRankings(criteria)
@@ -89,6 +90,7 @@ class RankingFacadeTest {
         fun `hasNext is true when there are more results`() {
             // given
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = "2025012614",
                 page = 0,
                 size = 2,
@@ -103,7 +105,7 @@ class RankingFacadeTest {
                 createProductView(productId = 2L, productName = "상품2"),
             )
 
-            every { productRankingReader.getTopRankings("ranking:products:2025012614", 0L, 3L) } returns rankings
+            every { rankingService.findRankings(any<RankingQuery>()) } returns rankings
             every { productService.findAllProductViewByIds(listOf(1L, 2L)) } returns productViews
 
             // when
@@ -119,18 +121,19 @@ class RankingFacadeTest {
         fun `pagination works correctly`() {
             // given
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = "2025012614",
                 page = 1,
                 size = 10,
             )
 
-            every { productRankingReader.getTopRankings("ranking:products:2025012614", 10L, 11L) } returns emptyList()
+            every { rankingService.findRankings(any<RankingQuery>()) } returns emptyList()
 
             // when
             val result = rankingFacade.findRankings(criteria)
 
             // then
-            verify { productRankingReader.getTopRankings("ranking:products:2025012614", 10L, 11L) }
+            verify { rankingService.findRankings(match<RankingQuery> { it.offset == 10L && it.limit == 10L }) }
             assertThat(result.rankings).isEmpty()
         }
 
@@ -139,18 +142,19 @@ class RankingFacadeTest {
         fun `uses current bucket when date is null`() {
             // given
             val criteria = RankingCriteria.FindRankings(
+                period = null,
                 date = null,
                 page = 0,
                 size = 10,
             )
 
-            every { productRankingReader.getTopRankings(any(), any(), any()) } returns emptyList()
+            every { rankingService.findRankings(any<RankingQuery>()) } returns emptyList()
 
             // when
             rankingFacade.findRankings(criteria)
 
             // then
-            verify { productRankingReader.getTopRankings(match { it.startsWith("ranking:products:") }, 0L, 11L) }
+            verify { rankingService.findRankings(match<RankingQuery> { it.bucketKey.startsWith("ranking:products:") }) }
         }
 
         @DisplayName("상품 정보를 랭킹 순서대로 반환한다")
@@ -158,6 +162,7 @@ class RankingFacadeTest {
         fun `returns products in ranking order`() {
             // given
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = "2025012614",
                 page = 0,
                 size = 10,
@@ -173,7 +178,7 @@ class RankingFacadeTest {
                 createProductView(productId = 3L, productName = "상품3"),
             )
 
-            every { productRankingReader.getTopRankings("ranking:products:2025012614", 0L, 11L) } returns rankings
+            every { rankingService.findRankings(any<RankingQuery>()) } returns rankings
             every { productService.findAllProductViewByIds(listOf(3L, 1L, 2L)) } returns productViews
 
             // when
@@ -187,6 +192,52 @@ class RankingFacadeTest {
             assertThat(result.rankings[1].rank).isEqualTo(2)
             assertThat(result.rankings[2].productId).isEqualTo(2L)
             assertThat(result.rankings[2].rank).isEqualTo(3)
+        }
+
+        @DisplayName("period=daily인 경우 일별 랭킹을 조회한다")
+        @Test
+        fun `queries daily rankings when period is daily`() {
+            // given
+            val criteria = RankingCriteria.FindRankings(
+                period = "daily",
+                date = null,
+                page = 0,
+                size = 10,
+            )
+
+            every { rankingService.findRankings(any<RankingQuery>()) } returns emptyList()
+
+            // when
+            rankingFacade.findRankings(criteria)
+
+            // then
+            verify { rankingService.findRankings(match<RankingQuery> { it.bucketKey.contains("daily") }) }
+        }
+
+        @DisplayName("period가 null이면 hourly로 조회한다")
+        @Test
+        fun `defaults to hourly when period is null`() {
+            // given
+            val criteria = RankingCriteria.FindRankings(
+                period = null,
+                date = null,
+                page = 0,
+                size = 10,
+            )
+
+            every { rankingService.findRankings(any<RankingQuery>()) } returns emptyList()
+
+            // when
+            rankingFacade.findRankings(criteria)
+
+            // then
+            verify {
+                rankingService.findRankings(
+                    match<RankingQuery> {
+                        it.bucketKey.startsWith("ranking:products:") && !it.bucketKey.contains("daily")
+                    },
+                )
+            }
         }
     }
 

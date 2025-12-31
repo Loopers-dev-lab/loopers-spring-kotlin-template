@@ -1,5 +1,7 @@
 package com.loopers.application.ranking
 
+import com.loopers.domain.ranking.RankingPeriod
+import com.loopers.domain.ranking.RankingQuery
 import java.math.BigDecimal
 
 class RankingCriteria {
@@ -7,22 +9,29 @@ class RankingCriteria {
     /**
      * 랭킹 조회 조건
      *
-     * @property date 조회할 시간대 (yyyyMMddHH 형식, null이면 현재 시간대)
+     * @property period 조회 기간 (hourly/daily, default: hourly)
+     * @property date 조회할 시간대 (hourly: yyyyMMddHH, daily: yyyyMMdd 형식, null이면 현재 시간대)
      * @property page 페이지 번호 (0-based, default: 0)
      * @property size 페이지 크기 (default: 20)
      */
     data class FindRankings(
+        val period: String? = null,
         val date: String? = null,
         val page: Int? = null,
         val size: Int? = null,
     ) {
-        companion object {
-            private const val DEFAULT_PAGE = 0
-            private const val DEFAULT_SIZE = 20
+        /**
+         * Converts to RankingQuery
+         * Provides .toQuery() method following the PageQuery pattern
+         */
+        fun toQuery(): RankingQuery {
+            return RankingQuery.of(
+                period = RankingPeriod.fromString(period),
+                date = date,
+                page = page,
+                size = size,
+            )
         }
-
-        fun resolvedPage(): Int = page ?: DEFAULT_PAGE
-        fun resolvedSize(): Int = size ?: DEFAULT_SIZE
     }
 
     /**

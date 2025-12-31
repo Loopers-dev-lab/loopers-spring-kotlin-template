@@ -61,6 +61,7 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             redisTemplate.opsForZSet().add(bucketKey, product2.id.toString(), 60.0)
 
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = null,
                 page = 0,
                 size = 10,
@@ -89,6 +90,7 @@ class RankingFacadeIntegrationTest @Autowired constructor(
         fun `returns empty list when no data in Redis`() {
             // given
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = null,
                 page = 0,
                 size = 10,
@@ -114,6 +116,7 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             }
 
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = null,
                 page = 0,
                 size = 2,
@@ -125,6 +128,89 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             // then
             assertThat(result.rankings).hasSize(2)
             assertThat(result.hasNext).isTrue()
+        }
+
+        @DisplayName("period=daily 일 때 일별 랭킹을 조회한다")
+        @Test
+        fun `returns daily rankings when period is daily`() {
+            // given
+            val product1 = createProduct(name = "상품1", stockQuantity = 50)
+            val product2 = createProduct(name = "상품2", stockQuantity = 30)
+
+            val dailyBucketKey = RankingKeyGenerator.currentDailyBucketKey()
+
+            redisTemplate.opsForZSet().add(dailyBucketKey, product2.id.toString(), 100.0)
+            redisTemplate.opsForZSet().add(dailyBucketKey, product1.id.toString(), 80.0)
+
+            val criteria = RankingCriteria.FindRankings(
+                period = "daily",
+                date = null,
+                page = 0,
+                size = 10,
+            )
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then
+            assertThat(result.rankings).hasSize(2)
+            assertThat(result.rankings[0].productId).isEqualTo(product2.id)
+            assertThat(result.rankings[0].rank).isEqualTo(1)
+            assertThat(result.rankings[1].productId).isEqualTo(product1.id)
+            assertThat(result.rankings[1].rank).isEqualTo(2)
+        }
+
+        @DisplayName("period가 null이면 hourly로 조회한다")
+        @Test
+        fun `defaults to hourly when period is null`() {
+            // given
+            val product1 = createProduct(name = "상품1")
+            val product2 = createProduct(name = "상품2")
+
+            val hourlyBucketKey = RankingKeyGenerator.currentBucketKey()
+            val dailyBucketKey = RankingKeyGenerator.currentDailyBucketKey()
+
+            // hourly에만 데이터 추가
+            redisTemplate.opsForZSet().add(hourlyBucketKey, product1.id.toString(), 100.0)
+            redisTemplate.opsForZSet().add(dailyBucketKey, product2.id.toString(), 100.0)
+
+            val criteria = RankingCriteria.FindRankings(
+                period = null,
+                date = null,
+                page = 0,
+                size = 10,
+            )
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then - hourly 데이터가 반환되어야 함
+            assertThat(result.rankings).hasSize(1)
+            assertThat(result.rankings[0].productId).isEqualTo(product1.id)
+        }
+
+        @DisplayName("현재 버킷이 비어있고 이전 버킷에 데이터가 있으면 폴백한다")
+        @Test
+        fun `falls back to previous bucket when current is empty`() {
+            // given
+            val product1 = createProduct(name = "상품1")
+
+            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+            redisTemplate.opsForZSet().add(previousBucketKey, product1.id.toString(), 100.0)
+
+            val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
+                date = null,
+                page = 0,
+                size = 10,
+            )
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then
+            assertThat(result.rankings).hasSize(1)
+            assertThat(result.rankings[0].productId).isEqualTo(product1.id)
         }
     }
 
