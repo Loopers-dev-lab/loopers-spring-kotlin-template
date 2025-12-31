@@ -415,7 +415,9 @@ docker-compose -f ./docker/infra-compose.yml ps
 - **Batch 랭킹 테이블**: Flyway 마이그레이션
   - `apps/commerce-batch/src/main/resources/db/migration/` 참고
   - V2: ProductRankDaily, ProductRankWeekly, ProductRankMonthly
+    - 일일 랭킹 영속화 및 주간/월간 집계 결과를 저장하는 Materialized View 테이블
   - V3: ProductMetrics
+    - 상품별 집계 통계 (조회수, 좋아요, 판매량 등) 메타데이터 관리
 
 ### 4. 애플리케이션 실행
 
@@ -431,10 +433,12 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:19092 ./gradlew :apps:commerce-streamer:bootRu
 
 # 주간 랭킹 배치 수동 실행
 # targetDate 형식: YYYY-MM-DD (예: 2025-12-29)
+# 지정한 날짜 기준 최근 7일간의 일일 랭킹을 집계하여 주간 순위 Materialized View 생성
 ./gradlew :apps:commerce-batch:bootRun --args='--spring.batch.job.name=weeklyRankingAggregationJob targetDate=2025-12-29'
 
 # 월간 랭킹 배치 수동 실행
 # targetYearMonth 형식: YYYYMM (예: 202412)
+# 해당 월의 일일 랭킹을 집계하여 월간 순위 Materialized View 생성
 ./gradlew :apps:commerce-batch:bootRun --args='--spring.batch.job.name=monthlyRankingAggregationJob targetYearMonth=202412'
 ```
 
