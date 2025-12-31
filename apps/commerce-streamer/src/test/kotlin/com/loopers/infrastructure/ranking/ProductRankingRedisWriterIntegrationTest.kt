@@ -168,6 +168,36 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             // then
             assertThat(redisTemplate.hasKey(testBucketKey)).isFalse()
         }
+
+        @DisplayName("100개를 초과하는 상품이 있을 경우 상위 100개만 유지한다")
+        @Test
+        fun `keeps only top 100 items when more than 100 are written`() {
+            // given - 150개 상품 생성 (점수: 1.0 ~ 150.0)
+            val scores = (1L..150L).associate { productId ->
+                productId to Score.of(productId.toDouble())
+            }
+
+            // when
+            productRankingWriter.replaceAll(testBucketKey, scores)
+
+            // then - 버킷에는 100개만 존재해야 함
+            val bucketSize = zSetOps.size(testBucketKey)
+            assertThat(bucketSize).isEqualTo(100)
+
+            // 상위 100개 (점수 51~150) 만 존재해야 함
+            // 점수 1~50은 삭제되어야 함
+            for (productId in 1L..50L) {
+                val score: Double? = zSetOps.score(testBucketKey, productId.toString())
+                assertThat(score).withFailMessage("Product $productId should be removed").isNull()
+            }
+
+            // 점수 51~150은 존재해야 함
+            for (productId in 51L..150L) {
+                val score: Double? = zSetOps.score(testBucketKey, productId.toString())
+                assertThat(score).withFailMessage("Product $productId should exist with score ${productId.toDouble()}").isNotNull()
+                assertThat(score).isEqualTo(productId.toDouble())
+            }
+        }
     }
 
     @DisplayName("createBucket()")

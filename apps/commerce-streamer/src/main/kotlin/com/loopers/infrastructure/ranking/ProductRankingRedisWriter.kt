@@ -21,6 +21,7 @@ class ProductRankingRedisWriter(
 
     companion object {
         private val TTL_SECONDS = java.time.Duration.ofHours(2).seconds
+        private const val MAX_BUCKET_SIZE = 100L
     }
 
     override fun incrementScores(bucketKey: String, deltas: Map<Long, Score>) {
@@ -60,6 +61,8 @@ class ProductRankingRedisWriter(
         }.toSet()
 
         zSetOps.add(bucketKey, tuples)
+        // Keep only top 100: remove all except ranks 0~99 (highest scores)
+        zSetOps.removeRange(bucketKey, 0, -(MAX_BUCKET_SIZE + 1))
         redisTemplate.expire(bucketKey, TTL_SECONDS, TimeUnit.SECONDS)
     }
 
