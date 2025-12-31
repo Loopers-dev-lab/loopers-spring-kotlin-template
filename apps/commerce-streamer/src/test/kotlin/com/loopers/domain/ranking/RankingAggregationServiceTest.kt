@@ -70,7 +70,6 @@ class RankingAggregationServiceTest {
                         viewDelta = 10,
                         likeCreatedDelta = 5,
                         likeCanceledDelta = 2,
-                        orderCountDelta = 3,
                         orderAmountDelta = BigDecimal("1000.00"),
                     ),
                 ),
@@ -89,7 +88,6 @@ class RankingAggregationServiceTest {
                             rows[0].productId == 1L &&
                             rows[0].viewCount == 10L &&
                             rows[0].likeCount == 3L && // 5 - 2
-                            rows[0].orderCount == 3L &&
                             rows[0].orderAmount == BigDecimal("1000.00")
                     },
                 )
@@ -164,7 +162,6 @@ class RankingAggregationServiceTest {
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 50,
-                orderCount = 10,
                 orderAmount = BigDecimal("5000.00"),
             )
 
@@ -193,7 +190,6 @@ class RankingAggregationServiceTest {
                 productId = 99L,
                 viewCount = 100,
                 likeCount = 0,
-                orderCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
 
@@ -231,7 +227,6 @@ class RankingAggregationServiceTest {
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 0,
-                orderCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
 
@@ -241,7 +236,6 @@ class RankingAggregationServiceTest {
                 productId = 1L,
                 viewCount = 200,
                 likeCount = 0,
-                orderCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
 
@@ -277,7 +271,6 @@ class RankingAggregationServiceTest {
                 productId = 1L,
                 viewCount = 10,
                 likeCount = 0,
-                orderCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
 

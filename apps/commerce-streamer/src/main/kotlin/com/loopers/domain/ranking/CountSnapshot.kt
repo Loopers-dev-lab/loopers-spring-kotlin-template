@@ -11,6 +11,5 @@ import java.math.BigDecimal
 data class CountSnapshot(
     val views: Long,
     val likes: Long,
-    val orderCount: Long,
     val orderAmount: BigDecimal,
 )

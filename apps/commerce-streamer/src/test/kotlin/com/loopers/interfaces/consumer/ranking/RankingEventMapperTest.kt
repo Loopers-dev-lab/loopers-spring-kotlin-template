@@ -56,7 +56,6 @@ class RankingEventMapperTest {
             assertThat(item.viewDelta).isEqualTo(1)
             assertThat(item.likeCreatedDelta).isEqualTo(0)
             assertThat(item.likeCanceledDelta).isEqualTo(0)
-            assertThat(item.orderCountDelta).isEqualTo(0)
             assertThat(item.orderAmountDelta).isEqualByComparingTo(BigDecimal.ZERO)
         }
 
@@ -150,12 +149,10 @@ class RankingEventMapperTest {
 
             // 상품 100: unitPrice 10000 * quantity 2 = 20000
             assertThat(items[0].productId).isEqualTo(100L)
-            assertThat(items[0].orderCountDelta).isEqualTo(1)
             assertThat(items[0].orderAmountDelta).isEqualByComparingTo(BigDecimal("20000"))
 
             // 상품 200: unitPrice 10000 * quantity 1 = 10000
             assertThat(items[1].productId).isEqualTo(200L)
-            assertThat(items[1].orderCountDelta).isEqualTo(1)
             assertThat(items[1].orderAmountDelta).isEqualByComparingTo(BigDecimal("10000"))
         }
 

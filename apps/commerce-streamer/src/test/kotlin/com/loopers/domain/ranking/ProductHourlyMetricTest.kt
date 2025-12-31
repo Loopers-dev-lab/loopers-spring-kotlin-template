@@ -23,7 +23,6 @@ class ProductHourlyMetricTest {
             val productId = 1L
             val viewCount = 100L
             val likeCount = 50L
-            val orderCount = 10L
             val orderAmount = BigDecimal("10000.00")
 
             // when
@@ -32,7 +31,6 @@ class ProductHourlyMetricTest {
                 productId = productId,
                 viewCount = viewCount,
                 likeCount = likeCount,
-                orderCount = orderCount,
                 orderAmount = orderAmount,
             )
 
@@ -41,7 +39,6 @@ class ProductHourlyMetricTest {
             assertThat(metric.productId).isEqualTo(productId)
             assertThat(metric.viewCount).isEqualTo(viewCount)
             assertThat(metric.likeCount).isEqualTo(likeCount)
-            assertThat(metric.orderCount).isEqualTo(orderCount)
             assertThat(metric.orderAmount).isEqualTo(orderAmount)
         }
 
@@ -63,7 +60,6 @@ class ProductHourlyMetricTest {
             assertThat(metric.productId).isEqualTo(productId)
             assertThat(metric.viewCount).isEqualTo(0L)
             assertThat(metric.likeCount).isEqualTo(0L)
-            assertThat(metric.orderCount).isEqualTo(0L)
             assertThat(metric.orderAmount).isEqualTo(BigDecimal.ZERO)
         }
     }
@@ -72,7 +68,7 @@ class ProductHourlyMetricTest {
     @Nested
     inner class DefaultValues {
 
-        @DisplayName("viewCount, likeCount, orderCount, orderAmount가 0으로 초기화된다")
+        @DisplayName("viewCount, likeCount, orderAmount가 0으로 초기화된다")
         @Test
         fun `all counts are initialized to zero`() {
             // given
@@ -85,7 +81,6 @@ class ProductHourlyMetricTest {
             // then
             assertThat(metric.viewCount).isEqualTo(0L)
             assertThat(metric.likeCount).isEqualTo(0L)
-            assertThat(metric.orderCount).isEqualTo(0L)
             assertThat(metric.orderAmount).isEqualByComparingTo(BigDecimal.ZERO)
         }
     }
@@ -116,7 +111,6 @@ class ProductHourlyMetricTest {
             val productId = 999L
             val viewCount = 10L
             val likeCount = 20L
-            val orderCount = 30L
             val orderAmount = BigDecimal("5000.00")
 
             // when
@@ -125,7 +119,6 @@ class ProductHourlyMetricTest {
                 productId = productId,
                 viewCount = viewCount,
                 likeCount = likeCount,
-                orderCount = orderCount,
                 orderAmount = orderAmount,
             )
 
@@ -135,7 +128,6 @@ class ProductHourlyMetricTest {
             assertThat(metric.productId).isEqualTo(productId)
             assertThat(metric.viewCount).isEqualTo(viewCount)
             assertThat(metric.likeCount).isEqualTo(likeCount)
-            assertThat(metric.orderCount).isEqualTo(orderCount)
             assertThat(metric.orderAmount).isEqualTo(orderAmount)
         }
     }
@@ -160,24 +152,6 @@ class ProductHourlyMetricTest {
                 )
             }.isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("viewCount")
-        }
-
-        @DisplayName("orderCount가 음수이면 예외가 발생한다")
-        @Test
-        fun `throws exception when orderCount is negative`() {
-            // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
-            val productId = 1L
-
-            // when & then
-            assertThatThrownBy {
-                ProductHourlyMetric(
-                    statHour = statHour,
-                    productId = productId,
-                    orderCount = -1L,
-                )
-            }.isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("orderCount")
         }
 
         @DisplayName("likeCount는 음수가 허용된다")
@@ -211,7 +185,6 @@ class ProductHourlyMetricTest {
             val productId = 1L
             val viewCount = 100L
             val likeCount = 50L
-            val orderCount = 10L
             val orderAmount = BigDecimal("10000.00")
 
             val metric = ProductHourlyMetric(
@@ -219,7 +192,6 @@ class ProductHourlyMetricTest {
                 productId = productId,
                 viewCount = viewCount,
                 likeCount = likeCount,
-                orderCount = orderCount,
                 orderAmount = orderAmount,
             )
 
@@ -229,7 +201,6 @@ class ProductHourlyMetricTest {
             // then
             assertThat(snapshot.views).isEqualTo(viewCount)
             assertThat(snapshot.likes).isEqualTo(likeCount)
-            assertThat(snapshot.orderCount).isEqualTo(orderCount)
             assertThat(snapshot.orderAmount).isEqualTo(orderAmount)
         }
 
@@ -251,7 +222,6 @@ class ProductHourlyMetricTest {
             // then
             assertThat(snapshot.views).isEqualTo(0L)
             assertThat(snapshot.likes).isEqualTo(0L)
-            assertThat(snapshot.orderCount).isEqualTo(0L)
             assertThat(snapshot.orderAmount).isEqualByComparingTo(BigDecimal.ZERO)
         }
 
@@ -288,7 +258,6 @@ class ProductHourlyMetricTest {
             val productId = 1L
             val viewCount = 100L
             val likeCount = 50L
-            val orderCount = 10L
             val orderAmount = BigDecimal("10000.00")
 
             // when
@@ -297,7 +266,6 @@ class ProductHourlyMetricTest {
                 productId = productId,
                 viewCount = viewCount,
                 likeCount = likeCount,
-                orderCount = orderCount,
                 orderAmount = orderAmount,
             )
 
@@ -306,7 +274,6 @@ class ProductHourlyMetricTest {
             assertThat(metric.productId).isEqualTo(productId)
             assertThat(metric.viewCount).isEqualTo(viewCount)
             assertThat(metric.likeCount).isEqualTo(likeCount)
-            assertThat(metric.orderCount).isEqualTo(orderCount)
             assertThat(metric.orderAmount).isEqualTo(orderAmount)
         }
 
@@ -326,7 +293,6 @@ class ProductHourlyMetricTest {
             // then
             assertThat(metric.viewCount).isEqualTo(0L)
             assertThat(metric.likeCount).isEqualTo(0L)
-            assertThat(metric.orderCount).isEqualTo(0L)
             assertThat(metric.orderAmount).isEqualTo(BigDecimal.ZERO)
         }
     }

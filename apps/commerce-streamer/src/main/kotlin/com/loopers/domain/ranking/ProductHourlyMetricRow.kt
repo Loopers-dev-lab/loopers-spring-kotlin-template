@@ -14,6 +14,5 @@ data class ProductHourlyMetricRow(
     val statHour: Instant,
     val viewCount: Long,
     val likeCount: Long,
-    val orderCount: Long,
     val orderAmount: BigDecimal,
 )

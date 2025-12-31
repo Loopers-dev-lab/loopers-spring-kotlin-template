@@ -66,7 +66,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
                         viewDelta = 10,
                         likeCreatedDelta = 5,
                         likeCanceledDelta = 2,
-                        orderCountDelta = 3,
                         orderAmountDelta = BigDecimal("1000.00"),
                     ),
                 ),
@@ -81,7 +80,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             assertThat(metrics[0].productId).isEqualTo(1L)
             assertThat(metrics[0].viewCount).isEqualTo(10L)
             assertThat(metrics[0].likeCount).isEqualTo(3L) // 5 - 2
-            assertThat(metrics[0].orderCount).isEqualTo(3L)
             assertThat(metrics[0].orderAmount).isEqualByComparingTo(BigDecimal("1000.00"))
         }
 
@@ -168,7 +166,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 50,
-                orderCount = 10,
                 orderAmount = BigDecimal("1000.00"),
             )
             productHourlyMetricJpaRepository.save(metric)
@@ -198,7 +195,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 0,
-                orderCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
 
@@ -208,7 +204,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
                 productId = 1L,
                 viewCount = 200,
                 likeCount = 0,
-                orderCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
 
@@ -237,7 +232,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
                 productId = 99L,
                 viewCount = 100,
                 likeCount = 0,
-                orderCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
             productHourlyMetricJpaRepository.save(previousMetric)
@@ -264,7 +258,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 0,
-                orderCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
             val metric2 = ProductHourlyMetric.create(
@@ -272,7 +265,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
                 productId = 2L,
                 viewCount = 200,
                 likeCount = 0,
-                orderCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
             productHourlyMetricJpaRepository.saveAll(listOf(metric1, metric2))

@@ -25,7 +25,6 @@ class AccumulateMetricsCommandTest {
             val viewDelta = 10L
             val likeCreatedDelta = 5L
             val likeCanceledDelta = 2L
-            val orderCountDelta = 3L
             val orderAmountDelta = BigDecimal("15000.50")
 
             // when
@@ -35,7 +34,6 @@ class AccumulateMetricsCommandTest {
                 viewDelta = viewDelta,
                 likeCreatedDelta = likeCreatedDelta,
                 likeCanceledDelta = likeCanceledDelta,
-                orderCountDelta = orderCountDelta,
                 orderAmountDelta = orderAmountDelta,
             )
 
@@ -45,7 +43,6 @@ class AccumulateMetricsCommandTest {
             assertThat(item.viewDelta).isEqualTo(viewDelta)
             assertThat(item.likeCreatedDelta).isEqualTo(likeCreatedDelta)
             assertThat(item.likeCanceledDelta).isEqualTo(likeCanceledDelta)
-            assertThat(item.orderCountDelta).isEqualTo(orderCountDelta)
             assertThat(item.orderAmountDelta).isEqualByComparingTo(orderAmountDelta)
         }
 
@@ -67,7 +64,6 @@ class AccumulateMetricsCommandTest {
             assertThat(item.viewDelta).isEqualTo(0L)
             assertThat(item.likeCreatedDelta).isEqualTo(0L)
             assertThat(item.likeCanceledDelta).isEqualTo(0L)
-            assertThat(item.orderCountDelta).isEqualTo(0L)
             assertThat(item.orderAmountDelta).isEqualByComparingTo(BigDecimal.ZERO)
         }
 
@@ -89,23 +85,20 @@ class AccumulateMetricsCommandTest {
             assertThat(item.viewDelta).isEqualTo(viewDelta)
             assertThat(item.likeCreatedDelta).isEqualTo(0L)
             assertThat(item.likeCanceledDelta).isEqualTo(0L)
-            assertThat(item.orderCountDelta).isEqualTo(0L)
             assertThat(item.orderAmountDelta).isEqualByComparingTo(BigDecimal.ZERO)
         }
 
-        @DisplayName("orderCountDelta와 orderAmountDelta만 지정하여 Item을 생성할 수 있다")
+        @DisplayName("orderAmountDelta만 지정하여 Item을 생성할 수 있다")
         @Test
-        fun `can create Item with only order deltas specified`() {
+        fun `can create Item with only orderAmountDelta specified`() {
             // given
             val productId = 321L
-            val orderCountDelta = 5L
             val orderAmountDelta = BigDecimal("50000.00")
 
             // when
             val item = AccumulateMetricsCommand.Item(
                 productId = productId,
                 statHour = testStatHour,
-                orderCountDelta = orderCountDelta,
                 orderAmountDelta = orderAmountDelta,
             )
 
@@ -113,7 +106,6 @@ class AccumulateMetricsCommandTest {
             assertThat(item.viewDelta).isEqualTo(0L)
             assertThat(item.likeCreatedDelta).isEqualTo(0L)
             assertThat(item.likeCanceledDelta).isEqualTo(0L)
-            assertThat(item.orderCountDelta).isEqualTo(orderCountDelta)
             assertThat(item.orderAmountDelta).isEqualByComparingTo(orderAmountDelta)
         }
     }
@@ -168,7 +160,6 @@ class AccumulateMetricsCommandTest {
                 AccumulateMetricsCommand.Item(
                     productId = 3L,
                     statHour = testStatHour,
-                    orderCountDelta = 2L,
                     orderAmountDelta = BigDecimal("30000.00"),
                 ),
             )
@@ -183,7 +174,6 @@ class AccumulateMetricsCommandTest {
             assertThat(command.items[1].productId).isEqualTo(2L)
             assertThat(command.items[1].likeCreatedDelta).isEqualTo(3L)
             assertThat(command.items[2].productId).isEqualTo(3L)
-            assertThat(command.items[2].orderCountDelta).isEqualTo(2L)
             assertThat(command.items[2].orderAmountDelta).isEqualByComparingTo(BigDecimal("30000.00"))
         }
 

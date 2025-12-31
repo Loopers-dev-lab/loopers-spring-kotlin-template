@@ -74,7 +74,6 @@ class RankingEventMapper(
                     AccumulateMetricsCommand.Item(
                         productId = item.productId,
                         statHour = statHour,
-                        orderCountDelta = 1,
                         orderAmountDelta = (item.unitPrice * item.quantity).toBigDecimal(),
                     )
                 }

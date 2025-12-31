@@ -143,7 +143,6 @@ class RankingEventConsumerTest {
             assertThat(item.viewDelta).isEqualTo(1)
             assertThat(item.likeCreatedDelta).isEqualTo(0)
             assertThat(item.likeCanceledDelta).isEqualTo(0)
-            assertThat(item.orderCountDelta).isEqualTo(0)
             assertThat(item.orderAmountDelta).isEqualByComparingTo(BigDecimal.ZERO)
         }
 
@@ -216,12 +215,10 @@ class RankingEventConsumerTest {
 
             val item1 = commandSlot.captured.items[0]
             assertThat(item1.productId).isEqualTo(100L)
-            assertThat(item1.orderCountDelta).isEqualTo(1)
             assertThat(item1.orderAmountDelta).isEqualByComparingTo(BigDecimal("20000")) // 10000 * 2
 
             val item2 = commandSlot.captured.items[1]
             assertThat(item2.productId).isEqualTo(200L)
-            assertThat(item2.orderCountDelta).isEqualTo(1)
             assertThat(item2.orderAmountDelta).isEqualByComparingTo(BigDecimal("10000")) // 10000 * 1
         }
     }

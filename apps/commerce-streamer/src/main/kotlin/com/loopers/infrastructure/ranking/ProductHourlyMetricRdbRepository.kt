@@ -28,13 +28,12 @@ class ProductHourlyMetricRdbRepository(
 
         val sql = """
             INSERT INTO product_hourly_metric
-                (stat_hour, product_id, view_count, like_count, order_count, order_amount, created_at, updated_at)
+                (stat_hour, product_id, view_count, like_count, order_amount, created_at, updated_at)
             VALUES
-                (:statHour, :productId, :viewCount, :likeCount, :orderCount, :orderAmount, NOW(), NOW())
+                (:statHour, :productId, :viewCount, :likeCount, :orderAmount, NOW(), NOW())
             ON DUPLICATE KEY UPDATE
                 view_count = view_count + VALUES(view_count),
                 like_count = like_count + VALUES(like_count),
-                order_count = order_count + VALUES(order_count),
                 order_amount = order_amount + VALUES(order_amount),
                 updated_at = NOW()
         """.trimIndent()
@@ -45,7 +44,6 @@ class ProductHourlyMetricRdbRepository(
                 .setParameter("productId", row.productId)
                 .setParameter("viewCount", row.viewCount)
                 .setParameter("likeCount", row.likeCount)
-                .setParameter("orderCount", row.orderCount)
                 .setParameter("orderAmount", row.orderAmount)
                 .executeUpdate()
         }

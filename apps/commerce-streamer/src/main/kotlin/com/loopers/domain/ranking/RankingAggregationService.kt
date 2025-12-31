@@ -42,7 +42,6 @@ class RankingAggregationService(
                 statHour = item.statHour.toInstant().truncatedTo(ChronoUnit.HOURS),
                 viewCount = item.viewDelta,
                 likeCount = item.likeCreatedDelta - item.likeCanceledDelta,
-                orderCount = item.orderCountDelta,
                 orderAmount = item.orderAmountDelta,
             )
         }

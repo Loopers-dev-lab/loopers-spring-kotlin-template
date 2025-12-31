@@ -28,7 +28,6 @@ class RankingScoreCalculatorTest {
             val snapshot = CountSnapshot(
                 views = 100L,
                 likes = 50L,
-                orderCount = 10L,
                 orderAmount = BigDecimal("10000.00"),
             )
             val weight = RankingWeight(
@@ -55,7 +54,6 @@ class RankingScoreCalculatorTest {
             val snapshot = CountSnapshot(
                 views = 0L,
                 likes = 0L,
-                orderCount = 0L,
                 orderAmount = BigDecimal.ZERO,
             )
             val weight = RankingWeight(
@@ -78,7 +76,6 @@ class RankingScoreCalculatorTest {
             val snapshot = CountSnapshot(
                 views = 1000L,
                 likes = 0L,
-                orderCount = 0L,
                 orderAmount = BigDecimal.ZERO,
             )
             val weight = RankingWeight(
@@ -103,7 +100,6 @@ class RankingScoreCalculatorTest {
             val snapshot = CountSnapshot(
                 views = 0L,
                 likes = 200L,
-                orderCount = 0L,
                 orderAmount = BigDecimal.ZERO,
             )
             val weight = RankingWeight(
@@ -128,7 +124,6 @@ class RankingScoreCalculatorTest {
             val snapshot = CountSnapshot(
                 views = 0L,
                 likes = 0L,
-                orderCount = 5L,
                 orderAmount = BigDecimal("50000.00"),
             )
             val weight = RankingWeight(
@@ -153,7 +148,6 @@ class RankingScoreCalculatorTest {
             val snapshot = CountSnapshot(
                 views = 100L,
                 likes = -10L,
-                orderCount = 0L,
                 orderAmount = BigDecimal.ZERO,
             )
             val weight = RankingWeight(
@@ -178,7 +172,6 @@ class RankingScoreCalculatorTest {
             val snapshot = CountSnapshot(
                 views = 0L,
                 likes = -100L,
-                orderCount = 0L,
                 orderAmount = BigDecimal.ZERO,
             )
             val weight = RankingWeight(
@@ -203,7 +196,6 @@ class RankingScoreCalculatorTest {
             val snapshot = CountSnapshot(
                 views = 100L,
                 likes = 50L,
-                orderCount = 10L,
                 orderAmount = BigDecimal("10000.00"),
             )
             val weight = RankingWeight.fallback()
@@ -226,7 +218,6 @@ class RankingScoreCalculatorTest {
             val snapshot = CountSnapshot(
                 views = 3L,
                 likes = 7L,
-                orderCount = 1L,
                 orderAmount = BigDecimal("33.33"),
             )
             val weight = RankingWeight(

@@ -17,7 +17,6 @@ data class AccumulateMetricsCommand(
         val viewDelta: Long = 0,
         val likeCreatedDelta: Long = 0,
         val likeCanceledDelta: Long = 0,
-        val orderCountDelta: Long = 0,
         val orderAmountDelta: BigDecimal = BigDecimal.ZERO,
     )
 }

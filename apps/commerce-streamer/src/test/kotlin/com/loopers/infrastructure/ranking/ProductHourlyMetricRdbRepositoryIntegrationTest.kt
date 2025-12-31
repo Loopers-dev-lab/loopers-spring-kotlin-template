@@ -41,7 +41,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                 statHour = statHour,
                 viewCount = 10L,
                 likeCount = 5L,
-                orderCount = 2L,
                 orderAmount = BigDecimal("1000.00"),
             )
 
@@ -56,7 +55,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
             assertThat(result.productId).isEqualTo(1L)
             assertThat(result.viewCount).isEqualTo(10L)
             assertThat(result.likeCount).isEqualTo(5L)
-            assertThat(result.orderCount).isEqualTo(2L)
             assertThat(result.orderAmount).isEqualByComparingTo(BigDecimal("1000.00"))
         }
 
@@ -70,7 +68,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                 statHour = statHour,
                 viewCount = 10L,
                 likeCount = 5L,
-                orderCount = 2L,
                 orderAmount = BigDecimal("1000.00"),
             )
             productHourlyMetricRepository.batchAccumulateCounts(listOf(firstRow))
@@ -80,7 +77,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                 statHour = statHour,
                 viewCount = 20L,
                 likeCount = 10L,
-                orderCount = 3L,
                 orderAmount = BigDecimal("2000.00"),
             )
 
@@ -94,7 +90,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
             val result = results[0]
             assertThat(result.viewCount).isEqualTo(30L) // 10 + 20
             assertThat(result.likeCount).isEqualTo(15L) // 5 + 10
-            assertThat(result.orderCount).isEqualTo(5L) // 2 + 3
             assertThat(result.orderAmount).isEqualByComparingTo(BigDecimal("3000.00")) // 1000 + 2000
         }
 
@@ -109,7 +104,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                     statHour = statHour,
                     viewCount = 10L,
                     likeCount = 5L,
-                    orderCount = 2L,
                     orderAmount = BigDecimal("1000.00"),
                 ),
                 ProductHourlyMetricRow(
@@ -117,7 +111,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                     statHour = statHour,
                     viewCount = 20L,
                     likeCount = 10L,
-                    orderCount = 4L,
                     orderAmount = BigDecimal("2000.00"),
                 ),
             )
@@ -152,7 +145,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                 statHour = statHour,
                 viewCount = 10L,
                 likeCount = 5L,
-                orderCount = 2L,
                 orderAmount = BigDecimal("1000.00"),
             )
             productHourlyMetricRepository.batchAccumulateCounts(listOf(firstRow))
@@ -163,7 +155,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                 statHour = statHour,
                 viewCount = 0L,
                 likeCount = -3L,
-                orderCount = 0L,
                 orderAmount = BigDecimal.ZERO,
             )
 
@@ -189,7 +180,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                     statHour = statHour1,
                     viewCount = 10L,
                     likeCount = 5L,
-                    orderCount = 2L,
                     orderAmount = BigDecimal("1000.00"),
                 ),
                 ProductHourlyMetricRow(
@@ -197,7 +187,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                     statHour = statHour2,
                     viewCount = 20L,
                     likeCount = 10L,
-                    orderCount = 4L,
                     orderAmount = BigDecimal("2000.00"),
                 ),
             )
@@ -231,7 +220,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                     statHour = statHour,
                     viewCount = 10L,
                     likeCount = 5L,
-                    orderCount = 2L,
                     orderAmount = BigDecimal("1000.00"),
                 ),
                 ProductHourlyMetricRow(
@@ -239,7 +227,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                     statHour = statHour,
                     viewCount = 20L,
                     likeCount = 10L,
-                    orderCount = 4L,
                     orderAmount = BigDecimal("2000.00"),
                 ),
             )
@@ -266,7 +253,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                     statHour = statHour1,
                     viewCount = 10L,
                     likeCount = 5L,
-                    orderCount = 2L,
                     orderAmount = BigDecimal("1000.00"),
                 ),
                 ProductHourlyMetricRow(
@@ -274,7 +260,6 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
                     statHour = statHour2,
                     viewCount = 20L,
                     likeCount = 10L,
-                    orderCount = 4L,
                     orderAmount = BigDecimal("2000.00"),
                 ),
             )

@@ -13,7 +13,7 @@ import java.time.ZonedDateTime
  *
  * - 1시간 단위로 상품별 조회/좋아요/주문 통계를 저장
  * - (statHour, productId) 조합이 고유
- * - viewCount, orderCount는 음수가 될 수 없음
+ * - viewCount는 음수가 될 수 없음
  * - likeCount는 음수 가능 (예: 14:00에 좋아요 → 15:00에 취소 → 15:00 버킷의 likeCount = -1)
  */
 @Entity
@@ -36,9 +36,6 @@ class ProductHourlyMetric(
     @Column(name = "like_count", nullable = false)
     var likeCount: Long = 0,
 
-    @Column(name = "order_count", nullable = false)
-    var orderCount: Long = 0,
-
     @Column(name = "order_amount", nullable = false, precision = 15, scale = 2)
     var orderAmount: BigDecimal = BigDecimal.ZERO,
 ) : BaseEntity() {
@@ -49,7 +46,6 @@ class ProductHourlyMetric(
 
     private fun validateCounts() {
         require(viewCount >= 0) { "viewCount는 음수가 될 수 없습니다: $viewCount" }
-        require(orderCount >= 0) { "orderCount는 음수가 될 수 없습니다: $orderCount" }
     }
 
     /**
@@ -59,7 +55,6 @@ class ProductHourlyMetric(
         CountSnapshot(
             views = viewCount,
             likes = likeCount,
-            orderCount = orderCount,
             orderAmount = orderAmount,
         )
 
@@ -69,7 +64,6 @@ class ProductHourlyMetric(
             productId: Long,
             viewCount: Long = 0,
             likeCount: Long = 0,
-            orderCount: Long = 0,
             orderAmount: BigDecimal = BigDecimal.ZERO,
         ): ProductHourlyMetric {
             return ProductHourlyMetric(
@@ -77,7 +71,6 @@ class ProductHourlyMetric(
                 productId = productId,
                 viewCount = viewCount,
                 likeCount = likeCount,
-                orderCount = orderCount,
                 orderAmount = orderAmount,
             )
         }
