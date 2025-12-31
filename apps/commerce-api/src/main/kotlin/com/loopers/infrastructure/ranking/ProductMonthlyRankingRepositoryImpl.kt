@@ -15,7 +15,6 @@ class ProductMonthlyRankingRepositoryImpl(
 ) : ProductMonthlyRankingRepository {
 
     override fun findByMonthPeriod(monthPeriod: YearMonth, pageable: Pageable): Page<ProductMonthlyRanking> {
-        val sortedPageable = PageRequest.of(pageable.pageNumber, pageable.pageSize, Sort.by("ranking").ascending())
-        return productMonthlyRankingJpaRepository.findByMonthPeriod(monthPeriod, sortedPageable)
+        return productMonthlyRankingJpaRepository.findByMonthPeriod(monthPeriod, pageable)
     }
 }
