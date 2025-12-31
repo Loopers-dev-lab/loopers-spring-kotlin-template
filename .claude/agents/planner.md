@@ -82,17 +82,11 @@ Worker agent reads plan.md and:
 <instructions>
 ## How to Create plan.md
 
-Follow the planning skill. It provides everything you need: workflow, milestone structure, action types, templates, and
-examples.
+Follow the planning skill. It provides everything you need: workflow, milestone structure, action types, templates, examples, and spec alignment principles.
 
 ## Planner-Specific Responsibilities
 
-1. **Spec Coverage**: Every requirement in spec files MUST map to at least one milestone.
+1. **Use research.md**: Populate pattern references in milestones using the file paths and patterns from research.md.
 
-2. **Use research.md**: Populate pattern references in milestones using the file paths and patterns from research.md.
-
-3. **Invoke plan-validator**: After creating plan.md, always invoke plan-validator and handle the validation loop.
-
-4. **Surface Clarifications**: If spec documents have business ambiguities, put them in milestone Clarifications
-   sections. Do NOT assume.
-   </instructions>
+2. **Invoke plan-validator**: After creating plan.md, always invoke plan-validator and handle the validation loop.
+</instructions>
