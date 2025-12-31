@@ -14,8 +14,22 @@ import java.util.concurrent.atomic.AtomicReference
 class MetricBuffer {
     private val bufferRef = AtomicReference(ConcurrentHashMap<AggregationKey, MutableCounts>())
 
+    companion object {
+        private const val MAX_RETRY_COUNT = 3
+    }
+
     private fun getOrCreate(key: AggregationKey): MutableCounts {
-        return bufferRef.get().computeIfAbsent(key) { MutableCounts() }
+        // CAS loop: poll()과의 경합 조건 방지
+        // bufferRef.get() 후 poll()이 버퍼를 교체하면 증분이 유실될 수 있으므로,
+        // 연산 후 버퍼가 동일한지 확인하고 교체되었으면 새 버퍼에 재시도
+        repeat(MAX_RETRY_COUNT) {
+            val currentBuffer = bufferRef.get()
+            val counts = currentBuffer.computeIfAbsent(key) { MutableCounts() }
+            if (bufferRef.get() === currentBuffer) {
+                return counts
+            }
+        }
+        throw IllegalStateException("버퍼 경합이 $MAX_RETRY_COUNT 회 연속 발생. poll() 호출 빈도를 확인하세요.")
     }
 
     fun incrementView(key: AggregationKey) {
