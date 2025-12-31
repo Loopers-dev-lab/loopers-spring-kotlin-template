@@ -68,7 +68,7 @@ class OutboxEventListenerIntegrationTest @Autowired constructor(
                 userId = 1L,
                 totalAmount = 10000L,
                 orderItems = listOf(
-                    OrderPaidEventV1.OrderItemSnapshot(productId = 1L, quantity = 2),
+                    OrderPaidEventV1.OrderItemSnapshot(productId = 1L, quantity = 2, unitPrice = 5000L),
                 ),
             )
 

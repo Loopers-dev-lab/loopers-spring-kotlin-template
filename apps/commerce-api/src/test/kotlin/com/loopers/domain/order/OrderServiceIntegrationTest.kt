@@ -159,8 +159,10 @@ class OrderServiceIntegrationTest @Autowired constructor(
             assertThat(event.orderItems).hasSize(2)
             assertThat(event.orderItems[0].productId).isEqualTo(product1.id)
             assertThat(event.orderItems[0].quantity).isEqualTo(2)
+            assertThat(event.orderItems[0].unitPrice).isEqualTo(10000L)
             assertThat(event.orderItems[1].productId).isEqualTo(product2.id)
             assertThat(event.orderItems[1].quantity).isEqualTo(3)
+            assertThat(event.orderItems[1].unitPrice).isEqualTo(10000L)
         }
     }
 

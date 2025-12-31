@@ -14,9 +14,10 @@ class ProductInfo {
         val brandId: Long,
         val brandName: String,
         val likeCount: Long,
+        val rank: Int?,
     ) {
         companion object {
-            fun from(view: ProductView): FindProductById {
+            fun from(view: ProductView, rank: Int?): FindProductById {
                 return FindProductById(
                     productId = view.productId,
                     name = view.productName,
@@ -26,6 +27,7 @@ class ProductInfo {
                     brandId = view.brandId,
                     brandName = view.brandName,
                     likeCount = view.likeCount,
+                    rank = rank,
                 )
             }
         }

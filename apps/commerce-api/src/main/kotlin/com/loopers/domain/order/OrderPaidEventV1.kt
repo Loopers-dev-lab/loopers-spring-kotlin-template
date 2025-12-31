@@ -14,6 +14,7 @@ data class OrderPaidEventV1(
     data class OrderItemSnapshot(
         val productId: Long,
         val quantity: Int,
+        val unitPrice: Long,
     )
 
     companion object {
@@ -26,6 +27,7 @@ data class OrderPaidEventV1(
                     OrderItemSnapshot(
                         productId = item.productId,
                         quantity = item.quantity,
+                        unitPrice = item.unitPrice.amount.toLong(),
                     )
                 },
             )
