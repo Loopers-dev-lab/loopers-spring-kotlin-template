@@ -8,21 +8,15 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.event.ApplicationEvents
-import org.springframework.test.context.event.RecordApplicationEvents
 import java.math.BigDecimal
 
 @SpringBootTest
-@RecordApplicationEvents
 @DisplayName("RankingService 통합 테스트")
 class RankingServiceIntegrationTest @Autowired constructor(
     private val rankingService: RankingService,
     private val rankingWeightRepository: RankingWeightRepository,
     private val databaseCleanUp: DatabaseCleanUp,
 ) {
-
-    @Autowired
-    private lateinit var applicationEvents: ApplicationEvents
 
     @AfterEach
     fun tearDown() {
@@ -123,30 +117,6 @@ class RankingServiceIntegrationTest @Autowired constructor(
             val latest = rankingWeightRepository.findLatest()
             assertThat(latest).isNotNull
             assertThat(latest!!.viewWeight).isEqualByComparingTo(BigDecimal("0.25"))
-        }
-
-        @DisplayName("업데이트 시 RankingWeightChangedEventV1 이벤트가 발행된다")
-        @Test
-        fun `publishes RankingWeightChangedEventV1 when updating`() {
-            // given
-            rankingWeightRepository.save(
-                RankingWeight.create(
-                    viewWeight = BigDecimal("0.10"),
-                    likeWeight = BigDecimal("0.20"),
-                    orderWeight = BigDecimal("0.60"),
-                ),
-            )
-
-            // when
-            rankingService.updateWeight(
-                viewWeight = BigDecimal("0.30"),
-                likeWeight = BigDecimal("0.30"),
-                orderWeight = BigDecimal("0.40"),
-            )
-
-            // then
-            val events = applicationEvents.stream(RankingWeightChangedEventV1::class.java).toList()
-            assertThat(events).hasSize(1)
         }
     }
 }

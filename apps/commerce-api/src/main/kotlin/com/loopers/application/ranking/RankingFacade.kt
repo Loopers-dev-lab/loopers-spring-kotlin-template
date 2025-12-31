@@ -76,9 +76,6 @@ class RankingFacade(
 
     /**
      * 가중치 수정 (US-3)
-     *
-     * 1. RankingService.updateWeight() 호출
-     * 2. RankingWeightChangedEventV1 이벤트 발행 (서비스 내부에서 처리)
      */
     @Transactional
     fun updateWeight(criteria: RankingCriteria.UpdateWeight): RankingInfo.UpdateWeight {
