@@ -85,11 +85,13 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
 
         // then - Consumer가 처리할 때까지 대기 후 검증
         await atMost Duration.ofSeconds(10) untilAsserted {
-            val metrics = productMetricsRepository.findByProductId(productId)
+            val metricDate = event.timestamp.toLocalDate()
+            val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
             assertThat(metrics).isNotNull
             assertThat(metrics!!.likeCount).isEqualTo(1)
 
-            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, productId.toString())).isTrue()
+            val aggregateId = "${productId}_$metricDate"
+            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId)).isTrue()
         }
     }
 
@@ -110,11 +112,13 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
 
         // then
         await atMost Duration.ofSeconds(10) untilAsserted {
-            val metrics = productMetricsRepository.findByProductId(productId)
+            val metricDate = event.timestamp.toLocalDate()
+            val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
             assertThat(metrics).isNotNull
             assertThat(metrics!!.viewCount).isEqualTo(1)
 
-            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, productId.toString())).isTrue()
+            val aggregateId = "${productId}_$metricDate"
+            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId)).isTrue()
         }
     }
 
@@ -141,17 +145,20 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
 
         // then
         await atMost Duration.ofSeconds(10) untilAsserted {
-            val metrics1 = productMetricsRepository.findByProductId(productId1)
+            val metricDate = event.timestamp.toLocalDate()
+            val metrics1 = productMetricsRepository.findByProductIdAndMetricDate(productId1, metricDate)
             assertThat(metrics1).isNotNull
             assertThat(metrics1!!.soldCount).isEqualTo(2)
 
-            val metrics2 = productMetricsRepository.findByProductId(productId2)
+            val metrics2 = productMetricsRepository.findByProductIdAndMetricDate(productId2, metricDate)
             assertThat(metrics2).isNotNull
             assertThat(metrics2!!.soldCount).isEqualTo(3)
 
             // 동일 eventId로 상품별 aggregateId 조합으로 처리됨
-            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, productId1.toString())).isTrue()
-            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, productId2.toString())).isTrue()
+            val aggregateId1 = "${productId1}_$metricDate"
+            val aggregateId2 = "${productId2}_$metricDate"
+            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId1)).isTrue()
+            assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId2)).isTrue()
         }
     }
 
@@ -174,7 +181,8 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
 
         // 주문 완료 처리 대기
         await atMost Duration.ofSeconds(10) untilAsserted {
-            val metrics = productMetricsRepository.findByProductId(productId)
+            val metricDate = orderCompletedEvent.timestamp.toLocalDate()
+            val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
             assertThat(metrics).isNotNull
             assertThat(metrics!!.soldCount).isEqualTo(5)
         }
@@ -195,7 +203,8 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
 
         // then
         await atMost Duration.ofSeconds(10) untilAsserted {
-            val metrics = productMetricsRepository.findByProductId(productId)
+            val metricDate = orderCanceledEvent.timestamp.toLocalDate()
+            val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
             assertThat(metrics).isNotNull
             assertThat(metrics!!.soldCount).isEqualTo(0)
         }
@@ -222,7 +231,8 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
 
         // then - 좋아요 수는 1만 증가
         await atMost Duration.ofSeconds(15) untilAsserted {
-            val metrics = productMetricsRepository.findByProductId(productId)
+            val metricDate = event.timestamp.toLocalDate()
+            val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
             assertThat(metrics).isNotNull
             assertThat(metrics!!.likeCount).isEqualTo(1)
         }
@@ -251,12 +261,15 @@ class KafkaConsumerIntegrationTest : IntegrationTest() {
 
         // then - 5개 모두 처리됨
         await atMost Duration.ofSeconds(15) untilAsserted {
-            val metrics = productMetricsRepository.findByProductId(productId)
+            // 첫 번째 이벤트의 날짜를 사용 (모두 같은 날짜)
+            val metricDate = events.first().second.timestamp.toLocalDate()
+            val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
             assertThat(metrics).isNotNull
             assertThat(metrics!!.likeCount).isEqualTo(5)
 
+            val aggregateId = "${productId}_$metricDate"
             events.forEach { (eventId, _) ->
-                assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, productId.toString())).isTrue()
+                assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId)).isTrue()
             }
         }
     }

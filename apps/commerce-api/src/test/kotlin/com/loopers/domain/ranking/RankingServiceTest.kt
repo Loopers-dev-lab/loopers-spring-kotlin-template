@@ -18,7 +18,13 @@ import java.time.format.DateTimeFormatter
 class RankingServiceTest {
 
     private val rankingRepository: RankingRepository = mockk()
-    private val rankingService = RankingService(rankingRepository)
+    private val productWeeklyRankingRepository: ProductWeeklyRankingRepository = mockk()
+    private val productMonthlyRankingRepository: ProductMonthlyRankingRepository = mockk()
+    private val rankingService = RankingService(
+        rankingRepository,
+        productWeeklyRankingRepository,
+        productMonthlyRankingRepository,
+    )
 
     @Nested
     @DisplayName("parseDateKey 메서드는")

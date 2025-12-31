@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.v1.ranking
 
 import com.loopers.application.ranking.RankingFacade
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.dto.PageResponse
 import org.springframework.data.domain.Pageable
@@ -18,10 +19,12 @@ class RankingV1Controller(
 
     @GetMapping
     override fun getRankings(
+        @RequestParam(required = false, defaultValue = "daily") period: String,
         @RequestParam date: String,
         @PageableDefault(size = 20) pageable: Pageable,
     ): ApiResponse<PageResponse<RankingV1Dto.RankingListResponse>> {
-        val rankingPage = rankingFacade.getRankings(date, pageable)
+        val rankingPeriod = RankingPeriod.from(period)
+        val rankingPage = rankingFacade.getRankings(rankingPeriod, date, pageable)
 
         return PageResponse.from(
             content = RankingV1Dto.RankingListResponse.from(rankingPage.content),

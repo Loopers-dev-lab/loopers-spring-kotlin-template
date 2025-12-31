@@ -33,6 +33,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         val eventId = "product-like-events-0-12345"
         val eventType = "LikeCountChanged"
         val eventTimestamp = ZonedDateTime.now()
+        val metricDate = eventTimestamp.toLocalDate()
 
         // when - 동일한 이벤트를 3번 전송
         productMetricsService.increaseLikeCount(productId, eventId, eventType, eventTimestamp, LIKE_CONSUMER_GROUP)
@@ -40,12 +41,13 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         productMetricsService.increaseLikeCount(productId, eventId, eventType, eventTimestamp, LIKE_CONSUMER_GROUP)
 
         // then
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
         assertThat(metrics).isNotNull
         assertThat(metrics!!.likeCount).isEqualTo(1) // 3번 호출했지만 1만 증가
 
         // 이벤트 처리 기록이 1개만 있어야 함
-        assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, productId.toString())).isTrue()
+        val aggregateId = "${productId}_$metricDate"
+        assertThat(eventHandledRepository.existsByEventIdAndAggregateId(eventId, aggregateId)).isTrue()
     }
 
     @Test
@@ -56,6 +58,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         val eventId = "product-view-events-1-67890"
         val eventType = "ViewCountIncreased"
         val eventTimestamp = ZonedDateTime.now()
+        val metricDate = eventTimestamp.toLocalDate()
 
         // when - 동일한 이벤트를 5번 전송
         repeat(5) {
@@ -63,7 +66,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         }
 
         // then
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
         assertThat(metrics).isNotNull
         assertThat(metrics!!.viewCount).isEqualTo(1) // 5번 호출했지만 1만 증가
     }
@@ -77,6 +80,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         val eventId = "order-completed-events-0-11111"
         val eventType = "OrderCompleted"
         val eventTimestamp = ZonedDateTime.now()
+        val metricDate = eventTimestamp.toLocalDate()
 
         // when - 동일한 이벤트를 3번 전송
         productMetricsService.increaseSoldCount(productId, quantity, eventId, eventType, eventTimestamp, ORDER_CONSUMER_GROUP)
@@ -84,7 +88,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         productMetricsService.increaseSoldCount(productId, quantity, eventId, eventType, eventTimestamp, ORDER_CONSUMER_GROUP)
 
         // then
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
         assertThat(metrics).isNotNull
         assertThat(metrics!!.soldCount).isEqualTo(quantity.toLong()) // 3번 호출했지만 quantity만큼만 증가
     }
@@ -99,6 +103,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         val eventId3 = "product-like-events-2"
         val eventType = "LikeCountChanged"
         val eventTimestamp = ZonedDateTime.now()
+        val metricDate = eventTimestamp.toLocalDate()
 
         // when - 서로 다른 이벤트를 3번 전송
         productMetricsService.increaseLikeCount(productId, eventId1, eventType, eventTimestamp, LIKE_CONSUMER_GROUP)
@@ -106,7 +111,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         productMetricsService.increaseLikeCount(productId, eventId3, eventType, eventTimestamp.plusSeconds(2L), LIKE_CONSUMER_GROUP)
 
         // then - 3번 모두 반영되어야 함
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
         assertThat(metrics).isNotNull
         assertThat(metrics!!.likeCount).isEqualTo(3)
     }
@@ -120,6 +125,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         val decreaseEventId = "product-like-events-0-2002"
         val eventType = "LikeCountChanged"
         val eventTimestamp = ZonedDateTime.now()
+        val metricDate = eventTimestamp.toLocalDate()
 
         // when - 증가 이벤트 3번, 감소 이벤트 3번
         repeat(3) {
@@ -130,7 +136,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         }
 
         // then - 증가 1번, 감소 1번만 반영 (최종 0)
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
         assertThat(metrics).isNotNull
         assertThat(metrics!!.likeCount).isEqualTo(0) // +1 -1 = 0
     }
@@ -146,6 +152,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         val completedEventType = "OrderCompleted"
         val canceledEventType = "OrderCanceled"
         val eventTimestamp = ZonedDateTime.now()
+        val metricDate = eventTimestamp.toLocalDate()
 
         // when - 완료 이벤트 3번, 취소 이벤트 3번
         repeat(3) {
@@ -156,7 +163,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         }
 
         // then - 증가 1번, 감소 1번만 반영 (최종 0)
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
         assertThat(metrics).isNotNull
         assertThat(metrics!!.soldCount).isEqualTo(0) // +10 -10 = 0
     }
@@ -170,6 +177,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         val viewEventId = "product-view-events-0-4002"
         val soldEventId = "order-completed-events-0-4003"
         val baseTimestamp = ZonedDateTime.now()
+        val metricDate = baseTimestamp.toLocalDate()
 
         // when - 각 이벤트를 여러 번 전송
         repeat(2) {
@@ -179,7 +187,7 @@ class ProductMetricsServiceIdempotencyTest : IntegrationTest() {
         }
 
         // then - 각각 1번씩만 반영
-        val metrics = productMetricsRepository.findByProductId(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDate(productId, metricDate)
         assertThat(metrics).isNotNull
         assertThat(metrics!!.likeCount).isEqualTo(1)
         assertThat(metrics.viewCount).isEqualTo(1)

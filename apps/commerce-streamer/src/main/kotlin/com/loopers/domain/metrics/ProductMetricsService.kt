@@ -30,7 +30,11 @@ class ProductMetricsService(
         eventTimestamp: ZonedDateTime,
         consumerGroup: String,
     ) {
-        val aggregateId = productId.toString()
+        // 1. 날짜 추출
+        val metricDate = eventTimestamp.toLocalDate()
+
+        // 2. aggregateId에 날짜 포함
+        val aggregateId = "${productId}_$metricDate"
 
         // 이벤트 처리 가능 여부 체크
         val result = eventService.checkAndPrepareForProcessing(
@@ -45,9 +49,9 @@ class ProductMetricsService(
             return
         }
 
-        // 메트릭스 업데이트
-        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
-            ?: ProductMetrics.create(productId)
+        // 메트릭스 업데이트 (날짜별 조회)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDateWithLock(productId, metricDate)
+            ?: ProductMetrics.create(productId, metricDate)
 
         metrics.increaseLikeCount()
         productMetricsRepository.save(metrics)
@@ -61,7 +65,7 @@ class ProductMetricsService(
             aggregateId = aggregateId,
         )
 
-        log.info("좋아요 수 증가: productId={}, likeCount={}", productId, metrics.likeCount)
+        log.info("좋아요 수 증가: productId={}, metricDate={}, likeCount={}", productId, metricDate, metrics.likeCount)
     }
 
     /**
@@ -74,7 +78,11 @@ class ProductMetricsService(
         eventTimestamp: ZonedDateTime,
         consumerGroup: String,
     ) {
-        val aggregateId = productId.toString()
+        // 1. 날짜 추출
+        val metricDate = eventTimestamp.toLocalDate()
+
+        // 2. aggregateId에 날짜 포함
+        val aggregateId = "${productId}_$metricDate"
 
         val result = eventService.checkAndPrepareForProcessing(
             eventId = eventId,
@@ -88,8 +96,8 @@ class ProductMetricsService(
             return
         }
 
-        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
-            ?: ProductMetrics.create(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDateWithLock(productId, metricDate)
+            ?: ProductMetrics.create(productId, metricDate)
 
         metrics.decreaseLikeCount()
         productMetricsRepository.save(metrics)
@@ -102,7 +110,7 @@ class ProductMetricsService(
             aggregateId = aggregateId,
         )
 
-        log.info("좋아요 수 감소: productId={}, likeCount={}", productId, metrics.likeCount)
+        log.info("좋아요 수 감소: productId={}, metricDate={}, likeCount={}", productId, metricDate, metrics.likeCount)
     }
 
     /**
@@ -116,16 +124,20 @@ class ProductMetricsService(
         eventType: String,
         eventTimestamp: ZonedDateTime,
     ) {
-        val aggregateId = productId.toString()
+        // 1. 날짜 추출
+        val metricDate = eventTimestamp.toLocalDate()
+
+        // 2. aggregateId에 날짜 포함
+        val aggregateId = "${productId}_$metricDate"
 
         // 멱등성 체크만 수행 (순서 보장 불필요) - eventId + aggregateId 조합
         if (eventService.isAlreadyHandled(eventId, aggregateId)) {
-            log.debug("이미 처리된 조회수 이벤트입니다: eventId={}, productId={}", eventId, productId)
+            log.debug("이미 처리된 조회수 이벤트입니다: eventId={}, productId={}, metricDate={}", eventId, productId, metricDate)
             return
         }
 
-        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
-            ?: ProductMetrics.create(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDateWithLock(productId, metricDate)
+            ?: ProductMetrics.create(productId, metricDate)
 
         metrics.increaseViewCount()
         productMetricsRepository.save(metrics)
@@ -133,7 +145,7 @@ class ProductMetricsService(
         // 이벤트 처리 완료 기록 (멱등성 용) - eventId + aggregateId 조합
         eventService.markAsHandled(eventId, aggregateId, eventType, eventTimestamp)
 
-        log.debug("조회 수 증가: productId={}, viewCount={}", productId, metrics.viewCount)
+        log.debug("조회 수 증가: productId={}, metricDate={}, viewCount={}", productId, metricDate, metrics.viewCount)
     }
 
     /**
@@ -147,7 +159,11 @@ class ProductMetricsService(
         eventTimestamp: ZonedDateTime,
         consumerGroup: String,
     ) {
-        val aggregateId = productId.toString()
+        // 1. 날짜 추출
+        val metricDate = eventTimestamp.toLocalDate()
+
+        // 2. aggregateId에 날짜 포함
+        val aggregateId = "${productId}_$metricDate"
 
         val result = eventService.checkAndPrepareForProcessing(
             eventId = eventId,
@@ -161,8 +177,8 @@ class ProductMetricsService(
             return
         }
 
-        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
-            ?: ProductMetrics.create(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDateWithLock(productId, metricDate)
+            ?: ProductMetrics.create(productId, metricDate)
 
         metrics.increaseSoldCount(quantity)
         productMetricsRepository.save(metrics)
@@ -175,7 +191,13 @@ class ProductMetricsService(
             aggregateId = aggregateId,
         )
 
-        log.info("판매 수량 증가: productId={}, quantity={}, soldCount={}", productId, quantity, metrics.soldCount)
+        log.info(
+            "판매 수량 증가: productId={}, metricDate={}, quantity={}, soldCount={}",
+            productId,
+            metricDate,
+            quantity,
+            metrics.soldCount,
+        )
     }
 
     /**
@@ -189,7 +211,11 @@ class ProductMetricsService(
         eventTimestamp: ZonedDateTime,
         consumerGroup: String,
     ) {
-        val aggregateId = productId.toString()
+        // 1. 날짜 추출
+        val metricDate = eventTimestamp.toLocalDate()
+
+        // 2. aggregateId에 날짜 포함
+        val aggregateId = "${productId}_$metricDate"
 
         val result = eventService.checkAndPrepareForProcessing(
             eventId = eventId,
@@ -203,8 +229,8 @@ class ProductMetricsService(
             return
         }
 
-        val metrics = productMetricsRepository.findByProductIdWithLock(productId)
-            ?: ProductMetrics.create(productId)
+        val metrics = productMetricsRepository.findByProductIdAndMetricDateWithLock(productId, metricDate)
+            ?: ProductMetrics.create(productId, metricDate)
 
         metrics.decreaseSoldCount(quantity)
         productMetricsRepository.save(metrics)
@@ -217,6 +243,12 @@ class ProductMetricsService(
             aggregateId = aggregateId,
         )
 
-        log.info("판매 수량 감소: productId={}, quantity={}, soldCount={}", productId, quantity, metrics.soldCount)
+        log.info(
+            "판매 수량 감소: productId={}, metricDate={}, quantity={}, soldCount={}",
+            productId,
+            metricDate,
+            quantity,
+            metrics.soldCount,
+        )
     }
 }

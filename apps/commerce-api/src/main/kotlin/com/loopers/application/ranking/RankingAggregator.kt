@@ -1,10 +1,11 @@
-package com.loopers.domain.ranking
+package com.loopers.application.ranking
 
 import com.loopers.application.ranking.dto.RankingResult
 import com.loopers.domain.brand.Brand
 import com.loopers.domain.brand.BrandService
 import com.loopers.domain.product.Product
 import com.loopers.domain.product.ProductService
+import com.loopers.domain.ranking.RankingScore
 import org.springframework.stereotype.Component
 
 /**

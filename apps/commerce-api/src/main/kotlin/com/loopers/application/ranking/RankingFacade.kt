@@ -1,7 +1,7 @@
 package com.loopers.application.ranking
 
 import com.loopers.application.ranking.dto.RankingResult
-import com.loopers.domain.ranking.RankingAggregator
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
@@ -16,27 +16,17 @@ class RankingFacade(
 ) {
 
     @Transactional(readOnly = true)
-    fun getRankings(date: String, pageable: Pageable): Page<RankingResult.RankedInfo> {
-        val dateKey = rankingService.parseDateKey(date)
-        val totalCount = rankingService.getTotalCount(dateKey)
+    fun getRankings(period: RankingPeriod, date: String, pageable: Pageable): Page<RankingResult.RankedInfo> {
+        val scorePage = rankingService.getRankingScores(period, date, pageable)
 
-        if (totalCount == 0L) {
-            return Page.empty(pageable)
-        }
-
-        if (pageable.offset >= totalCount) {
-            return PageImpl(emptyList(), pageable, totalCount)
-        }
-
-        val pageScores = rankingService.getPagedScores(dateKey, pageable.offset, pageable.pageSize)
-        if (pageScores.isEmpty()) {
-            return PageImpl(emptyList(), pageable, totalCount)
+        if (scorePage.isEmpty) {
+            return PageImpl(emptyList(), pageable, scorePage.totalElements)
         }
 
         val startRank = pageable.offset + 1L
-        val rankingItems = rankingAggregator.aggregate(pageScores, startRank)
+        val rankingItems = rankingAggregator.aggregate(scorePage.content, startRank)
 
-        return PageImpl(rankingItems, pageable, totalCount)
+        return PageImpl(rankingItems, pageable, scorePage.totalElements)
     }
 
     @Transactional(readOnly = true)

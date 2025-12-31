@@ -1,26 +1,33 @@
 package com.loopers.domain.metrics
 
 import jakarta.persistence.Column
+import jakarta.persistence.EmbeddedId
 import jakarta.persistence.Entity
-import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.Version
+import java.time.LocalDate
 import java.time.ZonedDateTime
 
 /**
- * 상품 메트릭 집계 테이블
+ * 상품 메트릭 집계 테이블 (일자별 이력 관리)
  *
- * Kafka 이벤트를 통해 수집된 상품 관련 메트릭을 집계
+ * Kafka 이벤트를 통해 수집된 상품 관련 메트릭을 일자별로 집계
  * - 좋아요 수
  * - 조회 수
  * - 판매 수량
  */
 @Entity
-@Table(name = "product_metrics")
+@Table(
+    name = "product_metrics",
+    indexes = [
+        Index(name = "idx_metric_date", columnList = "metric_date"),
+        Index(name = "idx_product_id", columnList = "product_id"),
+    ],
+)
 class ProductMetrics(
-    @Id
-    @Column(name = "product_id")
-    val productId: Long,
+    @EmbeddedId
+    val id: ProductMetricsId,
 
     @Column(name = "like_count", nullable = false)
     var likeCount: Long = 0,
@@ -68,9 +75,9 @@ class ProductMetrics(
     }
 
     companion object {
-        fun create(productId: Long): ProductMetrics {
+        fun create(productId: Long, metricDate: LocalDate): ProductMetrics {
             return ProductMetrics(
-                productId = productId,
+                id = ProductMetricsId(productId, metricDate),
                 likeCount = 0,
                 viewCount = 0,
                 soldCount = 0,
