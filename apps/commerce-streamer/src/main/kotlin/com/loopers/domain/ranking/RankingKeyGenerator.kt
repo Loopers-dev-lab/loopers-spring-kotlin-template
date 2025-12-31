@@ -1,6 +1,7 @@
 package com.loopers.domain.ranking
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -8,10 +9,16 @@ import java.time.temporal.ChronoUnit
 object RankingKeyGenerator {
 
     private const val PREFIX = "ranking:products"
+    private const val DAILY_PREFIX = "ranking:products:daily"
+    private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
 
     private val FORMATTER = DateTimeFormatter
         .ofPattern("yyyyMMddHH")
-        .withZone(ZoneId.of("Asia/Seoul"))
+        .withZone(SEOUL_ZONE)
+
+    private val DAILY_FORMATTER = DateTimeFormatter
+        .ofPattern("yyyyMMdd")
+        .withZone(SEOUL_ZONE)
 
     /**
      * Generates bucket key from instant
@@ -61,4 +68,19 @@ object RankingKeyGenerator {
      * @return Format: "ranking:products:yyyyMMddHH" for next hour
      */
     fun nextBucketKey(): String = nextBucketKey(Instant.now())
+
+    /**
+     * Generates daily bucket key from LocalDate
+     * @param date Date for the bucket
+     * @return Format: "ranking:products:daily:yyyyMMdd"
+     */
+    fun dailyBucketKey(date: LocalDate): String {
+        return "$DAILY_PREFIX:${DAILY_FORMATTER.format(date.atStartOfDay(SEOUL_ZONE))}"
+    }
+
+    /**
+     * Current daily bucket key based on current date
+     * @return Format: "ranking:products:daily:yyyyMMdd" for today
+     */
+    fun currentDailyBucketKey(): String = dailyBucketKey(LocalDate.now(SEOUL_ZONE))
 }

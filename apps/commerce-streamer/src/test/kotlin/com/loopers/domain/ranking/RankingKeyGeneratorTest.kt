@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -281,6 +282,103 @@ class RankingKeyGeneratorTest {
             } else {
                 assertThat(nextHour).isEqualTo(currentHour + 1)
             }
+        }
+    }
+
+    @DisplayName("dailyBucketKey 메서드 테스트")
+    @Nested
+    inner class DailyBucketKey {
+
+        @DisplayName("LocalDate에서 ranking:products:daily:yyyyMMdd 형식의 키를 생성한다")
+        @Test
+        fun `generates daily key in ranking daily yyyyMMdd format`() {
+            // given
+            val date = LocalDate.of(2025, 1, 15)
+
+            // when
+            val key = RankingKeyGenerator.dailyBucketKey(date)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:daily:20250115")
+        }
+
+        @DisplayName("연도 시작 경계에서 올바른 키를 생성한다")
+        @Test
+        fun `handles year start boundary correctly`() {
+            // given
+            val date = LocalDate.of(2025, 1, 1)
+
+            // when
+            val key = RankingKeyGenerator.dailyBucketKey(date)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:daily:20250101")
+        }
+
+        @DisplayName("연도 끝 경계에서 올바른 키를 생성한다")
+        @Test
+        fun `handles year end boundary correctly`() {
+            // given
+            val date = LocalDate.of(2025, 12, 31)
+
+            // when
+            val key = RankingKeyGenerator.dailyBucketKey(date)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:daily:20251231")
+        }
+
+        @DisplayName("2월 말일에 올바른 키를 생성한다")
+        @Test
+        fun `handles february end correctly`() {
+            // given
+            val date = LocalDate.of(2025, 2, 28) // 2025 is not a leap year
+
+            // when
+            val key = RankingKeyGenerator.dailyBucketKey(date)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:daily:20250228")
+        }
+    }
+
+    @DisplayName("currentDailyBucketKey 메서드 테스트")
+    @Nested
+    inner class CurrentDailyBucketKey {
+
+        @DisplayName("현재 날짜 기준으로 ranking:products:daily: prefix를 가진 키를 생성한다")
+        @Test
+        fun `generates key with ranking daily prefix`() {
+            // when
+            val key = RankingKeyGenerator.currentDailyBucketKey()
+
+            // then
+            assertThat(key).startsWith("ranking:products:daily:")
+        }
+
+        @DisplayName("현재 날짜 기준으로 8자리 날짜 문자열을 포함한 키를 생성한다")
+        @Test
+        fun `generates key with 8-digit date string`() {
+            // when
+            val key = RankingKeyGenerator.currentDailyBucketKey()
+
+            // then
+            val datePart = key.removePrefix("ranking:products:daily:")
+            assertThat(datePart).matches("\\d{8}")
+        }
+
+        @DisplayName("현재 날짜의 키와 일치한다")
+        @Test
+        fun `matches current date key`() {
+            // given
+            val today = LocalDate.now(ZoneId.of("Asia/Seoul"))
+
+            // when
+            val currentDailyKey = RankingKeyGenerator.currentDailyBucketKey()
+            val expectedKey = RankingKeyGenerator.dailyBucketKey(today)
+
+            // then
+            assertThat(currentDailyKey).isEqualTo(expectedKey)
         }
     }
 }
