@@ -8,14 +8,12 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.springframework.context.ApplicationEventPublisher
 import java.math.BigDecimal
 
 class RankingServiceTest {
 
     private val rankingWeightRepository: RankingWeightRepository = mockk()
-    private val eventPublisher: ApplicationEventPublisher = mockk(relaxed = true)
-    private val rankingService = RankingService(rankingWeightRepository, eventPublisher)
+    private val rankingService = RankingService(rankingWeightRepository)
 
     @DisplayName("findWeight 테스트")
     @Nested
@@ -114,53 +112,6 @@ class RankingServiceTest {
             assertThat(result.viewWeight).isEqualTo(viewWeight)
             assertThat(result.likeWeight).isEqualTo(likeWeight)
             assertThat(result.orderWeight).isEqualTo(orderWeight)
-        }
-
-        @DisplayName("기존 가중치가 있을 때 RankingWeightChangedEventV1 이벤트를 발행한다")
-        @Test
-        fun `publishes RankingWeightChangedEventV1 when existing weight exists`() {
-            // given
-            val existingWeight = RankingWeight.create(
-                viewWeight = BigDecimal("0.10"),
-                likeWeight = BigDecimal("0.20"),
-                orderWeight = BigDecimal("0.60"),
-            )
-            every { rankingWeightRepository.findLatest() } returns existingWeight
-            every { rankingWeightRepository.save(any()) } answers { firstArg() }
-
-            val eventSlot = slot<RankingWeightChangedEventV1>()
-
-            // when
-            rankingService.updateWeight(
-                viewWeight = BigDecimal("0.30"),
-                likeWeight = BigDecimal("0.30"),
-                orderWeight = BigDecimal("0.40"),
-            )
-
-            // then
-            verify { eventPublisher.publishEvent(capture(eventSlot)) }
-            assertThat(eventSlot.captured).isInstanceOf(RankingWeightChangedEventV1::class.java)
-        }
-
-        @DisplayName("기존 가중치가 없을 때도 RankingWeightChangedEventV1 이벤트를 발행한다")
-        @Test
-        fun `publishes RankingWeightChangedEventV1 when no existing weight`() {
-            // given
-            every { rankingWeightRepository.findLatest() } returns null
-            every { rankingWeightRepository.save(any()) } answers { firstArg() }
-
-            val eventSlot = slot<RankingWeightChangedEventV1>()
-
-            // when
-            rankingService.updateWeight(
-                viewWeight = BigDecimal("0.25"),
-                likeWeight = BigDecimal("0.35"),
-                orderWeight = BigDecimal("0.40"),
-            )
-
-            // then
-            verify { eventPublisher.publishEvent(capture(eventSlot)) }
-            assertThat(eventSlot.captured).isInstanceOf(RankingWeightChangedEventV1::class.java)
         }
 
         @DisplayName("저장소의 save 메서드가 호출된다")

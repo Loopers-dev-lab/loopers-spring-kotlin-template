@@ -211,62 +211,6 @@ class RankingWeightTest {
             }.isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("viewWeight must be between 0 and 1")
         }
-
-        @DisplayName("createNext 시 RankingWeightChangedEventV1이 새 인스턴스에 등록된다")
-        @Test
-        fun `registers RankingWeightChangedEventV1 on new instance when createNext`() {
-            // given
-            val original = createRankingWeight()
-
-            // when
-            val next = original.createNext(
-                viewWeight = BigDecimal("0.30"),
-                likeWeight = BigDecimal("0.30"),
-                orderWeight = BigDecimal("0.40"),
-            )
-            val events = next.pollEvents()
-
-            // then
-            assertThat(events).hasSize(1)
-            assertThat(events[0]).isInstanceOf(RankingWeightChangedEventV1::class.java)
-        }
-
-        @DisplayName("createNext 시 원본 인스턴스에는 이벤트가 등록되지 않는다")
-        @Test
-        fun `original instance has no events after createNext`() {
-            // given
-            val original = createRankingWeight()
-
-            // when
-            original.createNext(
-                viewWeight = BigDecimal("0.30"),
-                likeWeight = BigDecimal("0.30"),
-                orderWeight = BigDecimal("0.40"),
-            )
-            val events = original.pollEvents()
-
-            // then
-            assertThat(events).isEmpty()
-        }
-
-        @DisplayName("pollEvents 호출 후 이벤트 목록이 비워진다")
-        @Test
-        fun `clears events after pollEvents is called`() {
-            // given
-            val original = createRankingWeight()
-            val next = original.createNext(
-                viewWeight = BigDecimal("0.30"),
-                likeWeight = BigDecimal("0.30"),
-                orderWeight = BigDecimal("0.40"),
-            )
-
-            // when
-            next.pollEvents()
-            val eventsAfterPoll = next.pollEvents()
-
-            // then
-            assertThat(eventsAfterPoll).isEmpty()
-        }
     }
 
     @DisplayName("fallback 팩토리 메서드 테스트")

@@ -10,7 +10,6 @@ import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
 import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingWeight
-import com.loopers.domain.ranking.RankingWeightChangedEventV1
 import com.loopers.domain.ranking.RankingWeightRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
@@ -23,12 +22,9 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.test.context.event.ApplicationEvents
-import org.springframework.test.context.event.RecordApplicationEvents
 import java.math.BigDecimal
 
 @SpringBootTest
-@RecordApplicationEvents
 class RankingFacadeIntegrationTest @Autowired constructor(
     private val rankingFacade: RankingFacade,
     private val rankingWeightRepository: RankingWeightRepository,
@@ -40,9 +36,6 @@ class RankingFacadeIntegrationTest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
 ) {
-    @Autowired
-    private lateinit var applicationEvents: ApplicationEvents
-
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
@@ -202,24 +195,6 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             assertThat(savedWeight!!.viewWeight).isEqualTo(BigDecimal("0.30"))
             assertThat(savedWeight.likeWeight).isEqualTo(BigDecimal("0.30"))
             assertThat(savedWeight.orderWeight).isEqualTo(BigDecimal("0.40"))
-        }
-
-        @DisplayName("가중치 수정 시 RankingWeightChangedEventV1 이벤트가 발행된다")
-        @Test
-        fun `publishes RankingWeightChangedEventV1 when weight is updated`() {
-            // given
-            val criteria = RankingCriteria.UpdateWeight(
-                viewWeight = BigDecimal("0.25"),
-                likeWeight = BigDecimal("0.35"),
-                orderWeight = BigDecimal("0.40"),
-            )
-
-            // when
-            rankingFacade.updateWeight(criteria)
-
-            // then
-            val events = applicationEvents.stream(RankingWeightChangedEventV1::class.java).toList()
-            assertThat(events).hasSize(1)
         }
 
         @DisplayName("기존 가중치가 있으면 업데이트한다")
