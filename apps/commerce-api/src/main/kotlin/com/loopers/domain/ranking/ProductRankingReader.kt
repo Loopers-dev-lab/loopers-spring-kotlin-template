@@ -24,4 +24,29 @@ interface ProductRankingReader {
      * @return 순위 (1-based), 랭킹에 없으면 null
      */
     fun getRankByProductId(bucketKey: String, productId: Long): Int?
+
+    /**
+     * 랭킹을 RankingQuery 조건으로 조회
+     *
+     * @param query 조회 조건 (bucketKey, offset, limit 포함)
+     * @return ProductRanking 리스트
+     */
+    fun findTopRankings(query: RankingQuery): List<ProductRanking>
+
+    /**
+     * 특정 상품의 순위 조회
+     *
+     * @param bucketKey Redis 키
+     * @param productId 상품 ID
+     * @return 순위 (1-based), 랭킹에 없으면 null
+     */
+    fun findRankByProductId(bucketKey: String, productId: Long): Int?
+
+    /**
+     * 버킷 존재 여부 확인
+     *
+     * @param bucketKey Redis 키
+     * @return 버킷 존재 여부
+     */
+    fun exists(bucketKey: String): Boolean
 }
