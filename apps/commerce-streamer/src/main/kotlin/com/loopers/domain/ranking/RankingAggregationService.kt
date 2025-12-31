@@ -3,6 +3,8 @@ package com.loopers.domain.ranking
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 /**
@@ -10,10 +12,13 @@ import java.time.temporal.ChronoUnit
  *
  * - accumulateMetrics: 배치로 메트릭을 DB에 저장
  * - calculateAndUpdateScores: DB에서 조회 후 감쇠 공식 적용하여 Redis 업데이트
+ * - rollupHourlyToDaily: 시간별 메트릭을 일별 메트릭으로 롤업
+ * - calculateDailyRankings: 일별 랭킹 계산 및 Redis 업데이트
  */
 @Service
 class RankingAggregationService(
     private val metricRepository: ProductHourlyMetricRepository,
+    private val dailyMetricRepository: ProductDailyMetricRepository,
     private val rankingWriter: ProductRankingWriter,
     private val rankingWeightRepository: RankingWeightRepository,
     private val scoreCalculator: RankingScoreCalculator,
@@ -113,6 +118,83 @@ class RankingAggregationService(
             allProductIds.size,
             currentMetrics.size,
             previousMetrics.size,
+        )
+    }
+
+    /**
+     * 시간별 메트릭을 일별 메트릭으로 롤업
+     *
+     * 1. 대상 날짜의 모든 시간별 메트릭을 조회 (00:00 ~ 23:59)
+     * 2. 상품별로 그룹화하여 viewCount, likeCount, orderAmount 합산
+     * 3. ProductDailyMetric으로 upsert
+     *
+     * @param date 롤업 대상 날짜 (기본값: 오늘)
+     */
+    fun rollupHourlyToDaily(date: LocalDate = LocalDate.now(ZoneId.of("Asia/Seoul"))) {
+        val hourlyMetrics = metricRepository.findAllByDate(date)
+
+        if (hourlyMetrics.isEmpty()) {
+            logger.debug("No hourly metrics found for date: {}", date)
+            return
+        }
+
+        // 상품별로 그룹화하여 합산
+        val dailyMetrics = hourlyMetrics
+            .groupBy { it.productId }
+            .map { (productId, metrics) ->
+                ProductDailyMetric.create(
+                    statDate = date,
+                    productId = productId,
+                    viewCount = metrics.sumOf { it.viewCount },
+                    likeCount = metrics.sumOf { it.likeCount },
+                    orderAmount = metrics.fold(java.math.BigDecimal.ZERO) { acc, m -> acc + m.orderAmount },
+                )
+            }
+
+        dailyMetricRepository.upsertFromHourly(dailyMetrics)
+
+        logger.info(
+            "Rolled up {} hourly metrics into {} daily metrics for date: {}",
+            hourlyMetrics.size,
+            dailyMetrics.size,
+            date,
+        )
+    }
+
+    /**
+     * 일별 랭킹 계산 및 Redis 업데이트
+     *
+     * 1. 대상 날짜의 모든 일별 메트릭을 조회
+     * 2. RankingScoreCalculator로 점수 계산
+     * 3. Redis에 일별 버킷으로 저장
+     *
+     * @param date 랭킹 계산 대상 날짜 (기본값: 오늘)
+     */
+    fun calculateDailyRankings(date: LocalDate = LocalDate.now(ZoneId.of("Asia/Seoul"))) {
+        val dailyMetrics = dailyMetricRepository.findAllByStatDate(date)
+
+        if (dailyMetrics.isEmpty()) {
+            logger.debug("No daily metrics found for date: {}", date)
+            return
+        }
+
+        val weights = rankingWeightRepository.findLatest() ?: RankingWeight.fallback()
+
+        // 점수 계산
+        val scores = dailyMetrics.associate { metric ->
+            val snapshot = metric.toSnapshot()
+            val score = scoreCalculator.calculate(snapshot, weights)
+            metric.productId to score
+        }
+
+        // Redis에 일별 버킷으로 저장
+        val dailyBucketKey = RankingKeyGenerator.dailyBucketKey(date)
+        rankingWriter.replaceAll(dailyBucketKey, scores)
+
+        logger.info(
+            "Calculated and updated daily rankings for {} products on date: {}",
+            scores.size,
+            date,
         )
     }
 }

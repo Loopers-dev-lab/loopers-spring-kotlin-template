@@ -1,6 +1,7 @@
 package com.loopers.domain.ranking
 
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * ProductHourlyMetric Repository 인터페이스
@@ -24,4 +25,12 @@ interface ProductHourlyMetricRepository {
      * @return 해당 시간 버킷의 모든 ProductHourlyMetric 목록
      */
     fun findAllByStatHour(statHour: Instant): List<ProductHourlyMetric>
+
+    /**
+     * 특정 날짜의 모든 시간별 집계 데이터를 조회
+     *
+     * @param date 조회할 날짜
+     * @return 해당 날짜의 모든 ProductHourlyMetric 목록 (00:00 ~ 23:59)
+     */
+    fun findAllByDate(date: LocalDate): List<ProductHourlyMetric>
 }

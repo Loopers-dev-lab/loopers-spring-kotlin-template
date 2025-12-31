@@ -11,4 +11,6 @@ interface ProductHourlyMetricJpaRepository : JpaRepository<ProductHourlyMetric, 
     fun findByStatHourAndProductId(statHour: ZonedDateTime, productId: Long): ProductHourlyMetric?
 
     fun findAllByStatHour(statHour: ZonedDateTime): List<ProductHourlyMetric>
+
+    fun findAllByStatHourBetween(startHour: ZonedDateTime, endHour: ZonedDateTime): List<ProductHourlyMetric>
 }
