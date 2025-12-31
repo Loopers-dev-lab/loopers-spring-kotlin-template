@@ -31,11 +31,15 @@ docker-compose -f ./docker/monitoring-compose.yml up
 ```
 Root
 ├── apps ( spring-applications )
-│   └── 📦 commerce-api
+│   ├── 📦 commerce-api
+│   ├── 📦 commerce-batch
+│   └── 📦 commerce-streamer
 ├── modules ( reusable-configurations )
 │   ├── 📦 jpa
-│   └── 📦 redis
+│   ├── 📦 redis
+│   └── 📦 kafka
 └── supports ( add-ons )
+    ├── 📦 jackson
     ├── 📦 monitoring
     └── 📦 logging
 ```
