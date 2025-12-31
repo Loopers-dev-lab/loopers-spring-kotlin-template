@@ -6,8 +6,8 @@ import java.time.Instant
 /**
  * MetricType - 랭킹 집계를 위한 메트릭 종류
  *
- * - MutableCounts에서 어떤 카운터를 증감할지 결정
- * - AggregationKey 생성 시 사용
+ * - 어떤 카운터를 증감할지 결정
+ * - 이벤트 타입 식별에 사용
  */
 enum class MetricType {
     VIEW,
