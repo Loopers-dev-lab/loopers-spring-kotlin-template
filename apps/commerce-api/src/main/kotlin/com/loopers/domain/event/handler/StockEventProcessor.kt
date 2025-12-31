@@ -75,7 +75,7 @@ class StockEventProcessor(
             logger.error(
                 "Outbox 이벤트 저장 실패: productId=${event.productId}, " +
                         "exceptionType=${e::class.simpleName}, " +
-                        "이벤트가 Kafka로 발행되지 않을 수 있습니다",
+                        "재시도를 수행합니다 (최대 3회)",
                 e,
             )
             throw e

@@ -451,7 +451,7 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:19092 ./gradlew :apps:commerce-streamer:bootRu
 docker-compose -f ./docker/monitoring-compose.yml up -d
 
 # Grafana 접속
-# http://localhost:3000 (admin/admin)
+# <http://localhost:3000> (admin/admin)
 ```
 
 ---
