@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -109,6 +110,142 @@ class RankingKeyGeneratorTest {
             // then
             val dateTimePart = key.removePrefix("ranking:products:")
             assertThat(dateTimePart).matches("\\d{10}")
+        }
+    }
+
+    @DisplayName("previousBucketKey 메서드 테스트")
+    @Nested
+    inner class PreviousBucketKey {
+
+        @DisplayName("이전 시간 기준으로 ranking:products: prefix를 가진 키를 생성한다")
+        @Test
+        fun `generates key with ranking products prefix`() {
+            // when
+            val key = RankingKeyGenerator.previousBucketKey()
+
+            // then
+            assertThat(key).startsWith("ranking:products:")
+        }
+
+        @DisplayName("현재 시간보다 1시간 이전의 키를 생성한다")
+        @Test
+        fun `generates key for previous hour`() {
+            // when
+            val currentKey = RankingKeyGenerator.currentBucketKey()
+            val previousKey = RankingKeyGenerator.previousBucketKey()
+
+            // then
+            assertThat(currentKey).isNotEqualTo(previousKey)
+            // Both should have 10-digit datetime format
+            assertThat(currentKey.removePrefix("ranking:products:")).matches("\\d{10}")
+            assertThat(previousKey.removePrefix("ranking:products:")).matches("\\d{10}")
+        }
+    }
+
+    @DisplayName("dailyBucketKey 메서드 테스트")
+    @Nested
+    inner class DailyBucketKey {
+
+        @DisplayName("LocalDate에서 ranking:products:daily:yyyyMMdd 형식의 키를 생성한다")
+        @Test
+        fun `generates key in ranking daily yyyyMMdd format`() {
+            // given
+            val date = LocalDate.of(2025, 1, 15)
+
+            // when
+            val key = RankingKeyGenerator.dailyBucketKey(date)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:daily:20250115")
+        }
+
+        @DisplayName("연말 날짜에서 올바른 키를 생성한다")
+        @Test
+        fun `generates key for year end date`() {
+            // given
+            val date = LocalDate.of(2025, 12, 31)
+
+            // when
+            val key = RankingKeyGenerator.dailyBucketKey(date)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:daily:20251231")
+        }
+
+        @DisplayName("연초 날짜에서 올바른 키를 생성한다")
+        @Test
+        fun `generates key for year start date`() {
+            // given
+            val date = LocalDate.of(2025, 1, 1)
+
+            // when
+            val key = RankingKeyGenerator.dailyBucketKey(date)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:daily:20250101")
+        }
+    }
+
+    @DisplayName("currentDailyBucketKey 메서드 테스트")
+    @Nested
+    inner class CurrentDailyBucketKey {
+
+        @DisplayName("오늘 날짜 기준으로 ranking:products:daily: prefix를 가진 키를 생성한다")
+        @Test
+        fun `generates key with ranking daily prefix`() {
+            // when
+            val key = RankingKeyGenerator.currentDailyBucketKey()
+
+            // then
+            assertThat(key).startsWith("ranking:products:daily:")
+        }
+
+        @DisplayName("오늘 날짜 기준으로 8자리 날짜 문자열을 포함한 키를 생성한다")
+        @Test
+        fun `generates key with 8-digit date string`() {
+            // when
+            val key = RankingKeyGenerator.currentDailyBucketKey()
+
+            // then
+            val datePart = key.removePrefix("ranking:products:daily:")
+            assertThat(datePart).matches("\\d{8}")
+        }
+    }
+
+    @DisplayName("previousDailyBucketKey 메서드 테스트")
+    @Nested
+    inner class PreviousDailyBucketKey {
+
+        @DisplayName("어제 날짜 기준으로 ranking:products:daily: prefix를 가진 키를 생성한다")
+        @Test
+        fun `generates key with ranking daily prefix`() {
+            // when
+            val key = RankingKeyGenerator.previousDailyBucketKey()
+
+            // then
+            assertThat(key).startsWith("ranking:products:daily:")
+        }
+
+        @DisplayName("오늘 키와 다른 키를 생성한다")
+        @Test
+        fun `generates different key from current daily key`() {
+            // when
+            val currentKey = RankingKeyGenerator.currentDailyBucketKey()
+            val previousKey = RankingKeyGenerator.previousDailyBucketKey()
+
+            // then
+            assertThat(currentKey).isNotEqualTo(previousKey)
+        }
+
+        @DisplayName("어제 날짜 기준으로 8자리 날짜 문자열을 포함한 키를 생성한다")
+        @Test
+        fun `generates key with 8-digit date string`() {
+            // when
+            val key = RankingKeyGenerator.previousDailyBucketKey()
+
+            // then
+            val datePart = key.removePrefix("ranking:products:daily:")
+            assertThat(datePart).matches("\\d{8}")
         }
     }
 }
