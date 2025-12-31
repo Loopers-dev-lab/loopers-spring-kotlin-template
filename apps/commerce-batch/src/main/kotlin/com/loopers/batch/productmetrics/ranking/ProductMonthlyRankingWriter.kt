@@ -65,6 +65,7 @@ class ProductMonthlyRankingWriter(
         val sql = """
             INSERT INTO temp_monthly_ranking (product_id, score)
             VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE score = score + VALUES(score)
         """.trimIndent()
 
         jdbcTemplate.batchUpdate(
