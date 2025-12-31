@@ -1,11 +1,8 @@
 package com.loopers.domain.ranking
 
-import com.loopers.support.idempotency.EventHandled
-import com.loopers.support.idempotency.EventHandledRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Instant
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 /**
@@ -13,31 +10,20 @@ import java.time.temporal.ChronoUnit
  *
  * - accumulateMetrics: 배치로 메트릭을 DB에 저장
  * - calculateAndUpdateScores: DB에서 조회 후 감쇠 공식 적용하여 Redis 업데이트
- * - 기존 accumulate 메서드들은 consumer 호환성을 위해 임시로 유지 (Milestone 8에서 삭제 예정)
  */
 @Service
 class RankingAggregationService(
     private val metricRepository: ProductHourlyMetricRepository,
     private val rankingWriter: ProductRankingWriter,
-    private val rankingReader: ProductRankingReader,
     private val rankingWeightRepository: RankingWeightRepository,
     private val scoreCalculator: RankingScoreCalculator,
-    private val eventHandledRepository: EventHandledRepository,
 ) {
     companion object {
         private val DECAY_FACTOR = java.math.BigDecimal("0.1")
         private val CURRENT_WEIGHT = java.math.BigDecimal("0.9")
-        private const val IDEMPOTENCY_PREFIX = "ranking"
-        private const val BUFFER_HARD_THRESHOLD = 10000
-        private val ZONE_ID = ZoneId.of("Asia/Seoul")
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
-
-    // 버퍼는 서비스 내부에서 소유 (기존 accumulate 메서드들에서 사용 - Milestone 8에서 삭제 예정)
-    private val buffer = MetricBuffer()
-
-    // ==================== New Batch API ====================
 
     /**
      * 배치로 메트릭을 DB에 직접 저장
@@ -129,78 +115,5 @@ class RankingAggregationService(
             currentMetrics.size,
             previousMetrics.size,
         )
-    }
-
-    // ==================== Legacy API (will be removed in Milestone 8) ====================
-
-    /**
-     * VIEW 이벤트 메트릭을 축적
-     *
-     * 멱등성 체크 -> 버퍼 축적 -> 멱등성 기록 순서로 수행
-     * 기록 실패는 비즈니스 로직에 영향을 주지 않음
-     */
-    fun accumulateViewMetric(command: AccumulateViewMetricCommand) {
-        val idempotencyKey = "$IDEMPOTENCY_PREFIX:view:${command.eventId}"
-        if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
-
-        buffer.incrementView(AggregationKey.of(command.productId, command.occurredAt))
-        checkBufferThreshold()
-
-        eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
-    }
-
-    /**
-     * LIKE_CREATED 이벤트 메트릭을 축적
-     */
-    fun accumulateLikeCreatedMetric(command: AccumulateLikeCreatedMetricCommand) {
-        val idempotencyKey = "$IDEMPOTENCY_PREFIX:like-created:${command.eventId}"
-        if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
-
-        buffer.incrementLikeCreated(AggregationKey.of(command.productId, command.occurredAt))
-        checkBufferThreshold()
-
-        eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
-    }
-
-    /**
-     * LIKE_CANCELED 이벤트 메트릭을 축적
-     */
-    fun accumulateLikeCanceledMetric(command: AccumulateLikeCanceledMetricCommand) {
-        val idempotencyKey = "$IDEMPOTENCY_PREFIX:like-canceled:${command.eventId}"
-        if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
-
-        buffer.incrementLikeCanceled(AggregationKey.of(command.productId, command.occurredAt))
-        checkBufferThreshold()
-
-        eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
-    }
-
-    /**
-     * ORDER_PAID 이벤트 메트릭을 축적
-     *
-     * 여러 주문 아이템을 각각의 상품별로 버퍼에 축적
-     */
-    fun accumulateOrderPaidMetric(command: AccumulateOrderPaidMetricCommand) {
-        val idempotencyKey = "$IDEMPOTENCY_PREFIX:order-paid:${command.eventId}"
-        if (eventHandledRepository.existsByIdempotencyKey(idempotencyKey)) return
-
-        command.items.forEach { item ->
-            buffer.incrementOrderPaid(AggregationKey.of(item.productId, command.occurredAt), item.orderAmount)
-            checkBufferThreshold()
-        }
-
-        eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
-    }
-
-    // ==================== Buffer Management (Legacy - will be removed in Milestone 8) ====================
-
-    /**
-     * 버퍼 임계치 체크 - Legacy, 현재 사용되지 않음
-     */
-    private fun checkBufferThreshold() {
-        val currentSize = buffer.size()
-        if (currentSize >= BUFFER_HARD_THRESHOLD) {
-            logger.warn("Buffer reached threshold ({}), but flush is disabled", currentSize)
-        }
     }
 }

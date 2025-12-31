@@ -1,6 +1,5 @@
 package com.loopers.domain.ranking
 
-import com.loopers.infrastructure.idempotency.EventHandledJpaRepository
 import com.loopers.infrastructure.ranking.ProductHourlyMetricJpaRepository
 import com.loopers.infrastructure.ranking.RankingWeightJpaRepository
 import com.loopers.utils.DatabaseCleanUp
@@ -15,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
 import java.math.BigDecimal
-import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
@@ -26,7 +24,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
     private val rankingAggregationService: RankingAggregationService,
     private val productHourlyMetricJpaRepository: ProductHourlyMetricJpaRepository,
     private val rankingWeightJpaRepository: RankingWeightJpaRepository,
-    private val eventHandledJpaRepository: EventHandledJpaRepository,
     private val redisTemplate: RedisTemplate<String, String>,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
@@ -302,107 +299,6 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             // then
             val bucketKey = RankingKeyGenerator.currentBucketKey()
             assertThat(redisTemplate.hasKey(bucketKey)).isFalse()
-        }
-    }
-
-    @DisplayName("Legacy accumulate 메서드 멱등성 통합 테스트")
-    @Nested
-    inner class LegacyAccumulateMethodsIdempotency {
-
-        @DisplayName("accumulateViewMetric - 멱등성 키가 저장된다")
-        @Test
-        fun `accumulateViewMetric stores idempotency key`() {
-            // given
-            val command = AccumulateViewMetricCommand(
-                eventId = "view-event-123",
-                productId = 1L,
-                occurredAt = Instant.now(),
-            )
-
-            // when
-            rankingAggregationService.accumulateViewMetric(command)
-
-            // then
-            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:view:view-event-123")).isTrue()
-        }
-
-        @DisplayName("accumulateViewMetric - 중복 호출 시 멱등성 유지")
-        @Test
-        fun `accumulateViewMetric is idempotent on duplicate call`() {
-            // given
-            val command = AccumulateViewMetricCommand(
-                eventId = "view-event-duplicate",
-                productId = 1L,
-                occurredAt = Instant.now(),
-            )
-
-            // when - 두 번 호출
-            rankingAggregationService.accumulateViewMetric(command)
-            rankingAggregationService.accumulateViewMetric(command)
-
-            // then - 멱등성 키는 한 번만 저장
-            val count = eventHandledJpaRepository.count()
-            assertThat(count).isEqualTo(1L)
-        }
-
-        @DisplayName("accumulateLikeCreatedMetric - 멱등성 동작 검증")
-        @Test
-        fun `accumulateLikeCreatedMetric is idempotent`() {
-            // given
-            val command = AccumulateLikeCreatedMetricCommand(
-                eventId = "like-created-event-456",
-                productId = 2L,
-                occurredAt = Instant.now(),
-            )
-
-            // when - 두 번 호출
-            rankingAggregationService.accumulateLikeCreatedMetric(command)
-            rankingAggregationService.accumulateLikeCreatedMetric(command)
-
-            // then
-            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:like-created:like-created-event-456")).isTrue()
-            assertThat(eventHandledJpaRepository.count()).isEqualTo(1L)
-        }
-
-        @DisplayName("accumulateLikeCanceledMetric - 멱등성 동작 검증")
-        @Test
-        fun `accumulateLikeCanceledMetric is idempotent`() {
-            // given
-            val command = AccumulateLikeCanceledMetricCommand(
-                eventId = "like-canceled-event-789",
-                productId = 3L,
-                occurredAt = Instant.now(),
-            )
-
-            // when - 두 번 호출
-            rankingAggregationService.accumulateLikeCanceledMetric(command)
-            rankingAggregationService.accumulateLikeCanceledMetric(command)
-
-            // then
-            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:like-canceled:like-canceled-event-789")).isTrue()
-            assertThat(eventHandledJpaRepository.count()).isEqualTo(1L)
-        }
-
-        @DisplayName("accumulateOrderPaidMetric - 멱등성 동작 검증")
-        @Test
-        fun `accumulateOrderPaidMetric is idempotent`() {
-            // given
-            val command = AccumulateOrderPaidMetricCommand(
-                eventId = "order-paid-event-999",
-                items = listOf(
-                    AccumulateOrderPaidMetricCommand.Item(productId = 1L, orderAmount = BigDecimal("1000")),
-                    AccumulateOrderPaidMetricCommand.Item(productId = 2L, orderAmount = BigDecimal("2000")),
-                ),
-                occurredAt = Instant.now(),
-            )
-
-            // when - 두 번 호출
-            rankingAggregationService.accumulateOrderPaidMetric(command)
-            rankingAggregationService.accumulateOrderPaidMetric(command)
-
-            // then
-            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:order-paid:order-paid-event-999")).isTrue()
-            assertThat(eventHandledJpaRepository.count()).isEqualTo(1L)
         }
     }
 }

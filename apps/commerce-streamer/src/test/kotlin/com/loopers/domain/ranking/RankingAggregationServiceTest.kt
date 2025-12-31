@@ -1,7 +1,5 @@
 package com.loopers.domain.ranking
 
-import com.loopers.support.idempotency.EventHandledRepository
-import com.loopers.support.idempotency.IdempotencyResult
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
@@ -23,28 +21,22 @@ class RankingAggregationServiceTest {
 
     private lateinit var metricRepository: ProductHourlyMetricRepository
     private lateinit var rankingWriter: ProductRankingWriter
-    private lateinit var rankingReader: ProductRankingReader
     private lateinit var rankingWeightRepository: RankingWeightRepository
     private lateinit var scoreCalculator: RankingScoreCalculator
-    private lateinit var eventHandledRepository: EventHandledRepository
     private lateinit var service: RankingAggregationService
 
     @BeforeEach
     fun setUp() {
         metricRepository = mockk()
         rankingWriter = mockk(relaxed = true)
-        rankingReader = mockk()
         rankingWeightRepository = mockk()
         scoreCalculator = RankingScoreCalculator()
-        eventHandledRepository = mockk()
 
         service = RankingAggregationService(
             metricRepository = metricRepository,
             rankingWriter = rankingWriter,
-            rankingReader = rankingReader,
             rankingWeightRepository = rankingWeightRepository,
             scoreCalculator = scoreCalculator,
-            eventHandledRepository = eventHandledRepository,
         )
     }
 
@@ -305,187 +297,6 @@ class RankingAggregationServiceTest {
             // 10 * 0.10 * 0.9 = 0.9
             assertThat(capturedScores).isNotNull
             assertThat(capturedScores!![1L]!!.value).isEqualByComparingTo(BigDecimal("0.90"))
-        }
-    }
-
-    @DisplayName("accumulateViewMetric 멱등성 테스트")
-    @Nested
-    inner class AccumulateViewMetricIdempotency {
-
-        @DisplayName("새 이벤트는 버퍼에 축적되고 멱등성 키가 저장된다")
-        @Test
-        fun `new event is accumulated and idempotency key is saved`() {
-            // given
-            val command = AccumulateViewMetricCommand(
-                eventId = "event-123",
-                productId = 1L,
-                occurredAt = Instant.now(),
-            )
-            every { eventHandledRepository.existsByIdempotencyKey("ranking:view:event-123") } returns false
-            every { eventHandledRepository.save(any()) } returns IdempotencyResult.Recorded
-
-            // when
-            service.accumulateViewMetric(command)
-
-            // then
-            verify(exactly = 1) { eventHandledRepository.existsByIdempotencyKey("ranking:view:event-123") }
-            verify(exactly = 1) { eventHandledRepository.save(match { it.idempotencyKey == "ranking:view:event-123" }) }
-        }
-
-        @DisplayName("중복 이벤트는 버퍼에 축적되지 않는다")
-        @Test
-        fun `duplicate event is not accumulated`() {
-            // given
-            val command = AccumulateViewMetricCommand(
-                eventId = "event-123",
-                productId = 1L,
-                occurredAt = Instant.now(),
-            )
-            every { eventHandledRepository.existsByIdempotencyKey("ranking:view:event-123") } returns true
-
-            // when
-            service.accumulateViewMetric(command)
-
-            // then
-            verify(exactly = 1) { eventHandledRepository.existsByIdempotencyKey("ranking:view:event-123") }
-            verify(exactly = 0) { eventHandledRepository.save(any()) }
-        }
-    }
-
-    @DisplayName("accumulateLikeCreatedMetric 멱등성 테스트")
-    @Nested
-    inner class AccumulateLikeCreatedMetricIdempotency {
-
-        @DisplayName("새 이벤트는 버퍼에 축적되고 멱등성 키가 저장된다")
-        @Test
-        fun `new event is accumulated and idempotency key is saved`() {
-            // given
-            val command = AccumulateLikeCreatedMetricCommand(
-                eventId = "like-event-456",
-                productId = 2L,
-                occurredAt = Instant.now(),
-            )
-            every { eventHandledRepository.existsByIdempotencyKey("ranking:like-created:like-event-456") } returns false
-            every { eventHandledRepository.save(any()) } returns IdempotencyResult.Recorded
-
-            // when
-            service.accumulateLikeCreatedMetric(command)
-
-            // then
-            verify(exactly = 1) { eventHandledRepository.existsByIdempotencyKey("ranking:like-created:like-event-456") }
-            verify(exactly = 1) { eventHandledRepository.save(match { it.idempotencyKey == "ranking:like-created:like-event-456" }) }
-        }
-
-        @DisplayName("중복 이벤트는 버퍼에 축적되지 않는다")
-        @Test
-        fun `duplicate event is not accumulated`() {
-            // given
-            val command = AccumulateLikeCreatedMetricCommand(
-                eventId = "like-event-456",
-                productId = 2L,
-                occurredAt = Instant.now(),
-            )
-            every { eventHandledRepository.existsByIdempotencyKey("ranking:like-created:like-event-456") } returns true
-
-            // when
-            service.accumulateLikeCreatedMetric(command)
-
-            // then
-            verify(exactly = 1) { eventHandledRepository.existsByIdempotencyKey("ranking:like-created:like-event-456") }
-            verify(exactly = 0) { eventHandledRepository.save(any()) }
-        }
-    }
-
-    @DisplayName("accumulateLikeCanceledMetric 멱등성 테스트")
-    @Nested
-    inner class AccumulateLikeCanceledMetricIdempotency {
-
-        @DisplayName("새 이벤트는 버퍼에 축적되고 멱등성 키가 저장된다")
-        @Test
-        fun `new event is accumulated and idempotency key is saved`() {
-            // given
-            val command = AccumulateLikeCanceledMetricCommand(
-                eventId = "cancel-event-789",
-                productId = 3L,
-                occurredAt = Instant.now(),
-            )
-            every { eventHandledRepository.existsByIdempotencyKey("ranking:like-canceled:cancel-event-789") } returns false
-            every { eventHandledRepository.save(any()) } returns IdempotencyResult.Recorded
-
-            // when
-            service.accumulateLikeCanceledMetric(command)
-
-            // then
-            verify(exactly = 1) { eventHandledRepository.existsByIdempotencyKey("ranking:like-canceled:cancel-event-789") }
-            verify(exactly = 1) { eventHandledRepository.save(match { it.idempotencyKey == "ranking:like-canceled:cancel-event-789" }) }
-        }
-
-        @DisplayName("중복 이벤트는 버퍼에 축적되지 않는다")
-        @Test
-        fun `duplicate event is not accumulated`() {
-            // given
-            val command = AccumulateLikeCanceledMetricCommand(
-                eventId = "cancel-event-789",
-                productId = 3L,
-                occurredAt = Instant.now(),
-            )
-            every { eventHandledRepository.existsByIdempotencyKey("ranking:like-canceled:cancel-event-789") } returns true
-
-            // when
-            service.accumulateLikeCanceledMetric(command)
-
-            // then
-            verify(exactly = 1) { eventHandledRepository.existsByIdempotencyKey("ranking:like-canceled:cancel-event-789") }
-            verify(exactly = 0) { eventHandledRepository.save(any()) }
-        }
-    }
-
-    @DisplayName("accumulateOrderPaidMetric 멱등성 테스트")
-    @Nested
-    inner class AccumulateOrderPaidMetricIdempotency {
-
-        @DisplayName("새 이벤트는 모든 아이템이 버퍼에 축적되고 멱등성 키가 저장된다")
-        @Test
-        fun `new event accumulates all items and saves idempotency key`() {
-            // given
-            val command = AccumulateOrderPaidMetricCommand(
-                eventId = "order-event-999",
-                items = listOf(
-                    AccumulateOrderPaidMetricCommand.Item(productId = 1L, orderAmount = BigDecimal("1000")),
-                    AccumulateOrderPaidMetricCommand.Item(productId = 2L, orderAmount = BigDecimal("2000")),
-                ),
-                occurredAt = Instant.now(),
-            )
-            every { eventHandledRepository.existsByIdempotencyKey("ranking:order-paid:order-event-999") } returns false
-            every { eventHandledRepository.save(any()) } returns IdempotencyResult.Recorded
-
-            // when
-            service.accumulateOrderPaidMetric(command)
-
-            // then
-            verify(exactly = 1) { eventHandledRepository.existsByIdempotencyKey("ranking:order-paid:order-event-999") }
-            verify(exactly = 1) { eventHandledRepository.save(match { it.idempotencyKey == "ranking:order-paid:order-event-999" }) }
-        }
-
-        @DisplayName("중복 이벤트는 버퍼에 축적되지 않는다")
-        @Test
-        fun `duplicate event is not accumulated`() {
-            // given
-            val command = AccumulateOrderPaidMetricCommand(
-                eventId = "order-event-999",
-                items = listOf(
-                    AccumulateOrderPaidMetricCommand.Item(productId = 1L, orderAmount = BigDecimal("1000")),
-                ),
-                occurredAt = Instant.now(),
-            )
-            every { eventHandledRepository.existsByIdempotencyKey("ranking:order-paid:order-event-999") } returns true
-
-            // when
-            service.accumulateOrderPaidMetric(command)
-
-            // then
-            verify(exactly = 1) { eventHandledRepository.existsByIdempotencyKey("ranking:order-paid:order-event-999") }
-            verify(exactly = 0) { eventHandledRepository.save(any()) }
         }
     }
 }

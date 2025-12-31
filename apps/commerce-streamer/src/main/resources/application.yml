@@ -25,6 +25,10 @@ spring:
       - logging.yml
       - monitoring.yml
 
+scheduler:
+  ranking-score:
+    enabled: true
+
 demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
