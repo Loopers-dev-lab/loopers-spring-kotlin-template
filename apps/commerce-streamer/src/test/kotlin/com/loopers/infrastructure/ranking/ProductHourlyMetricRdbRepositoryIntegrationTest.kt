@@ -215,4 +215,90 @@ class ProductHourlyMetricRdbRepositoryIntegrationTest @Autowired constructor(
             assertThat(sortedByViewCount[1].viewCount).isEqualTo(20L)
         }
     }
+
+    @DisplayName("findAllByStatHour()")
+    @Nested
+    inner class FindAllByStatHour {
+
+        @DisplayName("해당 시간 버킷의 모든 레코드를 조회한다")
+        @Test
+        fun `returns all records for given stat hour`() {
+            // given
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val rows = listOf(
+                ProductHourlyMetricRow(
+                    productId = 1L,
+                    statHour = statHour,
+                    viewCount = 10L,
+                    likeCount = 5L,
+                    orderCount = 2L,
+                    orderAmount = BigDecimal("1000.00"),
+                ),
+                ProductHourlyMetricRow(
+                    productId = 2L,
+                    statHour = statHour,
+                    viewCount = 20L,
+                    likeCount = 10L,
+                    orderCount = 4L,
+                    orderAmount = BigDecimal("2000.00"),
+                ),
+            )
+            productHourlyMetricRepository.batchAccumulateCounts(rows)
+
+            // when
+            val results = productHourlyMetricRepository.findAllByStatHour(statHour)
+
+            // then
+            assertThat(results).hasSize(2)
+            assertThat(results.map { it.productId }).containsExactlyInAnyOrder(1L, 2L)
+        }
+
+        @DisplayName("다른 시간 버킷의 레코드는 조회하지 않는다")
+        @Test
+        fun `does not return records from different stat hours`() {
+            // given
+            val statHour1 = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val statHour2 = statHour1.plus(1, ChronoUnit.HOURS)
+
+            val rows = listOf(
+                ProductHourlyMetricRow(
+                    productId = 1L,
+                    statHour = statHour1,
+                    viewCount = 10L,
+                    likeCount = 5L,
+                    orderCount = 2L,
+                    orderAmount = BigDecimal("1000.00"),
+                ),
+                ProductHourlyMetricRow(
+                    productId = 2L,
+                    statHour = statHour2,
+                    viewCount = 20L,
+                    likeCount = 10L,
+                    orderCount = 4L,
+                    orderAmount = BigDecimal("2000.00"),
+                ),
+            )
+            productHourlyMetricRepository.batchAccumulateCounts(rows)
+
+            // when
+            val results = productHourlyMetricRepository.findAllByStatHour(statHour1)
+
+            // then
+            assertThat(results).hasSize(1)
+            assertThat(results[0].productId).isEqualTo(1L)
+        }
+
+        @DisplayName("해당 시간 버킷에 레코드가 없으면 빈 목록을 반환한다")
+        @Test
+        fun `returns empty list when no records exist for given stat hour`() {
+            // given
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
+
+            // when
+            val results = productHourlyMetricRepository.findAllByStatHour(statHour)
+
+            // then
+            assertThat(results).isEmpty()
+        }
+    }
 }

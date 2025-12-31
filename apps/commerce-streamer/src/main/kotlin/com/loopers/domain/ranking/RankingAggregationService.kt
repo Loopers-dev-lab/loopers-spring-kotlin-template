@@ -2,17 +2,18 @@ package com.loopers.domain.ranking
 
 import com.loopers.support.idempotency.EventHandled
 import com.loopers.support.idempotency.EventHandledRepository
-import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import java.time.Instant
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 /**
  * RankingAggregationService - 랭킹 집계 핵심 서비스
  *
- * - 서비스가 버퍼를 내부적으로 소유 (스케줄러는 순수 트리거)
- * - MetricBuffer를 통해 원자적 버퍼 스왑 수행
- * - poll() 시 새 버퍼로 교체되어 이벤트 유실 없이 안전하게 drain
- * - 멱등성 체크를 서비스 레이어에서 수행 (EventHandledRepository 사용)
+ * - accumulateMetrics: 배치로 메트릭을 DB에 저장
+ * - calculateAndUpdateScores: DB에서 조회 후 감쇠 공식 적용하여 Redis 업데이트
+ * - 기존 accumulate 메서드들은 consumer 호환성을 위해 임시로 유지 (Milestone 8에서 삭제 예정)
  */
 @Service
 class RankingAggregationService(
@@ -25,17 +26,112 @@ class RankingAggregationService(
 ) {
     companion object {
         private val DECAY_FACTOR = java.math.BigDecimal("0.1")
-        private const val MAX_RETRY_COUNT = 3
+        private val CURRENT_WEIGHT = java.math.BigDecimal("0.9")
         private const val IDEMPOTENCY_PREFIX = "ranking"
         private const val BUFFER_HARD_THRESHOLD = 10000
+        private val ZONE_ID = ZoneId.of("Asia/Seoul")
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    // 버퍼는 서비스 내부에서 소유
+    // 버퍼는 서비스 내부에서 소유 (기존 accumulate 메서드들에서 사용 - Milestone 8에서 삭제 예정)
     private val buffer = MetricBuffer()
 
-    // ==================== Public API with Idempotency ====================
+    // ==================== New Batch API ====================
+
+    /**
+     * 배치로 메트릭을 DB에 직접 저장
+     *
+     * - Consumer에서 배치로 호출
+     * - ProductHourlyMetricRow로 변환하여 batchAccumulateCounts 호출
+     *
+     * @param command 배치 메트릭 커맨드
+     */
+    fun accumulateMetrics(command: AccumulateMetricsCommand) {
+        if (command.items.isEmpty()) return
+
+        val rows = command.items.map { item ->
+            ProductHourlyMetricRow(
+                productId = item.productId,
+                statHour = item.statHour.toInstant().truncatedTo(ChronoUnit.HOURS),
+                viewCount = item.viewDelta,
+                likeCount = item.likeCreatedDelta - item.likeCanceledDelta,
+                orderCount = item.orderCountDelta,
+                orderAmount = item.orderAmountDelta,
+            )
+        }
+
+        metricRepository.batchAccumulateCounts(rows)
+        logger.debug("Accumulated {} metrics to DB", rows.size)
+    }
+
+    /**
+     * 점수 계산 및 Redis 업데이트
+     *
+     * 1. 현재 시간과 이전 시간 버킷의 메트릭을 DB에서 조회
+     * 2. 각 상품별 기본 점수 계산 (current bucket)
+     * 3. 감쇠 공식 적용: previousScore * 0.1 + currentScore * 0.9
+     * 4. Redis에 replaceAll로 업데이트
+     *
+     * 이전 버킷에만 있는 상품도 포함 (cold start prevention)
+     */
+    fun calculateAndUpdateScores() {
+        val now = Instant.now()
+        val currentHour = now.truncatedTo(ChronoUnit.HOURS)
+        val previousHour = currentHour.minus(1, ChronoUnit.HOURS)
+
+        // DB에서 현재/이전 버킷 조회
+        val currentMetrics = metricRepository.findAllByStatHour(currentHour)
+        val previousMetrics = metricRepository.findAllByStatHour(previousHour)
+
+        if (currentMetrics.isEmpty() && previousMetrics.isEmpty()) {
+            logger.debug("No metrics found for score calculation")
+            return
+        }
+
+        val weights = rankingWeightRepository.findLatest() ?: RankingWeight.fallback()
+
+        // 현재 버킷 기준 점수 계산 (productId -> Score)
+        val currentScores = currentMetrics.associate { metric ->
+            val snapshot = metric.toSnapshot()
+            val score = scoreCalculator.calculate(snapshot, weights)
+            metric.productId to score
+        }
+
+        // 이전 버킷 기준 점수 계산 (productId -> Score)
+        val previousScores = previousMetrics.associate { metric ->
+            val snapshot = metric.toSnapshot()
+            val score = scoreCalculator.calculate(snapshot, weights)
+            metric.productId to score
+        }
+
+        // 모든 상품 ID 수집 (현재 + 이전)
+        val allProductIds = (currentScores.keys + previousScores.keys).toSet()
+
+        // 감쇠 공식 적용: previousScore * 0.1 + currentScore * 0.9
+        val finalScores = allProductIds.associateWith { productId ->
+            val currentScore = currentScores[productId] ?: Score.ZERO
+            val previousScore = previousScores[productId] ?: Score.ZERO
+
+            // decay formula: previous * 0.1 + current * 0.9
+            val decayedPrevious = previousScore.applyDecay(DECAY_FACTOR)
+            val weightedCurrent = currentScore.applyDecay(CURRENT_WEIGHT)
+            decayedPrevious + weightedCurrent
+        }
+
+        // Redis에 업데이트
+        val bucketKey = RankingKeyGenerator.currentBucketKey()
+        rankingWriter.replaceAll(bucketKey, finalScores)
+
+        logger.info(
+            "Calculated and updated scores for {} products (current: {}, previous: {})",
+            allProductIds.size,
+            currentMetrics.size,
+            previousMetrics.size,
+        )
+    }
+
+    // ==================== Legacy API (will be removed in Milestone 8) ====================
 
     /**
      * VIEW 이벤트 메트릭을 축적
@@ -96,171 +192,15 @@ class RankingAggregationService(
         eventHandledRepository.save(EventHandled(idempotencyKey = idempotencyKey))
     }
 
-    // ==================== Buffer Management ====================
+    // ==================== Buffer Management (Legacy - will be removed in Milestone 8) ====================
 
     /**
-     * 버퍼 임계치 체크 및 필요시 동기적 flush 수행
+     * 버퍼 임계치 체크 - Legacy, 현재 사용되지 않음
      */
     private fun checkBufferThreshold() {
         val currentSize = buffer.size()
         if (currentSize >= BUFFER_HARD_THRESHOLD) {
-            logger.warn("Buffer reached threshold ({}), triggering synchronous flush", currentSize)
-            flush()
+            logger.warn("Buffer reached threshold ({}), but flush is disabled", currentSize)
         }
-    }
-
-    /**
-     * 버퍼를 원자적으로 교체하고 이전 버퍼의 데이터를 영속화
-     *
-     * 스케줄러에서 순수 트리거로 호출됨
-     */
-    fun flush() {
-        val data = buffer.poll()
-        if (data.isEmpty()) return
-
-        try {
-            // 시간 버킷별로 그룹화 - 보통 하나지만 시간 경계에서는 두 개가 섞일 수 있음
-            data.entries
-                .groupBy { it.key.hourBucket }
-                .forEach { (hourBucket, entries) ->
-                    persistBucket(hourBucket, entries)
-                }
-            logger.info("Ranking aggregation flushed: {} entries", data.size)
-        } catch (e: Exception) {
-            logger.error("Ranking aggregation flush failed", e)
-        }
-    }
-
-    private fun persistBucket(
-        hourBucket: java.time.Instant,
-        entries: List<Map.Entry<AggregationKey, MutableCounts>>,
-    ) {
-        val redisKey = RankingKeyGenerator.bucketKey(hourBucket)
-        val weights = rankingWeightRepository.findLatest() ?: RankingWeight.fallback()
-
-        // 점수 델타 계산
-        val scoreDeltas = entries.associate { (key, counts) ->
-            val snapshot = counts.toSnapshot()
-            val score = scoreCalculator.calculate(snapshot, weights)
-            key.productId to score
-        }
-
-        // Redis: Pipeline으로 점수 증분 업데이트
-        // ZINCRBY는 기존 점수에 더하므로 여러 번 호출해도 누적
-        rankingWriter.incrementScores(redisKey, scoreDeltas)
-
-        // DB: 카운트 누적 (점수는 저장하지 않음 - 가중치 변경 시 재계산 가능하도록)
-        // RDB 쓰기는 3회 재시도
-        val statsToSave = entries.map { (key, counts) ->
-            val snapshot = counts.toSnapshot()
-            ProductHourlyMetricRow(
-                productId = key.productId,
-                statHour = key.hourBucket,
-                viewCount = snapshot.views,
-                likeCount = snapshot.likes,
-                orderCount = snapshot.orderCount,
-                orderAmount = snapshot.orderAmount,
-            )
-        }
-        executeWithRetry("batchAccumulateCounts") {
-            metricRepository.batchAccumulateCounts(statsToSave)
-        }
-    }
-
-    /**
-     * 시간별 버킷 전환 수행
-     *
-     * 이전 버킷의 점수에 감쇠 계수(0.1)를 적용하여 새 버킷의 초기 점수로 설정
-     *
-     * 예: 14시 버킷에 상품1=100점, 상품2=50점이 있다면
-     *     15시 버킷은 상품1=10점, 상품2=5점으로 시작
-     */
-    fun transitionBucket() {
-        val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-        val currentBucketKey = RankingKeyGenerator.currentBucketKey()
-
-        try {
-            // 이전 버킷이 없으면 전환할 것이 없음
-            if (!rankingReader.exists(previousBucketKey)) {
-                logger.debug("Previous bucket does not exist: {}", previousBucketKey)
-                return
-            }
-
-            // 현재 버킷이 이미 존재하면 이미 전환됨 (중복 실행 방지)
-            if (rankingReader.exists(currentBucketKey)) {
-                logger.debug("Current bucket already exists: {}", currentBucketKey)
-                return
-            }
-
-            // 이전 버킷의 모든 점수 조회
-            val previousScores = rankingReader.getAllScores(previousBucketKey)
-            if (previousScores.isEmpty()) {
-                logger.debug("Previous bucket is empty: {}", previousBucketKey)
-                return
-            }
-
-            // 감쇠 적용하여 새 버킷 생성
-            // Redis createBucket은 3회 재시도
-            val decayedScores = previousScores.mapValues { (_, score) ->
-                score.applyDecay(DECAY_FACTOR)
-            }
-
-            executeWithRetry("createBucket") {
-                rankingWriter.createBucket(currentBucketKey, decayedScores)
-            }
-            logger.info(
-                "Bucket transition completed: {} -> {}, {} products with decayed scores",
-                previousBucketKey,
-                currentBucketKey,
-                decayedScores.size,
-            )
-        } catch (e: Exception) {
-            logger.error("Bucket transition failed: {} -> {}", previousBucketKey, currentBucketKey, e)
-        }
-    }
-
-    /**
-     * 재시도 로직 래퍼
-     *
-     * 실패 시 최대 3회까지 재시도하고, 모든 시도가 실패하면 에러 로깅 후 예외를 던짐
-     */
-    private fun executeWithRetry(
-        operationName: String,
-        action: () -> Unit,
-    ) {
-        var lastException: Exception? = null
-
-        repeat(MAX_RETRY_COUNT) { attempt ->
-            try {
-                action()
-                return
-            } catch (e: Exception) {
-                lastException = e
-                logger.warn(
-                    "{} failed, retry attempt {} of {}",
-                    operationName,
-                    attempt + 1,
-                    MAX_RETRY_COUNT,
-                )
-            }
-        }
-
-        logger.error("{} failed after {} retry attempts, data may be lost", operationName, MAX_RETRY_COUNT)
-        throw lastException!!
-    }
-
-    // ==================== Lifecycle ====================
-
-    /**
-     * 애플리케이션 종료 시 버퍼에 남은 데이터를 최종 flush
-     *
-     * SIGTERM 수신 시 Spring 컨테이너가 @PreDestroy 메서드를 호출하여
-     * 버퍼 데이터 손실을 방지함
-     */
-    @PreDestroy
-    fun onShutdown() {
-        logger.info("Shutting down RankingAggregationService, performing final flush...")
-        flush()
-        logger.info("Final flush completed")
     }
 }

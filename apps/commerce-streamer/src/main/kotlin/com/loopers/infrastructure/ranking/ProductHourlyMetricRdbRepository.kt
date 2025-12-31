@@ -1,15 +1,19 @@
 package com.loopers.infrastructure.ranking
 
+import com.loopers.domain.ranking.ProductHourlyMetric
 import com.loopers.domain.ranking.ProductHourlyMetricRepository
 import com.loopers.domain.ranking.ProductHourlyMetricRow
 import jakarta.persistence.EntityManager
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.sql.Timestamp
+import java.time.Instant
+import java.time.ZoneId
 
 @Repository
 class ProductHourlyMetricRdbRepository(
     private val entityManager: EntityManager,
+    private val productHourlyMetricJpaRepository: ProductHourlyMetricJpaRepository,
 ) : ProductHourlyMetricRepository {
 
     /**
@@ -45,5 +49,17 @@ class ProductHourlyMetricRdbRepository(
                 .setParameter("orderAmount", row.orderAmount)
                 .executeUpdate()
         }
+    }
+
+    /**
+     * 특정 시간 버킷의 모든 집계 데이터를 조회
+     *
+     * @param statHour 조회할 시간 버킷 (시간 단위로 truncate된 Instant)
+     * @return 해당 시간 버킷의 모든 ProductHourlyMetric 목록
+     */
+    @Transactional(readOnly = true)
+    override fun findAllByStatHour(statHour: Instant): List<ProductHourlyMetric> {
+        val zonedDateTime = statHour.atZone(ZoneId.of("Asia/Seoul"))
+        return productHourlyMetricJpaRepository.findAllByStatHour(zonedDateTime)
     }
 }

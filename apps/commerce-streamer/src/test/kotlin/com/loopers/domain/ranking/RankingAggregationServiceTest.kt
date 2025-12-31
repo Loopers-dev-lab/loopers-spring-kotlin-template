@@ -7,12 +7,16 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.temporal.ChronoUnit
 
 @DisplayName("RankingAggregationService 단위 테스트")
 class RankingAggregationServiceTest {
@@ -44,257 +48,263 @@ class RankingAggregationServiceTest {
         )
     }
 
-    @DisplayName("persistBucket 재시도 테스트")
+    @DisplayName("accumulateMetrics 테스트")
     @Nested
-    inner class PersistBucketRetry {
+    inner class AccumulateMetricsTest {
 
-        @DisplayName("batchAccumulateCounts 실패 시 최대 3회 재시도한다")
+        @DisplayName("빈 items 리스트는 DB 호출하지 않는다")
         @Test
-        fun `retries batchAccumulateCounts up to 3 times on failure`() {
+        fun `empty items list does not call repository`() {
             // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-            val command = AccumulateViewMetricCommand(
-                eventId = "event-retry-test",
-                productId = productId,
-                occurredAt = occurredAt,
-            )
-
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
-            every { eventHandledRepository.save(any()) } returns IdempotencyResult.Recorded
-            every { rankingWeightRepository.findLatest() } returns RankingWeight.fallback()
-            every { metricRepository.batchAccumulateCounts(any()) } throws RuntimeException("DB Error")
+            val command = AccumulateMetricsCommand(items = emptyList())
 
             // when
-            service.accumulateViewMetric(command)
-            service.flush()
+            service.accumulateMetrics(command)
 
-            // then - batchAccumulateCounts should be called 3 times (max retries)
-            verify(exactly = 3) { metricRepository.batchAccumulateCounts(any()) }
+            // then
+            verify(exactly = 0) { metricRepository.batchAccumulateCounts(any()) }
         }
 
-        @DisplayName("batchAccumulateCounts 첫 번째 시도 성공 시 재시도하지 않는다")
+        @DisplayName("items를 ProductHourlyMetricRow로 변환하여 repository에 저장한다")
         @Test
-        fun `does not retry when batchAccumulateCounts succeeds on first try`() {
+        fun `converts items to ProductHourlyMetricRow and saves to repository`() {
             // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-            val command = AccumulateViewMetricCommand(
-                eventId = "event-success-test",
-                productId = productId,
-                occurredAt = occurredAt,
+            val statHour = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.HOURS)
+            val command = AccumulateMetricsCommand(
+                items = listOf(
+                    AccumulateMetricsCommand.Item(
+                        productId = 1L,
+                        statHour = statHour,
+                        viewDelta = 10,
+                        likeCreatedDelta = 5,
+                        likeCanceledDelta = 2,
+                        orderCountDelta = 3,
+                        orderAmountDelta = BigDecimal("1000.00"),
+                    ),
+                ),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
-            every { eventHandledRepository.save(any()) } returns IdempotencyResult.Recorded
-            every { rankingWeightRepository.findLatest() } returns RankingWeight.fallback()
             every { metricRepository.batchAccumulateCounts(any()) } just Runs
 
             // when
-            service.accumulateViewMetric(command)
-            service.flush()
+            service.accumulateMetrics(command)
 
-            // then - batchAccumulateCounts should be called exactly once
-            verify(exactly = 1) { metricRepository.batchAccumulateCounts(any()) }
-        }
-
-        @DisplayName("batchAccumulateCounts 두 번째 시도에서 성공하면 재시도를 중단한다")
-        @Test
-        fun `stops retrying when batchAccumulateCounts succeeds on second try`() {
-            // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-            val command = AccumulateViewMetricCommand(
-                eventId = "event-retry-success-test",
-                productId = productId,
-                occurredAt = occurredAt,
-            )
-
-            var callCount = 0
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
-            every { eventHandledRepository.save(any()) } returns IdempotencyResult.Recorded
-            every { rankingWeightRepository.findLatest() } returns RankingWeight.fallback()
-            every { metricRepository.batchAccumulateCounts(any()) } answers {
-                callCount++
-                if (callCount == 1) {
-                    throw RuntimeException("DB Error - first attempt")
-                }
-                // Second attempt succeeds
+            // then
+            verify(exactly = 1) {
+                metricRepository.batchAccumulateCounts(
+                    match { rows ->
+                        rows.size == 1 &&
+                            rows[0].productId == 1L &&
+                            rows[0].viewCount == 10L &&
+                            rows[0].likeCount == 3L && // 5 - 2
+                            rows[0].orderCount == 3L &&
+                            rows[0].orderAmount == BigDecimal("1000.00")
+                    },
+                )
             }
-
-            // when
-            service.accumulateViewMetric(command)
-            service.flush()
-
-            // then - should be called twice (1 failure + 1 success)
-            verify(exactly = 2) { metricRepository.batchAccumulateCounts(any()) }
         }
 
-        @DisplayName("Redis incrementScores는 재시도 없이 호출된다 (멱등 연산)")
+        @DisplayName("여러 items를 한 번에 저장한다")
         @Test
-        fun `incrementScores is called without retry wrapper - idempotent operation`() {
+        fun `saves multiple items at once`() {
             // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-            val command = AccumulateViewMetricCommand(
-                eventId = "event-idempotent-test",
-                productId = productId,
-                occurredAt = occurredAt,
+            val statHour = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.HOURS)
+            val command = AccumulateMetricsCommand(
+                items = listOf(
+                    AccumulateMetricsCommand.Item(
+                        productId = 1L,
+                        statHour = statHour,
+                        viewDelta = 1,
+                    ),
+                    AccumulateMetricsCommand.Item(
+                        productId = 2L,
+                        statHour = statHour,
+                        viewDelta = 2,
+                    ),
+                    AccumulateMetricsCommand.Item(
+                        productId = 3L,
+                        statHour = statHour,
+                        viewDelta = 3,
+                    ),
+                ),
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
-            every { eventHandledRepository.save(any()) } returns IdempotencyResult.Recorded
-            every { rankingWeightRepository.findLatest() } returns RankingWeight.fallback()
             every { metricRepository.batchAccumulateCounts(any()) } just Runs
 
             // when
-            service.accumulateViewMetric(command)
-            service.flush()
+            service.accumulateMetrics(command)
 
-            // then - incrementScores should be called exactly once (no retry wrapper)
-            verify(exactly = 1) { rankingWriter.incrementScores(any(), any()) }
+            // then
+            verify(exactly = 1) {
+                metricRepository.batchAccumulateCounts(
+                    match { rows -> rows.size == 3 },
+                )
+            }
         }
     }
 
-    @DisplayName("transitionBucket 재시도 테스트")
+    @DisplayName("calculateAndUpdateScores 테스트")
     @Nested
-    inner class TransitionBucketRetry {
+    inner class CalculateAndUpdateScoresTest {
 
-        @DisplayName("createBucket 실패 시 최대 3회 재시도한다")
+        @DisplayName("현재와 이전 버킷 모두 비어있으면 Redis 업데이트하지 않는다")
         @Test
-        fun `retries createBucket up to 3 times on failure`() {
+        fun `does not update Redis when both buckets are empty`() {
             // given
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-
-            every { rankingReader.exists(previousBucketKey) } returns true
-            every { rankingReader.exists(RankingKeyGenerator.currentBucketKey()) } returns false
-            every { rankingReader.getAllScores(previousBucketKey) } returns mapOf(1L to Score.of(100.0))
-            every { rankingWriter.createBucket(any(), any()) } throws RuntimeException("Redis Error")
+            every { metricRepository.findAllByStatHour(any()) } returns emptyList()
 
             // when
-            service.transitionBucket()
+            service.calculateAndUpdateScores()
 
-            // then - createBucket should be called 3 times (max retries)
-            verify(exactly = 3) { rankingWriter.createBucket(any(), any()) }
+            // then
+            verify(exactly = 0) { rankingWriter.replaceAll(any(), any()) }
         }
 
-        @DisplayName("createBucket 첫 번째 시도 성공 시 재시도하지 않는다")
+        @DisplayName("현재 버킷의 메트릭으로 점수를 계산하여 Redis에 저장한다")
         @Test
-        fun `does not retry when createBucket succeeds on first try`() {
+        fun `calculates scores from current bucket and saves to Redis`() {
             // given
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+            val currentHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val previousHour = currentHour.minus(1, ChronoUnit.HOURS)
 
-            every { rankingReader.exists(previousBucketKey) } returns true
-            every { rankingReader.exists(currentBucketKey) } returns false
-            every { rankingReader.getAllScores(previousBucketKey) } returns mapOf(1L to Score.of(100.0))
-            every { rankingWriter.createBucket(any(), any()) } just Runs
+            val currentMetric = ProductHourlyMetric.create(
+                statHour = ZonedDateTime.ofInstant(currentHour, ZoneId.of("Asia/Seoul")),
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 50,
+                orderCount = 10,
+                orderAmount = BigDecimal("5000.00"),
+            )
+
+            val weights = RankingWeight.fallback()
+
+            every { metricRepository.findAllByStatHour(currentHour) } returns listOf(currentMetric)
+            every { metricRepository.findAllByStatHour(previousHour) } returns emptyList()
+            every { rankingWeightRepository.findLatest() } returns weights
 
             // when
-            service.transitionBucket()
+            service.calculateAndUpdateScores()
 
-            // then - createBucket should be called exactly once
-            verify(exactly = 1) { rankingWriter.createBucket(any(), any()) }
+            // then
+            verify(exactly = 1) { rankingWriter.replaceAll(any(), any()) }
         }
 
-        @DisplayName("createBucket 두 번째 시도에서 성공하면 재시도를 중단한다")
+        @DisplayName("이전 버킷에만 있는 상품도 점수 계산에 포함한다 (cold start prevention)")
         @Test
-        fun `stops retrying when createBucket succeeds on second try`() {
+        fun `includes products only in previous bucket`() {
             // given
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+            val currentHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val previousHour = currentHour.minus(1, ChronoUnit.HOURS)
 
-            var callCount = 0
-            every { rankingReader.exists(previousBucketKey) } returns true
-            every { rankingReader.exists(currentBucketKey) } returns false
-            every { rankingReader.getAllScores(previousBucketKey) } returns mapOf(1L to Score.of(100.0))
-            every { rankingWriter.createBucket(any(), any()) } answers {
-                callCount++
-                if (callCount == 1) {
-                    throw RuntimeException("Redis Error - first attempt")
-                }
-                // Second attempt succeeds
+            val previousMetric = ProductHourlyMetric.create(
+                statHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul")),
+                productId = 99L,
+                viewCount = 100,
+                likeCount = 0,
+                orderCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+
+            val weights = RankingWeight.fallback()
+
+            every { metricRepository.findAllByStatHour(currentHour) } returns emptyList()
+            every { metricRepository.findAllByStatHour(previousHour) } returns listOf(previousMetric)
+            every { rankingWeightRepository.findLatest() } returns weights
+
+            var capturedScores: Map<Long, Score>? = null
+            every { rankingWriter.replaceAll(any(), any()) } answers {
+                capturedScores = secondArg()
             }
 
             // when
-            service.transitionBucket()
-
-            // then - should be called twice (1 failure + 1 success)
-            verify(exactly = 2) { rankingWriter.createBucket(any(), any()) }
-        }
-
-        @DisplayName("이전 버킷이 없으면 createBucket을 호출하지 않는다")
-        @Test
-        fun `does not call createBucket when previous bucket does not exist`() {
-            // given
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-
-            every { rankingReader.exists(previousBucketKey) } returns false
-
-            // when
-            service.transitionBucket()
+            service.calculateAndUpdateScores()
 
             // then
-            verify(exactly = 0) { rankingWriter.createBucket(any(), any()) }
+            assertThat(capturedScores).isNotNull
+            assertThat(capturedScores).containsKey(99L)
+            // Previous only: 100 * 0.10 (viewWeight) * 0.1 (decay) = 1.0
+            assertThat(capturedScores!![99L]!!.value).isEqualByComparingTo(BigDecimal("1.00"))
         }
 
-        @DisplayName("현재 버킷이 이미 존재하면 createBucket을 호출하지 않는다")
+        @DisplayName("감쇠 공식을 적용한다: previous * 0.1 + current * 0.9")
         @Test
-        fun `does not call createBucket when current bucket already exists`() {
+        fun `applies decay formula - previous 0_1 plus current 0_9`() {
             // given
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
+            val currentHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val previousHour = currentHour.minus(1, ChronoUnit.HOURS)
 
-            every { rankingReader.exists(previousBucketKey) } returns true
-            every { rankingReader.exists(currentBucketKey) } returns true
-
-            // when
-            service.transitionBucket()
-
-            // then
-            verify(exactly = 0) { rankingWriter.createBucket(any(), any()) }
-        }
-    }
-
-    @DisplayName("재시도 후 예외 전파 테스트")
-    @Nested
-    inner class RetryExceptionPropagation {
-
-        @DisplayName("batchAccumulateCounts 3회 실패 후 flush에서 예외가 잡힌다 (로깅 후 계속)")
-        @Test
-        fun `exception from batchAccumulateCounts is caught in flush`() {
-            // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-            val command = AccumulateViewMetricCommand(
-                eventId = "event-exception-test",
-                productId = productId,
-                occurredAt = occurredAt,
+            // Current: 100 views -> 100 * 0.10 = 10 points
+            val currentMetric = ProductHourlyMetric.create(
+                statHour = ZonedDateTime.ofInstant(currentHour, ZoneId.of("Asia/Seoul")),
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 0,
+                orderCount = 0,
+                orderAmount = BigDecimal.ZERO,
             )
 
-            every { eventHandledRepository.existsByIdempotencyKey(any()) } returns false
-            every { eventHandledRepository.save(any()) } returns IdempotencyResult.Recorded
-            every { rankingWeightRepository.findLatest() } returns RankingWeight.fallback()
-            every { metricRepository.batchAccumulateCounts(any()) } throws RuntimeException("DB Error")
+            // Previous: 200 views -> 200 * 0.10 = 20 points
+            val previousMetric = ProductHourlyMetric.create(
+                statHour = ZonedDateTime.ofInstant(previousHour, ZoneId.of("Asia/Seoul")),
+                productId = 1L,
+                viewCount = 200,
+                likeCount = 0,
+                orderCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
 
-            // when & then - flush catches the exception internally, so no exception propagates
-            service.accumulateViewMetric(command)
-            service.flush() // Should not throw - exception is caught and logged
+            val weights = RankingWeight.fallback()
+
+            every { metricRepository.findAllByStatHour(currentHour) } returns listOf(currentMetric)
+            every { metricRepository.findAllByStatHour(previousHour) } returns listOf(previousMetric)
+            every { rankingWeightRepository.findLatest() } returns weights
+
+            var capturedScores: Map<Long, Score>? = null
+            every { rankingWriter.replaceAll(any(), any()) } answers {
+                capturedScores = secondArg()
+            }
+
+            // when
+            service.calculateAndUpdateScores()
+
+            // then
+            // Expected: 20 * 0.1 + 10 * 0.9 = 2 + 9 = 11
+            assertThat(capturedScores).isNotNull
+            assertThat(capturedScores!![1L]!!.value).isEqualByComparingTo(BigDecimal("11.00"))
         }
 
-        @DisplayName("createBucket 3회 실패 후 transitionBucket에서 예외가 잡힌다 (로깅 후 계속)")
+        @DisplayName("가중치가 없으면 fallback 값을 사용한다")
         @Test
-        fun `exception from createBucket is caught in transitionBucket`() {
+        fun `uses fallback weight when no weight configured`() {
             // given
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+            val currentHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val previousHour = currentHour.minus(1, ChronoUnit.HOURS)
 
-            every { rankingReader.exists(previousBucketKey) } returns true
-            every { rankingReader.exists(RankingKeyGenerator.currentBucketKey()) } returns false
-            every { rankingReader.getAllScores(previousBucketKey) } returns mapOf(1L to Score.of(100.0))
-            every { rankingWriter.createBucket(any(), any()) } throws RuntimeException("Redis Error")
+            val currentMetric = ProductHourlyMetric.create(
+                statHour = ZonedDateTime.ofInstant(currentHour, ZoneId.of("Asia/Seoul")),
+                productId = 1L,
+                viewCount = 10,
+                likeCount = 0,
+                orderCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
 
-            // when & then - transitionBucket catches the exception internally
-            service.transitionBucket() // Should not throw - exception is caught and logged
+            every { metricRepository.findAllByStatHour(currentHour) } returns listOf(currentMetric)
+            every { metricRepository.findAllByStatHour(previousHour) } returns emptyList()
+            every { rankingWeightRepository.findLatest() } returns null
+
+            var capturedScores: Map<Long, Score>? = null
+            every { rankingWriter.replaceAll(any(), any()) } answers {
+                capturedScores = secondArg()
+            }
+
+            // when
+            service.calculateAndUpdateScores()
+
+            // then - fallback viewWeight is 0.10
+            // 10 * 0.10 * 0.9 = 0.9
+            assertThat(capturedScores).isNotNull
+            assertThat(capturedScores!![1L]!!.value).isEqualByComparingTo(BigDecimal("0.90"))
         }
     }
 
@@ -476,21 +486,6 @@ class RankingAggregationServiceTest {
             // then
             verify(exactly = 1) { eventHandledRepository.existsByIdempotencyKey("ranking:order-paid:order-event-999") }
             verify(exactly = 0) { eventHandledRepository.save(any()) }
-        }
-    }
-
-    @DisplayName("onShutdown 테스트")
-    @Nested
-    inner class OnShutdownTest {
-
-        @DisplayName("onShutdown 호출 시 flush가 호출된다")
-        @Test
-        fun `onShutdown calls flush`() {
-            // given - buffer is empty, so flush should just return early
-            // when
-            service.onShutdown()
-
-            // then - no exception, flush completed (empty buffer case)
         }
     }
 }
