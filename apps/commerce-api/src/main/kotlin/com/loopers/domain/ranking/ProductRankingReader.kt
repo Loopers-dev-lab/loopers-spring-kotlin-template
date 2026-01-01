@@ -9,7 +9,7 @@ interface ProductRankingReader {
     /**
      * 랭킹을 RankingQuery 조건으로 조회
      *
-     * @param query 조회 조건 (bucketKey, offset, limit 포함)
+     * @param query 조회 조건 (period, dateTime, offset, limit 포함)
      * @return ProductRanking 리스트
      */
     fun findTopRankings(query: RankingQuery): List<ProductRanking>
@@ -17,17 +17,17 @@ interface ProductRankingReader {
     /**
      * 특정 상품의 순위 조회
      *
-     * @param bucketKey Redis 키
+     * @param query 조회 조건 (period, dateTime으로 버킷 결정)
      * @param productId 상품 ID
      * @return 순위 (1-based), 랭킹에 없으면 null
      */
-    fun findRankByProductId(bucketKey: String, productId: Long): Int?
+    fun findRankByProductId(query: RankingQuery, productId: Long): Int?
 
     /**
      * 버킷 존재 여부 확인
      *
-     * @param bucketKey Redis 키
+     * @param query 조회 조건 (period, dateTime으로 버킷 결정)
      * @return 버킷 존재 여부
      */
-    fun exists(bucketKey: String): Boolean
+    fun exists(query: RankingQuery): Boolean
 }

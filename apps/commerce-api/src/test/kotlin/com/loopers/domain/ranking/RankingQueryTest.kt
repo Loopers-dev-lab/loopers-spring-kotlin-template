@@ -9,9 +9,14 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 @DisplayName("RankingQuery 테스트")
 class RankingQueryTest {
+
+    private val seoulZone = ZoneId.of("Asia/Seoul")
+    private val testDateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone)
 
     @DisplayName("생성 테스트")
     @Nested
@@ -22,21 +27,21 @@ class RankingQueryTest {
         fun `creates RankingQuery with valid values`() {
             // given
             val period = RankingPeriod.HOURLY
-            val bucketKey = "ranking:products:hourly:2025011514"
+            val dateTime = testDateTime
             val offset = 0L
             val limit = 20L
 
             // when
             val query = RankingQuery(
                 period = period,
-                bucketKey = bucketKey,
+                dateTime = dateTime,
                 offset = offset,
                 limit = limit,
             )
 
             // then
             assertThat(query.period).isEqualTo(RankingPeriod.HOURLY)
-            assertThat(query.bucketKey).isEqualTo(bucketKey)
+            assertThat(query.dateTime).isEqualTo(dateTime)
             assertThat(query.offset).isEqualTo(0L)
             assertThat(query.limit).isEqualTo(20L)
         }
@@ -46,19 +51,19 @@ class RankingQueryTest {
         fun `creates RankingQuery with DAILY period`() {
             // given
             val period = RankingPeriod.DAILY
-            val bucketKey = "ranking:products:daily:20250115"
+            val dateTime = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, seoulZone)
 
             // when
             val query = RankingQuery(
                 period = period,
-                bucketKey = bucketKey,
+                dateTime = dateTime,
                 offset = 0L,
                 limit = 20L,
             )
 
             // then
             assertThat(query.period).isEqualTo(RankingPeriod.DAILY)
-            assertThat(query.bucketKey).isEqualTo(bucketKey)
+            assertThat(query.dateTime).isEqualTo(dateTime)
         }
 
         @DisplayName("offset과 limit으로 페이지네이션 설정을 한다")
@@ -71,7 +76,7 @@ class RankingQueryTest {
             // when
             val query = RankingQuery(
                 period = RankingPeriod.HOURLY,
-                bucketKey = "ranking:products:hourly:2025011514",
+                dateTime = testDateTime,
                 offset = offset,
                 limit = limit,
             )
@@ -94,7 +99,7 @@ class RankingQueryTest {
             val exception = assertThrows<CoreException> {
                 RankingQuery(
                     period = RankingPeriod.HOURLY,
-                    bucketKey = "ranking:products:hourly:2025011514",
+                    dateTime = testDateTime,
                     offset = invalidOffset,
                     limit = 20L,
                 )
@@ -113,7 +118,7 @@ class RankingQueryTest {
             val exception = assertThrows<CoreException> {
                 RankingQuery(
                     period = RankingPeriod.HOURLY,
-                    bucketKey = "ranking:products:hourly:2025011514",
+                    dateTime = testDateTime,
                     offset = 0L,
                     limit = invalidLimit,
                 )
@@ -132,7 +137,7 @@ class RankingQueryTest {
             val exception = assertThrows<CoreException> {
                 RankingQuery(
                     period = RankingPeriod.HOURLY,
-                    bucketKey = "ranking:products:hourly:2025011514",
+                    dateTime = testDateTime,
                     offset = 0L,
                     limit = invalidLimit,
                 )
@@ -150,7 +155,7 @@ class RankingQueryTest {
             // when
             val query = RankingQuery(
                 period = RankingPeriod.HOURLY,
-                bucketKey = "ranking:products:hourly:2025011514",
+                dateTime = testDateTime,
                 offset = 0L,
                 limit = validLimit,
             )
@@ -160,26 +165,98 @@ class RankingQueryTest {
         }
     }
 
-    @DisplayName("copy 메서드 테스트")
+    @DisplayName("previousPeriod 테스트")
     @Nested
-    inner class CopyMethod {
+    inner class PreviousPeriod {
 
-        @DisplayName("bucketKey만 변경하여 copy할 수 있다")
+        @DisplayName("HOURLY period에서 previousPeriod()는 1시간 이전의 Query를 반환한다")
         @Test
-        fun `can copy with different bucketKey`() {
+        fun `previousPeriod returns Query with dateTime subtracted by 1 hour for HOURLY`() {
             // given
-            val original = RankingQuery(
+            val query = RankingQuery(
                 period = RankingPeriod.HOURLY,
-                bucketKey = "ranking:products:hourly:2025011514",
+                dateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone),
                 offset = 0L,
                 limit = 20L,
             )
 
             // when
-            val copied = original.copy(bucketKey = "ranking:products:hourly:2025011513")
+            val previousQuery = query.previousPeriod()
 
             // then
-            assertThat(copied.bucketKey).isEqualTo("ranking:products:hourly:2025011513")
+            assertThat(previousQuery.period).isEqualTo(RankingPeriod.HOURLY)
+            assertThat(previousQuery.dateTime).isEqualTo(
+                ZonedDateTime.of(2025, 1, 15, 13, 0, 0, 0, seoulZone),
+            )
+            assertThat(previousQuery.offset).isEqualTo(query.offset)
+            assertThat(previousQuery.limit).isEqualTo(query.limit)
+        }
+
+        @DisplayName("DAILY period에서 previousPeriod()는 1일 이전의 Query를 반환한다")
+        @Test
+        fun `previousPeriod returns Query with dateTime subtracted by 1 day for DAILY`() {
+            // given
+            val query = RankingQuery(
+                period = RankingPeriod.DAILY,
+                dateTime = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, seoulZone),
+                offset = 10L,
+                limit = 20L,
+            )
+
+            // when
+            val previousQuery = query.previousPeriod()
+
+            // then
+            assertThat(previousQuery.period).isEqualTo(RankingPeriod.DAILY)
+            assertThat(previousQuery.dateTime).isEqualTo(
+                ZonedDateTime.of(2025, 1, 14, 0, 0, 0, 0, seoulZone),
+            )
+            assertThat(previousQuery.offset).isEqualTo(query.offset)
+            assertThat(previousQuery.limit).isEqualTo(query.limit)
+        }
+
+        @DisplayName("previousPeriod()는 년/월 경계를 넘어서도 올바르게 동작한다")
+        @Test
+        fun `previousPeriod handles year and month boundaries correctly`() {
+            // given
+            val query = RankingQuery(
+                period = RankingPeriod.HOURLY,
+                dateTime = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, seoulZone),
+                offset = 0L,
+                limit = 20L,
+            )
+
+            // when
+            val previousQuery = query.previousPeriod()
+
+            // then
+            assertThat(previousQuery.dateTime).isEqualTo(
+                ZonedDateTime.of(2024, 12, 31, 23, 0, 0, 0, seoulZone),
+            )
+        }
+    }
+
+    @DisplayName("copy 메서드 테스트")
+    @Nested
+    inner class CopyMethod {
+
+        @DisplayName("dateTime만 변경하여 copy할 수 있다")
+        @Test
+        fun `can copy with different dateTime`() {
+            // given
+            val original = RankingQuery(
+                period = RankingPeriod.HOURLY,
+                dateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone),
+                offset = 0L,
+                limit = 20L,
+            )
+            val newDateTime = ZonedDateTime.of(2025, 1, 15, 13, 0, 0, 0, seoulZone)
+
+            // when
+            val copied = original.copy(dateTime = newDateTime)
+
+            // then
+            assertThat(copied.dateTime).isEqualTo(newDateTime)
             assertThat(copied.period).isEqualTo(original.period)
             assertThat(copied.offset).isEqualTo(original.offset)
             assertThat(copied.limit).isEqualTo(original.limit)

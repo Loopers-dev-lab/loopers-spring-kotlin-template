@@ -7,9 +7,13 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 @DisplayName("RankingCommand 테스트")
 class RankingCommandTest {
+
+    private val seoulZone = ZoneId.of("Asia/Seoul")
 
     @DisplayName("FindRankings 테스트")
     @Nested
@@ -159,6 +163,129 @@ class RankingCommandTest {
                 // then
                 assertThat(command.size).isEqualTo(validSize)
             }
+        }
+    }
+
+    @DisplayName("toQuery 테스트")
+    @Nested
+    inner class ToQuery {
+
+        @DisplayName("date가 null이면 현재 시간의 ZonedDateTime을 사용한다 (Asia/Seoul timezone)")
+        @Test
+        fun `toQuery with null date uses current ZonedDateTime in Asia_Seoul timezone`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = null,
+                page = 0,
+                size = 20,
+            )
+            val beforeCall = ZonedDateTime.now(seoulZone)
+
+            // when
+            val query = command.toQuery()
+
+            // then
+            val afterCall = ZonedDateTime.now(seoulZone)
+            assertThat(query.dateTime.zone).isEqualTo(seoulZone)
+            assertThat(query.dateTime).isAfterOrEqualTo(beforeCall.minusSeconds(1))
+            assertThat(query.dateTime).isBeforeOrEqualTo(afterCall.plusSeconds(1))
+        }
+
+        @DisplayName("HOURLY date 2025011514는 2025-01-15T14:00 Asia/Seoul로 파싱된다")
+        @Test
+        fun `toQuery with HOURLY date parses to correct ZonedDateTime`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = "2025011514",
+                page = 0,
+                size = 20,
+            )
+
+            // when
+            val query = command.toQuery()
+
+            // then
+            assertThat(query.dateTime).isEqualTo(
+                ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone),
+            )
+            assertThat(query.period).isEqualTo(RankingPeriod.HOURLY)
+        }
+
+        @DisplayName("DAILY date 20250115는 2025-01-15T00:00 Asia/Seoul로 파싱된다")
+        @Test
+        fun `toQuery with DAILY date parses to correct ZonedDateTime`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.DAILY,
+                date = "20250115",
+                page = 0,
+                size = 20,
+            )
+
+            // when
+            val query = command.toQuery()
+
+            // then
+            assertThat(query.dateTime).isEqualTo(
+                ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, seoulZone),
+            )
+            assertThat(query.period).isEqualTo(RankingPeriod.DAILY)
+        }
+
+        @DisplayName("offset은 page * size로 계산된다")
+        @Test
+        fun `toQuery correctly calculates offset from page and size`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = "2025011514",
+                page = 2,
+                size = 20,
+            )
+
+            // when
+            val query = command.toQuery()
+
+            // then
+            assertThat(query.offset).isEqualTo(40L) // 2 * 20
+        }
+
+        @DisplayName("limit은 size와 같다")
+        @Test
+        fun `toQuery correctly passes limit as size`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = "2025011514",
+                page = 0,
+                size = 15,
+            )
+
+            // when
+            val query = command.toQuery()
+
+            // then
+            assertThat(query.limit).isEqualTo(15L)
+        }
+
+        @DisplayName("page가 0이면 offset도 0이다")
+        @Test
+        fun `toQuery with page 0 has offset 0`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = "2025011514",
+                page = 0,
+                size = 20,
+            )
+
+            // when
+            val query = command.toQuery()
+
+            // then
+            assertThat(query.offset).isEqualTo(0L)
         }
     }
 }

@@ -2,6 +2,7 @@ package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRanking
 import com.loopers.domain.ranking.ProductRankingReader
+import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingQuery
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Repository
@@ -10,16 +11,31 @@ import java.math.BigDecimal
 @Repository
 class ProductRankingRedisReader(
     private val redisTemplate: RedisTemplate<String, String>,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) : ProductRankingReader {
 
     private val zSetOps = redisTemplate.opsForZSet()
 
     override fun findTopRankings(query: RankingQuery): List<ProductRanking> {
+        val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime)
+        val rankings = findFromBucket(bucketKey, query)
+
+        // Fallback: if empty AND first page (offset=0), try previous period
+        if (rankings.isEmpty() && query.offset == 0L) {
+            val fallbackQuery = query.previousPeriod()
+            val fallbackKey = rankingKeyGenerator.bucketKey(fallbackQuery.period, fallbackQuery.dateTime)
+            return findFromBucket(fallbackKey, fallbackQuery)
+        }
+
+        return rankings
+    }
+
+    private fun findFromBucket(bucketKey: String, query: RankingQuery): List<ProductRanking> {
         // limit + 1 for hasNext determination
         val limit = query.limit + 1
         val end = query.offset + limit - 1
 
-        val result = zSetOps.reverseRangeWithScores(query.bucketKey, query.offset, end)
+        val result = zSetOps.reverseRangeWithScores(bucketKey, query.offset, end)
             ?: return emptyList()
 
         return result.mapIndexedNotNull { index, typedTuple ->
@@ -34,14 +50,16 @@ class ProductRankingRedisReader(
         }
     }
 
-    override fun findRankByProductId(bucketKey: String, productId: Long): Int? {
+    override fun findRankByProductId(query: RankingQuery, productId: Long): Int? {
+        val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime)
         val rank = zSetOps.reverseRank(bucketKey, productId.toString())
             ?: return null
 
         return (rank + 1).toInt()
     }
 
-    override fun exists(bucketKey: String): Boolean {
+    override fun exists(query: RankingQuery): Boolean {
+        val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime)
         return redisTemplate.hasKey(bucketKey)
     }
 }

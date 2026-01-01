@@ -5,8 +5,10 @@ import com.loopers.cache.CacheTemplate
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductViewedEventV1
 import com.loopers.domain.ranking.ProductRankingReader
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
+import com.loopers.domain.ranking.RankingQuery
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
@@ -18,11 +20,11 @@ class ProductFacade(
     private val cacheTemplate: CacheTemplate,
     private val eventPublisher: ApplicationEventPublisher,
     private val productRankingReader: ProductRankingReader,
-    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
     companion object {
         private val TYPE_CACHED_PRODUCT_DETAIL_V1 = object : TypeReference<CachedProductDetailV1>() {}
         private val TYPE_CACHED_PRODUCT_LIST = object : TypeReference<CachedProductList>() {}
+        private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
     }
 
     fun findProductById(id: Long, userId: Long? = null): ProductInfo.FindProductById {
@@ -38,8 +40,13 @@ class ProductFacade(
             view
         }
 
-        val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
-        val rank = productRankingReader.findRankByProductId(bucketKey, id)
+        val query = RankingQuery(
+            period = RankingPeriod.HOURLY,
+            dateTime = ZonedDateTime.now(SEOUL_ZONE),
+            offset = 0,
+            limit = 1,
+        )
+        val rank = productRankingReader.findRankByProductId(query, id)
 
         eventPublisher.publishEvent(ProductViewedEventV1.create(id, userId))
 

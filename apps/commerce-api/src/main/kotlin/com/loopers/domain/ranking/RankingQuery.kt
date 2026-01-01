@@ -2,10 +2,11 @@ package com.loopers.domain.ranking
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
+import java.time.ZonedDateTime
 
 data class RankingQuery(
     val period: RankingPeriod,
-    val bucketKey: String,
+    val dateTime: ZonedDateTime,
     val offset: Long,
     val limit: Long,
 ) {
@@ -19,6 +20,14 @@ data class RankingQuery(
         if (limit > MAX_LIMIT) {
             throw CoreException(ErrorType.BAD_REQUEST, "limit은 최대 ${MAX_LIMIT}까지 가능합니다.")
         }
+    }
+
+    /**
+     * Returns a new RankingQuery with dateTime adjusted by one period back.
+     * Used for fallback when the current period's bucket is empty.
+     */
+    fun previousPeriod(): RankingQuery {
+        return copy(dateTime = period.subtractOne(dateTime))
     }
 
     companion object {

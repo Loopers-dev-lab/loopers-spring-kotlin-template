@@ -231,9 +231,9 @@ class RankingServiceIntegrationTest @Autowired constructor(
             assertThat(result[0].productId).isEqualTo(101L)
         }
 
-        @DisplayName("date가 지정되면 fallback을 시도하지 않는다")
+        @DisplayName("date가 지정되어도 버킷이 비어있으면 fallback을 시도한다 (AC-4)")
         @Test
-        fun `does not use fallback when date is specified`() {
+        fun `uses fallback even when date is specified (AC-4)`() {
             // given - 지정된 date 버킷은 비어있고, 이전 버킷에 데이터가 있음
             val date = "2025011514"
             val specifiedBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, date)
@@ -250,8 +250,9 @@ class RankingServiceIntegrationTest @Autowired constructor(
             // when
             val result = rankingService.findRankings(command)
 
-            // then
-            assertThat(result).isEmpty()
+            // then - 이제 fallback이 적용되어 데이터가 반환됨
+            assertThat(result).hasSize(1)
+            assertThat(result[0].productId).isEqualTo(201L)
         }
     }
 }
