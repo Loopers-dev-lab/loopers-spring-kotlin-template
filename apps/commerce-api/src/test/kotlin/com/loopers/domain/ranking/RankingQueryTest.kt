@@ -3,6 +3,7 @@ package com.loopers.domain.ranking
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -12,6 +13,13 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("RankingQuery 테스트")
 class RankingQueryTest {
+
+    private lateinit var rankingKeyGenerator: RankingKeyGenerator
+
+    @BeforeEach
+    fun setUp() {
+        rankingKeyGenerator = RankingKeyGenerator()
+    }
 
     @DisplayName("of 메서드 테스트")
     @Nested
@@ -24,13 +32,13 @@ class RankingQueryTest {
             val period = RankingPeriod.HOURLY
 
             // when
-            val query = RankingQuery.of(period, null, null, null)
+            val query = RankingQuery.of(period, null, null, null, rankingKeyGenerator)
 
             // then
             assertThat(query.period).isEqualTo(RankingPeriod.HOURLY)
             assertThat(query.offset).isEqualTo(0L)
             assertThat(query.limit).isEqualTo(20L)
-            assertThat(query.bucketKey).startsWith("ranking:products:")
+            assertThat(query.bucketKey).startsWith("ranking:products:hourly:")
             assertThat(query.fallbackKey).isNotNull()
         }
 
@@ -43,7 +51,7 @@ class RankingQueryTest {
             val size = 10
 
             // when
-            val query = RankingQuery.of(period, null, page, size)
+            val query = RankingQuery.of(period, null, page, size, rankingKeyGenerator)
 
             // then
             assertThat(query.period).isEqualTo(RankingPeriod.HOURLY)
@@ -58,7 +66,7 @@ class RankingQueryTest {
             val period = RankingPeriod.DAILY
 
             // when
-            val query = RankingQuery.of(period, null, null, null)
+            val query = RankingQuery.of(period, null, null, null, rankingKeyGenerator)
 
             // then
             assertThat(query.period).isEqualTo(RankingPeriod.DAILY)
@@ -74,10 +82,10 @@ class RankingQueryTest {
             val date = "2025011514"
 
             // when
-            val query = RankingQuery.of(period, date, null, null)
+            val query = RankingQuery.of(period, date, null, null, rankingKeyGenerator)
 
             // then
-            assertThat(query.bucketKey).isEqualTo("ranking:products:2025011514")
+            assertThat(query.bucketKey).isEqualTo("ranking:products:hourly:2025011514")
         }
 
         @DisplayName("DAILY period와 date가 지정되면 daily bucketKey를 생성한다")
@@ -88,7 +96,7 @@ class RankingQueryTest {
             val date = "20250115"
 
             // when
-            val query = RankingQuery.of(period, date, null, null)
+            val query = RankingQuery.of(period, date, null, null, rankingKeyGenerator)
 
             // then
             assertThat(query.bucketKey).isEqualTo("ranking:products:daily:20250115")
@@ -102,7 +110,7 @@ class RankingQueryTest {
             val date = "2025011514"
 
             // when
-            val query = RankingQuery.of(period, date, null, null)
+            val query = RankingQuery.of(period, date, null, null, rankingKeyGenerator)
 
             // then
             assertThat(query.fallbackKey).isNull()
@@ -115,11 +123,11 @@ class RankingQueryTest {
             val period = RankingPeriod.HOURLY
 
             // when
-            val query = RankingQuery.of(period, null, null, null)
+            val query = RankingQuery.of(period, null, null, null, rankingKeyGenerator)
 
             // then
             assertThat(query.fallbackKey).isNotNull()
-            assertThat(query.fallbackKey).startsWith("ranking:products:")
+            assertThat(query.fallbackKey).startsWith("ranking:products:hourly:")
         }
 
         @DisplayName("DAILY period에서 date가 지정되지 않으면 daily fallbackKey가 생성된다")
@@ -129,7 +137,7 @@ class RankingQueryTest {
             val period = RankingPeriod.DAILY
 
             // when
-            val query = RankingQuery.of(period, null, null, null)
+            val query = RankingQuery.of(period, null, null, null, rankingKeyGenerator)
 
             // then
             assertThat(query.fallbackKey).isNotNull()
@@ -147,7 +155,7 @@ class RankingQueryTest {
         fun `throws CoreException when page is negative resulting in negative offset`(invalidPage: Int) {
             // when
             val exception = assertThrows<CoreException> {
-                RankingQuery.of(RankingPeriod.HOURLY, null, invalidPage, 20)
+                RankingQuery.of(RankingPeriod.HOURLY, null, invalidPage, 20, rankingKeyGenerator)
             }
 
             // then
@@ -161,7 +169,7 @@ class RankingQueryTest {
         fun `throws CoreException when size is zero or negative`(invalidSize: Int) {
             // when
             val exception = assertThrows<CoreException> {
-                RankingQuery.of(RankingPeriod.HOURLY, null, 0, invalidSize)
+                RankingQuery.of(RankingPeriod.HOURLY, null, 0, invalidSize, rankingKeyGenerator)
             }
 
             // then
@@ -175,7 +183,7 @@ class RankingQueryTest {
         fun `throws CoreException when size exceeds max limit`(invalidSize: Int) {
             // when
             val exception = assertThrows<CoreException> {
-                RankingQuery.of(RankingPeriod.HOURLY, null, 0, invalidSize)
+                RankingQuery.of(RankingPeriod.HOURLY, null, 0, invalidSize, rankingKeyGenerator)
             }
 
             // then
@@ -188,7 +196,7 @@ class RankingQueryTest {
         @DisplayName("유효한 size로 RankingQuery를 생성한다")
         fun `creates RankingQuery when valid size is given`(validSize: Int) {
             // when
-            val query = RankingQuery.of(RankingPeriod.HOURLY, null, 0, validSize)
+            val query = RankingQuery.of(RankingPeriod.HOURLY, null, 0, validSize, rankingKeyGenerator)
 
             // then
             assertThat(query.limit).isEqualTo(validSize.toLong())
@@ -203,7 +211,7 @@ class RankingQueryTest {
         @Test
         fun `limitForHasNext returns limit plus one`() {
             // given
-            val query = RankingQuery.of(RankingPeriod.HOURLY, null, 0, 20)
+            val query = RankingQuery.of(RankingPeriod.HOURLY, null, 0, 20, rankingKeyGenerator)
 
             // when
             val result = query.limitForHasNext()
@@ -216,7 +224,7 @@ class RankingQueryTest {
         @Test
         fun `limitForHasNext returns 101 when limit is 100`() {
             // given
-            val query = RankingQuery.of(RankingPeriod.HOURLY, null, 0, 100)
+            val query = RankingQuery.of(RankingPeriod.HOURLY, null, 0, 100, rankingKeyGenerator)
 
             // when
             val result = query.limitForHasNext()

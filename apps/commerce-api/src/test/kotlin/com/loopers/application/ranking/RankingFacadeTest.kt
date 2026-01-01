@@ -4,6 +4,7 @@ import com.loopers.domain.product.ProductSaleStatus
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductView
 import com.loopers.domain.ranking.ProductRanking
+import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingQuery
 import com.loopers.domain.ranking.RankingService
 import com.loopers.domain.ranking.RankingWeight
@@ -21,7 +22,8 @@ class RankingFacadeTest {
 
     private val rankingService: RankingService = mockk()
     private val productService: ProductService = mockk()
-    private val rankingFacade = RankingFacade(rankingService, productService)
+    private val rankingKeyGenerator: RankingKeyGenerator = RankingKeyGenerator()
+    private val rankingFacade = RankingFacade(rankingService, productService, rankingKeyGenerator)
 
     @DisplayName("findRankings 테스트")
     @Nested
@@ -234,7 +236,7 @@ class RankingFacadeTest {
             verify {
                 rankingService.findRankings(
                     match<RankingQuery> {
-                        it.bucketKey.startsWith("ranking:products:") && !it.bucketKey.contains("daily")
+                        it.bucketKey.startsWith("ranking:products:hourly:")
                     },
                 )
             }

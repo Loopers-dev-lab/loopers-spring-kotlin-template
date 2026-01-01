@@ -45,12 +45,13 @@ data class RankingQuery(
             date: String?,
             page: Int?,
             size: Int?,
+            rankingKeyGenerator: RankingKeyGenerator,
         ): RankingQuery {
             val resolvedPage = page ?: DEFAULT_PAGE
             val resolvedSize = size ?: DEFAULT_SIZE
 
-            val bucketKey = resolveBucketKey(period, date)
-            val fallbackKey = resolveFallbackKey(period, date)
+            val bucketKey = resolveBucketKey(period, date, rankingKeyGenerator)
+            val fallbackKey = resolveFallbackKey(period, date, bucketKey, rankingKeyGenerator)
 
             return RankingQuery(
                 period = period,
@@ -61,33 +62,28 @@ data class RankingQuery(
             )
         }
 
-        private fun resolveBucketKey(period: RankingPeriod, date: String?): String {
-            return when (period) {
-                RankingPeriod.HOURLY -> {
-                    if (date != null) {
-                        "ranking:products:$date"
-                    } else {
-                        RankingKeyGenerator.currentBucketKey()
-                    }
-                }
-                RankingPeriod.DAILY -> {
-                    if (date != null) {
-                        "ranking:products:daily:$date"
-                    } else {
-                        RankingKeyGenerator.currentDailyBucketKey()
-                    }
-                }
+        private fun resolveBucketKey(
+            period: RankingPeriod,
+            date: String?,
+            rankingKeyGenerator: RankingKeyGenerator,
+        ): String {
+            return if (date != null) {
+                rankingKeyGenerator.bucketKey(period, date)
+            } else {
+                rankingKeyGenerator.currentBucketKey(period)
             }
         }
 
-        private fun resolveFallbackKey(period: RankingPeriod, date: String?): String? {
+        private fun resolveFallbackKey(
+            period: RankingPeriod,
+            date: String?,
+            bucketKey: String,
+            rankingKeyGenerator: RankingKeyGenerator,
+        ): String? {
             // No fallback when a specific date is specified
             if (date != null) return null
 
-            return when (period) {
-                RankingPeriod.HOURLY -> RankingKeyGenerator.previousBucketKey()
-                RankingPeriod.DAILY -> RankingKeyGenerator.previousDailyBucketKey()
-            }
+            return rankingKeyGenerator.previousBucketKey(bucketKey)
         }
     }
 }

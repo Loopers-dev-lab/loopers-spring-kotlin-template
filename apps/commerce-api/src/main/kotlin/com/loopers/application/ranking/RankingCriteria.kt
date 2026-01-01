@@ -1,5 +1,6 @@
 package com.loopers.application.ranking
 
+import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingQuery
 import java.math.BigDecimal
@@ -24,12 +25,13 @@ class RankingCriteria {
          * Converts to RankingQuery
          * Provides .toQuery() method following the PageQuery pattern
          */
-        fun toQuery(): RankingQuery {
+        fun toQuery(rankingKeyGenerator: RankingKeyGenerator): RankingQuery {
             return RankingQuery.of(
                 period = RankingPeriod.fromString(period),
                 date = date,
                 page = page,
                 size = size,
+                rankingKeyGenerator = rankingKeyGenerator,
             )
         }
     }

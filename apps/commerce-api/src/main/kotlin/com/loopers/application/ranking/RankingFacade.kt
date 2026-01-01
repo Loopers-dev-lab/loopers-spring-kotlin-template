@@ -1,6 +1,7 @@
 package com.loopers.application.ranking
 
 import com.loopers.domain.product.ProductService
+import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingService
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -9,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional
 class RankingFacade(
     private val rankingService: RankingService,
     private val productService: ProductService,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
 
     /**
@@ -20,7 +22,7 @@ class RankingFacade(
      */
     @Transactional(readOnly = true)
     fun findRankings(criteria: RankingCriteria.FindRankings): RankingInfo.FindRankings {
-        val query = criteria.toQuery()
+        val query = criteria.toQuery(rankingKeyGenerator)
         val rankings = rankingService.findRankings(query)
 
         if (rankings.isEmpty()) {

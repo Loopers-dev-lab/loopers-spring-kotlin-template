@@ -9,6 +9,7 @@ import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
 import com.loopers.domain.ranking.RankingKeyGenerator
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingWeight
 import com.loopers.domain.ranking.RankingWeightRepository
 import com.loopers.support.values.Money
@@ -35,6 +36,7 @@ class RankingFacadeIntegrationTest @Autowired constructor(
     private val redisTemplate: RedisTemplate<String, String>,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
     @AfterEach
     fun tearDown() {
@@ -54,7 +56,7 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             val product2 = createProduct(name = "상품2", stockQuantity = 30)
             val product3 = createProduct(name = "상품3", stockQuantity = 20)
 
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
 
             redisTemplate.opsForZSet().add(bucketKey, product3.id.toString(), 100.0)
             redisTemplate.opsForZSet().add(bucketKey, product1.id.toString(), 80.0)
@@ -110,7 +112,7 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             // given
             val products = (1..5).map { createProduct(name = "상품$it") }
 
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
             products.forEachIndexed { index, product ->
                 redisTemplate.opsForZSet().add(bucketKey, product.id.toString(), (100 - index * 10).toDouble())
             }
@@ -137,7 +139,7 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             val product1 = createProduct(name = "상품1", stockQuantity = 50)
             val product2 = createProduct(name = "상품2", stockQuantity = 30)
 
-            val dailyBucketKey = RankingKeyGenerator.currentDailyBucketKey()
+            val dailyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.DAILY)
 
             redisTemplate.opsForZSet().add(dailyBucketKey, product2.id.toString(), 100.0)
             redisTemplate.opsForZSet().add(dailyBucketKey, product1.id.toString(), 80.0)
@@ -167,8 +169,8 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             val product1 = createProduct(name = "상품1")
             val product2 = createProduct(name = "상품2")
 
-            val hourlyBucketKey = RankingKeyGenerator.currentBucketKey()
-            val dailyBucketKey = RankingKeyGenerator.currentDailyBucketKey()
+            val hourlyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            val dailyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.DAILY)
 
             // hourly에만 데이터 추가
             redisTemplate.opsForZSet().add(hourlyBucketKey, product1.id.toString(), 100.0)
@@ -195,7 +197,8 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             // given
             val product1 = createProduct(name = "상품1")
 
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
+            val currentBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            val previousBucketKey = rankingKeyGenerator.previousBucketKey(currentBucketKey)
             redisTemplate.opsForZSet().add(previousBucketKey, product1.id.toString(), 100.0)
 
             val criteria = RankingCriteria.FindRankings(

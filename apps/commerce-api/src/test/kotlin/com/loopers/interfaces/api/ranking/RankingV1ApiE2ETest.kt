@@ -9,6 +9,7 @@ import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
 import com.loopers.domain.ranking.RankingKeyGenerator
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingWeight
 import com.loopers.domain.ranking.RankingWeightRepository
 import com.loopers.interfaces.api.ApiResponse
@@ -45,6 +46,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
     private val redisTemplate: StringRedisTemplate,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
 
     @AfterEach
@@ -65,7 +67,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
             val product1 = createProduct(brand = brand, name = "상품1")
             val product2 = createProduct(brand = brand, name = "상품2")
 
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
             redisTemplate.opsForZSet().add(bucketKey, product1.id.toString(), 100.0)
             redisTemplate.opsForZSet().add(bucketKey, product2.id.toString(), 50.0)
 
@@ -90,7 +92,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
             val brand = createBrand()
             repeat(5) { index ->
                 val product = createProduct(brand = brand, name = "상품${index + 1}")
-                val bucketKey = RankingKeyGenerator.currentBucketKey()
+                val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
                 redisTemplate.opsForZSet().add(bucketKey, product.id.toString(), (100 - index).toDouble())
             }
 
@@ -129,7 +131,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
             val product1 = createProduct(brand = brand, name = "상품1")
             val product2 = createProduct(brand = brand, name = "상품2")
 
-            val dailyBucketKey = RankingKeyGenerator.currentDailyBucketKey()
+            val dailyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.DAILY)
             redisTemplate.opsForZSet().add(dailyBucketKey, product2.id.toString(), 100.0)
             redisTemplate.opsForZSet().add(dailyBucketKey, product1.id.toString(), 50.0)
 
@@ -155,8 +157,8 @@ class RankingV1ApiE2ETest @Autowired constructor(
             val product1 = createProduct(brand = brand, name = "상품1")
             val product2 = createProduct(brand = brand, name = "상품2")
 
-            val hourlyBucketKey = RankingKeyGenerator.currentBucketKey()
-            val dailyBucketKey = RankingKeyGenerator.currentDailyBucketKey()
+            val hourlyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            val dailyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.DAILY)
 
             // hourly 버킷에만 데이터 추가
             redisTemplate.opsForZSet().add(hourlyBucketKey, product1.id.toString(), 100.0)

@@ -10,6 +10,7 @@ import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
 import com.loopers.domain.ranking.RankingKeyGenerator
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
@@ -42,6 +43,7 @@ class ProductV1ApiE2ETest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
     private val redisTemplate: RedisTemplate<String, String>,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
 
     @AfterEach
@@ -208,7 +210,7 @@ class ProductV1ApiE2ETest @Autowired constructor(
             val product1 = createProduct(brand = brand, name = "1등 상품")
             val product2 = createProduct(brand = brand, name = "2등 상품")
 
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
             redisTemplate.opsForZSet().add(bucketKey, product1.id.toString(), 100.0)
             redisTemplate.opsForZSet().add(bucketKey, product2.id.toString(), 50.0)
 
