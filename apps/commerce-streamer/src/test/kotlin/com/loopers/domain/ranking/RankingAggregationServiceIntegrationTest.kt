@@ -177,12 +177,12 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             productHourlyMetricJpaRepository.save(metric)
 
             // when
-            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
+            rankingAggregationService.calculateHourRankings()
 
             // then
             val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
             val score = zSetOps.score(bucketKey, "1")
-            assertThat(score).isNotNull
+            assertThat(score).isNotNull()
 
             // Score = (100 * 0.10 + 50 * 0.20 + 1000 * 0.60) * 0.9 = (10 + 10 + 600) * 0.9 = 620 * 0.9 = 558
             assertThat(score).isEqualTo(558.0)
@@ -216,7 +216,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             productHourlyMetricJpaRepository.saveAll(listOf(currentMetric, previousMetric))
 
             // when
-            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
+            rankingAggregationService.calculateHourRankings()
 
             // then
             val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
@@ -244,7 +244,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             productHourlyMetricJpaRepository.save(previousMetric)
 
             // when
-            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
+            rankingAggregationService.calculateHourRankings()
 
             // then
             val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
@@ -277,7 +277,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             productHourlyMetricJpaRepository.saveAll(listOf(metric1, metric2))
 
             // when
-            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
+            rankingAggregationService.calculateHourRankings()
 
             // then
             val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
@@ -294,7 +294,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
 
             // when
-            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
+            rankingAggregationService.calculateHourRankings()
 
             // then
             val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)

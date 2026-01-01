@@ -63,10 +63,9 @@ class RankingAggregationService(
      *
      * 이전 버킷에만 있는 상품도 포함 (cold start prevention)
      *
-     * @param period 랭킹 기간 (HOURLY, DAILY)
      * @param dateTime 버킷 기준 시간
      */
-    fun calculateAndUpdateScores(period: RankingPeriod, dateTime: ZonedDateTime) {
+    fun calculateHourRankings(dateTime: ZonedDateTime = ZonedDateTime.now(SEOUL_ZONE)) {
         val currentHour = dateTime.toInstant().truncatedTo(ChronoUnit.HOURS)
         val previousHour = currentHour.minus(1, ChronoUnit.HOURS)
 
@@ -85,7 +84,7 @@ class RankingAggregationService(
         val finalScores = scoreCalculator.calculateForHourly(currentMetrics, previousMetrics, weights)
 
         // Redis에 업데이트
-        rankingWriter.replaceAll(period, dateTime, finalScores)
+        rankingWriter.replaceAll(RankingPeriod.HOURLY, dateTime, finalScores)
 
         logger.info(
             "Calculated and updated scores for {} products (current: {}, previous: {})",
