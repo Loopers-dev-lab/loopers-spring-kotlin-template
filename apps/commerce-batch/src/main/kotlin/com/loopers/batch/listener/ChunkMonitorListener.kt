@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class ChunkMonitorListener : ChunkListener<Any, Any> {
-    private val log = LoggerFactory.getLogger(ChunkListener::class.java)
+    private val log = LoggerFactory.getLogger(ChunkMonitorListener::class.java)
 
     override fun beforeChunk(chunk: Chunk<Any>) {
         log.debug("Chunk 시작: size=${chunk.items.size}")

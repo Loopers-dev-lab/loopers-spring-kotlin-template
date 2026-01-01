@@ -123,12 +123,10 @@ class WeeklyRankingAggregationJobConfig(
             .groupBy { it.productId }
             .map { (productId, rankings) ->
                 val avgScore = rankings.map { it.score }.average()
-                val dayCount = rankings.size
 
                 WeeklyRankingAggregate(
                     productId = productId,
                     avgScore = avgScore,
-                    dayCount = dayCount,
                     startDate = startDate,
                     endDate = endDate,
                 )
@@ -186,7 +184,6 @@ class WeeklyRankingAggregationJobConfig(
 data class WeeklyRankingAggregate(
     val productId: Long,
     val avgScore: Double,
-    val dayCount: Int,
     val startDate: LocalDate,
     val endDate: LocalDate,
     val rank: Int = 0,

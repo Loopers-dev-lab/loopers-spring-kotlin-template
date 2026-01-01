@@ -128,12 +128,10 @@ class MonthlyRankingAggregationJobConfig(
             .groupBy { it.productId }
             .map { (productId, rankings) ->
                 val avgScore = rankings.map { it.score }.average()
-                val dayCount = rankings.size
 
                 MonthlyRankingAggregate(
                     productId = productId,
                     avgScore = avgScore,
-                    dayCount = dayCount,
                     yearMonth = ProductRankMonthly.yearMonthToString(targetYearMonth),
                     startDate = startDate,
                     endDate = endDate,
@@ -189,7 +187,6 @@ class MonthlyRankingAggregationJobConfig(
 data class MonthlyRankingAggregate(
     val productId: Long,
     val avgScore: Double,
-    val dayCount: Int,
     val yearMonth: String,
     val startDate: LocalDate,
     val endDate: LocalDate,
