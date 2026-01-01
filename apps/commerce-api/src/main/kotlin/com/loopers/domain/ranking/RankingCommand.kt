@@ -57,5 +57,8 @@ private fun parseDateTime(period: RankingPeriod, date: String): java.time.Instan
             val day = date.substring(6, 8).toInt()
             ZonedDateTime.of(year, month, day, 0, 0, 0, 0, SEOUL_ZONE).toInstant()
         }
+        RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
+            throw UnsupportedOperationException("$period is not yet supported")
+        }
     }
 }

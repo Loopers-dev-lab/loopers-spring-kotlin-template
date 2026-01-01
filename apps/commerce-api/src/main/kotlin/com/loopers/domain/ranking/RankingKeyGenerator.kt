@@ -30,6 +30,9 @@ class RankingKeyGenerator(
             RankingPeriod.DAILY -> {
                 "$DAILY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
             }
+            RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
+                throw UnsupportedOperationException("$period is not yet supported")
+            }
         }
     }
 
@@ -42,6 +45,9 @@ class RankingKeyGenerator(
         return when (period) {
             RankingPeriod.HOURLY -> "$HOURLY_PREFIX:$date"
             RankingPeriod.DAILY -> "$DAILY_PREFIX:$date"
+            RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
+                throw UnsupportedOperationException("$period is not yet supported")
+            }
         }
     }
 
@@ -86,6 +92,9 @@ class RankingKeyGenerator(
                 val month = date.substring(4, 6).toInt()
                 val day = date.substring(6, 8).toInt()
                 ZonedDateTime.of(year, month, day, 0, 0, 0, 0, SEOUL_ZONE)
+            }
+            RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
+                throw UnsupportedOperationException("$period is not yet supported")
             }
         }
     }
