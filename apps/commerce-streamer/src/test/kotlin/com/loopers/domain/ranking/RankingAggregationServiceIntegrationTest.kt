@@ -182,7 +182,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateHourRankings()
 
             // then
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now.toInstant())
             val score = zSetOps.score(bucketKey, "1")
             assertThat(score).isNotNull()
 
@@ -223,7 +223,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateHourRankings()
 
             // then
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now.toInstant())
             val score = zSetOps.score(bucketKey, "1")
 
             // Expected: 20 * 0.1 + 10 * 0.9 = 2 + 9 = 11
@@ -252,7 +252,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateHourRankings()
 
             // then
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now.toInstant())
             val score = zSetOps.score(bucketKey, "99")
 
             // Expected: 10 * 0.1 + 0 * 0.9 = 1.0
@@ -286,7 +286,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateHourRankings()
 
             // then
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now.toInstant())
             // Product 1: 100 * 0.10 * 0.9 = 9.0
             assertThat(zSetOps.score(bucketKey, "1")).isEqualTo(9.0)
             // Product 2: 200 * 0.10 * 0.9 = 18.0
@@ -303,7 +303,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateHourRankings()
 
             // then
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now.toInstant())
             assertThat(redisTemplate.hasKey(bucketKey)).isFalse()
         }
     }
@@ -418,7 +418,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(targetDate)
 
             // then
-            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE))
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE).toInstant())
             val score = zSetOps.score(dailyBucketKey, "1")
             assertThat(score).isNotNull
 
@@ -453,7 +453,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(targetDate)
 
             // then
-            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE))
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE).toInstant())
             // Product 1: 100 * 0.10 * 0.9 = 9.0 (cold start: currentScore * 0.9)
             assertThat(zSetOps.score(dailyBucketKey, "1")).isEqualTo(9.0)
             // Product 2: 200 * 0.10 * 0.9 = 18.0 (cold start: currentScore * 0.9)
@@ -491,7 +491,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(today)
 
             // then
-            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, today.atStartOfDay(SEOUL_ZONE))
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, today.atStartOfDay(SEOUL_ZONE).toInstant())
             val score = zSetOps.score(dailyBucketKey, "1")
 
             // Expected: 20 * 0.1 + 10 * 0.9 = 2 + 9 = 11
@@ -508,7 +508,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(targetDate)
 
             // then
-            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE))
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE).toInstant())
             assertThat(redisTemplate.hasKey(dailyBucketKey)).isFalse()
         }
     }

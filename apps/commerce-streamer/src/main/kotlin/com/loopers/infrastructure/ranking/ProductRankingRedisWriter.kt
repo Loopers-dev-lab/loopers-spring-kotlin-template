@@ -48,7 +48,7 @@ class ProductRankingRedisWriter(
      * @param scores 상품ID -> 점수 맵
      */
     override fun replaceAll(period: RankingPeriod, dateTime: ZonedDateTime, scores: Map<Long, Score>) {
-        val bucketKey = rankingKeyGenerator.bucketKey(period, dateTime)
+        val bucketKey = rankingKeyGenerator.bucketKey(period, dateTime.toInstant())
 
         if (scores.isEmpty()) {
             redisTemplate.delete(bucketKey)

@@ -4,26 +4,29 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 @DisplayName("RankingKeyGenerator 테스트")
 class RankingKeyGeneratorTest {
 
-    private val rankingKeyGenerator = RankingKeyGenerator()
+    private val fixedInstant = Instant.parse("2025-01-15T05:30:00Z") // KST 2025-01-15 14:30:00
+    private val fixedClock = Clock.fixed(fixedInstant, ZoneOffset.UTC)
+    private val rankingKeyGenerator = RankingKeyGenerator(fixedClock)
 
-    @DisplayName("bucketKey(period, dateTime) 메서드 테스트")
+    @DisplayName("bucketKey(period, instant) 메서드 테스트")
     @Nested
     inner class PeriodAwareBucketKey {
 
         @DisplayName("HOURLY period로 ranking:products:hourly:yyyyMMddHH 형식의 키를 생성한다")
         @Test
         fun `generates hourly key with period`() {
-            // given
-            val dateTime = ZonedDateTime.of(2025, 1, 15, 14, 30, 0, 0, ZoneId.of("Asia/Seoul"))
+            // given - KST 2025-01-15 14:30:00 (UTC 05:30:00)
+            val instant = Instant.parse("2025-01-15T05:30:00Z")
 
             // when
-            val key = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, dateTime)
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, instant)
 
             // then
             assertThat(key).isEqualTo("ranking:products:hourly:2025011514")
@@ -32,11 +35,11 @@ class RankingKeyGeneratorTest {
         @DisplayName("DAILY period로 ranking:products:daily:yyyyMMdd 형식의 키를 생성한다")
         @Test
         fun `generates daily key with period`() {
-            // given
-            val dateTime = ZonedDateTime.of(2025, 1, 15, 14, 30, 0, 0, ZoneId.of("Asia/Seoul"))
+            // given - KST 2025-01-15 14:30:00 (UTC 05:30:00)
+            val instant = Instant.parse("2025-01-15T05:30:00Z")
 
             // when
-            val key = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, dateTime)
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, instant)
 
             // then
             assertThat(key).isEqualTo("ranking:products:daily:20250115")
@@ -45,25 +48,25 @@ class RankingKeyGeneratorTest {
         @DisplayName("HOURLY: 시간이 정시가 아니어도 정시로 truncate하여 키를 생성한다")
         @Test
         fun `truncates hourly to hour boundary`() {
-            // given
-            val dateTime = ZonedDateTime.of(2025, 12, 31, 23, 59, 59, 999_999_999, ZoneId.of("Asia/Seoul"))
+            // given - KST 2025-12-31 23:59:59.999 (UTC 14:59:59.999)
+            val instant = Instant.parse("2025-12-31T14:59:59.999999999Z")
 
             // when
-            val key = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, dateTime)
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, instant)
 
             // then
             assertThat(key).isEqualTo("ranking:products:hourly:2025123123")
         }
 
-        @DisplayName("HOURLY: UTC 시간을 Asia/Seoul 타임존으로 변환하여 키를 생성한다")
+        @DisplayName("HOURLY: UTC Instant를 Asia/Seoul 타임존으로 변환하여 키를 생성한다")
         @Test
-        fun `converts UTC to Asia Seoul timezone for hourly`() {
+        fun `converts UTC instant to Asia Seoul timezone for hourly`() {
             // given
             // UTC 2025-01-15 05:30:00 = KST 2025-01-15 14:30:00 (Asia/Seoul is UTC+9)
-            val utcDateTime = ZonedDateTime.parse("2025-01-15T05:30:00Z")
+            val instant = Instant.parse("2025-01-15T05:30:00Z")
 
             // when
-            val key = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, utcDateTime)
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, instant)
 
             // then
             assertThat(key).isEqualTo("ranking:products:hourly:2025011514")
@@ -72,11 +75,11 @@ class RankingKeyGeneratorTest {
         @DisplayName("HOURLY: 자정 경계에서 올바른 키를 생성한다")
         @Test
         fun `handles midnight boundary correctly for hourly`() {
-            // given
-            val dateTime = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneId.of("Asia/Seoul"))
+            // given - KST 2025-01-01 00:00:00 (UTC 2024-12-31 15:00:00)
+            val instant = Instant.parse("2024-12-31T15:00:00Z")
 
             // when
-            val key = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, dateTime)
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, instant)
 
             // then
             assertThat(key).isEqualTo("ranking:products:hourly:2025010100")
@@ -85,11 +88,11 @@ class RankingKeyGeneratorTest {
         @DisplayName("DAILY: 연도 시작 경계에서 올바른 키를 생성한다")
         @Test
         fun `handles year start boundary for daily`() {
-            // given
-            val dateTime = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneId.of("Asia/Seoul"))
+            // given - KST 2025-01-01 00:00:00 (UTC 2024-12-31 15:00:00)
+            val instant = Instant.parse("2024-12-31T15:00:00Z")
 
             // when
-            val key = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, dateTime)
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, instant)
 
             // then
             assertThat(key).isEqualTo("ranking:products:daily:20250101")
@@ -98,11 +101,11 @@ class RankingKeyGeneratorTest {
         @DisplayName("DAILY: 연도 끝 경계에서 올바른 키를 생성한다")
         @Test
         fun `handles year end boundary for daily`() {
-            // given
-            val dateTime = ZonedDateTime.of(2025, 12, 31, 23, 59, 59, 0, ZoneId.of("Asia/Seoul"))
+            // given - KST 2025-12-31 23:59:59 (UTC 14:59:59)
+            val instant = Instant.parse("2025-12-31T14:59:59Z")
 
             // when
-            val key = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, dateTime)
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, instant)
 
             // then
             assertThat(key).isEqualTo("ranking:products:daily:20251231")
@@ -146,28 +149,28 @@ class RankingKeyGeneratorTest {
     @Nested
     inner class PeriodAwareCurrentBucketKey {
 
-        @DisplayName("HOURLY period로 현재 시간 기준 hourly 키를 생성한다")
+        @DisplayName("HOURLY period로 Clock 기준 hourly 키를 생성한다")
         @Test
-        fun `generates current hourly key with period`() {
+        fun `generates current hourly key with period using clock`() {
+            // given - fixedClock is set to 2025-01-15T05:30:00Z (KST 14:30)
+
             // when
             val key = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
 
-            // then
-            assertThat(key).startsWith("ranking:products:hourly:")
-            val dateTimePart = key.removePrefix("ranking:products:hourly:")
-            assertThat(dateTimePart).matches("\\d{10}")
+            // then - KST 14:00 (truncated to hour boundary)
+            assertThat(key).isEqualTo("ranking:products:hourly:2025011514")
         }
 
-        @DisplayName("DAILY period로 현재 날짜 기준 daily 키를 생성한다")
+        @DisplayName("DAILY period로 Clock 기준 daily 키를 생성한다")
         @Test
-        fun `generates current daily key with period`() {
+        fun `generates current daily key with period using clock`() {
+            // given - fixedClock is set to 2025-01-15T05:30:00Z (KST 14:30)
+
             // when
             val key = rankingKeyGenerator.currentBucketKey(RankingPeriod.DAILY)
 
-            // then
-            assertThat(key).startsWith("ranking:products:daily:")
-            val datePart = key.removePrefix("ranking:products:daily:")
-            assertThat(datePart).matches("\\d{8}")
+            // then - KST 2025-01-15
+            assertThat(key).isEqualTo("ranking:products:daily:20250115")
         }
     }
 
