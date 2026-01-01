@@ -178,6 +178,7 @@ Load references based on the current task. Each file provides detailed patterns 
 - @references/concurrency-test.md - Concurrency patterns (thread pool, locking, idempotency)
 - @references/adapter-test.md - Adapter patterns (WireMock, Circuit Breaker, Retry, complex queries)
 - @references/e2e-test.md - E2E patterns (HTTP status codes, auth failures, API contract)
+- @references/batch-test.md - Spring Batch patterns (Processor unit test, Step/Job integration test)
 
 ### When deciding external dependencies strategy
 
