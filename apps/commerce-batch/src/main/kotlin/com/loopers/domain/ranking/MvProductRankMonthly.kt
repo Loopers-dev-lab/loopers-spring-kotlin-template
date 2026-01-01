@@ -20,14 +20,14 @@ import java.time.LocalDate
 @Table(
     name = "mv_product_rank_monthly",
     indexes = [
-        Index(name = "uk_monthly_rank", columnList = "base_date, rank", unique = true),
+        Index(name = "uk_monthly_rank", columnList = "base_date, `rank`", unique = true),
     ],
 )
 class MvProductRankMonthly(
     @Column(name = "base_date", nullable = false)
     val baseDate: LocalDate,
 
-    @Column(name = "rank", nullable = false)
+    @Column(name = "`rank`", nullable = false)
     val rank: Int,
 
     @Column(name = "product_id", nullable = false)
