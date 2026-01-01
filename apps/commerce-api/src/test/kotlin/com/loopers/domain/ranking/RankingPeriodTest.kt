@@ -5,8 +5,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import java.time.Instant
 
 @DisplayName("RankingPeriod 테스트")
 class RankingPeriodTest {
@@ -159,52 +158,91 @@ class RankingPeriodTest {
         @Test
         fun `HOURLY subtracts one hour`() {
             // given
-            val dateTime = ZonedDateTime.of(2024, 1, 15, 10, 30, 0, 0, ZoneId.of("Asia/Seoul"))
+            val instant = Instant.parse("2024-01-15T01:30:00Z")
 
             // when
-            val result = RankingPeriod.HOURLY.subtractOne(dateTime)
+            val result = RankingPeriod.HOURLY.subtractOne(instant)
 
             // then
-            assertThat(result).isEqualTo(ZonedDateTime.of(2024, 1, 15, 9, 30, 0, 0, ZoneId.of("Asia/Seoul")))
+            assertThat(result).isEqualTo(Instant.parse("2024-01-15T00:30:00Z"))
         }
 
         @DisplayName("HOURLY로 자정을 넘어가면 전날로 이동한다")
         @Test
         fun `HOURLY crossing midnight goes to previous day`() {
             // given
-            val dateTime = ZonedDateTime.of(2024, 1, 15, 0, 30, 0, 0, ZoneId.of("Asia/Seoul"))
+            val instant = Instant.parse("2024-01-15T00:30:00Z")
 
             // when
-            val result = RankingPeriod.HOURLY.subtractOne(dateTime)
+            val result = RankingPeriod.HOURLY.subtractOne(instant)
 
             // then
-            assertThat(result).isEqualTo(ZonedDateTime.of(2024, 1, 14, 23, 30, 0, 0, ZoneId.of("Asia/Seoul")))
+            assertThat(result).isEqualTo(Instant.parse("2024-01-14T23:30:00Z"))
         }
 
-        @DisplayName("DAILY는 1일을 뺀다")
+        @DisplayName("DAILY는 1일(24시간)을 뺀다")
         @Test
         fun `DAILY subtracts one day`() {
             // given
-            val dateTime = ZonedDateTime.of(2024, 1, 15, 10, 30, 0, 0, ZoneId.of("Asia/Seoul"))
+            val instant = Instant.parse("2024-01-15T10:30:00Z")
 
             // when
-            val result = RankingPeriod.DAILY.subtractOne(dateTime)
+            val result = RankingPeriod.DAILY.subtractOne(instant)
 
             // then
-            assertThat(result).isEqualTo(ZonedDateTime.of(2024, 1, 14, 10, 30, 0, 0, ZoneId.of("Asia/Seoul")))
+            assertThat(result).isEqualTo(Instant.parse("2024-01-14T10:30:00Z"))
         }
 
         @DisplayName("DAILY로 월을 넘어가면 전달로 이동한다")
         @Test
         fun `DAILY crossing month goes to previous month`() {
             // given
-            val dateTime = ZonedDateTime.of(2024, 2, 1, 10, 30, 0, 0, ZoneId.of("Asia/Seoul"))
+            val instant = Instant.parse("2024-02-01T10:30:00Z")
 
             // when
-            val result = RankingPeriod.DAILY.subtractOne(dateTime)
+            val result = RankingPeriod.DAILY.subtractOne(instant)
 
             // then
-            assertThat(result).isEqualTo(ZonedDateTime.of(2024, 1, 31, 10, 30, 0, 0, ZoneId.of("Asia/Seoul")))
+            assertThat(result).isEqualTo(Instant.parse("2024-01-31T10:30:00Z"))
+        }
+
+        @DisplayName("HOURLY: 연도 경계에서 이전 연도로 넘어간다")
+        @Test
+        fun `HOURLY crosses year boundary to previous year`() {
+            // given
+            val instant = Instant.parse("2025-01-01T00:00:00Z")
+
+            // when
+            val result = RankingPeriod.HOURLY.subtractOne(instant)
+
+            // then
+            assertThat(result).isEqualTo(Instant.parse("2024-12-31T23:00:00Z"))
+        }
+
+        @DisplayName("DAILY: 연도 경계에서 이전 연도로 넘어간다")
+        @Test
+        fun `DAILY crosses year boundary to previous year`() {
+            // given
+            val instant = Instant.parse("2025-01-01T00:00:00Z")
+
+            // when
+            val result = RankingPeriod.DAILY.subtractOne(instant)
+
+            // then
+            assertThat(result).isEqualTo(Instant.parse("2024-12-31T00:00:00Z"))
+        }
+
+        @DisplayName("HOURLY: Instant의 나노초는 유지된다")
+        @Test
+        fun `HOURLY preserves nanoseconds`() {
+            // given
+            val instant = Instant.parse("2024-01-15T14:30:00.123456789Z")
+
+            // when
+            val result = RankingPeriod.HOURLY.subtractOne(instant)
+
+            // then
+            assertThat(result).isEqualTo(Instant.parse("2024-01-15T13:30:00.123456789Z"))
         }
     }
 

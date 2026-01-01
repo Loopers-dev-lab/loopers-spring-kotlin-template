@@ -59,7 +59,8 @@ class RankingKeyGenerator {
         val date = parts[3] // date portion
         val period = RankingPeriod.fromKey(periodKey)
         val dateTime = parseDateTime(period, date)
-        val previousDateTime = period.subtractOne(dateTime)
+        val previousInstant = period.subtractOne(dateTime.toInstant())
+        val previousDateTime = previousInstant.atZone(SEOUL_ZONE)
         return bucketKey(period, previousDateTime)
     }
 

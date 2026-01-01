@@ -27,7 +27,8 @@ data class RankingQuery(
      * Used for fallback when the current period's bucket is empty.
      */
     fun previousPeriod(): RankingQuery {
-        return copy(dateTime = period.subtractOne(dateTime))
+        val previousInstant = period.subtractOne(dateTime.toInstant())
+        return copy(dateTime = previousInstant.atZone(dateTime.zone))
     }
 
     companion object {

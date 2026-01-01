@@ -275,7 +275,7 @@ class RankingServiceTest {
             // Second query is previous period (dateTime should be 1 hour earlier for HOURLY)
             val secondQuery = queries[1]
             assertThat(secondQuery.period).isEqualTo(firstQuery.period)
-            assertThat(secondQuery.dateTime).isEqualTo(firstQuery.period.subtractOne(firstQuery.dateTime))
+            assertThat(secondQuery.dateTime.toInstant()).isEqualTo(firstQuery.period.subtractOne(firstQuery.dateTime.toInstant()))
         }
 
         @DisplayName("첫 페이지가 아니면 결과가 비어있어도 fallback하지 않는다 (offset > 0)")
