@@ -2,9 +2,10 @@ package com.loopers.domain.ranking
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
 /**
@@ -22,6 +23,7 @@ class RankingAggregationService(
     private val rankingWriter: ProductRankingWriter,
     private val rankingWeightRepository: RankingWeightRepository,
     private val scoreCalculator: RankingScoreCalculator,
+    private val clock: Clock,
 ) {
     companion object {
         private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
@@ -65,8 +67,8 @@ class RankingAggregationService(
      *
      * @param dateTime 버킷 기준 시간
      */
-    fun calculateHourRankings(dateTime: ZonedDateTime = ZonedDateTime.now(SEOUL_ZONE)) {
-        val currentHour = dateTime.toInstant().truncatedTo(ChronoUnit.HOURS)
+    fun calculateHourRankings(dateTime: Instant = clock.instant()) {
+        val currentHour = dateTime.truncatedTo(ChronoUnit.HOURS)
         val previousHour = currentHour.minus(1, ChronoUnit.HOURS)
 
         // DB에서 현재/이전 버킷 조회
@@ -103,7 +105,7 @@ class RankingAggregationService(
      *
      * @param date 롤업 대상 날짜 (기본값: 오늘)
      */
-    fun rollupHourlyToDaily(date: LocalDate = LocalDate.now(SEOUL_ZONE)) {
+    fun rollupHourlyToDaily(date: LocalDate = LocalDate.now(clock)) {
         val hourlyMetrics = metricRepository.findAllByDate(date)
 
         if (hourlyMetrics.isEmpty()) {
@@ -145,7 +147,7 @@ class RankingAggregationService(
      *
      * @param date 랭킹 계산 대상 날짜 (기본값: 오늘)
      */
-    fun calculateDailyRankings(date: LocalDate = LocalDate.now(SEOUL_ZONE)) {
+    fun calculateDailyRankings(date: LocalDate = LocalDate.now(clock)) {
         val currentDailyMetrics = dailyMetricRepository.findAllByStatDate(date)
         val previousDailyMetrics = dailyMetricRepository.findAllByStatDate(date.minusDays(1))
 

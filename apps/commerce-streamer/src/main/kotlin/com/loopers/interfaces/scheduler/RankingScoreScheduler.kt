@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import java.time.ZoneId
 
 @Component
 @ConditionalOnProperty(
@@ -16,10 +15,6 @@ import java.time.ZoneId
 class RankingScoreScheduler(
     private val rankingAggregationService: RankingAggregationService,
 ) {
-    companion object {
-        private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
-    }
-
     private val log = LoggerFactory.getLogger(javaClass)
 
     @Scheduled(fixedRate = 1800000) // 30 minutes
