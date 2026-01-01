@@ -3,11 +3,13 @@ package com.loopers.domain.ranking
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import java.time.Clock
 
 @Component
 class RankingService(
     private val rankingWeightRepository: RankingWeightRepository,
     private val productRankingReader: ProductRankingReader,
+    private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
     fun findWeight(): RankingWeight {
@@ -45,7 +47,7 @@ class RankingService(
      */
     @Transactional(readOnly = true)
     fun findRankings(command: RankingCommand.FindRankings): List<ProductRanking> {
-        val query = command.toQuery()
+        val query = command.toQuery(clock)
         val rankings = productRankingReader.findTopRankings(query)
 
         // Fallback: if empty AND first page (offset=0), try previous period

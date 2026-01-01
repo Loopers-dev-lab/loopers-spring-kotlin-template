@@ -9,14 +9,21 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 class RankingServiceTest {
 
     private val rankingWeightRepository: RankingWeightRepository = mockk()
     private val productRankingReader: ProductRankingReader = mockk()
+    private val fixedInstant = Instant.parse("2025-01-15T05:00:00Z") // 14:00 KST
+    private val clock: Clock = Clock.fixed(fixedInstant, ZoneOffset.UTC)
     private val rankingService = RankingService(
         rankingWeightRepository,
         productRankingReader,
+        clock,
     )
 
     @DisplayName("findWeight 테스트")
@@ -194,10 +201,12 @@ class RankingServiceTest {
             assertThat(result).hasSize(1)
             val capturedQuery = querySlot.captured
             assertThat(capturedQuery.period).isEqualTo(RankingPeriod.HOURLY)
-            assertThat(capturedQuery.dateTime.year).isEqualTo(2025)
-            assertThat(capturedQuery.dateTime.monthValue).isEqualTo(1)
-            assertThat(capturedQuery.dateTime.dayOfMonth).isEqualTo(15)
-            assertThat(capturedQuery.dateTime.hour).isEqualTo(14)
+            val seoulZone = ZoneId.of("Asia/Seoul")
+            val zonedDateTime = capturedQuery.dateTime.atZone(seoulZone)
+            assertThat(zonedDateTime.year).isEqualTo(2025)
+            assertThat(zonedDateTime.monthValue).isEqualTo(1)
+            assertThat(zonedDateTime.dayOfMonth).isEqualTo(15)
+            assertThat(zonedDateTime.hour).isEqualTo(14)
         }
 
         @DisplayName("ProductRankingReader가 호출된다")
@@ -275,7 +284,7 @@ class RankingServiceTest {
             // Second query is previous period (dateTime should be 1 hour earlier for HOURLY)
             val secondQuery = queries[1]
             assertThat(secondQuery.period).isEqualTo(firstQuery.period)
-            assertThat(secondQuery.dateTime.toInstant()).isEqualTo(firstQuery.period.subtractOne(firstQuery.dateTime.toInstant()))
+            assertThat(secondQuery.dateTime).isEqualTo(firstQuery.period.subtractOne(firstQuery.dateTime))
         }
 
         @DisplayName("첫 페이지가 아니면 결과가 비어있어도 fallback하지 않는다 (offset > 0)")

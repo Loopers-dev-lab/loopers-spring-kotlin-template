@@ -7,8 +7,7 @@ import com.loopers.domain.product.ProductViewedEventV1
 import com.loopers.domain.ranking.ProductRankingReader
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingQuery
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import java.time.Clock
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
@@ -20,11 +19,11 @@ class ProductFacade(
     private val cacheTemplate: CacheTemplate,
     private val eventPublisher: ApplicationEventPublisher,
     private val productRankingReader: ProductRankingReader,
+    private val clock: Clock,
 ) {
     companion object {
         private val TYPE_CACHED_PRODUCT_DETAIL_V1 = object : TypeReference<CachedProductDetailV1>() {}
         private val TYPE_CACHED_PRODUCT_LIST = object : TypeReference<CachedProductList>() {}
-        private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
     }
 
     fun findProductById(id: Long, userId: Long? = null): ProductInfo.FindProductById {
@@ -42,7 +41,7 @@ class ProductFacade(
 
         val query = RankingQuery(
             period = RankingPeriod.HOURLY,
-            dateTime = ZonedDateTime.now(SEOUL_ZONE),
+            dateTime = clock.instant(),
             offset = 0,
             limit = 1,
         )

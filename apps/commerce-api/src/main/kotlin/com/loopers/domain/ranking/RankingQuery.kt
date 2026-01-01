@@ -2,11 +2,11 @@ package com.loopers.domain.ranking
 
 import com.loopers.support.error.CoreException
 import com.loopers.support.error.ErrorType
-import java.time.ZonedDateTime
+import java.time.Instant
 
 data class RankingQuery(
     val period: RankingPeriod,
-    val dateTime: ZonedDateTime,
+    val dateTime: Instant,
     val offset: Long,
     val limit: Long,
 ) {
@@ -27,8 +27,7 @@ data class RankingQuery(
      * Used for fallback when the current period's bucket is empty.
      */
     fun previousPeriod(): RankingQuery {
-        val previousInstant = period.subtractOne(dateTime.toInstant())
-        return copy(dateTime = previousInstant.atZone(dateTime.zone))
+        return copy(dateTime = period.subtractOne(dateTime))
     }
 
     companion object {

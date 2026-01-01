@@ -7,7 +7,10 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.time.Clock
+import java.time.Instant
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
 @DisplayName("RankingCommand 테스트")
@@ -170,32 +173,31 @@ class RankingCommandTest {
     @Nested
     inner class ToQuery {
 
-        @DisplayName("date가 null이면 현재 시간의 ZonedDateTime을 사용한다 (Asia/Seoul timezone)")
+        @DisplayName("date가 null이면 clock.instant()를 사용한다")
         @Test
-        fun `toQuery with null date uses current ZonedDateTime in Asia_Seoul timezone`() {
+        fun `toQuery with null date uses clock instant`() {
             // given
+            val fixedInstant = Instant.parse("2025-01-15T05:00:00Z") // 14:00 KST
+            val clock = Clock.fixed(fixedInstant, ZoneOffset.UTC)
             val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
                 date = null,
                 page = 0,
                 size = 20,
             )
-            val beforeCall = ZonedDateTime.now(seoulZone)
 
             // when
-            val query = command.toQuery()
+            val query = command.toQuery(clock)
 
             // then
-            val afterCall = ZonedDateTime.now(seoulZone)
-            assertThat(query.dateTime.zone).isEqualTo(seoulZone)
-            assertThat(query.dateTime).isAfterOrEqualTo(beforeCall.minusSeconds(1))
-            assertThat(query.dateTime).isBeforeOrEqualTo(afterCall.plusSeconds(1))
+            assertThat(query.dateTime).isEqualTo(fixedInstant)
         }
 
-        @DisplayName("HOURLY date 2025011514는 2025-01-15T14:00 Asia/Seoul로 파싱된다")
+        @DisplayName("HOURLY date 2025011514는 2025-01-15T14:00 Asia/Seoul에 해당하는 Instant로 파싱된다")
         @Test
-        fun `toQuery with HOURLY date parses to correct ZonedDateTime`() {
+        fun `toQuery with HOURLY date parses to correct Instant`() {
             // given
+            val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
             val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
                 date = "2025011514",
@@ -204,19 +206,20 @@ class RankingCommandTest {
             )
 
             // when
-            val query = command.toQuery()
+            val query = command.toQuery(clock)
 
             // then
             assertThat(query.dateTime).isEqualTo(
-                ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone),
+                ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone).toInstant(),
             )
             assertThat(query.period).isEqualTo(RankingPeriod.HOURLY)
         }
 
-        @DisplayName("DAILY date 20250115는 2025-01-15T00:00 Asia/Seoul로 파싱된다")
+        @DisplayName("DAILY date 20250115는 2025-01-15T00:00 Asia/Seoul에 해당하는 Instant로 파싱된다")
         @Test
-        fun `toQuery with DAILY date parses to correct ZonedDateTime`() {
+        fun `toQuery with DAILY date parses to correct Instant`() {
             // given
+            val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
             val command = RankingCommand.FindRankings(
                 period = RankingPeriod.DAILY,
                 date = "20250115",
@@ -225,11 +228,11 @@ class RankingCommandTest {
             )
 
             // when
-            val query = command.toQuery()
+            val query = command.toQuery(clock)
 
             // then
             assertThat(query.dateTime).isEqualTo(
-                ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, seoulZone),
+                ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, seoulZone).toInstant(),
             )
             assertThat(query.period).isEqualTo(RankingPeriod.DAILY)
         }
@@ -238,6 +241,7 @@ class RankingCommandTest {
         @Test
         fun `toQuery correctly calculates offset from page and size`() {
             // given
+            val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
             val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
                 date = "2025011514",
@@ -246,7 +250,7 @@ class RankingCommandTest {
             )
 
             // when
-            val query = command.toQuery()
+            val query = command.toQuery(clock)
 
             // then
             assertThat(query.offset).isEqualTo(40L) // 2 * 20
@@ -256,6 +260,7 @@ class RankingCommandTest {
         @Test
         fun `toQuery correctly passes limit as size`() {
             // given
+            val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
             val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
                 date = "2025011514",
@@ -264,7 +269,7 @@ class RankingCommandTest {
             )
 
             // when
-            val query = command.toQuery()
+            val query = command.toQuery(clock)
 
             // then
             assertThat(query.limit).isEqualTo(15L)
@@ -274,6 +279,7 @@ class RankingCommandTest {
         @Test
         fun `toQuery with page 0 has offset 0`() {
             // given
+            val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
             val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
                 date = "2025011514",
@@ -282,7 +288,7 @@ class RankingCommandTest {
             )
 
             // when
-            val query = command.toQuery()
+            val query = command.toQuery(clock)
 
             // then
             assertThat(query.offset).isEqualTo(0L)

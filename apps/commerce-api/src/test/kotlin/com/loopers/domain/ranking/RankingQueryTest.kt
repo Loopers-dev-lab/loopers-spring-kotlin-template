@@ -16,7 +16,7 @@ import java.time.ZonedDateTime
 class RankingQueryTest {
 
     private val seoulZone = ZoneId.of("Asia/Seoul")
-    private val testDateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone)
+    private val testDateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone).toInstant()
 
     @DisplayName("생성 테스트")
     @Nested
@@ -51,7 +51,7 @@ class RankingQueryTest {
         fun `creates RankingQuery with DAILY period`() {
             // given
             val period = RankingPeriod.DAILY
-            val dateTime = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, seoulZone)
+            val dateTime = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, seoulZone).toInstant()
 
             // when
             val query = RankingQuery(
@@ -173,9 +173,10 @@ class RankingQueryTest {
         @Test
         fun `previousPeriod returns Query with dateTime subtracted by 1 hour for HOURLY`() {
             // given
+            val dateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone).toInstant()
             val query = RankingQuery(
                 period = RankingPeriod.HOURLY,
-                dateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone),
+                dateTime = dateTime,
                 offset = 0L,
                 limit = 20L,
             )
@@ -184,10 +185,9 @@ class RankingQueryTest {
             val previousQuery = query.previousPeriod()
 
             // then
+            val expectedDateTime = ZonedDateTime.of(2025, 1, 15, 13, 0, 0, 0, seoulZone).toInstant()
             assertThat(previousQuery.period).isEqualTo(RankingPeriod.HOURLY)
-            assertThat(previousQuery.dateTime).isEqualTo(
-                ZonedDateTime.of(2025, 1, 15, 13, 0, 0, 0, seoulZone),
-            )
+            assertThat(previousQuery.dateTime).isEqualTo(expectedDateTime)
             assertThat(previousQuery.offset).isEqualTo(query.offset)
             assertThat(previousQuery.limit).isEqualTo(query.limit)
         }
@@ -196,9 +196,10 @@ class RankingQueryTest {
         @Test
         fun `previousPeriod returns Query with dateTime subtracted by 1 day for DAILY`() {
             // given
+            val dateTime = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, seoulZone).toInstant()
             val query = RankingQuery(
                 period = RankingPeriod.DAILY,
-                dateTime = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, seoulZone),
+                dateTime = dateTime,
                 offset = 10L,
                 limit = 20L,
             )
@@ -207,10 +208,9 @@ class RankingQueryTest {
             val previousQuery = query.previousPeriod()
 
             // then
+            val expectedDateTime = ZonedDateTime.of(2025, 1, 14, 0, 0, 0, 0, seoulZone).toInstant()
             assertThat(previousQuery.period).isEqualTo(RankingPeriod.DAILY)
-            assertThat(previousQuery.dateTime).isEqualTo(
-                ZonedDateTime.of(2025, 1, 14, 0, 0, 0, 0, seoulZone),
-            )
+            assertThat(previousQuery.dateTime).isEqualTo(expectedDateTime)
             assertThat(previousQuery.offset).isEqualTo(query.offset)
             assertThat(previousQuery.limit).isEqualTo(query.limit)
         }
@@ -219,9 +219,10 @@ class RankingQueryTest {
         @Test
         fun `previousPeriod handles year and month boundaries correctly`() {
             // given
+            val dateTime = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, seoulZone).toInstant()
             val query = RankingQuery(
                 period = RankingPeriod.HOURLY,
-                dateTime = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, seoulZone),
+                dateTime = dateTime,
                 offset = 0L,
                 limit = 20L,
             )
@@ -230,9 +231,8 @@ class RankingQueryTest {
             val previousQuery = query.previousPeriod()
 
             // then
-            assertThat(previousQuery.dateTime).isEqualTo(
-                ZonedDateTime.of(2024, 12, 31, 23, 0, 0, 0, seoulZone),
-            )
+            val expectedDateTime = ZonedDateTime.of(2024, 12, 31, 23, 0, 0, 0, seoulZone).toInstant()
+            assertThat(previousQuery.dateTime).isEqualTo(expectedDateTime)
         }
     }
 
@@ -246,11 +246,11 @@ class RankingQueryTest {
             // given
             val original = RankingQuery(
                 period = RankingPeriod.HOURLY,
-                dateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone),
+                dateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone).toInstant(),
                 offset = 0L,
                 limit = 20L,
             )
-            val newDateTime = ZonedDateTime.of(2025, 1, 15, 13, 0, 0, 0, seoulZone)
+            val newDateTime = ZonedDateTime.of(2025, 1, 15, 13, 0, 0, 0, seoulZone).toInstant()
 
             // when
             val copied = original.copy(dateTime = newDateTime)

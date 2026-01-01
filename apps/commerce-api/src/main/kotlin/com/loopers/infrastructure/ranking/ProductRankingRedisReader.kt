@@ -7,6 +7,7 @@ import com.loopers.domain.ranking.RankingQuery
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Repository
 import java.math.BigDecimal
+import java.time.ZoneId
 
 @Repository
 class ProductRankingRedisReader(
@@ -17,7 +18,7 @@ class ProductRankingRedisReader(
     private val zSetOps = redisTemplate.opsForZSet()
 
     override fun findTopRankings(query: RankingQuery): List<ProductRanking> {
-        val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime)
+        val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime.atZone(SEOUL_ZONE))
         return findFromBucket(bucketKey, query)
     }
 
@@ -42,7 +43,7 @@ class ProductRankingRedisReader(
     }
 
     override fun findRankByProductId(query: RankingQuery, productId: Long): Int? {
-        val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime)
+        val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime.atZone(SEOUL_ZONE))
         val rank = zSetOps.reverseRank(bucketKey, productId.toString())
             ?: return null
 
@@ -50,7 +51,11 @@ class ProductRankingRedisReader(
     }
 
     override fun exists(query: RankingQuery): Boolean {
-        val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime)
+        val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime.atZone(SEOUL_ZONE))
         return redisTemplate.hasKey(bucketKey)
+    }
+
+    companion object {
+        private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
     }
 }
