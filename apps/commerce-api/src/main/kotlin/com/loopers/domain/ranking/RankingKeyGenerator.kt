@@ -17,6 +17,8 @@ class RankingKeyGenerator(
      * Generates bucket key from Instant and period
      * - Hourly: ranking:products:hourly:yyyyMMddHH
      * - Daily: ranking:products:daily:yyyyMMdd
+     * - Weekly: ranking:products:weekly:yyyyMMdd
+     * - Monthly: ranking:products:monthly:yyyyMMdd
      *
      * Internally converts to Seoul timezone for key formatting (spec#8.2 - Redis keys remain KST-based)
      */
@@ -30,8 +32,11 @@ class RankingKeyGenerator(
             RankingPeriod.DAILY -> {
                 "$DAILY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
             }
-            RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
-                throw UnsupportedOperationException("$period is not yet supported")
+            RankingPeriod.WEEKLY -> {
+                "$WEEKLY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
+            }
+            RankingPeriod.MONTHLY -> {
+                "$MONTHLY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
             }
         }
     }
@@ -40,14 +45,15 @@ class RankingKeyGenerator(
      * Generates bucket key from date string and period
      * - Hourly: ranking:products:hourly:yyyyMMddHH (expects 10-digit date string)
      * - Daily: ranking:products:daily:yyyyMMdd (expects 8-digit date string)
+     * - Weekly: ranking:products:weekly:yyyyMMdd (expects 8-digit date string)
+     * - Monthly: ranking:products:monthly:yyyyMMdd (expects 8-digit date string)
      */
     fun bucketKey(period: RankingPeriod, date: String): String {
         return when (period) {
             RankingPeriod.HOURLY -> "$HOURLY_PREFIX:$date"
             RankingPeriod.DAILY -> "$DAILY_PREFIX:$date"
-            RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
-                throw UnsupportedOperationException("$period is not yet supported")
-            }
+            RankingPeriod.WEEKLY -> "$WEEKLY_PREFIX:$date"
+            RankingPeriod.MONTHLY -> "$MONTHLY_PREFIX:$date"
         }
     }
 
@@ -85,16 +91,13 @@ class RankingKeyGenerator(
                 val hour = date.substring(8, 10).toInt()
                 ZonedDateTime.of(year, month, day, hour, 0, 0, 0, SEOUL_ZONE)
             }
-            RankingPeriod.DAILY -> {
-                // Parse yyyyMMdd format
-                require(date.length == 8) { "Invalid daily date format: $date (expected yyyyMMdd)" }
+            RankingPeriod.DAILY, RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
+                // Parse yyyyMMdd format (same format for daily, weekly, and monthly)
+                require(date.length == 8) { "Invalid ${period.key} date format: $date (expected yyyyMMdd)" }
                 val year = date.substring(0, 4).toInt()
                 val month = date.substring(4, 6).toInt()
                 val day = date.substring(6, 8).toInt()
                 ZonedDateTime.of(year, month, day, 0, 0, 0, 0, SEOUL_ZONE)
-            }
-            RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
-                throw UnsupportedOperationException("$period is not yet supported")
             }
         }
     }
@@ -104,6 +107,8 @@ class RankingKeyGenerator(
 
         private const val HOURLY_PREFIX = "ranking:products:hourly"
         private const val DAILY_PREFIX = "ranking:products:daily"
+        private const val WEEKLY_PREFIX = "ranking:products:weekly"
+        private const val MONTHLY_PREFIX = "ranking:products:monthly"
 
         private val HOURLY_FORMATTER = DateTimeFormatter
             .ofPattern("yyyyMMddHH")
