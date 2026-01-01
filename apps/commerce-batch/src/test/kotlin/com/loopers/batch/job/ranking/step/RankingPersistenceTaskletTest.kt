@@ -1,5 +1,6 @@
 package com.loopers.batch.job.ranking.step
 
+import com.loopers.batch.job.ranking.RankingPeriodType
 import com.loopers.batch.job.ranking.WeeklyRankingJobConfig
 import com.loopers.domain.ranking.ProductPeriodRankingRepository
 import com.loopers.testcontainers.MySqlTestContainersConfig
@@ -48,16 +49,16 @@ class RankingPersistenceTaskletTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("execute 메서드는")
-    inner class ExecuteTest {
+    @DisplayName("WEEKLY 기간에서 execute 메서드는")
+    inner class WeeklyExecuteTest {
 
-        @DisplayName("Redis에서 TOP 100을 추출하여 RDB에 저장한다")
+        @DisplayName("Redis에서 TOP 100을 추출하여 주간 테이블에 저장한다")
         @Test
-        fun shouldExtractTop100AndSaveToRdb() {
+        fun shouldExtractTop100AndSaveToWeeklyTable() {
             // arrange
             val baseDate = LocalDate.of(2025, 1, 8)
             val stagingKey = "ranking:products:weekly:20250108:staging"
-            val tasklet = createTasklet(baseDate)
+            val tasklet = createTasklet(baseDate, RankingPeriodType.WEEKLY)
 
             // Redis에 테스트 데이터 설정 (점수가 높은 순으로 정렬됨)
             val zSetOps = redisTemplate.opsForZSet()
@@ -106,7 +107,7 @@ class RankingPersistenceTaskletTest @Autowired constructor(
         fun shouldFinishWithoutSaving_whenStagingKeyIsEmpty() {
             // arrange
             val baseDate = LocalDate.of(2025, 1, 8)
-            val tasklet = createTasklet(baseDate)
+            val tasklet = createTasklet(baseDate, RankingPeriodType.WEEKLY)
 
             val stepExecution = createStepExecution()
             val contribution = StepContribution(stepExecution)
@@ -131,7 +132,7 @@ class RankingPersistenceTaskletTest @Autowired constructor(
             // arrange
             val baseDate = LocalDate.of(2025, 1, 8)
             val stagingKey = "ranking:products:weekly:20250108:staging"
-            val tasklet = createTasklet(baseDate)
+            val tasklet = createTasklet(baseDate, RankingPeriodType.WEEKLY)
 
             // 기존 데이터 삽입
             jdbcTemplate.update(
@@ -178,7 +179,7 @@ class RankingPersistenceTaskletTest @Autowired constructor(
             // arrange
             val baseDate = LocalDate.of(2025, 1, 8)
             val stagingKey = "ranking:products:weekly:20250108:staging"
-            val tasklet = createTasklet(baseDate)
+            val tasklet = createTasklet(baseDate, RankingPeriodType.WEEKLY)
 
             val zSetOps = redisTemplate.opsForZSet()
             zSetOps.add(stagingKey, "100", 1000.0)
@@ -201,7 +202,7 @@ class RankingPersistenceTaskletTest @Autowired constructor(
             // arrange
             val baseDate = LocalDate.of(2025, 1, 8)
             val stagingKey = "ranking:products:weekly:20250108:staging"
-            val tasklet = createTasklet(baseDate)
+            val tasklet = createTasklet(baseDate, RankingPeriodType.WEEKLY)
 
             // Redis에 110개 데이터 설정
             val zSetOps = redisTemplate.opsForZSet()
@@ -246,7 +247,7 @@ class RankingPersistenceTaskletTest @Autowired constructor(
             // arrange
             val baseDate = LocalDate.of(2025, 1, 8)
             val stagingKey = "ranking:products:weekly:20250108:staging"
-            val tasklet = createTasklet(baseDate)
+            val tasklet = createTasklet(baseDate, RankingPeriodType.WEEKLY)
 
             val zSetOps = redisTemplate.opsForZSet()
             zSetOps.add(stagingKey, "100", 1234.56)
@@ -274,7 +275,7 @@ class RankingPersistenceTaskletTest @Autowired constructor(
             // arrange
             val baseDate = LocalDate.of(2025, 1, 8)
             val stagingKey = "ranking:products:weekly:20250108:staging"
-            val tasklet = createTasklet(baseDate)
+            val tasklet = createTasklet(baseDate, RankingPeriodType.WEEKLY)
 
             val zSetOps = redisTemplate.opsForZSet()
             zSetOps.add(stagingKey, "100", 1000.0)
@@ -293,11 +294,134 @@ class RankingPersistenceTaskletTest @Autowired constructor(
         }
     }
 
-    private fun createTasklet(baseDate: LocalDate): RankingPersistenceTasklet {
+    @Nested
+    @DisplayName("MONTHLY 기간에서 execute 메서드는")
+    inner class MonthlyExecuteTest {
+
+        @DisplayName("Redis에서 TOP 100을 추출하여 월간 테이블에 저장한다")
+        @Test
+        fun shouldExtractTop100AndSaveToMonthlyTable() {
+            // arrange
+            val baseDate = LocalDate.of(2025, 2, 1)
+            val stagingKey = "ranking:products:monthly:20250201:staging"
+            val tasklet = createTasklet(baseDate, RankingPeriodType.MONTHLY)
+
+            // Redis에 테스트 데이터 설정
+            val zSetOps = redisTemplate.opsForZSet()
+            zSetOps.add(stagingKey, "100", 2000.0) // 1등
+            zSetOps.add(stagingKey, "200", 1500.0) // 2등
+            zSetOps.add(stagingKey, "300", 1000.0) // 3등
+
+            val stepExecution = createStepExecution()
+            val contribution = StepContribution(stepExecution)
+            val chunkContext = ChunkContext(StepContext(stepExecution))
+
+            // act
+            val result = tasklet.execute(contribution, chunkContext)
+
+            // assert
+            assertThat(result).isEqualTo(RepeatStatus.FINISHED)
+
+            // 월간 테이블에 저장 확인
+            val count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mv_product_rank_monthly WHERE base_date = ?",
+                Int::class.java,
+                baseDate,
+            )
+            assertThat(count).isEqualTo(3)
+
+            // 순위 확인
+            val rank1ProductId = jdbcTemplate.queryForObject(
+                "SELECT product_id FROM mv_product_rank_monthly WHERE base_date = ? AND `rank` = 1",
+                Long::class.java,
+                baseDate,
+            )
+            assertThat(rank1ProductId).isEqualTo(100L)
+
+            // 주간 테이블에는 저장되지 않음
+            val weeklyCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mv_product_rank_weekly",
+                Int::class.java,
+            )
+            assertThat(weeklyCount).isEqualTo(0)
+        }
+
+        @DisplayName("기존 월간 랭킹 데이터를 삭제하고 새로운 데이터를 저장한다")
+        @Test
+        fun shouldDeleteExistingMonthlyAndSaveNew() {
+            // arrange
+            val baseDate = LocalDate.of(2025, 2, 1)
+            val stagingKey = "ranking:products:monthly:20250201:staging"
+            val tasklet = createTasklet(baseDate, RankingPeriodType.MONTHLY)
+
+            // 기존 월간 데이터 삽입
+            jdbcTemplate.update(
+                "INSERT INTO mv_product_rank_monthly (base_date, `rank`, product_id, score, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+                baseDate,
+                1,
+                888L,
+                BigDecimal("888.00"),
+            )
+
+            // Redis에 새 데이터 설정
+            val zSetOps = redisTemplate.opsForZSet()
+            zSetOps.add(stagingKey, "100", 2000.0)
+
+            val stepExecution = createStepExecution()
+            val contribution = StepContribution(stepExecution)
+            val chunkContext = ChunkContext(StepContext(stepExecution))
+
+            // act
+            val result = tasklet.execute(contribution, chunkContext)
+
+            // assert
+            assertThat(result).isEqualTo(RepeatStatus.FINISHED)
+
+            // 기존 데이터는 삭제되고 새 데이터만 존재
+            val count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mv_product_rank_monthly WHERE base_date = ?",
+                Int::class.java,
+                baseDate,
+            )
+            assertThat(count).isEqualTo(1)
+
+            val oldDataCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mv_product_rank_monthly WHERE product_id = 888",
+                Int::class.java,
+            )
+            assertThat(oldDataCount).isEqualTo(0)
+        }
+
+        @DisplayName("월간 스테이징 키를 삭제한다")
+        @Test
+        fun shouldDeleteMonthlyStagingKeyAfterSave() {
+            // arrange
+            val baseDate = LocalDate.of(2025, 2, 1)
+            val stagingKey = "ranking:products:monthly:20250201:staging"
+            val tasklet = createTasklet(baseDate, RankingPeriodType.MONTHLY)
+
+            val zSetOps = redisTemplate.opsForZSet()
+            zSetOps.add(stagingKey, "100", 2000.0)
+
+            val stepExecution = createStepExecution()
+            val contribution = StepContribution(stepExecution)
+            val chunkContext = ChunkContext(StepContext(stepExecution))
+
+            // act
+            tasklet.execute(contribution, chunkContext)
+
+            // assert
+            val exists = redisTemplate.hasKey(stagingKey)
+            assertThat(exists).isFalse()
+        }
+    }
+
+    private fun createTasklet(baseDate: LocalDate, periodType: RankingPeriodType): RankingPersistenceTasklet {
         return RankingPersistenceTasklet(
             redisTemplate,
             productPeriodRankingRepository,
             baseDate,
+            periodType,
         )
     }
 

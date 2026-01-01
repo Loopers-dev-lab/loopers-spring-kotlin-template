@@ -1,18 +1,15 @@
 package com.loopers.batch.job.ranking.step
 
-import com.loopers.batch.job.ranking.WeeklyRankingJobConfig
+import com.loopers.batch.job.ranking.RankingPeriodType
+import com.loopers.domain.ranking.MvProductRankMonthly
 import com.loopers.domain.ranking.MvProductRankWeekly
 import com.loopers.domain.ranking.ProductPeriodRankingRepository
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.StepContribution
-import org.springframework.batch.core.configuration.annotation.StepScope
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.tasklet.Tasklet
 import org.springframework.batch.repeat.RepeatStatus
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -26,34 +23,27 @@ import java.time.format.DateTimeFormatter
  * 3. 새로운 랭킹 데이터를 RDB에 저장
  * 4. 스테이징 키 삭제 (실패해도 Job은 성공으로 처리 - TTL로 자동 만료)
  */
-@StepScope
-@ConditionalOnProperty(name = ["spring.batch.job.name"], havingValue = WeeklyRankingJobConfig.JOB_NAME)
-@Component
 class RankingPersistenceTasklet(
     private val redisTemplate: RedisTemplate<String, String>,
     private val productPeriodRankingRepository: ProductPeriodRankingRepository,
-    @Value("#{jobParameters['baseDate']}") private val baseDateParam: LocalDate?,
+    private val baseDate: LocalDate,
+    private val periodType: RankingPeriodType,
 ) : Tasklet {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        private const val WEEKLY_PREFIX = "ranking:products:weekly"
         private const val STAGING_SUFFIX = ":staging"
         private const val TOP_RANKING_LIMIT = 100L
         private val DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd")
     }
 
-    private val baseDate: LocalDate by lazy {
-        baseDateParam ?: LocalDate.now()
-    }
-
     private val stagingKey: String by lazy {
-        "$WEEKLY_PREFIX:${DATE_FORMATTER.format(baseDate)}$STAGING_SUFFIX"
+        "${periodType.redisPrefix}:${DATE_FORMATTER.format(baseDate)}$STAGING_SUFFIX"
     }
 
     override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
-        log.info("Step 2 시작 - baseDate: {}, stagingKey: {}", baseDate, stagingKey)
+        log.info("Step 2 시작 - baseDate: {}, periodType: {}, stagingKey: {}", baseDate, periodType, stagingKey)
 
         // 1. Redis에서 TOP 100 추출 (ZREVRANGE with SCORES)
         val topRankings = fetchTopRankingsFromRedis()
@@ -65,11 +55,34 @@ class RankingPersistenceTasklet(
         }
 
         // 2. 기존 랭킹 삭제
-        val deletedCount = productPeriodRankingRepository.deleteWeeklyByBaseDate(baseDate)
-        log.info("기존 랭킹 {} 개 삭제 완료 - baseDate: {}", deletedCount, baseDate)
+        val deletedCount = when (periodType) {
+            RankingPeriodType.WEEKLY -> productPeriodRankingRepository.deleteWeeklyByBaseDate(baseDate)
+            RankingPeriodType.MONTHLY -> productPeriodRankingRepository.deleteMonthlyByBaseDate(baseDate)
+        }
+        log.info("기존 {} 랭킹 {} 개 삭제 완료 - baseDate: {}", periodType, deletedCount, baseDate)
 
         // 3. 새로운 랭킹 저장 (rank는 1부터 시작)
-        val rankings = topRankings.mapIndexed { index, entry ->
+        val savedCount = when (periodType) {
+            RankingPeriodType.WEEKLY -> saveWeeklyRankings(topRankings)
+            RankingPeriodType.MONTHLY -> saveMonthlyRankings(topRankings)
+        }
+        log.info("새로운 {} 랭킹 {} 개 저장 완료 - baseDate: {}", periodType, savedCount, baseDate)
+
+        // 4. 스테이징 키 삭제 (실패해도 무시 - TTL로 자동 만료)
+        deleteStagingKey()
+
+        // StepContribution에 쓰기 수 기록
+        contribution.incrementWriteCount(savedCount.toLong())
+
+        log.info("Step 2 완료 - {} 개의 {} 랭킹 저장됨", savedCount, periodType)
+        return RepeatStatus.FINISHED
+    }
+
+    /**
+     * 주간 랭킹을 저장한다
+     */
+    private fun saveWeeklyRankings(rankings: List<RankingEntry>): Int {
+        val weeklyRankings = rankings.mapIndexed { index, entry ->
             MvProductRankWeekly.create(
                 baseDate = baseDate,
                 rank = index + 1,
@@ -77,17 +90,24 @@ class RankingPersistenceTasklet(
                 score = entry.score,
             )
         }
-        productPeriodRankingRepository.saveAllWeekly(rankings)
-        log.info("새로운 랭킹 {} 개 저장 완료 - baseDate: {}", rankings.size, baseDate)
+        productPeriodRankingRepository.saveAllWeekly(weeklyRankings)
+        return weeklyRankings.size
+    }
 
-        // 4. 스테이징 키 삭제 (실패해도 무시 - TTL로 자동 만료)
-        deleteStagingKey()
-
-        // StepContribution에 쓰기 수 기록
-        contribution.incrementWriteCount(rankings.size.toLong())
-
-        log.info("Step 2 완료 - {} 개의 랭킹 저장됨", rankings.size)
-        return RepeatStatus.FINISHED
+    /**
+     * 월간 랭킹을 저장한다
+     */
+    private fun saveMonthlyRankings(rankings: List<RankingEntry>): Int {
+        val monthlyRankings = rankings.mapIndexed { index, entry ->
+            MvProductRankMonthly.create(
+                baseDate = baseDate,
+                rank = index + 1,
+                productId = entry.productId,
+                score = entry.score,
+            )
+        }
+        productPeriodRankingRepository.saveAllMonthly(monthlyRankings)
+        return monthlyRankings.size
     }
 
     /**
