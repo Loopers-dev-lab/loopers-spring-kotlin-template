@@ -58,8 +58,7 @@ class ProductHourlyMetricRdbRepository(
      */
     @Transactional(readOnly = true)
     override fun findAllByStatHour(statHour: Instant): List<ProductHourlyMetric> {
-        val zonedDateTime = statHour.atZone(ZoneId.of("Asia/Seoul"))
-        return productHourlyMetricJpaRepository.findAllByStatHour(zonedDateTime)
+        return productHourlyMetricJpaRepository.findAllByStatHour(statHour)
     }
 
     /**
@@ -71,8 +70,8 @@ class ProductHourlyMetricRdbRepository(
     @Transactional(readOnly = true)
     override fun findAllByDate(date: LocalDate): List<ProductHourlyMetric> {
         val seoulZone = ZoneId.of("Asia/Seoul")
-        val startHour = date.atStartOfDay(seoulZone)
-        val endHour = date.plusDays(1).atStartOfDay(seoulZone).minusNanos(1)
+        val startHour = date.atStartOfDay(seoulZone).toInstant()
+        val endHour = date.plusDays(1).atStartOfDay(seoulZone).minusNanos(1).toInstant()
         return productHourlyMetricJpaRepository.findAllByStatHourBetween(startHour, endHour)
     }
 }

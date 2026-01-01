@@ -25,8 +25,8 @@ class RankingScoreCalculatorTest {
     inner class CalculateForHourly {
 
         private val seoulZone = ZoneId.of("Asia/Seoul")
-        private val baseHour = ZonedDateTime.of(2024, 1, 1, 10, 0, 0, 0, seoulZone)
-        private val previousHour = baseHour.minusHours(1)
+        private val baseHour = ZonedDateTime.of(2024, 1, 1, 10, 0, 0, 0, seoulZone).toInstant()
+        private val previousHour = baseHour.minusSeconds(3600)
 
         @DisplayName("Score 공식이 시간별 메트릭에 올바르게 적용된다")
         @Test

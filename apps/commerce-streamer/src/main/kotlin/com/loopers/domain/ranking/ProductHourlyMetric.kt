@@ -6,7 +6,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.Instant
 
 /**
  * ProductHourlyMetric 엔티티 - 시간별 상품 행동 집계
@@ -25,7 +25,7 @@ import java.time.ZonedDateTime
 )
 class ProductHourlyMetric(
     @Column(name = "stat_hour", nullable = false)
-    val statHour: ZonedDateTime,
+    val statHour: Instant,
 
     @Column(name = "product_id", nullable = false)
     val productId: Long,
@@ -50,7 +50,7 @@ class ProductHourlyMetric(
 
     companion object {
         fun create(
-            statHour: ZonedDateTime,
+            statHour: Instant,
             productId: Long,
             viewCount: Long = 0,
             likeCount: Long = 0,

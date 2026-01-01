@@ -168,8 +168,9 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         fun `saves scores to Redis based on current bucket metrics`() {
             // given - 현재 시간 버킷에 메트릭 저장
             val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val nowInstant = now.toInstant()
             val metric = ProductHourlyMetric.create(
-                statHour = now,
+                statHour = nowInstant,
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 50,
@@ -194,11 +195,13 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         fun `applies decay formula - previous 0_1 plus current 0_9`() {
             // given
             val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val nowInstant = now.toInstant()
             val previousHour = now.minusHours(1)
+            val previousHourInstant = previousHour.toInstant()
 
             // Current bucket: 100 views -> 100 * 0.10 = 10 points
             val currentMetric = ProductHourlyMetric.create(
-                statHour = now,
+                statHour = nowInstant,
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 0,
@@ -207,7 +210,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
 
             // Previous bucket: 200 views -> 200 * 0.10 = 20 points
             val previousMetric = ProductHourlyMetric.create(
-                statHour = previousHour,
+                statHour = previousHourInstant,
                 productId = 1L,
                 viewCount = 200,
                 likeCount = 0,
@@ -233,10 +236,11 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             // given
             val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
             val previousHour = now.minusHours(1)
+            val previousHourInstant = previousHour.toInstant()
 
             // Only in previous bucket: 100 views -> 100 * 0.10 = 10 points
             val previousMetric = ProductHourlyMetric.create(
-                statHour = previousHour,
+                statHour = previousHourInstant,
                 productId = 99L,
                 viewCount = 100,
                 likeCount = 0,
@@ -260,16 +264,17 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         fun `calculates scores for multiple products`() {
             // given
             val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val nowInstant = now.toInstant()
 
             val metric1 = ProductHourlyMetric.create(
-                statHour = now,
+                statHour = nowInstant,
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
             val metric2 = ProductHourlyMetric.create(
-                statHour = now,
+                statHour = nowInstant,
                 productId = 2L,
                 viewCount = 200,
                 likeCount = 0,
@@ -316,14 +321,14 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val hour12 = hour00.plusHours(12)
 
             val metric1 = ProductHourlyMetric.create(
-                statHour = hour00,
+                statHour = hour00.toInstant(),
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 10,
                 orderAmount = BigDecimal("1000.00"),
             )
             val metric2 = ProductHourlyMetric.create(
-                statHour = hour12,
+                statHour = hour12.toInstant(),
                 productId = 1L,
                 viewCount = 50,
                 likeCount = 5,
@@ -349,16 +354,17 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             // given
             val targetDate = LocalDate.now(seoulZone)
             val hour00 = targetDate.atStartOfDay(seoulZone)
+            val hour00Instant = hour00.toInstant()
 
             val metric1 = ProductHourlyMetric.create(
-                statHour = hour00,
+                statHour = hour00Instant,
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 10,
                 orderAmount = BigDecimal("1000.00"),
             )
             val metric2 = ProductHourlyMetric.create(
-                statHour = hour00,
+                statHour = hour00Instant,
                 productId = 2L,
                 viewCount = 200,
                 likeCount = 20,

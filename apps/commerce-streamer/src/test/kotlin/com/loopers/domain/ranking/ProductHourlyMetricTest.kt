@@ -6,7 +6,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 @DisplayName("ProductHourlyMetric 단위 테스트")
 class ProductHourlyMetricTest {
@@ -19,7 +20,7 @@ class ProductHourlyMetricTest {
         @Test
         fun `all fields are correctly initialized`() {
             // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val productId = 1L
             val viewCount = 100L
             val likeCount = 50L
@@ -46,7 +47,7 @@ class ProductHourlyMetricTest {
         @Test
         fun `fields default to zero when only required fields are specified`() {
             // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val productId = 1L
 
             // when
@@ -72,7 +73,7 @@ class ProductHourlyMetricTest {
         @Test
         fun `all counts are initialized to zero`() {
             // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val productId = 42L
 
             // when
@@ -93,7 +94,7 @@ class ProductHourlyMetricTest {
         @Test
         fun `id is 0 before persistence`() {
             // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val productId = 1L
 
             // when
@@ -107,7 +108,7 @@ class ProductHourlyMetricTest {
         @Test
         fun `all fields are correctly mapped`() {
             // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val productId = 999L
             val viewCount = 10L
             val likeCount = 20L
@@ -140,7 +141,7 @@ class ProductHourlyMetricTest {
         @Test
         fun `throws exception when viewCount is negative`() {
             // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val productId = 1L
 
             // when & then
@@ -158,7 +159,7 @@ class ProductHourlyMetricTest {
         @Test
         fun `allows negative likeCount`() {
             // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val productId = 1L
 
             // when
@@ -181,7 +182,7 @@ class ProductHourlyMetricTest {
         @Test
         fun `creates entity using factory method`() {
             // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val productId = 1L
             val viewCount = 100L
             val likeCount = 50L
@@ -208,7 +209,7 @@ class ProductHourlyMetricTest {
         @Test
         fun `factory method applies default values`() {
             // given
-            val statHour = ZonedDateTime.now().withMinute(0).withSecond(0).withNano(0)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val productId = 1L
 
             // when
