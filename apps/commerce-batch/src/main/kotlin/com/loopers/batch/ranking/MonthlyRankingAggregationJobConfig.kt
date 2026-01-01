@@ -1,5 +1,8 @@
 package com.loopers.batch.ranking
 
+import com.loopers.batch.listener.ChunkListener
+import com.loopers.batch.listener.JobListener
+import com.loopers.batch.listener.StepMonitorListener
 import com.loopers.domain.ranking.ProductRankDailyRepository
 import com.loopers.domain.ranking.ProductRankMonthly
 import com.loopers.domain.ranking.ProductRankMonthlyRepository
@@ -37,6 +40,9 @@ class MonthlyRankingAggregationJobConfig(
     private val transactionManager: PlatformTransactionManager,
     private val productRankDailyRepository: ProductRankDailyRepository,
     private val productRankMonthlyRepository: ProductRankMonthlyRepository,
+    private val jobListener: JobListener,
+    private val stepMonitorListener: StepMonitorListener,
+    private val chunkListener: ChunkListener,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(MonthlyRankingAggregationJobConfig::class.java)
@@ -50,6 +56,7 @@ class MonthlyRankingAggregationJobConfig(
     @Bean
     fun monthlyRankingAggregationJob(): Job = JobBuilder(JOB_NAME, jobRepository)
         .incrementer(RunIdIncrementer())
+        .listener(jobListener)
         .start(monthlyRankingDeleteStep(null))
         .next(monthlyRankingAggregateStep())
         .build()
@@ -76,6 +83,7 @@ class MonthlyRankingAggregationJobConfig(
                 },
                 transactionManager,
             )
+            .listener(stepMonitorListener)
             .build()
     }
 
@@ -89,6 +97,8 @@ class MonthlyRankingAggregationJobConfig(
         .reader(monthlyRankingReader(null))
         .processor(monthlyRankingProcessor())
         .writer(monthlyRankingWriter())
+        .listener(stepMonitorListener)
+        .listener(chunkListener)
         .transactionManager(transactionManager)
         .build()
 
