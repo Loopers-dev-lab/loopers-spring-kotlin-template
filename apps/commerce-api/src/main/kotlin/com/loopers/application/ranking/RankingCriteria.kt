@@ -1,8 +1,7 @@
 package com.loopers.application.ranking
 
-import com.loopers.domain.ranking.RankingKeyGenerator
+import com.loopers.domain.ranking.RankingCommand
 import com.loopers.domain.ranking.RankingPeriod
-import com.loopers.domain.ranking.RankingQuery
 import java.math.BigDecimal
 
 class RankingCriteria {
@@ -22,17 +21,20 @@ class RankingCriteria {
         val size: Int? = null,
     ) {
         /**
-         * Converts to RankingQuery
-         * Provides .toQuery() method following the PageQuery pattern
+         * Converts to RankingCommand.FindRankings
          */
-        fun toQuery(rankingKeyGenerator: RankingKeyGenerator): RankingQuery {
-            return RankingQuery.of(
+        fun toCommand(): RankingCommand.FindRankings {
+            return RankingCommand.FindRankings(
                 period = RankingPeriod.fromString(period),
                 date = date,
-                page = page,
-                size = size,
-                rankingKeyGenerator = rankingKeyGenerator,
+                page = page ?: DEFAULT_PAGE,
+                size = size ?: DEFAULT_SIZE,
             )
+        }
+
+        companion object {
+            private const val DEFAULT_PAGE = 0
+            private const val DEFAULT_SIZE = 20
         }
     }
 

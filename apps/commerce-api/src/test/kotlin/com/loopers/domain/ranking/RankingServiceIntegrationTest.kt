@@ -17,6 +17,7 @@ import java.math.BigDecimal
 class RankingServiceIntegrationTest @Autowired constructor(
     private val rankingService: RankingService,
     private val rankingWeightRepository: RankingWeightRepository,
+    private val rankingKeyGenerator: RankingKeyGenerator,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
     private val redisTemplate: RedisTemplate<String, String>,
@@ -131,27 +132,24 @@ class RankingServiceIntegrationTest @Autowired constructor(
     @Nested
     inner class FindRankings {
 
-        private val testBucketKey = "ranking:products:2025011514"
-        private val fallbackBucketKey = "ranking:products:2025011513"
-
         @DisplayName("Redis에서 랭킹을 조회하여 반환한다")
         @Test
         fun `returns rankings from Redis`() {
             // given
-            zSetOps.add(testBucketKey, "101", 300.0)
-            zSetOps.add(testBucketKey, "102", 200.0)
-            zSetOps.add(testBucketKey, "103", 100.0)
+            val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            zSetOps.add(bucketKey, "101", 300.0)
+            zSetOps.add(bucketKey, "102", 200.0)
+            zSetOps.add(bucketKey, "103", 100.0)
 
-            val query = RankingQuery(
+            val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
-                bucketKey = testBucketKey,
-                fallbackKey = fallbackBucketKey,
-                offset = 0,
-                limit = 10,
+                date = null,
+                page = 0,
+                size = 10,
             )
 
             // when
-            val result = rankingService.findRankings(query)
+            val result = rankingService.findRankings(command)
 
             // then
             assertThat(result).hasSize(3)
@@ -167,19 +165,20 @@ class RankingServiceIntegrationTest @Autowired constructor(
         @Test
         fun `uses fallback bucket when current bucket is empty and offset is 0`() {
             // given - fallback 버킷에만 데이터가 있음
+            val currentBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            val fallbackBucketKey = rankingKeyGenerator.previousBucketKey(currentBucketKey)
             zSetOps.add(fallbackBucketKey, "201", 500.0)
             zSetOps.add(fallbackBucketKey, "202", 400.0)
 
-            val query = RankingQuery(
+            val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
-                bucketKey = testBucketKey,
-                fallbackKey = fallbackBucketKey,
-                offset = 0,
-                limit = 10,
+                date = null,
+                page = 0,
+                size = 10,
             )
 
             // when
-            val result = rankingService.findRankings(query)
+            val result = rankingService.findRankings(command)
 
             // then
             assertThat(result).hasSize(2)
@@ -191,18 +190,65 @@ class RankingServiceIntegrationTest @Autowired constructor(
         @Test
         fun `does not use fallback when not first page`() {
             // given - fallback 버킷에만 데이터가 있음
+            val currentBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            val fallbackBucketKey = rankingKeyGenerator.previousBucketKey(currentBucketKey)
             zSetOps.add(fallbackBucketKey, "201", 500.0)
 
-            val query = RankingQuery(
+            val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
-                bucketKey = testBucketKey,
-                fallbackKey = fallbackBucketKey,
-                offset = 10,
-                limit = 10,
+                date = null,
+                page = 1,
+                size = 10,
             )
 
             // when
-            val result = rankingService.findRankings(query)
+            val result = rankingService.findRankings(command)
+
+            // then
+            assertThat(result).isEmpty()
+        }
+
+        @DisplayName("date가 지정되면 해당 date 버킷에서 조회한다")
+        @Test
+        fun `uses specified date bucket when date is provided`() {
+            // given
+            val date = "2025011514"
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, date)
+            zSetOps.add(bucketKey, "101", 300.0)
+
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = date,
+                page = 0,
+                size = 10,
+            )
+
+            // when
+            val result = rankingService.findRankings(command)
+
+            // then
+            assertThat(result).hasSize(1)
+            assertThat(result[0].productId).isEqualTo(101L)
+        }
+
+        @DisplayName("date가 지정되면 fallback을 시도하지 않는다")
+        @Test
+        fun `does not use fallback when date is specified`() {
+            // given - 지정된 date 버킷은 비어있고, 이전 버킷에 데이터가 있음
+            val date = "2025011514"
+            val specifiedBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, date)
+            val previousBucketKey = rankingKeyGenerator.previousBucketKey(specifiedBucketKey)
+            zSetOps.add(previousBucketKey, "201", 500.0)
+
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = date,
+                page = 0,
+                size = 10,
+            )
+
+            // when
+            val result = rankingService.findRankings(command)
 
             // then
             assertThat(result).isEmpty()

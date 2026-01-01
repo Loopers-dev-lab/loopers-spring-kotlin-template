@@ -45,7 +45,6 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             val query = RankingQuery(
                 period = RankingPeriod.HOURLY,
                 bucketKey = testBucketKey,
-                fallbackKey = null,
                 offset = 0,
                 limit = 3,
             )
@@ -53,7 +52,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             // when
             val result = productRankingReader.findTopRankings(query)
 
-            // then - limitForHasNext()가 4를 반환하므로 최대 4개까지 조회 시도
+            // then - limit + 1 = 4개까지 조회 시도하나 데이터가 3개뿐
             assertThat(result).hasSize(3)
             assertThat(result[0].productId).isEqualTo(102L)
             assertThat(result[0].rank).isEqualTo(1)
@@ -68,7 +67,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             assertThat(result[2].score).isEqualByComparingTo(BigDecimal("100.0"))
         }
 
-        @DisplayName("limitForHasNext()를 사용하여 limit + 1개까지 조회한다")
+        @DisplayName("limit + 1개까지 조회한다 (hasNext 판단용)")
         @Test
         fun `returns limit plus one items for hasNext check`() {
             // given
@@ -79,7 +78,6 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             val query = RankingQuery(
                 period = RankingPeriod.HOURLY,
                 bucketKey = testBucketKey,
-                fallbackKey = null,
                 offset = 0,
                 limit = 3,
             )
@@ -87,7 +85,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             // when
             val result = productRankingReader.findTopRankings(query)
 
-            // then - limitForHasNext() = 4
+            // then - limit + 1 = 4
             assertThat(result).hasSize(4)
         }
 
@@ -98,7 +96,6 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             val query = RankingQuery(
                 period = RankingPeriod.HOURLY,
                 bucketKey = "non-existent-key",
-                fallbackKey = null,
                 offset = 0,
                 limit = 10,
             )
@@ -123,7 +120,6 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             val query = RankingQuery(
                 period = RankingPeriod.HOURLY,
                 bucketKey = testBucketKey,
-                fallbackKey = null,
                 offset = 2,
                 limit = 2,
             )
@@ -131,7 +127,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             // when
             val result = productRankingReader.findTopRankings(query)
 
-            // then - offset 2부터 limitForHasNext() = 3개 조회
+            // then - offset 2부터 limit + 1 = 3개 조회
             assertThat(result).hasSize(3)
             assertThat(result[0].productId).isEqualTo(103L)
             assertThat(result[0].rank).isEqualTo(3)

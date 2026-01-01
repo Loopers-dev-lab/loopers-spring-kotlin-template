@@ -14,7 +14,12 @@ class RankingServiceTest {
 
     private val rankingWeightRepository: RankingWeightRepository = mockk()
     private val productRankingReader: ProductRankingReader = mockk()
-    private val rankingService = RankingService(rankingWeightRepository, productRankingReader)
+    private val rankingKeyGenerator: RankingKeyGenerator = mockk()
+    private val rankingService = RankingService(
+        rankingWeightRepository,
+        productRankingReader,
+        rankingKeyGenerator,
+    )
 
     @DisplayName("findWeight 테스트")
     @Nested
@@ -147,21 +152,22 @@ class RankingServiceTest {
         @Test
         fun `returns rankings when found`() {
             // given
-            val query = RankingQuery(
+            val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
-                bucketKey = "ranking:products:2025011514",
-                fallbackKey = "ranking:products:2025011513",
-                offset = 0,
-                limit = 20,
+                date = null,
+                page = 0,
+                size = 20,
             )
+            val bucketKey = "ranking:products:hourly:2025011514"
             val expectedRankings = listOf(
                 ProductRanking(productId = 101L, rank = 1, score = BigDecimal("100.0")),
                 ProductRanking(productId = 102L, rank = 2, score = BigDecimal("90.0")),
             )
-            every { productRankingReader.findTopRankings(query) } returns expectedRankings
+            every { rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY) } returns bucketKey
+            every { productRankingReader.findTopRankings(any()) } returns expectedRankings
 
             // when
-            val result = rankingService.findRankings(query)
+            val result = rankingService.findRankings(command)
 
             // then
             assertThat(result).hasSize(2)
@@ -169,73 +175,99 @@ class RankingServiceTest {
             assertThat(result[1].productId).isEqualTo(102L)
         }
 
-        @DisplayName("결과가 비어있고 offset=0이고 fallbackKey가 있으면 fallback을 시도한다")
+        @DisplayName("date가 지정되면 해당 date의 bucketKey를 사용한다")
         @Test
-        fun `uses fallback when empty and offset is 0 and fallbackKey exists`() {
+        fun `uses specified date for bucketKey`() {
             // given
-            val query = RankingQuery(
+            val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
-                bucketKey = "ranking:products:2025011514",
-                fallbackKey = "ranking:products:2025011513",
-                offset = 0,
-                limit = 20,
+                date = "2025011514",
+                page = 0,
+                size = 20,
             )
-            val fallbackQuery = query.copy(
-                bucketKey = query.fallbackKey!!,
-                fallbackKey = null,
+            val bucketKey = "ranking:products:hourly:2025011514"
+            val expectedRankings = listOf(
+                ProductRanking(productId = 101L, rank = 1, score = BigDecimal("100.0")),
             )
+            every { rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, "2025011514") } returns bucketKey
+            every { productRankingReader.findTopRankings(any()) } returns expectedRankings
+
+            // when
+            val result = rankingService.findRankings(command)
+
+            // then
+            assertThat(result).hasSize(1)
+            verify { rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, "2025011514") }
+        }
+
+        @DisplayName("결과가 비어있고 offset=0이고 date가 null이면 fallback을 시도한다")
+        @Test
+        fun `uses fallback when empty and offset is 0 and date is null`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = null,
+                page = 0,
+                size = 20,
+            )
+            val bucketKey = "ranking:products:hourly:2025011514"
+            val fallbackKey = "ranking:products:hourly:2025011513"
             val fallbackRankings = listOf(
                 ProductRanking(productId = 201L, rank = 1, score = BigDecimal("80.0")),
             )
-            every { productRankingReader.findTopRankings(query) } returns emptyList()
-            every { productRankingReader.findTopRankings(fallbackQuery) } returns fallbackRankings
+            every { rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY) } returns bucketKey
+            every { rankingKeyGenerator.previousBucketKey(bucketKey) } returns fallbackKey
+            every { productRankingReader.findTopRankings(match { it.bucketKey == bucketKey }) } returns emptyList()
+            every { productRankingReader.findTopRankings(match { it.bucketKey == fallbackKey }) } returns fallbackRankings
 
             // when
-            val result = rankingService.findRankings(query)
+            val result = rankingService.findRankings(command)
 
             // then
             assertThat(result).hasSize(1)
             assertThat(result[0].productId).isEqualTo(201L)
-            verify { productRankingReader.findTopRankings(query) }
-            verify { productRankingReader.findTopRankings(fallbackQuery) }
+            verify { productRankingReader.findTopRankings(match { it.bucketKey == bucketKey }) }
+            verify { productRankingReader.findTopRankings(match { it.bucketKey == fallbackKey }) }
         }
 
         @DisplayName("결과가 비어있어도 offset > 0이면 fallback을 시도하지 않는다")
         @Test
         fun `does not use fallback when offset is greater than 0`() {
             // given
-            val query = RankingQuery(
+            val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
-                bucketKey = "ranking:products:2025011514",
-                fallbackKey = "ranking:products:2025011513",
-                offset = 20,
-                limit = 20,
+                date = null,
+                page = 1,
+                size = 20,
             )
-            every { productRankingReader.findTopRankings(query) } returns emptyList()
+            val bucketKey = "ranking:products:hourly:2025011514"
+            every { rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY) } returns bucketKey
+            every { productRankingReader.findTopRankings(any()) } returns emptyList()
 
             // when
-            val result = rankingService.findRankings(query)
+            val result = rankingService.findRankings(command)
 
             // then
             assertThat(result).isEmpty()
             verify(exactly = 1) { productRankingReader.findTopRankings(any()) }
         }
 
-        @DisplayName("결과가 비어있어도 fallbackKey가 null이면 fallback을 시도하지 않는다")
+        @DisplayName("결과가 비어있어도 date가 지정되어 있으면 fallback을 시도하지 않는다")
         @Test
-        fun `does not use fallback when fallbackKey is null`() {
+        fun `does not use fallback when date is specified`() {
             // given
-            val query = RankingQuery(
+            val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
-                bucketKey = "ranking:products:2025011514",
-                fallbackKey = null,
-                offset = 0,
-                limit = 20,
+                date = "2025011514",
+                page = 0,
+                size = 20,
             )
-            every { productRankingReader.findTopRankings(query) } returns emptyList()
+            val bucketKey = "ranking:products:hourly:2025011514"
+            every { rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, "2025011514") } returns bucketKey
+            every { productRankingReader.findTopRankings(any()) } returns emptyList()
 
             // when
-            val result = rankingService.findRankings(query)
+            val result = rankingService.findRankings(command)
 
             // then
             assertThat(result).isEmpty()
@@ -246,17 +278,20 @@ class RankingServiceTest {
         @Test
         fun `returns empty when fallback is also empty`() {
             // given
-            val query = RankingQuery(
+            val command = RankingCommand.FindRankings(
                 period = RankingPeriod.HOURLY,
-                bucketKey = "ranking:products:2025011514",
-                fallbackKey = "ranking:products:2025011513",
-                offset = 0,
-                limit = 20,
+                date = null,
+                page = 0,
+                size = 20,
             )
+            val bucketKey = "ranking:products:hourly:2025011514"
+            val fallbackKey = "ranking:products:hourly:2025011513"
+            every { rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY) } returns bucketKey
+            every { rankingKeyGenerator.previousBucketKey(bucketKey) } returns fallbackKey
             every { productRankingReader.findTopRankings(any()) } returns emptyList()
 
             // when
-            val result = rankingService.findRankings(query)
+            val result = rankingService.findRankings(command)
 
             // then
             assertThat(result).isEmpty()

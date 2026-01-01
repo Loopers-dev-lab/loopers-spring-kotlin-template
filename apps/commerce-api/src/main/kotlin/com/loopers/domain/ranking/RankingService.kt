@@ -8,6 +8,7 @@ import java.math.BigDecimal
 class RankingService(
     private val rankingWeightRepository: RankingWeightRepository,
     private val productRankingReader: ProductRankingReader,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
     @Transactional(readOnly = true)
     fun findWeight(): RankingWeight {
@@ -39,22 +40,32 @@ class RankingService(
     /**
      * 랭킹을 조회한다 (폴백 로직 포함)
      *
-     * @param query 조회 조건
+     * @param command 조회 명령
      * @return ProductRanking 리스트 (hasNext 판단을 위해 limit + 1개 포함 가능)
      */
     @Transactional(readOnly = true)
-    fun findRankings(query: RankingQuery): List<ProductRanking> {
-        val rankings = productRankingReader.findTopRankings(query)
-
-        // Fallback: 현재 버킷이 비어있고, 첫 페이지이고, fallbackKey가 있으면
-        if (rankings.isEmpty() && query.offset == 0L && query.fallbackKey != null) {
-            val fallbackQuery = query.copy(
-                bucketKey = query.fallbackKey,
-                fallbackKey = null,
-            )
-            return productRankingReader.findTopRankings(fallbackQuery)
+    fun findRankings(command: RankingCommand.FindRankings): List<ProductRanking> {
+        val bucketKey = if (command.date != null) {
+            rankingKeyGenerator.bucketKey(command.period, command.date)
+        } else {
+            rankingKeyGenerator.currentBucketKey(command.period)
         }
 
+        val query = RankingQuery(
+            period = command.period,
+            bucketKey = bucketKey,
+            offset = (command.page * command.size).toLong(),
+            limit = command.size.toLong(),
+        )
+
+        val rankings = productRankingReader.findTopRankings(query)
+
+        // Fallback: first page empty -> try previous bucket (only when no specific date)
+        if (rankings.isEmpty() && query.offset == 0L && command.date == null) {
+            val fallbackKey = rankingKeyGenerator.previousBucketKey(query.bucketKey)
+            val fallbackQuery = query.copy(bucketKey = fallbackKey)
+            return productRankingReader.findTopRankings(fallbackQuery)
+        }
         return rankings
     }
 }

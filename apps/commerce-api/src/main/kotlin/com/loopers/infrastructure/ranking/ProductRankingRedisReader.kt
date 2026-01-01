@@ -15,7 +15,8 @@ class ProductRankingRedisReader(
     private val zSetOps = redisTemplate.opsForZSet()
 
     override fun findTopRankings(query: RankingQuery): List<ProductRanking> {
-        val limit = query.limitForHasNext()
+        // limit + 1 for hasNext determination
+        val limit = query.limit + 1
         val end = query.offset + limit - 1
 
         val result = zSetOps.reverseRangeWithScores(query.bucketKey, query.offset, end)
