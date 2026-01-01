@@ -194,7 +194,7 @@ CREATE TABLE IF NOT EXISTS dead_letter_queue (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'DLQ 레코드 ID',
     event_id VARCHAR(36) NOT NULL UNIQUE COMMENT '이벤트 고유 ID',
     event_type VARCHAR(50) NOT NULL COMMENT '이벤트 타입',
-    aggregate_id VARCHAR(255) NULL COMMENT '집합 ID',
+    aggregate_id BIGINT NOT NULL COMMENT '집합 ID',
     payload TEXT NOT NULL COMMENT '메시지 본문 (JSON)',
     error_message TEXT NOT NULL COMMENT '에러 메시지',
     stack_trace TEXT NOT NULL COMMENT '스택 트레이스',
@@ -267,5 +267,147 @@ CREATE TABLE IF NOT EXISTS product_metrics (
     CONSTRAINT fk_product_metrics_product FOREIGN KEY (product_id) REFERENCES products(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='상품별 집계 데이터';
 
+-- ================================================
+-- 15. mv_product_rank_weekly 테이블
+-- ================================================
+CREATE TABLE IF NOT EXISTS mv_product_rank_weekly (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT NOT NULL COMMENT '상품 ID',
+    year_week VARCHAR(10) NOT NULL COMMENT 'ISO Week: 2025-W52',
+    score DOUBLE NOT NULL COMMENT '랭킹 점수',
+    rank_position BIGINT NOT NULL COMMENT '순위 (1~100)',
+    created_at DATETIME(6) NOT NULL COMMENT '생성 시각',
+    updated_at DATETIME(6) NOT NULL COMMENT '수정 시각',
+    deleted_at DATETIME(6) NULL COMMENT '삭제 시각',
+
+    UNIQUE KEY uk_product_year_week (product_id, year_week),
+    INDEX idx_year_week_rank (year_week, rank_position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='주간 상품 랭킹 MV';
+
+-- ================================================
+-- 16. mv_product_rank_monthly 테이블
+-- ================================================
+CREATE TABLE IF NOT EXISTS mv_product_rank_monthly (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT NOT NULL COMMENT '상품 ID',
+    period VARCHAR(7) NOT NULL COMMENT '2025-12',
+    score DOUBLE NOT NULL COMMENT '랭킹 점수',
+    rank_position BIGINT NOT NULL COMMENT '순위 (1~100)',
+    created_at DATETIME(6) NOT NULL COMMENT '생성 시각',
+    updated_at DATETIME(6) NOT NULL COMMENT '수정 시각',
+    deleted_at DATETIME(6) NULL COMMENT '삭제 시각',
+
+    UNIQUE KEY uk_product_period (product_id, period),
+    INDEX idx_period_rank (period, rank_position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='월간 상품 랭킹 MV';
+
+-- ================================================
+-- 17. Spring Batch 메타데이터 테이블
+-- ================================================
+
+-- Sequence Tables
+CREATE TABLE IF NOT EXISTS BATCH_STEP_EXECUTION_SEQ (
+    ID BIGINT NOT NULL,
+    UNIQUE_KEY CHAR(1) NOT NULL,
+    constraint UNIQUE_KEY_UN unique (UNIQUE_KEY)
+) ENGINE=InnoDB;
+
+INSERT INTO BATCH_STEP_EXECUTION_SEQ (ID, UNIQUE_KEY) VALUES (0, '0') ON DUPLICATE KEY UPDATE ID=ID;
+
+CREATE TABLE IF NOT EXISTS BATCH_JOB_EXECUTION_SEQ (
+    ID BIGINT NOT NULL,
+    UNIQUE_KEY CHAR(1) NOT NULL,
+    constraint UNIQUE_KEY_UN2 unique (UNIQUE_KEY)
+) ENGINE=InnoDB;
+
+INSERT INTO BATCH_JOB_EXECUTION_SEQ (ID, UNIQUE_KEY) VALUES (0, '0') ON DUPLICATE KEY UPDATE ID=ID;
+
+CREATE TABLE IF NOT EXISTS BATCH_JOB_SEQ (
+    ID BIGINT NOT NULL,
+    UNIQUE_KEY CHAR(1) NOT NULL,
+    constraint UNIQUE_KEY_UN3 unique (UNIQUE_KEY)
+) ENGINE=InnoDB;
+
+INSERT INTO BATCH_JOB_SEQ (ID, UNIQUE_KEY) VALUES (0, '0') ON DUPLICATE KEY UPDATE ID=ID;
+
+-- Job Instance
+CREATE TABLE IF NOT EXISTS BATCH_JOB_INSTANCE (
+    JOB_INSTANCE_ID BIGINT NOT NULL PRIMARY KEY,
+    VERSION BIGINT,
+    JOB_NAME VARCHAR(100) NOT NULL,
+    JOB_KEY VARCHAR(32) NOT NULL,
+    constraint JOB_INST_UN unique (JOB_NAME, JOB_KEY)
+) ENGINE=InnoDB;
+
+-- Job Execution
+CREATE TABLE IF NOT EXISTS BATCH_JOB_EXECUTION (
+    JOB_EXECUTION_ID BIGINT NOT NULL PRIMARY KEY,
+    VERSION BIGINT,
+    JOB_INSTANCE_ID BIGINT NOT NULL,
+    CREATE_TIME DATETIME(6) NOT NULL,
+    START_TIME DATETIME(6) DEFAULT NULL,
+    END_TIME DATETIME(6) DEFAULT NULL,
+    STATUS VARCHAR(10),
+    EXIT_CODE VARCHAR(2500),
+    EXIT_MESSAGE VARCHAR(2500),
+    LAST_UPDATED DATETIME(6),
+    constraint JOB_INST_EXEC_FK foreign key (JOB_INSTANCE_ID)
+        references BATCH_JOB_INSTANCE(JOB_INSTANCE_ID)
+) ENGINE=InnoDB;
+
+-- Job Execution Params
+CREATE TABLE IF NOT EXISTS BATCH_JOB_EXECUTION_PARAMS (
+    JOB_EXECUTION_ID BIGINT NOT NULL,
+    PARAMETER_NAME VARCHAR(100) NOT NULL,
+    PARAMETER_TYPE VARCHAR(100) NOT NULL,
+    PARAMETER_VALUE VARCHAR(2500),
+    IDENTIFYING CHAR(1) NOT NULL,
+    constraint JOB_EXEC_PARAMS_FK foreign key (JOB_EXECUTION_ID)
+        references BATCH_JOB_EXECUTION(JOB_EXECUTION_ID)
+) ENGINE=InnoDB;
+
+-- Step Execution
+CREATE TABLE IF NOT EXISTS BATCH_STEP_EXECUTION (
+    STEP_EXECUTION_ID BIGINT NOT NULL PRIMARY KEY,
+    VERSION BIGINT NOT NULL,
+    STEP_NAME VARCHAR(100) NOT NULL,
+    JOB_EXECUTION_ID BIGINT NOT NULL,
+    CREATE_TIME DATETIME(6) NOT NULL,
+    START_TIME DATETIME(6) DEFAULT NULL,
+    END_TIME DATETIME(6) DEFAULT NULL,
+    STATUS VARCHAR(10),
+    COMMIT_COUNT BIGINT,
+    READ_COUNT BIGINT,
+    FILTER_COUNT BIGINT,
+    WRITE_COUNT BIGINT,
+    READ_SKIP_COUNT BIGINT,
+    WRITE_SKIP_COUNT BIGINT,
+    PROCESS_SKIP_COUNT BIGINT,
+    ROLLBACK_COUNT BIGINT,
+    EXIT_CODE VARCHAR(2500),
+    EXIT_MESSAGE VARCHAR(2500),
+    LAST_UPDATED DATETIME(6),
+    constraint JOB_EXEC_STEP_FK foreign key (JOB_EXECUTION_ID)
+        references BATCH_JOB_EXECUTION(JOB_EXECUTION_ID)
+) ENGINE=InnoDB;
+
+-- Step Execution Context
+CREATE TABLE IF NOT EXISTS BATCH_STEP_EXECUTION_CONTEXT (
+    STEP_EXECUTION_ID BIGINT NOT NULL PRIMARY KEY,
+    SHORT_CONTEXT VARCHAR(2500) NOT NULL,
+    SERIALIZED_CONTEXT TEXT,
+    constraint STEP_EXEC_CTX_FK foreign key (STEP_EXECUTION_ID)
+        references BATCH_STEP_EXECUTION(STEP_EXECUTION_ID)
+) ENGINE=InnoDB;
+
+-- Job Execution Context
+CREATE TABLE IF NOT EXISTS BATCH_JOB_EXECUTION_CONTEXT (
+    JOB_EXECUTION_ID BIGINT NOT NULL PRIMARY KEY,
+    SHORT_CONTEXT VARCHAR(2500) NOT NULL,
+    SERIALIZED_CONTEXT TEXT,
+    constraint JOB_EXEC_CTX_FK foreign key (JOB_EXECUTION_ID)
+        references BATCH_JOB_EXECUTION(JOB_EXECUTION_ID)
+) ENGINE=InnoDB;
+
 -- 생성 결과 확인
-SELECT '✅ loopers DB 테이블 스키마 생성 완료' as result;
+SELECT '✅ loopers DB 테이블 스키마 생성 완료 (Spring Batch 메타데이터 포함)' as result;
