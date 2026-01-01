@@ -5,31 +5,20 @@ import org.springframework.batch.core.job.JobExecution
 import org.springframework.batch.core.listener.JobExecutionListener
 import org.springframework.stereotype.Component
 import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
+import java.time.LocalDateTime
 
 @Component
-class JobListener : JobExecutionListener {
-    private val log = LoggerFactory.getLogger(JobListener::class.java)
+class JobMonitorListener : JobExecutionListener {
+    private val log = LoggerFactory.getLogger(JobMonitorListener::class.java)
 
     override fun beforeJob(jobExecution: JobExecution) {
         log.info("Job '${jobExecution.jobInstance.jobName}' 시작")
-        jobExecution.executionContext.putLong("startTime", System.currentTimeMillis())
     }
 
     override fun afterJob(jobExecution: JobExecution) {
-        val startTime = jobExecution.executionContext.getLong("startTime")
-        val endTime = System.currentTimeMillis()
-
-        val startDateTime = Instant.ofEpochMilli(startTime)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDateTime()
-        val endDateTime = Instant.ofEpochMilli(endTime)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDateTime()
-
-        val totalTime = endTime - startTime
-        val duration = Duration.ofMillis(totalTime)
+        val startDateTime = jobExecution.startTime
+        val endDateTime = jobExecution.endTime ?: LocalDateTime.now()
+        val duration = Duration.between(startDateTime, endDateTime)
         val hours = duration.toHours()
         val minutes = duration.toMinutes() % 60
         val seconds = duration.seconds % 60

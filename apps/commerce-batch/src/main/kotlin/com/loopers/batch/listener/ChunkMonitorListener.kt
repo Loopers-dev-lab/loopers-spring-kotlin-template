@@ -6,7 +6,7 @@ import org.springframework.batch.infrastructure.item.Chunk
 import org.springframework.stereotype.Component
 
 @Component
-class ChunkListener : ChunkListener<Any, Any> {
+class ChunkMonitorListener : ChunkListener<Any, Any> {
     private val log = LoggerFactory.getLogger(ChunkListener::class.java)
 
     override fun beforeChunk(chunk: Chunk<Any>) {
