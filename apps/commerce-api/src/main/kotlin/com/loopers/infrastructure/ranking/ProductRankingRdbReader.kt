@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRanking
+import com.loopers.domain.ranking.ProductRankingReader
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingQuery
 import org.springframework.data.domain.PageRequest
@@ -13,21 +14,20 @@ import java.time.ZoneId
  * WEEKLY/MONTHLY 랭킹 조회를 위한 구현체입니다.
  * mv_product_rank_weekly 및 mv_product_rank_monthly 테이블에서 데이터를 조회합니다.
  *
- * Note: 이 클래스는 ProductRankingReader 인터페이스를 직접 구현하지 않습니다.
- * Milestone 9에서 CompositeProductRankingReader가 이 클래스와 ProductRankingRedisReader를
- * 조합하여 ProductRankingReader 인터페이스를 구현합니다.
+ * Note: 이 클래스는 @Component로 등록되며, CompositeProductRankingReader가
+ * ProductRankingReader 인터페이스의 단일 @Repository 빈으로 동작합니다.
  */
 @Component
 class ProductRankingRdbReader(
     private val weeklyJpaRepository: MvProductRankWeeklyJpaRepository,
     private val monthlyJpaRepository: MvProductRankMonthlyJpaRepository,
-) {
+) : ProductRankingReader {
 
     companion object {
         private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
     }
 
-    fun findTopRankings(query: RankingQuery): List<ProductRanking> {
+    override fun findTopRankings(query: RankingQuery): List<ProductRanking> {
         val baseDate = query.dateTime.atZone(SEOUL_ZONE).toLocalDate()
         // limit + 1 for hasNext determination (same pattern as ProductRankingRedisReader)
         val limit = (query.limit + 1).toInt()
@@ -51,7 +51,7 @@ class ProductRankingRdbReader(
         }
     }
 
-    fun findRankByProductId(query: RankingQuery, productId: Long): Int? {
+    override fun findRankByProductId(query: RankingQuery, productId: Long): Int? {
         val baseDate = query.dateTime.atZone(SEOUL_ZONE).toLocalDate()
 
         return when (query.period) {
@@ -67,7 +67,7 @@ class ProductRankingRdbReader(
         }
     }
 
-    fun exists(query: RankingQuery): Boolean {
+    override fun exists(query: RankingQuery): Boolean {
         val baseDate = query.dateTime.atZone(SEOUL_ZONE).toLocalDate()
 
         return when (query.period) {
