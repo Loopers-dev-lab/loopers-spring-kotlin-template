@@ -21,34 +21,6 @@ class RankingScoreCalculator {
     }
 
     /**
-     * CountSnapshot과 가중치를 기반으로 Score 계산
-     *
-     * Score = viewCount x viewWeight + likeCount x likeWeight + orderAmount x orderWeight
-     *
-     * @param snapshot 집계된 카운트 스냅샷
-     * @param weight 가중치 설정
-     * @return 계산된 Score
-     */
-    fun calculate(snapshot: CountSnapshot, weight: RankingWeight): Score {
-        val viewScore = BigDecimal.valueOf(snapshot.views)
-            .multiply(weight.viewWeight)
-
-        val likeScore = BigDecimal.valueOf(snapshot.likes)
-            .multiply(weight.likeWeight)
-
-        val orderScore = snapshot.orderAmount
-            .multiply(weight.orderWeight)
-
-        val totalScore = viewScore
-            .add(likeScore)
-            .add(orderScore)
-            .setScale(SCALE, ROUNDING_MODE)
-
-        // Score는 음수가 될 수 없으므로 0 이상으로 보정
-        return Score.of(maxOf(totalScore, BigDecimal.ZERO))
-    }
-
-    /**
      * 시간별 메트릭 리스트에서 감쇠 공식을 적용하여 상품별 점수 계산
      *
      * 감쇠 공식: previousScore * 0.1 + currentScore * 0.9
@@ -121,7 +93,7 @@ class RankingScoreCalculator {
     }
 
     /**
-     * 메트릭 필드에서 직접 Score 계산 (CountSnapshot 의존성 없음)
+     * 메트릭 필드에서 직접 Score 계산
      */
     private fun calculateScoreForMetric(
         viewCount: Long,

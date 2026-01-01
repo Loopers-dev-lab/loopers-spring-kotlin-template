@@ -48,16 +48,6 @@ class ProductHourlyMetric(
         require(viewCount >= 0) { "viewCount는 음수가 될 수 없습니다: $viewCount" }
     }
 
-    /**
-     * Convert entity to CountSnapshot for score calculation
-     */
-    fun toSnapshot(): CountSnapshot =
-        CountSnapshot(
-            views = viewCount,
-            likes = likeCount,
-            orderAmount = orderAmount,
-        )
-
     companion object {
         fun create(
             statHour: ZonedDateTime,
