@@ -30,6 +30,10 @@ class RankingKeyGenerator(
             RankingPeriod.DAILY -> {
                 "$DAILY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
             }
+
+            RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
+                throw UnsupportedOperationException("$period is not yet supported")
+            }
         }
     }
 

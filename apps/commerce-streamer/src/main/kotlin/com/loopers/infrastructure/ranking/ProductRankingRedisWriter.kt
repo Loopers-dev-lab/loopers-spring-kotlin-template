@@ -83,11 +83,15 @@ class ProductRankingRedisWriter(
      *
      * - HOURLY -> 2시간 TTL
      * - DAILY -> 48시간 TTL
+     * - WEEKLY/MONTHLY -> RDB에 저장되므로 지원하지 않음
      */
     private fun determineTtl(period: RankingPeriod): Long {
         return when (period) {
             RankingPeriod.HOURLY -> HOURLY_TTL_SECONDS
             RankingPeriod.DAILY -> DAILY_TTL_SECONDS
+            RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
+                throw UnsupportedOperationException("$period is not supported in Redis writer")
+            }
         }
     }
 }
