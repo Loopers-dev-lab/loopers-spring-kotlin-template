@@ -13,8 +13,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.Instant
-import java.time.ZoneId
-import java.time.ZonedDateTime
 
 @DisplayName("RankingEventMapper 테스트")
 class RankingEventMapperTest {
@@ -60,10 +58,10 @@ class RankingEventMapperTest {
         }
 
         @Test
-        @DisplayName("statHour는 Asia/Seoul 타임존으로 변환된다")
-        fun `statHour is converted to Asia Seoul timezone`() {
+        @DisplayName("statHour는 시간 단위로 truncate된 Instant를 반환한다")
+        fun `statHour is truncated to hours as Instant`() {
             // given
-            val eventTime = Instant.parse("2025-01-01T00:30:00Z") // UTC 00:30 = KST 09:30
+            val eventTime = Instant.parse("2025-01-01T00:30:00Z")
             val envelope = createEnvelope(
                 type = "loopers.product.viewed.v1",
                 payload = """{"productId": 100}""",
@@ -74,7 +72,7 @@ class RankingEventMapperTest {
             val items = rankingEventMapper.toCommandItems(envelope)
 
             // then
-            val expectedStatHour = ZonedDateTime.ofInstant(eventTime, ZoneId.of("Asia/Seoul"))
+            val expectedStatHour = Instant.parse("2025-01-01T00:00:00Z") // truncated to hour
             assertThat(items.first().statHour).isEqualTo(expectedStatHour)
         }
     }
