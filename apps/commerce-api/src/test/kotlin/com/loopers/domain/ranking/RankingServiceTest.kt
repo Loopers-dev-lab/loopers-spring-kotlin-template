@@ -210,12 +210,15 @@ class RankingServiceTest {
                 page = 0,
                 size = 20,
             )
-            every { productRankingReader.findTopRankings(any()) } returns emptyList()
+            val rankings = listOf(
+                ProductRanking(productId = 101L, rank = 1, score = BigDecimal("100.0")),
+            )
+            every { productRankingReader.findTopRankings(any()) } returns rankings
 
             // when
             rankingService.findRankings(command)
 
-            // then
+            // then - 결과가 있으면 한 번만 호출
             verify(exactly = 1) { productRankingReader.findTopRankings(any()) }
         }
 
@@ -239,6 +242,84 @@ class RankingServiceTest {
             val capturedQuery = querySlot.captured
             assertThat(capturedQuery.offset).isEqualTo(20L) // page 2 * size 10
             assertThat(capturedQuery.limit).isEqualTo(10L)
+        }
+
+        @DisplayName("첫 페이지에서 결과가 비어있으면 이전 period로 fallback 조회한다")
+        @Test
+        fun `falls back to previous period when first page is empty`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = null,
+                page = 0,
+                size = 20,
+            )
+            val fallbackRankings = listOf(
+                ProductRanking(productId = 201L, rank = 1, score = BigDecimal("500.0")),
+            )
+            val queries = mutableListOf<RankingQuery>()
+            every { productRankingReader.findTopRankings(capture(queries)) } returnsMany listOf(
+                emptyList(),
+                fallbackRankings,
+            )
+
+            // when
+            val result = rankingService.findRankings(command)
+
+            // then
+            assertThat(result).hasSize(1)
+            assertThat(result[0].productId).isEqualTo(201L)
+            assertThat(queries).hasSize(2)
+            // First query is current period
+            val firstQuery = queries[0]
+            // Second query is previous period (dateTime should be 1 hour earlier for HOURLY)
+            val secondQuery = queries[1]
+            assertThat(secondQuery.period).isEqualTo(firstQuery.period)
+            assertThat(secondQuery.dateTime).isEqualTo(firstQuery.period.subtractOne(firstQuery.dateTime))
+        }
+
+        @DisplayName("첫 페이지가 아니면 결과가 비어있어도 fallback하지 않는다 (offset > 0)")
+        @Test
+        fun `does not fallback when offset is greater than 0`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = null,
+                page = 1,
+                size = 20,
+            )
+            every { productRankingReader.findTopRankings(any()) } returns emptyList()
+
+            // when
+            val result = rankingService.findRankings(command)
+
+            // then
+            assertThat(result).isEmpty()
+            verify(exactly = 1) { productRankingReader.findTopRankings(any()) }
+        }
+
+        @DisplayName("첫 페이지에서 결과가 있으면 fallback하지 않는다")
+        @Test
+        fun `does not fallback when first page has results`() {
+            // given
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.HOURLY,
+                date = null,
+                page = 0,
+                size = 20,
+            )
+            val rankings = listOf(
+                ProductRanking(productId = 101L, rank = 1, score = BigDecimal("100.0")),
+            )
+            every { productRankingReader.findTopRankings(any()) } returns rankings
+
+            // when
+            val result = rankingService.findRankings(command)
+
+            // then
+            assertThat(result).hasSize(1)
+            assertThat(result[0].productId).isEqualTo(101L)
+            verify(exactly = 1) { productRankingReader.findTopRankings(any()) }
         }
     }
 }

@@ -38,7 +38,7 @@ class RankingService(
 
     /**
      * 랭킹을 조회한다.
-     * Fallback 로직은 ProductRankingReader 구현체에서 처리됨.
+     * Fallback 정책: offset=0이고 현재 버킷이 비어있으면 이전 period 버킷을 한 번 조회한다.
      *
      * @param command 조회 명령
      * @return ProductRanking 리스트 (hasNext 판단을 위해 limit + 1개 포함 가능)
@@ -46,6 +46,13 @@ class RankingService(
     @Transactional(readOnly = true)
     fun findRankings(command: RankingCommand.FindRankings): List<ProductRanking> {
         val query = command.toQuery()
-        return productRankingReader.findTopRankings(query)
+        val rankings = productRankingReader.findTopRankings(query)
+
+        // Fallback: if empty AND first page (offset=0), try previous period
+        if (rankings.isEmpty() && query.offset == 0L) {
+            return productRankingReader.findTopRankings(query.previousPeriod())
+        }
+
+        return rankings
     }
 }

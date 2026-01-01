@@ -18,16 +18,7 @@ class ProductRankingRedisReader(
 
     override fun findTopRankings(query: RankingQuery): List<ProductRanking> {
         val bucketKey = rankingKeyGenerator.bucketKey(query.period, query.dateTime)
-        val rankings = findFromBucket(bucketKey, query)
-
-        // Fallback: if empty AND first page (offset=0), try previous period
-        if (rankings.isEmpty() && query.offset == 0L) {
-            val fallbackQuery = query.previousPeriod()
-            val fallbackKey = rankingKeyGenerator.bucketKey(fallbackQuery.period, fallbackQuery.dateTime)
-            return findFromBucket(fallbackKey, fallbackQuery)
-        }
-
-        return rankings
+        return findFromBucket(bucketKey, query)
     }
 
     private fun findFromBucket(bucketKey: String, query: RankingQuery): List<ProductRanking> {
