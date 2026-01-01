@@ -22,6 +22,7 @@ class RankingAggregationService(
     private val rankingWriter: ProductRankingWriter,
     private val rankingWeightRepository: RankingWeightRepository,
     private val scoreCalculator: RankingScoreCalculator,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
     companion object {
         private val DECAY_FACTOR = java.math.BigDecimal("0.1")
@@ -110,7 +111,7 @@ class RankingAggregationService(
         }
 
         // Redis에 업데이트
-        val bucketKey = RankingKeyGenerator.currentBucketKey()
+        val bucketKey = rankingKeyGenerator.currentBucketKey()
         rankingWriter.replaceAll(bucketKey, finalScores)
 
         logger.info(
@@ -188,7 +189,7 @@ class RankingAggregationService(
         }
 
         // Redis에 일별 버킷으로 저장
-        val dailyBucketKey = RankingKeyGenerator.dailyBucketKey(date)
+        val dailyBucketKey = rankingKeyGenerator.dailyBucketKey(date)
         rankingWriter.replaceAll(dailyBucketKey, scores)
 
         logger.info(

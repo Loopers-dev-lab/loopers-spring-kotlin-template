@@ -24,6 +24,7 @@ import java.time.temporal.ChronoUnit
 @DisplayName("RankingAggregationService 통합 테스트")
 class RankingAggregationServiceIntegrationTest @Autowired constructor(
     private val rankingAggregationService: RankingAggregationService,
+    private val rankingKeyGenerator: RankingKeyGenerator,
     private val productHourlyMetricJpaRepository: ProductHourlyMetricJpaRepository,
     private val productDailyMetricJpaRepository: ProductDailyMetricJpaRepository,
     private val rankingWeightJpaRepository: RankingWeightJpaRepository,
@@ -177,7 +178,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateAndUpdateScores()
 
             // then
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey()
             val score = zSetOps.score(bucketKey, "1")
             assertThat(score).isNotNull
 
@@ -216,7 +217,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateAndUpdateScores()
 
             // then
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey()
             val score = zSetOps.score(bucketKey, "1")
 
             // Expected: 20 * 0.1 + 10 * 0.9 = 2 + 9 = 11
@@ -243,7 +244,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateAndUpdateScores()
 
             // then
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey()
             val score = zSetOps.score(bucketKey, "99")
 
             // Expected: 10 * 0.1 + 0 * 0.9 = 1.0
@@ -276,7 +277,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateAndUpdateScores()
 
             // then
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey()
             // Product 1: 100 * 0.10 * 0.9 = 9.0
             assertThat(zSetOps.score(bucketKey, "1")).isEqualTo(9.0)
             // Product 2: 200 * 0.10 * 0.9 = 18.0
@@ -292,7 +293,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateAndUpdateScores()
 
             // then
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey()
             assertThat(redisTemplate.hasKey(bucketKey)).isFalse()
         }
     }
@@ -406,7 +407,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(targetDate)
 
             // then
-            val dailyBucketKey = RankingKeyGenerator.dailyBucketKey(targetDate)
+            val dailyBucketKey = rankingKeyGenerator.dailyBucketKey(targetDate)
             val score = zSetOps.score(dailyBucketKey, "1")
             assertThat(score).isNotNull
 
@@ -440,7 +441,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(targetDate)
 
             // then
-            val dailyBucketKey = RankingKeyGenerator.dailyBucketKey(targetDate)
+            val dailyBucketKey = rankingKeyGenerator.dailyBucketKey(targetDate)
             // Product 1: 100 * 0.10 = 10.0
             assertThat(zSetOps.score(dailyBucketKey, "1")).isEqualTo(10.0)
             // Product 2: 200 * 0.10 = 20.0
@@ -457,7 +458,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(targetDate)
 
             // then
-            val dailyBucketKey = RankingKeyGenerator.dailyBucketKey(targetDate)
+            val dailyBucketKey = rankingKeyGenerator.dailyBucketKey(targetDate)
             assertThat(redisTemplate.hasKey(dailyBucketKey)).isFalse()
         }
     }
