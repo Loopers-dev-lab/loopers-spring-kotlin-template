@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRankingWriter
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.Score
 import com.loopers.utils.RedisCleanUp
 import org.assertj.core.api.Assertions.assertThat
@@ -11,8 +12,12 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
-import java.math.BigDecimal
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
+
+private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
 
 @SpringBootTest
 @DisplayName("ProductRankingRedisWriter 통합 테스트")
@@ -23,91 +28,18 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
 ) {
 
     private val zSetOps = redisTemplate.opsForZSet()
-    private val testBucketKey = "ranking:products:2025011514"
+
+    // Test dateTime values (Instant)
+    private val testHourlyDateTime: Instant = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, SEOUL_ZONE).toInstant()
+    private val testDailyDateTime: Instant = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, SEOUL_ZONE).toInstant()
+
+    // Expected bucket keys based on the dateTime values
+    private val testHourlyBucketKey = "ranking:products:hourly:2025011514"
+    private val testDailyBucketKey = "ranking:products:daily:20250115"
 
     @AfterEach
     fun tearDown() {
         redisCleanUp.truncateAll()
-    }
-
-    @DisplayName("incrementScores()")
-    @Nested
-    inner class IncrementScores {
-
-        @DisplayName("Pipeline을 사용하여 여러 상품의 점수를 일괄 증분한다")
-        @Test
-        fun `increments multiple product scores using pipeline`() {
-            // given
-            val deltas = mapOf(
-                101L to Score.of(100.0),
-                102L to Score.of(200.0),
-                103L to Score.of(300.0),
-            )
-
-            // when
-            productRankingWriter.incrementScores(testBucketKey, deltas)
-
-            // then
-            assertThat(zSetOps.score(testBucketKey, "101")).isEqualTo(100.0)
-            assertThat(zSetOps.score(testBucketKey, "102")).isEqualTo(200.0)
-            assertThat(zSetOps.score(testBucketKey, "103")).isEqualTo(300.0)
-        }
-
-        @DisplayName("기존 점수에 증분값을 더한다")
-        @Test
-        fun `adds increment to existing score`() {
-            // given
-            zSetOps.add(testBucketKey, "101", 100.0)
-            val deltas = mapOf(101L to Score.of(50.0))
-
-            // when
-            productRankingWriter.incrementScores(testBucketKey, deltas)
-
-            // then
-            assertThat(zSetOps.score(testBucketKey, "101")).isEqualTo(150.0)
-        }
-
-        @DisplayName("여러 번 증분 호출 시 점수가 누적된다")
-        @Test
-        fun `accumulates scores on multiple increment calls`() {
-            // given
-            val deltas1 = mapOf(101L to Score.of(100.0))
-            val deltas2 = mapOf(101L to Score.of(50.0))
-            val deltas3 = mapOf(101L to Score.of(25.0))
-
-            // when
-            productRankingWriter.incrementScores(testBucketKey, deltas1)
-            productRankingWriter.incrementScores(testBucketKey, deltas2)
-            productRankingWriter.incrementScores(testBucketKey, deltas3)
-
-            // then
-            assertThat(zSetOps.score(testBucketKey, "101")).isEqualTo(175.0)
-        }
-
-        @DisplayName("빈 deltas 맵은 아무 작업도 수행하지 않는다")
-        @Test
-        fun `does nothing when deltas map is empty`() {
-            // when
-            productRankingWriter.incrementScores(testBucketKey, emptyMap())
-
-            // then
-            assertThat(redisTemplate.hasKey(testBucketKey)).isFalse()
-        }
-
-        @DisplayName("존재하지 않는 버킷에도 점수를 추가할 수 있다")
-        @Test
-        fun `creates bucket and adds scores when bucket does not exist`() {
-            // given
-            assertThat(redisTemplate.hasKey(testBucketKey)).isFalse()
-            val deltas = mapOf(101L to Score.of(100.0))
-
-            // when
-            productRankingWriter.incrementScores(testBucketKey, deltas)
-
-            // then
-            assertThat(redisTemplate.hasKey(testBucketKey)).isTrue()
-            assertThat(zSetOps.score(testBucketKey, "101")).isEqualTo(100.0)
-        }
     }
 
     @DisplayName("replaceAll()")
@@ -118,8 +50,8 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
         @Test
         fun `replaces all existing scores`() {
             // given
-            zSetOps.add(testBucketKey, "101", 100.0)
-            zSetOps.add(testBucketKey, "102", 200.0)
+            zSetOps.add(testHourlyBucketKey, "101", 100.0)
+            zSetOps.add(testHourlyBucketKey, "102", 200.0)
 
             val newScores = mapOf(
                 103L to Score.of(500.0),
@@ -127,130 +59,175 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             )
 
             // when
-            productRankingWriter.replaceAll(testBucketKey, newScores)
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, newScores)
 
             // then - old entries should be removed
-            val score101: Double? = zSetOps.score(testBucketKey, "101")
-            val score102: Double? = zSetOps.score(testBucketKey, "102")
+            val score101: Double? = zSetOps.score(testHourlyBucketKey, "101")
+            val score102: Double? = zSetOps.score(testHourlyBucketKey, "102")
             assertThat(score101).isNull()
             assertThat(score102).isNull()
 
             // new entries should exist
-            assertThat(zSetOps.score(testBucketKey, "103")).isEqualTo(500.0)
-            assertThat(zSetOps.score(testBucketKey, "104")).isEqualTo(600.0)
-        }
-
-        @DisplayName("TTL이 올바르게 설정된다 (내부 TTL 2시간)")
-        @Test
-        fun `sets TTL correctly`() {
-            // given
-            val scores = mapOf(101L to Score.of(100.0))
-
-            // when
-            productRankingWriter.replaceAll(testBucketKey, scores)
-
-            // then - 내부 TTL은 2시간(7200초)
-            val ttl = redisTemplate.getExpire(testBucketKey, TimeUnit.SECONDS)
-            assertThat(ttl).isGreaterThan(7100L)
-            assertThat(ttl).isLessThanOrEqualTo(7200L)
+            assertThat(zSetOps.score(testHourlyBucketKey, "103")).isEqualTo(500.0)
+            assertThat(zSetOps.score(testHourlyBucketKey, "104")).isEqualTo(600.0)
         }
 
         @DisplayName("빈 scores 맵은 버킷을 삭제한다")
         @Test
         fun `deletes bucket when scores map is empty`() {
             // given
-            zSetOps.add(testBucketKey, "101", 100.0)
-            assertThat(redisTemplate.hasKey(testBucketKey)).isTrue()
+            zSetOps.add(testHourlyBucketKey, "101", 100.0)
+            assertThat(redisTemplate.hasKey(testHourlyBucketKey)).isTrue()
 
             // when
-            productRankingWriter.replaceAll(testBucketKey, emptyMap())
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, emptyMap())
 
             // then
-            assertThat(redisTemplate.hasKey(testBucketKey)).isFalse()
+            assertThat(redisTemplate.hasKey(testHourlyBucketKey)).isFalse()
+        }
+
+        @DisplayName("100개를 초과하는 상품이 있을 경우 상위 100개만 유지한다")
+        @Test
+        fun `keeps only top 100 items when more than 100 are written`() {
+            // given - 150개 상품 생성 (점수: 1.0 ~ 150.0)
+            val scores = (1L..150L).associate { productId ->
+                productId to Score.of(productId.toDouble())
+            }
+
+            // when
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, scores)
+
+            // then - 버킷에는 100개만 존재해야 함
+            val bucketSize = zSetOps.size(testHourlyBucketKey)
+            assertThat(bucketSize).isEqualTo(100)
+
+            // 상위 100개 (점수 51~150) 만 존재해야 함
+            // 점수 1~50은 삭제되어야 함
+            for (productId in 1L..50L) {
+                val score: Double? = zSetOps.score(testHourlyBucketKey, productId.toString())
+                assertThat(score).withFailMessage("Product $productId should be removed").isNull()
+            }
+
+            // 점수 51~150은 존재해야 함
+            for (productId in 51L..150L) {
+                val score: Double? = zSetOps.score(testHourlyBucketKey, productId.toString())
+                assertThat(score).withFailMessage("Product $productId should exist with score ${productId.toDouble()}").isNotNull()
+                assertThat(score).isEqualTo(productId.toDouble())
+            }
         }
     }
 
-    @DisplayName("createBucket()")
+    @DisplayName("Atomic Transition (FR-4, AC-8)")
     @Nested
-    inner class CreateBucket {
+    inner class AtomicTransition {
 
-        @DisplayName("새 버킷을 생성하고 점수를 설정한다")
+        @DisplayName("staging key에 작성 후 RENAME으로 active key로 원자적 교체한다")
         @Test
-        fun `creates new bucket with scores`() {
+        fun `writes to staging key then renames to active key`() {
             // given
+            val stagingKey = "$testHourlyBucketKey:staging"
             val scores = mapOf(
-                101L to Score.of(10.0),
-                102L to Score.of(20.0),
+                101L to Score.of(100.0),
+                102L to Score.of(200.0),
             )
 
             // when
-            productRankingWriter.createBucket(testBucketKey, scores)
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, scores)
 
-            // then
-            assertThat(zSetOps.score(testBucketKey, "101")).isEqualTo(10.0)
-            assertThat(zSetOps.score(testBucketKey, "102")).isEqualTo(20.0)
+            // then - staging key should not exist after RENAME
+            assertThat(redisTemplate.hasKey(stagingKey)).isFalse()
+
+            // active key should have the data
+            assertThat(zSetOps.score(testHourlyBucketKey, "101")).isEqualTo(100.0)
+            assertThat(zSetOps.score(testHourlyBucketKey, "102")).isEqualTo(200.0)
         }
 
-        @DisplayName("TTL이 올바르게 설정된다 (내부 TTL 2시간)")
+        @DisplayName("기존 데이터를 원자적으로 교체한다 (부분 데이터 노출 없음)")
         @Test
-        fun `sets TTL correctly`() {
+        fun `atomically replaces existing data without partial data exposure`() {
+            // given - 기존 데이터가 있는 상태
+            zSetOps.add(testHourlyBucketKey, "1", 10.0)
+            zSetOps.add(testHourlyBucketKey, "2", 20.0)
+            zSetOps.add(testHourlyBucketKey, "3", 30.0)
+
+            val newScores = mapOf(
+                101L to Score.of(100.0),
+                102L to Score.of(200.0),
+            )
+
+            // when
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, newScores)
+
+            // then - 기존 데이터는 완전히 제거됨
+            val score1: Double? = zSetOps.score(testHourlyBucketKey, "1")
+            val score2: Double? = zSetOps.score(testHourlyBucketKey, "2")
+            val score3: Double? = zSetOps.score(testHourlyBucketKey, "3")
+            assertThat(score1).isNull()
+            assertThat(score2).isNull()
+            assertThat(score3).isNull()
+
+            // 새 데이터만 존재
+            assertThat(zSetOps.size(testHourlyBucketKey)).isEqualTo(2)
+            val score101: Double? = zSetOps.score(testHourlyBucketKey, "101")
+            val score102: Double? = zSetOps.score(testHourlyBucketKey, "102")
+            assertThat(score101).isEqualTo(100.0)
+            assertThat(score102).isEqualTo(200.0)
+        }
+
+        @DisplayName("이미 존재하는 staging key를 정리 후 새 데이터를 작성한다")
+        @Test
+        fun `handles already existing staging key by clearing it before writing`() {
+            // given - 이전 실패로 staging key가 남아있는 상태
+            val stagingKey = "$testHourlyBucketKey:staging"
+            zSetOps.add(stagingKey, "old", 999.0)
+            assertThat(redisTemplate.hasKey(stagingKey)).isTrue()
+
+            val newScores = mapOf(101L to Score.of(100.0))
+
+            // when
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, newScores)
+
+            // then - staging key 정리 후 RENAME 완료
+            assertThat(redisTemplate.hasKey(stagingKey)).isFalse()
+            val score101: Double? = zSetOps.score(testHourlyBucketKey, "101")
+            val scoreOld: Double? = zSetOps.score(testHourlyBucketKey, "old")
+            assertThat(score101).isEqualTo(100.0)
+            assertThat(scoreOld).isNull()
+        }
+    }
+
+    @DisplayName("TTL (BR-2)")
+    @Nested
+    inner class TtlSettings {
+
+        @DisplayName("HOURLY 버킷은 2시간 TTL이 설정된다")
+        @Test
+        fun `sets 2 hour TTL for hourly bucket`() {
             // given
             val scores = mapOf(101L to Score.of(100.0))
 
             // when
-            productRankingWriter.createBucket(testBucketKey, scores)
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, scores)
 
-            // then - 내부 TTL은 2시간(7200초)
-            val ttl = redisTemplate.getExpire(testBucketKey, TimeUnit.SECONDS)
+            // then - HOURLY TTL은 2시간(7200초)
+            val ttl = redisTemplate.getExpire(testHourlyBucketKey, TimeUnit.SECONDS)
             assertThat(ttl).isGreaterThan(7100L)
             assertThat(ttl).isLessThanOrEqualTo(7200L)
         }
 
-        @DisplayName("빈 scores 맵은 버킷을 생성하지 않는다")
+        @DisplayName("DAILY 버킷은 48시간 TTL이 설정된다")
         @Test
-        fun `does not create bucket when scores map is empty`() {
-            // when
-            productRankingWriter.createBucket(testBucketKey, emptyMap())
-
-            // then
-            assertThat(redisTemplate.hasKey(testBucketKey)).isFalse()
-        }
-
-        @DisplayName("기존 버킷이 있는 경우 점수가 추가된다")
-        @Test
-        fun `adds scores to existing bucket`() {
+        fun `sets 48 hour TTL for daily bucket`() {
             // given
-            zSetOps.add(testBucketKey, "101", 100.0)
-            val scores = mapOf(102L to Score.of(200.0))
+            val scores = mapOf(101L to Score.of(100.0))
 
             // when
-            productRankingWriter.createBucket(testBucketKey, scores)
+            productRankingWriter.replaceAll(RankingPeriod.DAILY, testDailyDateTime, scores)
 
-            // then
-            assertThat(zSetOps.score(testBucketKey, "101")).isEqualTo(100.0)
-            assertThat(zSetOps.score(testBucketKey, "102")).isEqualTo(200.0)
-        }
-    }
-
-    @DisplayName("소수점 점수 처리")
-    @Nested
-    inner class DecimalScoreHandling {
-
-        @DisplayName("BigDecimal 점수가 정확하게 저장된다")
-        @Test
-        fun `stores BigDecimal scores accurately`() {
-            // given
-            val deltas = mapOf(
-                101L to Score.of(BigDecimal("123.45")),
-                102L to Score.of(BigDecimal("0.01")),
-            )
-
-            // when
-            productRankingWriter.incrementScores(testBucketKey, deltas)
-
-            // then
-            assertThat(zSetOps.score(testBucketKey, "101")).isEqualTo(123.45)
-            assertThat(zSetOps.score(testBucketKey, "102")).isEqualTo(0.01)
+            // then - DAILY TTL은 48시간(172800초)
+            val ttl = redisTemplate.getExpire(testDailyBucketKey, TimeUnit.SECONDS)
+            assertThat(ttl).isGreaterThan(172700L)
+            assertThat(ttl).isLessThanOrEqualTo(172800L)
         }
     }
 }

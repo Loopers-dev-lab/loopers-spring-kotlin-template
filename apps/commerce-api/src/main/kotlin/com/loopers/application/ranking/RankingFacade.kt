@@ -1,8 +1,6 @@
 package com.loopers.application.ranking
 
 import com.loopers.domain.product.ProductService
-import com.loopers.domain.ranking.ProductRankingReader
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingService
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -11,30 +9,19 @@ import org.springframework.transaction.annotation.Transactional
 class RankingFacade(
     private val rankingService: RankingService,
     private val productService: ProductService,
-    private val productRankingReader: ProductRankingReader,
 ) {
-
-    companion object {
-        private const val RANKING_KEY_PREFIX = "ranking:products:"
-    }
 
     /**
      * 인기 상품 랭킹 조회 (US-1)
      *
-     * 1. Redis에서 상위 N개 productId 조회
+     * 1. RankingService를 통해 랭킹 조회 (폴백 로직 포함)
      * 2. ProductService를 통해 상품 정보 조회
      * 3. 랭킹 순서대로 결합하여 반환
      */
     @Transactional(readOnly = true)
     fun findRankings(criteria: RankingCriteria.FindRankings): RankingInfo.FindRankings {
-        val bucketKey = resolveBucketKey(criteria.date)
-        val page = criteria.resolvedPage()
-        val size = criteria.resolvedSize()
-
-        val offset = (page * size).toLong()
-        val limit = (size + 1).toLong()
-
-        val rankings = productRankingReader.getTopRankings(bucketKey, offset, limit)
+        val command = criteria.toCommand()
+        val rankings = rankingService.findRankings(command)
 
         if (rankings.isEmpty()) {
             return RankingInfo.FindRankings(
@@ -43,7 +30,7 @@ class RankingFacade(
             )
         }
 
-        val hasNext = rankings.size > size
+        val hasNext = rankings.size > command.size
         val paginatedRankings = if (hasNext) rankings.dropLast(1) else rankings
 
         val productIds = paginatedRankings.map { it.productId }
@@ -76,9 +63,6 @@ class RankingFacade(
 
     /**
      * 가중치 수정 (US-3)
-     *
-     * 1. RankingService.updateWeight() 호출
-     * 2. RankingWeightChangedEventV1 이벤트 발행 (서비스 내부에서 처리)
      */
     @Transactional
     fun updateWeight(criteria: RankingCriteria.UpdateWeight): RankingInfo.UpdateWeight {
@@ -88,13 +72,5 @@ class RankingFacade(
             orderWeight = criteria.orderWeight,
         )
         return RankingInfo.UpdateWeight.from(updatedWeight)
-    }
-
-    private fun resolveBucketKey(date: String?): String {
-        return if (date != null) {
-            "$RANKING_KEY_PREFIX$date"
-        } else {
-            RankingKeyGenerator.currentBucketKey()
-        }
     }
 }

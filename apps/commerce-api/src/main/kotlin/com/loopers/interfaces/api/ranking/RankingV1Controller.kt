@@ -19,11 +19,13 @@ class RankingV1Controller(
 
     @GetMapping
     override fun getRankings(
+        @RequestParam(required = false) period: String?,
         @RequestParam(required = false) date: String?,
         @RequestParam(required = false) page: Int?,
         @RequestParam(required = false) size: Int?,
     ): ApiResponse<RankingV1Response.GetRankings> {
         val criteria = RankingCriteria.FindRankings(
+            period = period,
             date = date,
             page = page,
             size = size,

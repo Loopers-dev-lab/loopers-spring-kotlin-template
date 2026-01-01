@@ -5,7 +5,9 @@ import com.loopers.cache.CacheTemplate
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductViewedEventV1
 import com.loopers.domain.ranking.ProductRankingReader
-import com.loopers.domain.ranking.RankingKeyGenerator
+import com.loopers.domain.ranking.RankingPeriod
+import com.loopers.domain.ranking.RankingQuery
+import java.time.Clock
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.SliceImpl
@@ -17,6 +19,7 @@ class ProductFacade(
     private val cacheTemplate: CacheTemplate,
     private val eventPublisher: ApplicationEventPublisher,
     private val productRankingReader: ProductRankingReader,
+    private val clock: Clock,
 ) {
     companion object {
         private val TYPE_CACHED_PRODUCT_DETAIL_V1 = object : TypeReference<CachedProductDetailV1>() {}
@@ -36,8 +39,13 @@ class ProductFacade(
             view
         }
 
-        val bucketKey = RankingKeyGenerator.currentBucketKey()
-        val rank = productRankingReader.getRankByProductId(bucketKey, id)
+        val query = RankingQuery(
+            period = RankingPeriod.HOURLY,
+            dateTime = clock.instant(),
+            offset = 0,
+            limit = 1,
+        )
+        val rank = productRankingReader.findRankByProductId(query, id)
 
         eventPublisher.publishEvent(ProductViewedEventV1.create(id, userId))
 

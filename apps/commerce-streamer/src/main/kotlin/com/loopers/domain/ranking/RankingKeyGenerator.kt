@@ -1,64 +1,50 @@
 package com.loopers.domain.ranking
 
+import org.springframework.stereotype.Component
+import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
-object RankingKeyGenerator {
-
-    private const val PREFIX = "ranking:products"
-
-    private val FORMATTER = DateTimeFormatter
-        .ofPattern("yyyyMMddHH")
-        .withZone(ZoneId.of("Asia/Seoul"))
+@Component
+class RankingKeyGenerator(
+    private val clock: Clock,
+) {
 
     /**
-     * Generates bucket key from instant
-     * @param instant Time (on the hour)
-     * @return Format: "ranking:products:yyyyMMddHH"
+     * Generates bucket key from Instant and period
+     * - Hourly: ranking:products:hourly:yyyyMMddHH
+     * - Daily: ranking:products:daily:yyyyMMdd
+     *
+     * Internally converts to Seoul timezone for key formatting (spec#8.2 - Redis keys remain KST-based)
      */
-    fun bucketKey(instant: Instant): String {
-        val truncated = instant.truncatedTo(ChronoUnit.HOURS)
-        return "$PREFIX:${FORMATTER.format(truncated)}"
+    fun bucketKey(period: RankingPeriod, instant: Instant): String {
+        val seoulDateTime = instant.atZone(SEOUL_ZONE)
+        return when (period) {
+            RankingPeriod.HOURLY -> {
+                val truncated = seoulDateTime.truncatedTo(ChronoUnit.HOURS)
+                "$HOURLY_PREFIX:${HOURLY_FORMATTER.format(truncated)}"
+            }
+
+            RankingPeriod.DAILY -> {
+                "$DAILY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
+            }
+        }
     }
 
-    /**
-     * Current bucket key
-     */
-    fun currentBucketKey(): String = bucketKey(Instant.now())
+    companion object {
+        private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
 
-    /**
-     * Previous bucket key from given instant (1 hour before)
-     * @param instant Time reference
-     * @return Format: "ranking:products:yyyyMMddHH" for previous hour
-     */
-    fun previousBucketKey(instant: Instant): String {
-        val truncated = instant.truncatedTo(ChronoUnit.HOURS)
-        val previousHour = truncated.minus(1, ChronoUnit.HOURS)
-        return "$PREFIX:${FORMATTER.format(previousHour)}"
+        private const val HOURLY_PREFIX = "ranking:products:hourly"
+        private const val DAILY_PREFIX = "ranking:products:daily"
+
+        private val HOURLY_FORMATTER = DateTimeFormatter
+            .ofPattern("yyyyMMddHH")
+            .withZone(SEOUL_ZONE)
+
+        private val DAILY_FORMATTER = DateTimeFormatter
+            .ofPattern("yyyyMMdd")
+            .withZone(SEOUL_ZONE)
     }
-
-    /**
-     * Previous bucket key based on current time
-     * @return Format: "ranking:products:yyyyMMddHH" for previous hour
-     */
-    fun previousBucketKey(): String = previousBucketKey(Instant.now())
-
-    /**
-     * Next bucket key from given instant (1 hour after)
-     * @param instant Time reference
-     * @return Format: "ranking:products:yyyyMMddHH" for next hour
-     */
-    fun nextBucketKey(instant: Instant): String {
-        val truncated = instant.truncatedTo(ChronoUnit.HOURS)
-        val nextHour = truncated.plus(1, ChronoUnit.HOURS)
-        return "$PREFIX:${FORMATTER.format(nextHour)}"
-    }
-
-    /**
-     * Next bucket key based on current time
-     * @return Format: "ranking:products:yyyyMMddHH" for next hour
-     */
-    fun nextBucketKey(): String = nextBucketKey(Instant.now())
 }

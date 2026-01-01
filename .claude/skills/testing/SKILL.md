@@ -144,11 +144,18 @@ assertThat(point.balance).isEqualTo(initialBalance - deductAmount)
 
 ## When to Skip Test Generation
 
-Pure data objects with no behavior:
+### Pure data objects with no behavior
 
 - **Command** - use case input (e.g., `CreateOrderCommand`)
 - **Event** - immutable fact record (e.g., `OrderCreatedEvent`)
 - **DTO / Request / Response** - data transfer only
+
+### Infrastructure triggers with no business logic
+
+- **Scheduler** - `@Scheduled` methods that only invoke service methods
+    - Scheduler's responsibility is only "when to call", not "what to do"
+    - Test the invoked service method instead (Unit or Integration Test)
+    - Cron expression correctness is Spring Framework's responsibility
 
 ---
 
@@ -171,6 +178,7 @@ Load references based on the current task. Each file provides detailed patterns 
 - @references/concurrency-test.md - Concurrency patterns (thread pool, locking, idempotency)
 - @references/adapter-test.md - Adapter patterns (WireMock, Circuit Breaker, Retry, complex queries)
 - @references/e2e-test.md - E2E patterns (HTTP status codes, auth failures, API contract)
+- @references/batch-test.md - Spring Batch patterns (Processor unit test, Step/Job integration test)
 
 ### When deciding external dependencies strategy
 

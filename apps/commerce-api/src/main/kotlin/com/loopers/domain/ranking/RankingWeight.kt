@@ -1,11 +1,9 @@
 package com.loopers.domain.ranking
 
 import com.loopers.domain.BaseEntity
-import com.loopers.support.event.DomainEvent
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
-import jakarta.persistence.Transient
 import java.math.BigDecimal
 
 @Entity
@@ -28,22 +26,6 @@ class RankingWeight(
     var orderWeight: BigDecimal = orderWeight
         private set
 
-    @Transient
-    private var domainEvents: MutableList<DomainEvent>? = null
-
-    private fun getDomainEvents(): MutableList<DomainEvent> {
-        if (domainEvents == null) {
-            domainEvents = mutableListOf()
-        }
-        return domainEvents!!
-    }
-
-    fun pollEvents(): List<DomainEvent> {
-        val events = getDomainEvents().toList()
-        getDomainEvents().clear()
-        return events
-    }
-
     init {
         validateWeights()
     }
@@ -53,13 +35,11 @@ class RankingWeight(
         likeWeight: BigDecimal,
         orderWeight: BigDecimal,
     ): RankingWeight {
-        val newWeight = RankingWeight(
+        return RankingWeight(
             viewWeight = viewWeight,
             likeWeight = likeWeight,
             orderWeight = orderWeight,
         )
-        newWeight.getDomainEvents().add(RankingWeightChangedEventV1.create())
-        return newWeight
     }
 
     private fun validateWeights() {
@@ -79,17 +59,12 @@ class RankingWeight(
             viewWeight: BigDecimal,
             likeWeight: BigDecimal,
             orderWeight: BigDecimal,
-            registerEvent: Boolean = false,
         ): RankingWeight {
-            val weight = RankingWeight(
+            return RankingWeight(
                 viewWeight = viewWeight,
                 likeWeight = likeWeight,
                 orderWeight = orderWeight,
             )
-            if (registerEvent) {
-                weight.getDomainEvents().add(RankingWeightChangedEventV1.create())
-            }
-            return weight
         }
 
         fun fallback(): RankingWeight {

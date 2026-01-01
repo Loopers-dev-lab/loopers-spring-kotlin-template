@@ -1,14 +1,15 @@
 package com.loopers.domain.ranking
 
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import java.time.Clock
 
 @Component
 class RankingService(
     private val rankingWeightRepository: RankingWeightRepository,
-    private val eventPublisher: ApplicationEventPublisher,
+    private val productRankingReader: ProductRankingReader,
+    private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
     fun findWeight(): RankingWeight {
@@ -32,13 +33,28 @@ class RankingService(
             viewWeight = viewWeight,
             likeWeight = likeWeight,
             orderWeight = orderWeight,
-            registerEvent = true,
         )
 
-        val savedWeight = rankingWeightRepository.save(newWeight)
+        return rankingWeightRepository.save(newWeight)
+    }
 
-        newWeight.pollEvents().forEach { eventPublisher.publishEvent(it) }
+    /**
+     * 랭킹을 조회한다.
+     * Fallback 정책: offset=0이고 현재 버킷이 비어있으면 이전 period 버킷을 한 번 조회한다.
+     *
+     * @param command 조회 명령
+     * @return ProductRanking 리스트 (hasNext 판단을 위해 limit + 1개 포함 가능)
+     */
+    @Transactional(readOnly = true)
+    fun findRankings(command: RankingCommand.FindRankings): List<ProductRanking> {
+        val query = command.toQuery(clock)
+        val rankings = productRankingReader.findTopRankings(query)
 
-        return savedWeight
+        // Fallback: if empty AND first page (offset=0), try previous period
+        if (rankings.isEmpty() && query.offset == 0L) {
+            return productRankingReader.findTopRankings(query.previousPeriod())
+        }
+
+        return rankings
     }
 }

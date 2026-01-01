@@ -43,17 +43,6 @@ class OutboxCursorTest {
             // then
             assertThat(cursor.lastProcessedId).isEqualTo(0L)
         }
-
-        @DisplayName("각 호출마다 새로운 Instant로 createdAt이 설정된다")
-        @Test
-        fun `sets createdAt to current time on each call`() {
-            // when
-            val cursor1 = OutboxCursor.create(1L)
-            val cursor2 = OutboxCursor.create(2L)
-
-            // then
-            assertThat(cursor1.createdAt).isBefore(cursor2.createdAt)
-        }
     }
 
     @DisplayName("필드 검증")

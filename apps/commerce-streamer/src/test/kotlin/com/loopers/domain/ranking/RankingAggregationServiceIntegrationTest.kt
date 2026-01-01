@@ -1,6 +1,6 @@
 package com.loopers.domain.ranking
 
-import com.loopers.infrastructure.idempotency.EventHandledJpaRepository
+import com.loopers.infrastructure.ranking.ProductDailyMetricJpaRepository
 import com.loopers.infrastructure.ranking.ProductHourlyMetricJpaRepository
 import com.loopers.infrastructure.ranking.RankingWeightJpaRepository
 import com.loopers.utils.DatabaseCleanUp
@@ -15,19 +15,26 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
 import java.math.BigDecimal
+import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+
+private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
 
 @SpringBootTest
 @DisplayName("RankingAggregationService 통합 테스트")
 class RankingAggregationServiceIntegrationTest @Autowired constructor(
     private val rankingAggregationService: RankingAggregationService,
+    private val rankingKeyGenerator: RankingKeyGenerator,
     private val productHourlyMetricJpaRepository: ProductHourlyMetricJpaRepository,
+    private val productDailyMetricJpaRepository: ProductDailyMetricJpaRepository,
     private val rankingWeightJpaRepository: RankingWeightJpaRepository,
-    private val eventHandledJpaRepository: EventHandledJpaRepository,
     private val redisTemplate: RedisTemplate<String, String>,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
+    private val clock: Clock,
 ) {
 
     private val zSetOps = redisTemplate.opsForZSet()
@@ -49,610 +56,455 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         redisCleanUp.truncateAll()
     }
 
-    @DisplayName("전체 흐름 테스트")
+    @DisplayName("accumulateMetrics 통합 테스트")
     @Nested
-    inner class FullFlow {
+    inner class AccumulateMetricsIntegration {
 
-        @DisplayName("메트릭 추가 후 flush하면 DB와 Redis에 모두 저장된다")
+        @DisplayName("배치 커맨드로 DB에 메트릭을 저장한다")
         @Test
-        fun `accumulateViewMetric and flush persists to both DB and Redis`() {
+        fun `saves metrics to DB via batch command`() {
             // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-            val command = AccumulateViewMetricCommand(
-                eventId = "view-event-full-flow",
-                productId = productId,
-                occurredAt = occurredAt,
-            )
-
-            // when
-            rankingAggregationService.accumulateViewMetric(command)
-            rankingAggregationService.flush()
-
-            // then - DB 검증
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].productId).isEqualTo(productId)
-            assertThat(metrics[0].viewCount).isEqualTo(1L)
-
-            // then - Redis 검증
-            val bucketKey = RankingKeyGenerator.bucketKey(occurredAt)
-            val score = zSetOps.score(bucketKey, productId.toString())
-            assertThat(score).isEqualTo(0.10) // 1 view * 0.10 viewWeight
-        }
-
-        @DisplayName("여러 메트릭을 누적한 후 flush하면 합계가 저장된다")
-        @Test
-        fun `multiple metrics are accumulated before flush`() {
-            // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-
-            // 3 views, 2 likes, 1 order with 1000 amount
-            repeat(3) { idx ->
-                rankingAggregationService.accumulateViewMetric(
-                    AccumulateViewMetricCommand(
-                        eventId = "view-event-multi-$idx",
-                        productId = productId,
-                        occurredAt = occurredAt,
-                    ),
-                )
-            }
-            repeat(2) { idx ->
-                rankingAggregationService.accumulateLikeCreatedMetric(
-                    AccumulateLikeCreatedMetricCommand(
-                        eventId = "like-event-multi-$idx",
-                        productId = productId,
-                        occurredAt = occurredAt,
-                    ),
-                )
-            }
-            rankingAggregationService.accumulateOrderPaidMetric(
-                AccumulateOrderPaidMetricCommand(
-                    eventId = "order-event-multi",
-                    items = listOf(AccumulateOrderPaidMetricCommand.Item(productId = productId, orderAmount = BigDecimal("1000.00"))),
-                    occurredAt = occurredAt,
-                ),
-            )
-
-            // when
-            rankingAggregationService.flush()
-
-            // then - DB 검증
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].viewCount).isEqualTo(3L)
-            assertThat(metrics[0].likeCount).isEqualTo(2L)
-            assertThat(metrics[0].orderCount).isEqualTo(1L)
-            assertThat(metrics[0].orderAmount).isEqualByComparingTo(BigDecimal("1000.00"))
-
-            // then - Redis 검증
-            // Score = 3 * 0.10 + 2 * 0.20 + 1000 * 0.60 = 0.3 + 0.4 + 600 = 600.70
-            val bucketKey = RankingKeyGenerator.bucketKey(occurredAt)
-            val score = zSetOps.score(bucketKey, productId.toString())
-            assertThat(score).isEqualTo(600.70)
-        }
-
-        @DisplayName("여러 상품의 메트릭이 각각 저장된다")
-        @Test
-        fun `metrics for multiple products are stored separately`() {
-            // given
-            val occurredAt = Instant.now()
-
-            // Product 1: 1 view + 1 like
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-p1", productId = 1L, occurredAt = occurredAt),
-            )
-            rankingAggregationService.accumulateLikeCreatedMetric(
-                AccumulateLikeCreatedMetricCommand(eventId = "like-p1", productId = 1L, occurredAt = occurredAt),
-            )
-
-            // Product 2: 2 views
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-p2-1", productId = 2L, occurredAt = occurredAt),
-            )
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-p2-2", productId = 2L, occurredAt = occurredAt),
-            )
-
-            // when
-            rankingAggregationService.flush()
-
-            // then - DB 검증
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(2)
-
-            val product1Metric = metrics.find { it.productId == 1L }
-            val product2Metric = metrics.find { it.productId == 2L }
-
-            assertThat(product1Metric!!.viewCount).isEqualTo(1L)
-            assertThat(product1Metric.likeCount).isEqualTo(1L)
-            assertThat(product2Metric!!.viewCount).isEqualTo(2L)
-
-            // then - Redis 검증
-            val bucketKey = RankingKeyGenerator.bucketKey(occurredAt)
-            // Product 1: 1 * 0.10 + 1 * 0.20 = 0.30
-            assertThat(zSetOps.score(bucketKey, "1")).isEqualTo(0.30)
-            // Product 2: 2 * 0.10 = 0.20
-            assertThat(zSetOps.score(bucketKey, "2")).isEqualTo(0.20)
-        }
-
-        @DisplayName("flush 후 새 메트릭은 새 버퍼에 저장된다")
-        @Test
-        fun `metrics after flush go to new buffer`() {
-            // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-
-            // when - 첫 번째 메트릭 추가 및 flush
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-buffer-1", productId = productId, occurredAt = occurredAt),
-            )
-            rankingAggregationService.flush()
-
-            // then - DB에 첫 번째 결과 저장됨
-            var metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].viewCount).isEqualTo(1L)
-
-            // when - 두 번째 메트릭 추가 및 flush
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-buffer-2", productId = productId, occurredAt = occurredAt),
-            )
-            rankingAggregationService.flush()
-
-            // then - DB에 누적됨 (upsert)
-            metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].viewCount).isEqualTo(2L) // 1 + 1
-
-            // then - Redis 점수도 누적됨 (ZINCRBY)
-            val bucketKey = RankingKeyGenerator.bucketKey(occurredAt)
-            assertThat(zSetOps.score(bucketKey, productId.toString())).isEqualTo(0.20) // 0.10 + 0.10
-        }
-    }
-
-    @DisplayName("시간 버킷 처리 테스트")
-    @Nested
-    inner class HourBucketHandling {
-
-        @DisplayName("다른 시간 버킷의 메트릭은 개별 레코드로 저장된다")
-        @Test
-        fun `metrics in different hour buckets are stored separately`() {
-            // given
-            val productId = 1L
-            val hour14 = Instant.parse("2025-01-15T14:30:00Z")
-            val hour15 = Instant.parse("2025-01-15T15:30:00Z")
-
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-hour14", productId = productId, occurredAt = hour14),
-            )
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-hour15", productId = productId, occurredAt = hour15),
-            )
-
-            // when
-            rankingAggregationService.flush()
-
-            // then - DB에 두 개의 레코드
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(2)
-            assertThat(metrics.all { it.productId == productId }).isTrue()
-
-            // then - Redis에도 두 개의 버킷
-            val bucket14Key = RankingKeyGenerator.bucketKey(hour14.truncatedTo(ChronoUnit.HOURS))
-            val bucket15Key = RankingKeyGenerator.bucketKey(hour15.truncatedTo(ChronoUnit.HOURS))
-
-            assertThat(zSetOps.score(bucket14Key, productId.toString())).isEqualTo(0.10)
-            assertThat(zSetOps.score(bucket15Key, productId.toString())).isEqualTo(0.10)
-        }
-
-        @DisplayName("시간 경계에서 14:59:58과 15:00:02 메트릭이 각각의 버킷에 저장된다")
-        @Test
-        fun `metrics at hour boundary are correctly bucketed`() {
-            // given
-            val productId = 1L
-            val time1459 = Instant.parse("2025-01-15T14:59:58Z")
-            val time1500 = Instant.parse("2025-01-15T15:00:02Z")
-
-            // when
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-1459", productId = productId, occurredAt = time1459),
-            )
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-1500", productId = productId, occurredAt = time1500),
-            )
-            rankingAggregationService.flush()
-
-            // then - DB 검증
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(2)
-
-            val hour14Metric = metrics.find { it.statHour.toInstant() == Instant.parse("2025-01-15T14:00:00Z") }
-            val hour15Metric = metrics.find { it.statHour.toInstant() == Instant.parse("2025-01-15T15:00:00Z") }
-
-            assertThat(hour14Metric).isNotNull
-            assertThat(hour15Metric).isNotNull
-            assertThat(hour14Metric!!.viewCount).isEqualTo(1L)
-            assertThat(hour15Metric!!.viewCount).isEqualTo(1L)
-        }
-    }
-
-    @DisplayName("좋아요 취소 처리 테스트")
-    @Nested
-    inner class LikeCancelHandling {
-
-        @DisplayName("좋아요 생성 후 취소하면 likeCount가 0이 된다")
-        @Test
-        fun `like created then canceled results in zero likeCount`() {
-            // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-
-            rankingAggregationService.accumulateLikeCreatedMetric(
-                AccumulateLikeCreatedMetricCommand(eventId = "like-created-cancel-test", productId = productId, occurredAt = occurredAt),
-            )
-            rankingAggregationService.accumulateLikeCanceledMetric(
-                AccumulateLikeCanceledMetricCommand(eventId = "like-canceled-cancel-test", productId = productId, occurredAt = occurredAt),
-            )
-
-            // when
-            rankingAggregationService.flush()
-
-            // then
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].likeCount).isEqualTo(0L)
-        }
-
-        @DisplayName("취소만 있으면 likeCount가 음수가 된다")
-        @Test
-        fun `only cancels result in negative likeCount`() {
-            // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-
-            rankingAggregationService.accumulateLikeCanceledMetric(
-                AccumulateLikeCanceledMetricCommand(eventId = "like-canceled-only-1", productId = productId, occurredAt = occurredAt),
-            )
-            rankingAggregationService.accumulateLikeCanceledMetric(
-                AccumulateLikeCanceledMetricCommand(eventId = "like-canceled-only-2", productId = productId, occurredAt = occurredAt),
-            )
-
-            // when
-            rankingAggregationService.flush()
-
-            // then
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].likeCount).isEqualTo(-2L)
-        }
-    }
-
-    @DisplayName("Redis TTL 테스트")
-    @Nested
-    inner class RedisTtl {
-
-        @DisplayName("flush 후 Redis 키에 TTL이 설정된다")
-        @Test
-        fun `TTL is set on Redis key after flush`() {
-            // given
-            val productId = 1L
-            val occurredAt = Instant.now()
-
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-ttl-test", productId = productId, occurredAt = occurredAt),
-            )
-
-            // when
-            rankingAggregationService.flush()
-
-            // then
-            val bucketKey = RankingKeyGenerator.bucketKey(occurredAt)
-            val ttl = redisTemplate.getExpire(bucketKey, java.util.concurrent.TimeUnit.SECONDS)
-
-            // TTL이 2시간(7200초) 근처인지 확인
-            assertThat(ttl).isGreaterThan(7100L)
-            assertThat(ttl).isLessThanOrEqualTo(7200L)
-        }
-    }
-
-    @DisplayName("가중치 fallback 테스트")
-    @Nested
-    inner class WeightFallback {
-
-        @DisplayName("가중치가 없으면 fallback 값을 사용한다")
-        @Test
-        fun `uses fallback weight when no weight configured`() {
-            // given - 기존 가중치 삭제
-            rankingWeightJpaRepository.deleteAll()
-
-            val productId = 1L
-            val occurredAt = Instant.now()
-
-            rankingAggregationService.accumulateViewMetric(
-                AccumulateViewMetricCommand(eventId = "view-fallback-test", productId = productId, occurredAt = occurredAt),
-            )
-
-            // when
-            rankingAggregationService.flush()
-
-            // then - fallback weight (view=0.10)이 사용됨
-            val bucketKey = RankingKeyGenerator.bucketKey(occurredAt)
-            assertThat(zSetOps.score(bucketKey, productId.toString())).isEqualTo(0.10)
-        }
-    }
-
-    @DisplayName("빈 버퍼 flush 테스트")
-    @Nested
-    inner class EmptyBufferFlush {
-
-        @DisplayName("버퍼가 비어있으면 flush해도 DB/Redis에 아무것도 저장되지 않는다")
-        @Test
-        fun `empty buffer flush does not persist anything`() {
-            // when
-            rankingAggregationService.flush()
-
-            // then
-            assertThat(productHourlyMetricJpaRepository.findAll()).isEmpty()
-        }
-    }
-
-    @DisplayName("버킷 전환 테스트")
-    @Nested
-    inner class BucketTransition {
-
-        @DisplayName("이전 버킷의 점수에 0.1 감쇠를 적용하여 새 버킷을 생성한다")
-        @Test
-        fun `transition creates new bucket with decayed scores`() {
-            // given - 이전 시간 버킷에 점수 설정
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
-
-            // 이전 버킷에 점수 직접 설정
-            zSetOps.add(previousBucketKey, "1", 100.0)
-            zSetOps.add(previousBucketKey, "2", 50.0)
-            zSetOps.add(previousBucketKey, "3", 25.0)
-
-            // when
-            rankingAggregationService.transitionBucket()
-
-            // then - 새 버킷에 감쇠된 점수가 있어야 함
-            val score1 = zSetOps.score(currentBucketKey, "1")
-            val score2 = zSetOps.score(currentBucketKey, "2")
-            val score3 = zSetOps.score(currentBucketKey, "3")
-
-            // 100 * 0.1 = 10.0, 50 * 0.1 = 5.0, 25 * 0.1 = 2.5
-            assertThat(score1).isEqualTo(10.0)
-            assertThat(score2).isEqualTo(5.0)
-            assertThat(score3).isEqualTo(2.5)
-        }
-
-        @DisplayName("이전 버킷이 없으면 아무 작업도 하지 않는다")
-        @Test
-        fun `transition does nothing when previous bucket does not exist`() {
-            // given - 이전 버킷이 없는 상태
-            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
-
-            // when
-            rankingAggregationService.transitionBucket()
-
-            // then - 새 버킷이 생성되지 않음
-            assertThat(redisTemplate.hasKey(currentBucketKey)).isFalse()
-        }
-
-        @DisplayName("현재 버킷이 이미 존재하면 중복 전환하지 않는다")
-        @Test
-        fun `transition does not overwrite existing current bucket`() {
-            // given
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
-
-            // 이전 버킷 설정
-            zSetOps.add(previousBucketKey, "1", 100.0)
-
-            // 현재 버킷에 기존 점수 설정
-            zSetOps.add(currentBucketKey, "1", 999.0)
-
-            // when
-            rankingAggregationService.transitionBucket()
-
-            // then - 기존 점수가 유지됨 (덮어쓰지 않음)
-            val score = zSetOps.score(currentBucketKey, "1")
-            assertThat(score).isEqualTo(999.0)
-        }
-
-        @DisplayName("새 버킷에 TTL이 설정된다")
-        @Test
-        fun `transition sets TTL on new bucket`() {
-            // given
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
-
-            zSetOps.add(previousBucketKey, "1", 100.0)
-
-            // when
-            rankingAggregationService.transitionBucket()
-
-            // then - TTL이 2시간(7200초) 근처인지 확인
-            val ttl = redisTemplate.getExpire(currentBucketKey, java.util.concurrent.TimeUnit.SECONDS)
-            assertThat(ttl).isGreaterThan(7100L)
-            assertThat(ttl).isLessThanOrEqualTo(7200L)
-        }
-
-        @DisplayName("전체 전환 흐름: 이벤트 추가 -> flush -> 전환 -> 새 버킷에 감쇠 점수")
-        @Test
-        fun `full transition flow with events`() {
-            // given - 이전 시간대에 이벤트 발생 시뮬레이션
-            val previousBucketKey = RankingKeyGenerator.previousBucketKey()
-            val currentBucketKey = RankingKeyGenerator.currentBucketKey()
-
-            // 이전 버킷에 점수 설정 (실제 이벤트 처리 후의 상태)
-            // Product 1: 3 views, 2 likes, 1 order with 1000 amount
-            // Score = 3 * 0.10 + 2 * 0.20 + 1000 * 0.60 = 0.3 + 0.4 + 600 = 600.70
-            zSetOps.add(previousBucketKey, "1", 600.70)
-
-            // when - 버킷 전환
-            rankingAggregationService.transitionBucket()
-
-            // then - 새 버킷에 감쇠된 점수
-            // 600.70 * 0.1 = 60.07
-            val decayedScore = zSetOps.score(currentBucketKey, "1")
-            assertThat(decayedScore).isEqualTo(60.07)
-        }
-    }
-
-    @DisplayName("새로운 accumulate 메서드 멱등성 통합 테스트")
-    @Nested
-    inner class NewAccumulateMethodsIdempotency {
-
-        @DisplayName("accumulateViewMetric - 첫 호출은 버퍼에 축적되고 멱등성 키가 저장된다")
-        @Test
-        fun `accumulateViewMetric stores data and idempotency key on first call`() {
-            // given
-            val command = AccumulateViewMetricCommand(
-                eventId = "view-event-123",
-                productId = 1L,
-                occurredAt = Instant.now(),
-            )
-
-            // when
-            rankingAggregationService.accumulateViewMetric(command)
-            rankingAggregationService.flush()
-
-            // then - DB 검증
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].viewCount).isEqualTo(1L)
-
-            // then - 멱등성 키 저장 검증
-            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:view:view-event-123")).isTrue()
-        }
-
-        @DisplayName("accumulateViewMetric - 중복 호출 시 버퍼에 축적되지 않는다")
-        @Test
-        fun `accumulateViewMetric does not accumulate on duplicate call`() {
-            // given
-            val command = AccumulateViewMetricCommand(
-                eventId = "view-event-duplicate",
-                productId = 1L,
-                occurredAt = Instant.now(),
-            )
-
-            // when - 첫 번째 호출
-            rankingAggregationService.accumulateViewMetric(command)
-            rankingAggregationService.flush()
-
-            // when - 중복 호출
-            rankingAggregationService.accumulateViewMetric(command)
-            rankingAggregationService.flush()
-
-            // then - viewCount가 1인지 확인 (중복 추가되지 않음)
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].viewCount).isEqualTo(1L)
-        }
-
-        @DisplayName("accumulateLikeCreatedMetric - 멱등성 동작 검증")
-        @Test
-        fun `accumulateLikeCreatedMetric is idempotent`() {
-            // given
-            val command = AccumulateLikeCreatedMetricCommand(
-                eventId = "like-created-event-456",
-                productId = 2L,
-                occurredAt = Instant.now(),
-            )
-
-            // when - 두 번 호출
-            rankingAggregationService.accumulateLikeCreatedMetric(command)
-            rankingAggregationService.accumulateLikeCreatedMetric(command)
-            rankingAggregationService.flush()
-
-            // then - likeCount가 1인지 확인
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].likeCount).isEqualTo(1L)
-            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:like-created:like-created-event-456")).isTrue()
-        }
-
-        @DisplayName("accumulateLikeCanceledMetric - 멱등성 동작 검증")
-        @Test
-        fun `accumulateLikeCanceledMetric is idempotent`() {
-            // given
-            val command = AccumulateLikeCanceledMetricCommand(
-                eventId = "like-canceled-event-789",
-                productId = 3L,
-                occurredAt = Instant.now(),
-            )
-
-            // when - 두 번 호출
-            rankingAggregationService.accumulateLikeCanceledMetric(command)
-            rankingAggregationService.accumulateLikeCanceledMetric(command)
-            rankingAggregationService.flush()
-
-            // then - likeCount가 -1인지 확인 (취소 1회만)
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].likeCount).isEqualTo(-1L)
-            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:like-canceled:like-canceled-event-789")).isTrue()
-        }
-
-        @DisplayName("accumulateOrderPaidMetric - 여러 아이템과 멱등성 동작 검증")
-        @Test
-        fun `accumulateOrderPaidMetric handles multiple items and is idempotent`() {
-            // given
-            val command = AccumulateOrderPaidMetricCommand(
-                eventId = "order-paid-event-999",
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val command = AccumulateMetricsCommand(
                 items = listOf(
-                    AccumulateOrderPaidMetricCommand.Item(productId = 1L, orderAmount = BigDecimal("1000")),
-                    AccumulateOrderPaidMetricCommand.Item(productId = 2L, orderAmount = BigDecimal("2000")),
+                    AccumulateMetricsCommand.Item(
+                        productId = 1L,
+                        statHour = statHour,
+                        viewDelta = 10,
+                        likeCreatedDelta = 5,
+                        likeCanceledDelta = 2,
+                        orderAmountDelta = BigDecimal("1000.00"),
+                    ),
                 ),
-                occurredAt = Instant.now(),
             )
 
-            // when - 두 번 호출
-            rankingAggregationService.accumulateOrderPaidMetric(command)
-            rankingAggregationService.accumulateOrderPaidMetric(command)
-            rankingAggregationService.flush()
+            // when
+            rankingAggregationService.accumulateMetrics(command)
 
-            // then - 각 상품별로 orderCount가 1인지 확인
+            // then
             val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(2)
+            assertThat(metrics).hasSize(1)
+            assertThat(metrics[0].productId).isEqualTo(1L)
+            assertThat(metrics[0].viewCount).isEqualTo(10L)
+            assertThat(metrics[0].likeCount).isEqualTo(3L) // 5 - 2
+            assertThat(metrics[0].orderAmount).isEqualByComparingTo(BigDecimal("1000.00"))
+        }
 
-            val product1Metric = metrics.find { it.productId == 1L }
-            val product2Metric = metrics.find { it.productId == 2L }
+        @DisplayName("여러 상품의 메트릭을 한 번에 저장한다")
+        @Test
+        fun `saves multiple products metrics at once`() {
+            // given
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val command = AccumulateMetricsCommand(
+                items = listOf(
+                    AccumulateMetricsCommand.Item(
+                        productId = 1L,
+                        statHour = statHour,
+                        viewDelta = 10,
+                    ),
+                    AccumulateMetricsCommand.Item(
+                        productId = 2L,
+                        statHour = statHour,
+                        viewDelta = 20,
+                    ),
+                    AccumulateMetricsCommand.Item(
+                        productId = 3L,
+                        statHour = statHour,
+                        viewDelta = 30,
+                    ),
+                ),
+            )
 
-            assertThat(product1Metric!!.orderCount).isEqualTo(1L)
-            assertThat(product1Metric.orderAmount).isEqualByComparingTo(BigDecimal("1000"))
-            assertThat(product2Metric!!.orderCount).isEqualTo(1L)
-            assertThat(product2Metric.orderAmount).isEqualByComparingTo(BigDecimal("2000"))
+            // when
+            rankingAggregationService.accumulateMetrics(command)
 
-            assertThat(eventHandledJpaRepository.existsByIdempotencyKey("ranking:order-paid:order-paid-event-999")).isTrue()
+            // then
+            val metrics = productHourlyMetricJpaRepository.findAll()
+            assertThat(metrics).hasSize(3)
+            assertThat(metrics.map { it.productId }).containsExactlyInAnyOrder(1L, 2L, 3L)
+        }
+
+        @DisplayName("동일 상품-시간에 대해 누적된다 (upsert)")
+        @Test
+        fun `accumulates for same product-hour combination`() {
+            // given
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
+            val command1 = AccumulateMetricsCommand(
+                items = listOf(
+                    AccumulateMetricsCommand.Item(
+                        productId = 1L,
+                        statHour = statHour,
+                        viewDelta = 10,
+                    ),
+                ),
+            )
+            val command2 = AccumulateMetricsCommand(
+                items = listOf(
+                    AccumulateMetricsCommand.Item(
+                        productId = 1L,
+                        statHour = statHour,
+                        viewDelta = 5,
+                    ),
+                ),
+            )
+
+            // when
+            rankingAggregationService.accumulateMetrics(command1)
+            rankingAggregationService.accumulateMetrics(command2)
+
+            // then
+            val metrics = productHourlyMetricJpaRepository.findAll()
+            assertThat(metrics).hasSize(1)
+            assertThat(metrics[0].viewCount).isEqualTo(15L) // 10 + 5
         }
     }
 
-    @DisplayName("onShutdown 통합 테스트")
+    @DisplayName("calculateAndUpdateScores 통합 테스트")
     @Nested
-    inner class OnShutdownIntegration {
+    inner class CalculateAndUpdateScoresIntegration {
 
-        @DisplayName("onShutdown 호출 시 버퍼의 데이터가 모두 flush된다")
+        @DisplayName("현재 버킷 메트릭을 기반으로 Redis에 점수를 저장한다")
         @Test
-        fun `onShutdown flushes all buffered data`() {
-            // given - 데이터 버퍼에 축적
-            val command = AccumulateViewMetricCommand(
-                eventId = "shutdown-test-event",
+        fun `saves scores to Redis based on current bucket metrics`() {
+            // given - 현재 시간 버킷에 메트릭 저장
+            val nowInstant = clock.instant().truncatedTo(ChronoUnit.HOURS)
+            val metric = ProductHourlyMetric.create(
+                statHour = nowInstant,
                 productId = 1L,
-                occurredAt = Instant.now(),
+                viewCount = 100,
+                likeCount = 50,
+                orderAmount = BigDecimal("1000.00"),
             )
-            rankingAggregationService.accumulateViewMetric(command)
+            productHourlyMetricJpaRepository.save(metric)
 
-            // when - onShutdown 호출
-            rankingAggregationService.onShutdown()
+            // when
+            rankingAggregationService.calculateHourRankings()
 
-            // then - 데이터가 저장되었는지 확인
-            val metrics = productHourlyMetricJpaRepository.findAll()
-            assertThat(metrics).hasSize(1)
-            assertThat(metrics[0].viewCount).isEqualTo(1L)
+            // then
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, nowInstant)
+            val score = zSetOps.score(bucketKey, "1")
+            assertThat(score).isNotNull()
+
+            // Score = (100 * 0.10 + 50 * 0.20 + 1000 * 0.60) * 0.9 = (10 + 10 + 600) * 0.9 = 620 * 0.9 = 558
+            assertThat(score).isEqualTo(558.0)
+        }
+
+        @DisplayName("감쇠 공식을 적용한다: previous * 0.1 + current * 0.9")
+        @Test
+        fun `applies decay formula - previous 0_1 plus current 0_9`() {
+            // given
+            val nowInstant = clock.instant().truncatedTo(ChronoUnit.HOURS)
+            val previousHourInstant = nowInstant.minus(1, ChronoUnit.HOURS)
+
+            // Current bucket: 100 views -> 100 * 0.10 = 10 points
+            val currentMetric = ProductHourlyMetric.create(
+                statHour = nowInstant,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+
+            // Previous bucket: 200 views -> 200 * 0.10 = 20 points
+            val previousMetric = ProductHourlyMetric.create(
+                statHour = previousHourInstant,
+                productId = 1L,
+                viewCount = 200,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+
+            productHourlyMetricJpaRepository.saveAll(listOf(currentMetric, previousMetric))
+
+            // when
+            rankingAggregationService.calculateHourRankings()
+
+            // then
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, nowInstant)
+            val score = zSetOps.score(bucketKey, "1")
+
+            // Expected: 20 * 0.1 + 10 * 0.9 = 2 + 9 = 11
+            assertThat(score).isEqualTo(11.0)
+        }
+
+        @DisplayName("이전 버킷에만 있는 상품도 점수 계산에 포함한다")
+        @Test
+        fun `includes products only in previous bucket`() {
+            // given
+            val nowInstant = clock.instant().truncatedTo(ChronoUnit.HOURS)
+            val previousHourInstant = nowInstant.minus(1, ChronoUnit.HOURS)
+
+            // Only in previous bucket: 100 views -> 100 * 0.10 = 10 points
+            val previousMetric = ProductHourlyMetric.create(
+                statHour = previousHourInstant,
+                productId = 99L,
+                viewCount = 100,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+            productHourlyMetricJpaRepository.save(previousMetric)
+
+            // when
+            rankingAggregationService.calculateHourRankings()
+
+            // then
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, nowInstant)
+            val score = zSetOps.score(bucketKey, "99")
+
+            // Expected: 10 * 0.1 + 0 * 0.9 = 1.0
+            assertThat(score).isEqualTo(1.0)
+        }
+
+        @DisplayName("여러 상품의 점수를 동시에 계산한다")
+        @Test
+        fun `calculates scores for multiple products`() {
+            // given
+            val nowInstant = clock.instant().truncatedTo(ChronoUnit.HOURS)
+
+            val metric1 = ProductHourlyMetric.create(
+                statHour = nowInstant,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+            val metric2 = ProductHourlyMetric.create(
+                statHour = nowInstant,
+                productId = 2L,
+                viewCount = 200,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+            productHourlyMetricJpaRepository.saveAll(listOf(metric1, metric2))
+
+            // when
+            rankingAggregationService.calculateHourRankings()
+
+            // then
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, nowInstant)
+            // Product 1: 100 * 0.10 * 0.9 = 9.0
+            assertThat(zSetOps.score(bucketKey, "1")).isEqualTo(9.0)
+            // Product 2: 200 * 0.10 * 0.9 = 18.0
+            assertThat(zSetOps.score(bucketKey, "2")).isEqualTo(18.0)
+        }
+
+        @DisplayName("메트릭이 없으면 Redis를 업데이트하지 않는다")
+        @Test
+        fun `does not update Redis when no metrics exist`() {
+            // given - no metrics in DB
+            val nowInstant = clock.instant().truncatedTo(ChronoUnit.HOURS)
+
+            // when
+            rankingAggregationService.calculateHourRankings()
+
+            // then
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, nowInstant)
+            assertThat(redisTemplate.hasKey(bucketKey)).isFalse()
+        }
+    }
+
+    @DisplayName("rollupHourlyToDaily 통합 테스트")
+    @Nested
+    inner class RollupHourlyToDailyIntegration {
+
+        @DisplayName("시간별 메트릭을 일별 메트릭으로 집계한다")
+        @Test
+        fun `aggregates hourly metrics to daily metrics`() {
+            // given - 특정 날짜의 여러 시간대에 시간별 메트릭 저장
+            val targetDate = LocalDate.now(clock)
+            val hour00 = targetDate.atStartOfDay(SEOUL_ZONE)
+            val hour12 = hour00.plusHours(12)
+
+            val metric1 = ProductHourlyMetric.create(
+                statHour = hour00.toInstant(),
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 10,
+                orderAmount = BigDecimal("1000.00"),
+            )
+            val metric2 = ProductHourlyMetric.create(
+                statHour = hour12.toInstant(),
+                productId = 1L,
+                viewCount = 50,
+                likeCount = 5,
+                orderAmount = BigDecimal("500.00"),
+            )
+            productHourlyMetricJpaRepository.saveAll(listOf(metric1, metric2))
+
+            // when
+            rankingAggregationService.rollupHourlyToDaily(targetDate)
+
+            // then
+            val dailyMetrics = productDailyMetricJpaRepository.findAllByStatDate(targetDate)
+            assertThat(dailyMetrics).hasSize(1)
+            assertThat(dailyMetrics[0].productId).isEqualTo(1L)
+            assertThat(dailyMetrics[0].viewCount).isEqualTo(150L) // 100 + 50
+            assertThat(dailyMetrics[0].likeCount).isEqualTo(15L) // 10 + 5
+            assertThat(dailyMetrics[0].orderAmount).isEqualByComparingTo(BigDecimal("1500.00")) // 1000 + 500
+        }
+
+        @DisplayName("여러 상품의 시간별 메트릭을 각각 일별로 집계한다")
+        @Test
+        fun `aggregates multiple products hourly metrics to daily`() {
+            // given
+            val targetDate = LocalDate.now(clock)
+            val hour00 = targetDate.atStartOfDay(SEOUL_ZONE)
+            val hour00Instant = hour00.toInstant()
+
+            val metric1 = ProductHourlyMetric.create(
+                statHour = hour00Instant,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 10,
+                orderAmount = BigDecimal("1000.00"),
+            )
+            val metric2 = ProductHourlyMetric.create(
+                statHour = hour00Instant,
+                productId = 2L,
+                viewCount = 200,
+                likeCount = 20,
+                orderAmount = BigDecimal("2000.00"),
+            )
+            productHourlyMetricJpaRepository.saveAll(listOf(metric1, metric2))
+
+            // when
+            rankingAggregationService.rollupHourlyToDaily(targetDate)
+
+            // then
+            val dailyMetrics = productDailyMetricJpaRepository.findAllByStatDate(targetDate)
+            assertThat(dailyMetrics).hasSize(2)
+            assertThat(dailyMetrics.map { it.productId }).containsExactlyInAnyOrder(1L, 2L)
+        }
+
+        @DisplayName("시간별 메트릭이 없으면 일별 메트릭을 생성하지 않는다")
+        @Test
+        fun `does not create daily metrics when no hourly metrics exist`() {
+            // given - no hourly metrics for target date
+            val targetDate = LocalDate.now(clock)
+
+            // when
+            rankingAggregationService.rollupHourlyToDaily(targetDate)
+
+            // then
+            val dailyMetrics = productDailyMetricJpaRepository.findAllByStatDate(targetDate)
+            assertThat(dailyMetrics).isEmpty()
+        }
+    }
+
+    @DisplayName("calculateDailyRankings 통합 테스트")
+    @Nested
+    inner class CalculateDailyRankingsIntegration {
+
+        @DisplayName("일별 메트릭을 기반으로 Redis에 일별 랭킹 점수를 저장한다")
+        @Test
+        fun `saves daily rankings to Redis with correct scores`() {
+            // given - 일별 메트릭 저장
+            val targetDate = LocalDate.now(clock)
+            val dailyMetric = ProductDailyMetric.create(
+                statDate = targetDate,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 50,
+                orderAmount = BigDecimal("1000.00"),
+            )
+            productDailyMetricJpaRepository.save(dailyMetric)
+
+            // when
+            rankingAggregationService.calculateDailyRankings(targetDate)
+
+            // then
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE).toInstant())
+            val score = zSetOps.score(dailyBucketKey, "1")
+            assertThat(score).isNotNull
+
+            // Score = (100 * 0.10 + 50 * 0.20 + 1000 * 0.60) * 0.9 = (10 + 10 + 600) * 0.9 = 620 * 0.9 = 558
+            // Cold start (no previous day): currentScore * 0.9
+            assertThat(score).isEqualTo(558.0)
+        }
+
+        @DisplayName("여러 상품의 일별 랭킹 점수를 계산한다")
+        @Test
+        fun `calculates daily rankings for multiple products`() {
+            // given
+            val targetDate = LocalDate.now(clock)
+
+            val dailyMetric1 = ProductDailyMetric.create(
+                statDate = targetDate,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+            val dailyMetric2 = ProductDailyMetric.create(
+                statDate = targetDate,
+                productId = 2L,
+                viewCount = 200,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+            productDailyMetricJpaRepository.saveAll(listOf(dailyMetric1, dailyMetric2))
+
+            // when
+            rankingAggregationService.calculateDailyRankings(targetDate)
+
+            // then
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE).toInstant())
+            // Product 1: 100 * 0.10 * 0.9 = 9.0 (cold start: currentScore * 0.9)
+            assertThat(zSetOps.score(dailyBucketKey, "1")).isEqualTo(9.0)
+            // Product 2: 200 * 0.10 * 0.9 = 18.0 (cold start: currentScore * 0.9)
+            assertThat(zSetOps.score(dailyBucketKey, "2")).isEqualTo(18.0)
+        }
+
+        @DisplayName("전날 메트릭이 있으면 감쇠 공식을 적용한다: previous * 0.1 + current * 0.9")
+        @Test
+        fun `applies decay formula for daily rankings`() {
+            // given
+            val today = LocalDate.now(clock)
+            val yesterday = today.minusDays(1)
+
+            // 전날 메트릭: 200 views -> 200 * 0.10 = 20 points
+            val previousDailyMetric = ProductDailyMetric.create(
+                statDate = yesterday,
+                productId = 1L,
+                viewCount = 200,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+
+            // 오늘 메트릭: 100 views -> 100 * 0.10 = 10 points
+            val currentDailyMetric = ProductDailyMetric.create(
+                statDate = today,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+
+            productDailyMetricJpaRepository.saveAll(listOf(previousDailyMetric, currentDailyMetric))
+
+            // when
+            rankingAggregationService.calculateDailyRankings(today)
+
+            // then
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, today.atStartOfDay(SEOUL_ZONE).toInstant())
+            val score = zSetOps.score(dailyBucketKey, "1")
+
+            // Expected: 20 * 0.1 + 10 * 0.9 = 2 + 9 = 11
+            assertThat(score).isEqualTo(11.0)
+        }
+
+        @DisplayName("일별 메트릭이 없으면 Redis를 업데이트하지 않는다")
+        @Test
+        fun `does not update Redis when no daily metrics exist`() {
+            // given - no daily metrics for target date
+            val targetDate = LocalDate.now(clock)
+
+            // when
+            rankingAggregationService.calculateDailyRankings(targetDate)
+
+            // then
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE).toInstant())
+            assertThat(redisTemplate.hasKey(dailyBucketKey)).isFalse()
         }
     }
 }

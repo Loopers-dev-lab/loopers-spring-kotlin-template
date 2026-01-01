@@ -15,8 +15,15 @@ interface RankingV1ApiSpec {
     )
     fun getRankings(
         @Parameter(
+            name = "period",
+            description = "조회 기간 (hourly/daily, 선택, 기본값: hourly)",
+            required = false,
+            `in` = ParameterIn.QUERY,
+        )
+        period: String?,
+        @Parameter(
             name = "date",
-            description = "조회할 시간대 (yyyyMMddHH 형식, 선택, 기본값: 현재 시간대)",
+            description = "조회할 시간대 (hourly: yyyyMMddHH, daily: yyyyMMdd 형식, 선택, 기본값: 현재 시간대)",
             required = false,
             `in` = ParameterIn.QUERY,
         )

@@ -7,21 +7,27 @@ package com.loopers.domain.ranking
 interface ProductRankingReader {
 
     /**
-     * 상위 N개 랭킹을 페이지네이션하여 조회
+     * 랭킹을 RankingQuery 조건으로 조회
      *
-     * @param bucketKey Redis 키 (예: "ranking:products:2025011514")
-     * @param offset 시작 위치 (0-based)
-     * @param limit 조회할 개수
-     * @return ProductRanking 리스트 (rank는 1-based)
+     * @param query 조회 조건 (period, dateTime, offset, limit 포함)
+     * @return ProductRanking 리스트
      */
-    fun getTopRankings(bucketKey: String, offset: Long, limit: Long): List<ProductRanking>
+    fun findTopRankings(query: RankingQuery): List<ProductRanking>
 
     /**
      * 특정 상품의 순위 조회
      *
-     * @param bucketKey Redis 키 (예: "ranking:products:2025011514")
+     * @param query 조회 조건 (period, dateTime으로 버킷 결정)
      * @param productId 상품 ID
      * @return 순위 (1-based), 랭킹에 없으면 null
      */
-    fun getRankByProductId(bucketKey: String, productId: Long): Int?
+    fun findRankByProductId(query: RankingQuery, productId: Long): Int?
+
+    /**
+     * 버킷 존재 여부 확인
+     *
+     * @param query 조회 조건 (period, dateTime으로 버킷 결정)
+     * @return 버킷 존재 여부
+     */
+    fun exists(query: RankingQuery): Boolean
 }

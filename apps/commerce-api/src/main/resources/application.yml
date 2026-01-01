@@ -15,6 +15,9 @@ spring:
     web-application-type: servlet
   application:
     name: commerce-api
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
   lifecycle:
     timeout-per-shutdown-phase: 30s
   task:

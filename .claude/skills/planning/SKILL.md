@@ -73,6 +73,55 @@ Think of each milestone as a work order that could be handed to a contractor who
 
 ---
 
+## Spec Alignment Principles
+
+### Spec-Based Description
+
+Describe milestones based on spec document content only. This includes requirements, background, example code, constraints, integration points, migration notes—anything present in the spec.
+
+Do NOT arbitrarily decide implementation details not present in the spec. If the spec doesn't specify how to implement something, leave that decision to the implementer's judgment.
+
+- Spec has pseudo-code → include it as-is
+- Spec has field table → reference it, don't convert to code
+- Spec is silent on implementation → describe what to achieve, not how
+
+### Rich Context Transfer
+
+Include not only direct implementation details but also the reasoning, background, and constraints from spec documents.
+
+The implementer should be able to make informed decisions without lacking context. When spec explains WHY something is needed, transfer that context to the milestone.
+
+- Background: Why this feature exists
+- Constraints: Performance considerations, fault isolation requirements
+- Related sections: Integration points, migration notes that affect implementation
+
+### Spec Coverage
+
+Every requirement in spec files MUST map to at least one milestone.
+
+After creating milestones, verify coverage with a Spec Requirement Mapping table:
+
+```markdown
+| Requirement | Spec Location | Milestone |
+|-------------|---------------|----------|
+| [Requirement 1] | [file#section] | Milestone N |
+```
+
+If a spec requirement has no corresponding milestone, the plan is incomplete.
+
+### Surface Clarifications
+
+If spec documents have business ambiguities, put them in milestone Clarifications sections. Do NOT assume or make decisions on behalf of the spec author.
+
+Clarifications are for genuine ambiguities where:
+- Spec is unclear or contradictory
+- Multiple valid interpretations exist
+- Business decision is needed before implementation
+
+Technical decisions (library choice, algorithm selection, etc.) are NOT clarifications—those belong to the implementer.
+
+---
+
 ## Milestone Structure (Summary)
 
 ```markdown

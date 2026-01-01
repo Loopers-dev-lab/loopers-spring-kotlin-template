@@ -9,6 +9,7 @@ import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
 import com.loopers.domain.ranking.RankingKeyGenerator
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingWeight
 import com.loopers.domain.ranking.RankingWeightRepository
 import com.loopers.interfaces.api.ApiResponse
@@ -45,6 +46,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
     private val redisTemplate: StringRedisTemplate,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
 
     @AfterEach
@@ -65,7 +67,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
             val product1 = createProduct(brand = brand, name = "상품1")
             val product2 = createProduct(brand = brand, name = "상품2")
 
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
             redisTemplate.opsForZSet().add(bucketKey, product1.id.toString(), 100.0)
             redisTemplate.opsForZSet().add(bucketKey, product2.id.toString(), 50.0)
 
@@ -90,7 +92,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
             val brand = createBrand()
             repeat(5) { index ->
                 val product = createProduct(brand = brand, name = "상품${index + 1}")
-                val bucketKey = RankingKeyGenerator.currentBucketKey()
+                val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
                 redisTemplate.opsForZSet().add(bucketKey, product.id.toString(), (100 - index).toDouble())
             }
 
@@ -118,6 +120,59 @@ class RankingV1ApiE2ETest @Autowired constructor(
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
                 { assertThat(response.body?.data?.rankings).isEmpty() },
                 { assertThat(response.body?.data?.hasNext).isFalse() },
+            )
+        }
+
+        @DisplayName("period=daily 조회 시 일별 랭킹을 반환한다")
+        @Test
+        fun returnDailyRankings_whenPeriodIsDaily() {
+            // given
+            val brand = createBrand()
+            val product1 = createProduct(brand = brand, name = "상품1")
+            val product2 = createProduct(brand = brand, name = "상품2")
+
+            val dailyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.DAILY)
+            redisTemplate.opsForZSet().add(dailyBucketKey, product2.id.toString(), 100.0)
+            redisTemplate.opsForZSet().add(dailyBucketKey, product1.id.toString(), 50.0)
+
+            // when
+            val response = getRankings(period = "daily")
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.rankings).hasSize(2) },
+                { assertThat(response.body?.data?.rankings?.get(0)?.rank).isEqualTo(1) },
+                { assertThat(response.body?.data?.rankings?.get(0)?.productId).isEqualTo(product2.id) },
+                { assertThat(response.body?.data?.rankings?.get(1)?.rank).isEqualTo(2) },
+                { assertThat(response.body?.data?.rankings?.get(1)?.productId).isEqualTo(product1.id) },
+            )
+        }
+
+        @DisplayName("period가 없으면 기본값 hourly로 조회한다")
+        @Test
+        fun defaultToHourly_whenPeriodIsNotProvided() {
+            // given
+            val brand = createBrand()
+            val product1 = createProduct(brand = brand, name = "상품1")
+            val product2 = createProduct(brand = brand, name = "상품2")
+
+            val hourlyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            val dailyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.DAILY)
+
+            // hourly 버킷에만 데이터 추가
+            redisTemplate.opsForZSet().add(hourlyBucketKey, product1.id.toString(), 100.0)
+            // daily 버킷에 다른 상품 추가
+            redisTemplate.opsForZSet().add(dailyBucketKey, product2.id.toString(), 100.0)
+
+            // when
+            val response = getRankings() // period 없이 호출
+
+            // then - hourly 데이터만 반환되어야 함
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.rankings).hasSize(1) },
+                { assertThat(response.body?.data?.rankings?.get(0)?.productId).isEqualTo(product1.id) },
             )
         }
     }
@@ -250,6 +305,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
     }
 
     private fun getRankings(
+        period: String? = null,
         date: String? = null,
         page: Int? = null,
         size: Int? = null,
@@ -260,6 +316,7 @@ class RankingV1ApiE2ETest @Autowired constructor(
 
         val queryParams = buildString {
             val params = mutableListOf<String>()
+            period?.let { params.add("period=$it") }
             date?.let { params.add("date=$it") }
             page?.let { params.add("page=$it") }
             size?.let { params.add("size=$it") }

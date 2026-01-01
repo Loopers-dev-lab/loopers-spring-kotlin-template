@@ -6,7 +6,6 @@ import com.loopers.domain.like.LikeCreatedEventV1
 import com.loopers.domain.order.OrderPaidEventV1
 import com.loopers.domain.product.ProductViewedEventV1
 import com.loopers.domain.product.StockDepletedEventV1
-import com.loopers.domain.ranking.RankingWeightChangedEventV1
 import com.loopers.eventschema.CloudEventEnvelope
 import com.loopers.support.event.DomainEvent
 import org.springframework.stereotype.Component
@@ -62,12 +61,6 @@ class CloudEventEnvelopeFactory(
             type = "loopers.stock.depleted.v1",
             aggregateType = "Stock",
             aggregateId = event.productId.toString(),
-        )
-
-        is RankingWeightChangedEventV1 -> EventMetadata(
-            type = "loopers.ranking.weight-changed.v1",
-            aggregateType = "RankingWeight",
-            aggregateId = "singleton",
         )
 
         else -> null

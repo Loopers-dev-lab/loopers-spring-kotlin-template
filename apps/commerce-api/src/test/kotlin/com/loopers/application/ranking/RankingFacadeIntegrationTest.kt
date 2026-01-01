@@ -9,8 +9,8 @@ import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
 import com.loopers.domain.ranking.RankingKeyGenerator
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingWeight
-import com.loopers.domain.ranking.RankingWeightChangedEventV1
 import com.loopers.domain.ranking.RankingWeightRepository
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
@@ -23,12 +23,9 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.test.context.event.ApplicationEvents
-import org.springframework.test.context.event.RecordApplicationEvents
 import java.math.BigDecimal
 
 @SpringBootTest
-@RecordApplicationEvents
 class RankingFacadeIntegrationTest @Autowired constructor(
     private val rankingFacade: RankingFacade,
     private val rankingWeightRepository: RankingWeightRepository,
@@ -39,10 +36,8 @@ class RankingFacadeIntegrationTest @Autowired constructor(
     private val redisTemplate: RedisTemplate<String, String>,
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
-    @Autowired
-    private lateinit var applicationEvents: ApplicationEvents
-
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
@@ -61,13 +56,14 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             val product2 = createProduct(name = "상품2", stockQuantity = 30)
             val product3 = createProduct(name = "상품3", stockQuantity = 20)
 
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
 
             redisTemplate.opsForZSet().add(bucketKey, product3.id.toString(), 100.0)
             redisTemplate.opsForZSet().add(bucketKey, product1.id.toString(), 80.0)
             redisTemplate.opsForZSet().add(bucketKey, product2.id.toString(), 60.0)
 
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = null,
                 page = 0,
                 size = 10,
@@ -96,6 +92,7 @@ class RankingFacadeIntegrationTest @Autowired constructor(
         fun `returns empty list when no data in Redis`() {
             // given
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = null,
                 page = 0,
                 size = 10,
@@ -115,12 +112,13 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             // given
             val products = (1..5).map { createProduct(name = "상품$it") }
 
-            val bucketKey = RankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
             products.forEachIndexed { index, product ->
                 redisTemplate.opsForZSet().add(bucketKey, product.id.toString(), (100 - index * 10).toDouble())
             }
 
             val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
                 date = null,
                 page = 0,
                 size = 2,
@@ -132,6 +130,90 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             // then
             assertThat(result.rankings).hasSize(2)
             assertThat(result.hasNext).isTrue()
+        }
+
+        @DisplayName("period=daily 일 때 일별 랭킹을 조회한다")
+        @Test
+        fun `returns daily rankings when period is daily`() {
+            // given
+            val product1 = createProduct(name = "상품1", stockQuantity = 50)
+            val product2 = createProduct(name = "상품2", stockQuantity = 30)
+
+            val dailyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.DAILY)
+
+            redisTemplate.opsForZSet().add(dailyBucketKey, product2.id.toString(), 100.0)
+            redisTemplate.opsForZSet().add(dailyBucketKey, product1.id.toString(), 80.0)
+
+            val criteria = RankingCriteria.FindRankings(
+                period = "daily",
+                date = null,
+                page = 0,
+                size = 10,
+            )
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then
+            assertThat(result.rankings).hasSize(2)
+            assertThat(result.rankings[0].productId).isEqualTo(product2.id)
+            assertThat(result.rankings[0].rank).isEqualTo(1)
+            assertThat(result.rankings[1].productId).isEqualTo(product1.id)
+            assertThat(result.rankings[1].rank).isEqualTo(2)
+        }
+
+        @DisplayName("period가 null이면 hourly로 조회한다")
+        @Test
+        fun `defaults to hourly when period is null`() {
+            // given
+            val product1 = createProduct(name = "상품1")
+            val product2 = createProduct(name = "상품2")
+
+            val hourlyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            val dailyBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.DAILY)
+
+            // hourly에만 데이터 추가
+            redisTemplate.opsForZSet().add(hourlyBucketKey, product1.id.toString(), 100.0)
+            redisTemplate.opsForZSet().add(dailyBucketKey, product2.id.toString(), 100.0)
+
+            val criteria = RankingCriteria.FindRankings(
+                period = null,
+                date = null,
+                page = 0,
+                size = 10,
+            )
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then - hourly 데이터가 반환되어야 함
+            assertThat(result.rankings).hasSize(1)
+            assertThat(result.rankings[0].productId).isEqualTo(product1.id)
+        }
+
+        @DisplayName("현재 버킷이 비어있고 이전 버킷에 데이터가 있으면 폴백한다")
+        @Test
+        fun `falls back to previous bucket when current is empty`() {
+            // given
+            val product1 = createProduct(name = "상품1")
+
+            val currentBucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            val previousBucketKey = rankingKeyGenerator.previousBucketKey(currentBucketKey)
+            redisTemplate.opsForZSet().add(previousBucketKey, product1.id.toString(), 100.0)
+
+            val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
+                date = null,
+                page = 0,
+                size = 10,
+            )
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then
+            assertThat(result.rankings).hasSize(1)
+            assertThat(result.rankings[0].productId).isEqualTo(product1.id)
         }
     }
 
@@ -202,24 +284,6 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             assertThat(savedWeight!!.viewWeight).isEqualTo(BigDecimal("0.30"))
             assertThat(savedWeight.likeWeight).isEqualTo(BigDecimal("0.30"))
             assertThat(savedWeight.orderWeight).isEqualTo(BigDecimal("0.40"))
-        }
-
-        @DisplayName("가중치 수정 시 RankingWeightChangedEventV1 이벤트가 발행된다")
-        @Test
-        fun `publishes RankingWeightChangedEventV1 when weight is updated`() {
-            // given
-            val criteria = RankingCriteria.UpdateWeight(
-                viewWeight = BigDecimal("0.25"),
-                likeWeight = BigDecimal("0.35"),
-                orderWeight = BigDecimal("0.40"),
-            )
-
-            // when
-            rankingFacade.updateWeight(criteria)
-
-            // then
-            val events = applicationEvents.stream(RankingWeightChangedEventV1::class.java).toList()
-            assertThat(events).hasSize(1)
         }
 
         @DisplayName("기존 가중치가 있으면 업데이트한다")
