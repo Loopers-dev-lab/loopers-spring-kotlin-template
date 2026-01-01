@@ -8,7 +8,7 @@ import org.springframework.data.redis.core.DefaultTypedTuple
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Repository
 import java.time.Duration
-import java.time.ZonedDateTime
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 /**
@@ -47,8 +47,8 @@ class ProductRankingRedisWriter(
      * @param dateTime 버킷 기준 시간
      * @param scores 상품ID -> 점수 맵
      */
-    override fun replaceAll(period: RankingPeriod, dateTime: ZonedDateTime, scores: Map<Long, Score>) {
-        val bucketKey = rankingKeyGenerator.bucketKey(period, dateTime.toInstant())
+    override fun replaceAll(period: RankingPeriod, dateTime: Instant, scores: Map<Long, Score>) {
+        val bucketKey = rankingKeyGenerator.bucketKey(period, dateTime)
 
         if (scores.isEmpty()) {
             redisTemplate.delete(bucketKey)

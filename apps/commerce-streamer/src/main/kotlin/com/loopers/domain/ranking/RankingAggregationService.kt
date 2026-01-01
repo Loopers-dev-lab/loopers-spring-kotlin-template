@@ -84,7 +84,7 @@ class RankingAggregationService(
         val finalScores = scoreCalculator.calculateForHourly(currentMetrics, previousMetrics, weights)
 
         // Redis에 업데이트
-        rankingWriter.replaceAll(RankingPeriod.HOURLY, dateTime, finalScores)
+        rankingWriter.replaceAll(RankingPeriod.HOURLY, currentHour, finalScores)
 
         logger.info(
             "Calculated and updated scores for {} products (current: {}, previous: {})",
@@ -160,8 +160,8 @@ class RankingAggregationService(
         val scores = scoreCalculator.calculateForDaily(currentDailyMetrics, previousDailyMetrics, weights)
 
         // Redis에 일별 버킷으로 저장
-        val dateTime = date.atStartOfDay(SEOUL_ZONE)
-        rankingWriter.replaceAll(RankingPeriod.DAILY, dateTime, scores)
+        val dateTimeInstant = date.atStartOfDay(SEOUL_ZONE).toInstant()
+        rankingWriter.replaceAll(RankingPeriod.DAILY, dateTimeInstant, scores)
 
         logger.info(
             "Calculated and updated daily rankings for {} products on date: {}",

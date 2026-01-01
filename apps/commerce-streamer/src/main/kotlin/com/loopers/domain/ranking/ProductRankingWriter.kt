@@ -1,6 +1,6 @@
 package com.loopers.domain.ranking
 
-import java.time.ZonedDateTime
+import java.time.Instant
 
 /**
  * ProductRankingWriter - Redis ZSET 쓰기를 위한 Port 인터페이스
@@ -20,5 +20,5 @@ interface ProductRankingWriter {
      * @param dateTime 버킷 기준 시간
      * @param scores 상품ID -> 점수 맵
      */
-    fun replaceAll(period: RankingPeriod, dateTime: ZonedDateTime, scores: Map<Long, Score>)
+    fun replaceAll(period: RankingPeriod, dateTime: Instant, scores: Map<Long, Score>)
 }

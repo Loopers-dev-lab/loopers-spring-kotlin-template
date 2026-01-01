@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
+import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
@@ -28,9 +29,9 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
 
     private val zSetOps = redisTemplate.opsForZSet()
 
-    // Test dateTime values
-    private val testHourlyDateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, SEOUL_ZONE)
-    private val testDailyDateTime = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, SEOUL_ZONE)
+    // Test dateTime values (Instant)
+    private val testHourlyDateTime: Instant = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, SEOUL_ZONE).toInstant()
+    private val testDailyDateTime: Instant = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, SEOUL_ZONE).toInstant()
 
     // Expected bucket keys based on the dateTime values
     private val testHourlyBucketKey = "ranking:products:hourly:2025011514"
