@@ -45,23 +45,4 @@ class RankingScoreCalculator {
         // Score는 음수가 될 수 없으므로 0 이상으로 보정
         return Score.of(maxOf(totalScore, BigDecimal.ZERO))
     }
-
-    /**
-     * 감쇠(decay)를 적용한 Score 계산 (버킷 전환 시 사용)
-     *
-     * newScore = currentScore x 1.0 + previousScore x decayFactor
-     *
-     * @param currentScore 현재 버킷의 점수
-     * @param previousScore 이전 버킷의 점수
-     * @param decayFactor 감쇠 계수 (기본값: 0.1)
-     * @return 감쇠가 적용된 새로운 Score
-     */
-    fun calculateWithDecay(
-        currentScore: Score,
-        previousScore: Score,
-        decayFactor: BigDecimal,
-    ): Score {
-        val decayedPreviousScore = previousScore.applyDecay(decayFactor)
-        return currentScore + decayedPreviousScore
-    }
 }
