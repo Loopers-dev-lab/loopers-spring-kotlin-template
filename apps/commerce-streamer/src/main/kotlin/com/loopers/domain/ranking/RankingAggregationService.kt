@@ -24,8 +24,6 @@ class RankingAggregationService(
     private val scoreCalculator: RankingScoreCalculator,
 ) {
     companion object {
-        private val DECAY_FACTOR = java.math.BigDecimal("0.1")
-        private val CURRENT_WEIGHT = java.math.BigDecimal("0.9")
         private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
     }
 
@@ -60,9 +58,8 @@ class RankingAggregationService(
      * 점수 계산 및 Redis 업데이트
      *
      * 1. 현재 시간과 이전 시간 버킷의 메트릭을 DB에서 조회
-     * 2. 각 상품별 기본 점수 계산 (current bucket)
-     * 3. 감쇠 공식 적용: previousScore * 0.1 + currentScore * 0.9
-     * 4. Redis에 replaceAll로 업데이트
+     * 2. RankingScoreCalculator.calculateForHourly로 감쇠 공식 적용한 점수 계산
+     * 3. Redis에 replaceAll로 업데이트
      *
      * 이전 버킷에만 있는 상품도 포함 (cold start prevention)
      *
@@ -84,40 +81,15 @@ class RankingAggregationService(
 
         val weights = rankingWeightRepository.findLatest() ?: RankingWeight.fallback()
 
-        // 현재 버킷 기준 점수 계산 (productId -> Score)
-        val currentScores = currentMetrics.associate { metric ->
-            val snapshot = metric.toSnapshot()
-            val score = scoreCalculator.calculate(snapshot, weights)
-            metric.productId to score
-        }
-
-        // 이전 버킷 기준 점수 계산 (productId -> Score)
-        val previousScores = previousMetrics.associate { metric ->
-            val snapshot = metric.toSnapshot()
-            val score = scoreCalculator.calculate(snapshot, weights)
-            metric.productId to score
-        }
-
-        // 모든 상품 ID 수집 (현재 + 이전)
-        val allProductIds = (currentScores.keys + previousScores.keys).toSet()
-
-        // 감쇠 공식 적용: previousScore * 0.1 + currentScore * 0.9
-        val finalScores = allProductIds.associateWith { productId ->
-            val currentScore = currentScores[productId] ?: Score.ZERO
-            val previousScore = previousScores[productId] ?: Score.ZERO
-
-            // decay formula: previous * 0.1 + current * 0.9
-            val decayedPrevious = previousScore.applyDecay(DECAY_FACTOR)
-            val weightedCurrent = currentScore.applyDecay(CURRENT_WEIGHT)
-            decayedPrevious + weightedCurrent
-        }
+        // Calculator에 위임하여 감쇠 공식 적용된 점수 계산
+        val finalScores = scoreCalculator.calculateForHourly(currentMetrics, previousMetrics, weights)
 
         // Redis에 업데이트
         rankingWriter.replaceAll(period, dateTime, finalScores)
 
         logger.info(
             "Calculated and updated scores for {} products (current: {}, previous: {})",
-            allProductIds.size,
+            finalScores.size,
             currentMetrics.size,
             previousMetrics.size,
         )
@@ -166,28 +138,27 @@ class RankingAggregationService(
     /**
      * 일별 랭킹 계산 및 Redis 업데이트
      *
-     * 1. 대상 날짜의 모든 일별 메트릭을 조회
-     * 2. RankingScoreCalculator로 점수 계산
+     * 1. 대상 날짜와 전날의 일별 메트릭을 조회
+     * 2. RankingScoreCalculator.calculateForDaily로 감쇠 공식 적용하여 점수 계산
      * 3. Redis에 일별 버킷으로 저장
+     *
+     * 감쇠 공식: previousScore * 0.1 + currentScore * 0.9
      *
      * @param date 랭킹 계산 대상 날짜 (기본값: 오늘)
      */
     fun calculateDailyRankings(date: LocalDate = LocalDate.now(SEOUL_ZONE)) {
-        val dailyMetrics = dailyMetricRepository.findAllByStatDate(date)
+        val currentDailyMetrics = dailyMetricRepository.findAllByStatDate(date)
+        val previousDailyMetrics = dailyMetricRepository.findAllByStatDate(date.minusDays(1))
 
-        if (dailyMetrics.isEmpty()) {
+        if (currentDailyMetrics.isEmpty() && previousDailyMetrics.isEmpty()) {
             logger.debug("No daily metrics found for date: {}", date)
             return
         }
 
         val weights = rankingWeightRepository.findLatest() ?: RankingWeight.fallback()
 
-        // 점수 계산
-        val scores = dailyMetrics.associate { metric ->
-            val snapshot = metric.toSnapshot()
-            val score = scoreCalculator.calculate(snapshot, weights)
-            metric.productId to score
-        }
+        // Calculator에 위임하여 감쇠 공식 적용된 점수 계산
+        val scores = scoreCalculator.calculateForDaily(currentDailyMetrics, previousDailyMetrics, weights)
 
         // Redis에 일별 버킷으로 저장
         val dateTime = date.atStartOfDay(SEOUL_ZONE)

@@ -415,8 +415,9 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             val score = zSetOps.score(dailyBucketKey, "1")
             assertThat(score).isNotNull
 
-            // Score = 100 * 0.10 + 50 * 0.20 + 1000 * 0.60 = 10 + 10 + 600 = 620
-            assertThat(score).isEqualTo(620.0)
+            // Score = (100 * 0.10 + 50 * 0.20 + 1000 * 0.60) * 0.9 = (10 + 10 + 600) * 0.9 = 620 * 0.9 = 558
+            // Cold start (no previous day): currentScore * 0.9
+            assertThat(score).isEqualTo(558.0)
         }
 
         @DisplayName("여러 상품의 일별 랭킹 점수를 계산한다")
@@ -446,10 +447,48 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
 
             // then
             val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE))
-            // Product 1: 100 * 0.10 = 10.0
-            assertThat(zSetOps.score(dailyBucketKey, "1")).isEqualTo(10.0)
-            // Product 2: 200 * 0.10 = 20.0
-            assertThat(zSetOps.score(dailyBucketKey, "2")).isEqualTo(20.0)
+            // Product 1: 100 * 0.10 * 0.9 = 9.0 (cold start: currentScore * 0.9)
+            assertThat(zSetOps.score(dailyBucketKey, "1")).isEqualTo(9.0)
+            // Product 2: 200 * 0.10 * 0.9 = 18.0 (cold start: currentScore * 0.9)
+            assertThat(zSetOps.score(dailyBucketKey, "2")).isEqualTo(18.0)
+        }
+
+        @DisplayName("전날 메트릭이 있으면 감쇠 공식을 적용한다: previous * 0.1 + current * 0.9")
+        @Test
+        fun `applies decay formula for daily rankings`() {
+            // given
+            val today = LocalDate.now(seoulZone)
+            val yesterday = today.minusDays(1)
+
+            // 전날 메트릭: 200 views -> 200 * 0.10 = 20 points
+            val previousDailyMetric = ProductDailyMetric.create(
+                statDate = yesterday,
+                productId = 1L,
+                viewCount = 200,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+
+            // 오늘 메트릭: 100 views -> 100 * 0.10 = 10 points
+            val currentDailyMetric = ProductDailyMetric.create(
+                statDate = today,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+
+            productDailyMetricJpaRepository.saveAll(listOf(previousDailyMetric, currentDailyMetric))
+
+            // when
+            rankingAggregationService.calculateDailyRankings(today)
+
+            // then
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, today.atStartOfDay(SEOUL_ZONE))
+            val score = zSetOps.score(dailyBucketKey, "1")
+
+            // Expected: 20 * 0.1 + 10 * 0.9 = 2 + 9 = 11
+            assertThat(score).isEqualTo(11.0)
         }
 
         @DisplayName("일별 메트릭이 없으면 Redis를 업데이트하지 않는다")
