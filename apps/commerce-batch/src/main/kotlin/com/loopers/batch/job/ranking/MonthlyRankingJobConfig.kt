@@ -27,15 +27,17 @@ import java.time.LocalDate
 import javax.sql.DataSource
 
 /**
- * WeeklyRankingJobConfig - 주간 랭킹 배치 Job 설정
+ * MonthlyRankingJobConfig - 월간 랭킹 배치 Job 설정
  *
  * 2-Step 구조:
- * - Step 1 (metricAggregationStep): ProductDailyMetric 읽기 -> 점수 계산 -> Redis 집계
- * - Step 2 (rankingPersistenceStep): Redis TOP 100 추출 -> RDB 저장
+ * - Step 1 (metricAggregationStep): ProductDailyMetric 읽기 (30일 윈도우) -> 점수 계산 -> Redis 집계
+ * - Step 2 (rankingPersistenceStep): Redis TOP 100 추출 -> RDB 저장 (mv_product_rank_monthly)
+ *
+ * 스테이징 키: ranking:products:monthly:{yyyyMMdd}:staging
  */
-@ConditionalOnProperty(name = ["spring.batch.job.name"], havingValue = WeeklyRankingJobConfig.JOB_NAME)
+@ConditionalOnProperty(name = ["spring.batch.job.name"], havingValue = MonthlyRankingJobConfig.JOB_NAME)
 @Configuration
-class WeeklyRankingJobConfig(
+class MonthlyRankingJobConfig(
     private val jobRepository: JobRepository,
     private val transactionManager: PlatformTransactionManager,
     private val jobListener: JobListener,
@@ -46,29 +48,29 @@ class WeeklyRankingJobConfig(
     private val productPeriodRankingRepository: ProductPeriodRankingRepository,
 ) {
     companion object {
-        const val JOB_NAME = "weeklyRankingJob"
-        private const val STEP_METRIC_AGGREGATION = "weeklyMetricAggregationStep"
-        private const val STEP_RANKING_PERSISTENCE = "weeklyRankingPersistenceStep"
+        const val JOB_NAME = "monthlyRankingJob"
+        private const val STEP_METRIC_AGGREGATION = "monthlyMetricAggregationStep"
+        private const val STEP_RANKING_PERSISTENCE = "monthlyRankingPersistenceStep"
         private const val CHUNK_SIZE = 1000
     }
 
     @Bean(JOB_NAME)
-    fun weeklyRankingJob(): Job {
+    fun monthlyRankingJob(): Job {
         return JobBuilder(JOB_NAME, jobRepository)
             .incrementer(RunIdIncrementer())
-            .start(metricAggregationStep(null))
-            .next(rankingPersistenceStep(null))
+            .start(monthlyMetricAggregationStep(null))
+            .next(monthlyRankingPersistenceStep(null))
             .listener(jobListener)
             .build()
     }
 
     @JobScope
     @Bean(STEP_METRIC_AGGREGATION)
-    fun metricAggregationStep(
+    fun monthlyMetricAggregationStep(
         @Value("#{jobParameters['baseDate']}") baseDateParam: LocalDate?,
     ): Step {
         val baseDate = baseDateParam ?: LocalDate.now()
-        val periodType = RankingPeriodType.WEEKLY
+        val periodType = RankingPeriodType.MONTHLY
 
         val reader = MetricAggregationReader(
             dataSource = dataSource,
@@ -94,11 +96,11 @@ class WeeklyRankingJobConfig(
 
     @JobScope
     @Bean(STEP_RANKING_PERSISTENCE)
-    fun rankingPersistenceStep(
+    fun monthlyRankingPersistenceStep(
         @Value("#{jobParameters['baseDate']}") baseDateParam: LocalDate?,
     ): Step {
         val baseDate = baseDateParam ?: LocalDate.now()
-        val periodType = RankingPeriodType.WEEKLY
+        val periodType = RankingPeriodType.MONTHLY
 
         val tasklet = RankingPersistenceTasklet(
             redisTemplate = redisTemplate,

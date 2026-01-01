@@ -1,5 +1,6 @@
 package com.loopers.batch.job.ranking.step
 
+import com.loopers.batch.job.ranking.RankingPeriodType
 import com.loopers.batch.job.ranking.WeeklyRankingJobConfig
 import com.loopers.testcontainers.MySqlTestContainersConfig
 import com.loopers.utils.DatabaseCleanUp
@@ -40,8 +41,8 @@ class MetricAggregationReaderTest @Autowired constructor(
     }
 
     @Nested
-    @DisplayName("날짜 범위 조회는")
-    inner class DateRangeTest {
+    @DisplayName("WEEKLY 윈도우 조회는")
+    inner class WeeklyWindowTest {
 
         @DisplayName("baseDate 기준 최근 7일 데이터를 조회한다 (baseDate 당일 제외)")
         @Test
@@ -61,7 +62,7 @@ class MetricAggregationReaderTest @Autowired constructor(
             // 범위 밖 데이터 (baseDate - 8일)
             insertMetric(LocalDate.of(2024, 12, 31), 100L, 50, 5, BigDecimal("500"))
 
-            val reader = createReader(baseDate)
+            val reader = createReader(baseDate, RankingPeriodType.WEEKLY)
             reader.afterPropertiesSet()
             reader.open(MetaDataInstanceFactory.createStepExecution().executionContext)
 
@@ -93,7 +94,7 @@ class MetricAggregationReaderTest @Autowired constructor(
             insertMetric(LocalDate.of(2025, 1, 1), 100L, 20, 2, BigDecimal("200"))
             insertMetric(LocalDate.of(2025, 1, 2), 100L, 30, 3, BigDecimal("300"))
 
-            val reader = createReader(baseDate)
+            val reader = createReader(baseDate, RankingPeriodType.WEEKLY)
             reader.afterPropertiesSet()
             reader.open(MetaDataInstanceFactory.createStepExecution().executionContext)
 
@@ -123,7 +124,7 @@ class MetricAggregationReaderTest @Autowired constructor(
             // arrange
             val baseDate = LocalDate.of(2025, 1, 8)
 
-            val reader = createReader(baseDate)
+            val reader = createReader(baseDate, RankingPeriodType.WEEKLY)
             reader.afterPropertiesSet()
             reader.open(MetaDataInstanceFactory.createStepExecution().executionContext)
 
@@ -136,8 +137,53 @@ class MetricAggregationReaderTest @Autowired constructor(
         }
     }
 
-    private fun createReader(baseDate: LocalDate): MetricAggregationReader {
-        return MetricAggregationReader(dataSource, baseDate)
+    @Nested
+    @DisplayName("MONTHLY 윈도우 조회는")
+    inner class MonthlyWindowTest {
+
+        @DisplayName("baseDate 기준 최근 30일 데이터를 조회한다 (baseDate 당일 제외)")
+        @Test
+        fun shouldReadLast30Days() {
+            // arrange
+            val baseDate = LocalDate.of(2025, 2, 1)
+            // baseDate=2025-02-01 -> 조회 범위: 2025-01-02 ~ 2025-01-31
+
+            // 범위 내 데이터
+            insertMetric(LocalDate.of(2025, 1, 2), 100L, 10, 1, BigDecimal("100"))
+            insertMetric(LocalDate.of(2025, 1, 15), 100L, 20, 2, BigDecimal("200"))
+            insertMetric(LocalDate.of(2025, 1, 31), 100L, 30, 3, BigDecimal("300"))
+
+            // 범위 밖 데이터 (baseDate 당일)
+            insertMetric(LocalDate.of(2025, 2, 1), 100L, 40, 4, BigDecimal("400"))
+
+            // 범위 밖 데이터 (baseDate - 31일)
+            insertMetric(LocalDate.of(2025, 1, 1), 100L, 50, 5, BigDecimal("500"))
+
+            val reader = createReader(baseDate, RankingPeriodType.MONTHLY)
+            reader.afterPropertiesSet()
+            reader.open(MetaDataInstanceFactory.createStepExecution().executionContext)
+
+            // act
+            val items = mutableListOf<com.loopers.domain.ranking.ProductDailyMetric>()
+            var item = reader.read()
+            while (item != null) {
+                items.add(item)
+                item = reader.read()
+            }
+            reader.close()
+
+            // assert
+            assertThat(items).hasSize(3)
+            assertThat(items.map { it.statDate }).containsExactlyInAnyOrder(
+                LocalDate.of(2025, 1, 2),
+                LocalDate.of(2025, 1, 15),
+                LocalDate.of(2025, 1, 31),
+            )
+        }
+    }
+
+    private fun createReader(baseDate: LocalDate, periodType: RankingPeriodType): MetricAggregationReader {
+        return MetricAggregationReader(dataSource, baseDate, periodType.windowDays)
     }
 
     private fun insertMetric(
