@@ -110,5 +110,57 @@ class RankingKeyGeneratorTest {
             // then
             assertThat(key).isEqualTo("ranking:products:daily:20251231")
         }
+
+        @DisplayName("WEEKLY period로 ranking:products:weekly:yyyyMMdd 형식의 키를 생성한다")
+        @Test
+        fun `generates weekly key with period`() {
+            // given - KST 2025-01-15 14:30:00 (UTC 05:30:00)
+            val instant = Instant.parse("2025-01-15T05:30:00Z")
+
+            // when
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.WEEKLY, instant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:weekly:20250115")
+        }
+
+        @DisplayName("MONTHLY period로 ranking:products:monthly:yyyyMMdd 형식의 키를 생성한다")
+        @Test
+        fun `generates monthly key with period`() {
+            // given - KST 2025-01-15 14:30:00 (UTC 05:30:00)
+            val instant = Instant.parse("2025-01-15T05:30:00Z")
+
+            // when
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.MONTHLY, instant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:monthly:20250115")
+        }
+
+        @DisplayName("WEEKLY: 연도 경계에서 올바른 키를 생성한다")
+        @Test
+        fun `handles year boundary for weekly`() {
+            // given - KST 2025-01-01 00:00:00 (UTC 2024-12-31 15:00:00)
+            val instant = Instant.parse("2024-12-31T15:00:00Z")
+
+            // when
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.WEEKLY, instant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:weekly:20250101")
+        }
+
+        @DisplayName("MONTHLY: 월 경계에서 올바른 키를 생성한다")
+        @Test
+        fun `handles month boundary for monthly`() {
+            // given - KST 2025-02-01 00:30:00 (UTC 2025-01-31 15:30:00)
+            val instant = Instant.parse("2025-01-31T15:30:00Z")
+
+            // when
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.MONTHLY, instant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:monthly:20250201")
+        }
     }
 }

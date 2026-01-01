@@ -16,6 +16,8 @@ class RankingKeyGenerator(
      * Generates bucket key from Instant and period
      * - Hourly: ranking:products:hourly:yyyyMMddHH
      * - Daily: ranking:products:daily:yyyyMMdd
+     * - Weekly: ranking:products:weekly:yyyyMMdd
+     * - Monthly: ranking:products:monthly:yyyyMMdd
      *
      * Internally converts to Seoul timezone for key formatting (spec#8.2 - Redis keys remain KST-based)
      */
@@ -31,8 +33,12 @@ class RankingKeyGenerator(
                 "$DAILY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
             }
 
-            RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
-                throw UnsupportedOperationException("$period is not yet supported")
+            RankingPeriod.WEEKLY -> {
+                "$WEEKLY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
+            }
+
+            RankingPeriod.MONTHLY -> {
+                "$MONTHLY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
             }
         }
     }
@@ -42,6 +48,8 @@ class RankingKeyGenerator(
 
         private const val HOURLY_PREFIX = "ranking:products:hourly"
         private const val DAILY_PREFIX = "ranking:products:daily"
+        private const val WEEKLY_PREFIX = "ranking:products:weekly"
+        private const val MONTHLY_PREFIX = "ranking:products:monthly"
 
         private val HOURLY_FORMATTER = DateTimeFormatter
             .ofPattern("yyyyMMddHH")
