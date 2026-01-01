@@ -1,6 +1,7 @@
 package com.loopers.batch.job.ranking
 
 import com.loopers.batch.job.ranking.step.MetricAggregationReader
+import com.loopers.batch.job.ranking.step.RankingPersistenceTasklet
 import com.loopers.batch.job.ranking.step.RedisAggregationWriter
 import com.loopers.batch.job.ranking.step.ScoreCalculationProcessor
 import com.loopers.batch.job.ranking.step.ScoreEntry
@@ -25,7 +26,7 @@ import org.springframework.transaction.PlatformTransactionManager
  *
  * 2-Step 구조:
  * - Step 1 (metricAggregationStep): ProductDailyMetric 읽기 -> 점수 계산 -> Redis 집계
- * - Step 2 (rankingPersistenceStep): Redis TOP 100 추출 -> RDB 저장 (Milestone 11에서 구현)
+ * - Step 2 (rankingPersistenceStep): Redis TOP 100 추출 -> RDB 저장
  */
 @ConditionalOnProperty(name = ["spring.batch.job.name"], havingValue = WeeklyRankingJobConfig.JOB_NAME)
 @Configuration
@@ -38,10 +39,12 @@ class WeeklyRankingJobConfig(
     private val metricAggregationReader: MetricAggregationReader,
     private val scoreCalculationProcessor: ScoreCalculationProcessor,
     private val redisAggregationWriter: RedisAggregationWriter,
+    private val rankingPersistenceTasklet: RankingPersistenceTasklet,
 ) {
     companion object {
         const val JOB_NAME = "weeklyRankingJob"
         private const val STEP_METRIC_AGGREGATION = "metricAggregationStep"
+        private const val STEP_RANKING_PERSISTENCE = "rankingPersistenceStep"
         private const val CHUNK_SIZE = 1000
     }
 
@@ -50,6 +53,7 @@ class WeeklyRankingJobConfig(
         return JobBuilder(JOB_NAME, jobRepository)
             .incrementer(RunIdIncrementer())
             .start(metricAggregationStep())
+            .next(rankingPersistenceStep())
             .listener(jobListener)
             .build()
     }
@@ -64,6 +68,15 @@ class WeeklyRankingJobConfig(
             .writer(redisAggregationWriter)
             .listener(stepMonitorListener)
             .listener(chunkListener)
+            .build()
+    }
+
+    @JobScope
+    @Bean(STEP_RANKING_PERSISTENCE)
+    fun rankingPersistenceStep(): Step {
+        return StepBuilder(STEP_RANKING_PERSISTENCE, jobRepository)
+            .tasklet(rankingPersistenceTasklet, transactionManager)
+            .listener(stepMonitorListener)
             .build()
     }
 }
