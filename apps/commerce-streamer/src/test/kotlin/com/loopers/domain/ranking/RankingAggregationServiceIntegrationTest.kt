@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -63,7 +64,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         @Test
         fun `saves metrics to DB via batch command`() {
             // given
-            val statHour = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val command = AccumulateMetricsCommand(
                 items = listOf(
                     AccumulateMetricsCommand.Item(
@@ -93,7 +94,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         @Test
         fun `saves multiple products metrics at once`() {
             // given
-            val statHour = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val command = AccumulateMetricsCommand(
                 items = listOf(
                     AccumulateMetricsCommand.Item(
@@ -127,7 +128,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         @Test
         fun `accumulates for same product-hour combination`() {
             // given
-            val statHour = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val statHour = Instant.now().truncatedTo(ChronoUnit.HOURS)
             val command1 = AccumulateMetricsCommand(
                 items = listOf(
                     AccumulateMetricsCommand.Item(

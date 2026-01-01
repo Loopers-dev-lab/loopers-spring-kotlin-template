@@ -8,8 +8,7 @@ import com.loopers.domain.ranking.event.RankingOrderPaidEventV1
 import com.loopers.domain.ranking.event.RankingProductViewedEventV1
 import com.loopers.eventschema.CloudEventEnvelope
 import org.springframework.stereotype.Component
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import java.time.temporal.ChronoUnit
 
 /**
  * RankingEventMapper - CloudEventEnvelope를 AccumulateMetricsCommand.Item으로 변환하는 매퍼
@@ -22,10 +21,6 @@ import java.time.ZonedDateTime
 class RankingEventMapper(
     private val objectMapper: ObjectMapper,
 ) {
-    companion object {
-        private val ZONE_ID = ZoneId.of("Asia/Seoul")
-    }
-
     /**
      * CloudEventEnvelope를 AccumulateMetricsCommand.Item 리스트로 변환
      *
@@ -35,7 +30,7 @@ class RankingEventMapper(
      * @return 변환된 Item 리스트 (지원하지 않는 타입이면 빈 리스트)
      */
     fun toCommandItems(envelope: CloudEventEnvelope): List<AccumulateMetricsCommand.Item> {
-        val statHour = ZonedDateTime.ofInstant(envelope.time, ZONE_ID)
+        val statHour = envelope.time.truncatedTo(ChronoUnit.HOURS)
 
         return when (envelope.type) {
             "loopers.product.viewed.v1" -> {

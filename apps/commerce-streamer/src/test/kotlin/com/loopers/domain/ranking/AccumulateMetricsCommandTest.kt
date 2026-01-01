@@ -5,13 +5,12 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import java.time.Instant
 
 @DisplayName("AccumulateMetricsCommand 단위 테스트")
 class AccumulateMetricsCommandTest {
 
-    private val testStatHour = ZonedDateTime.of(2024, 1, 15, 10, 0, 0, 0, ZoneId.of("Asia/Seoul"))
+    private val testStatHour = Instant.parse("2024-01-15T01:00:00Z") // 2024-01-15 10:00 KST = 01:00 UTC
 
     @DisplayName("Item 생성 테스트")
     @Nested
@@ -182,7 +181,7 @@ class AccumulateMetricsCommandTest {
         fun `can create Command with Items having same productId`() {
             // given
             val hour1 = testStatHour
-            val hour2 = testStatHour.plusHours(1)
+            val hour2 = testStatHour.plusSeconds(3600)
             val items = listOf(
                 AccumulateMetricsCommand.Item(
                     productId = 1L,

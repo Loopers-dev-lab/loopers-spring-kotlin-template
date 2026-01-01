@@ -43,7 +43,7 @@ class RankingAggregationService(
         val rows = command.items.map { item ->
             ProductHourlyMetricRow(
                 productId = item.productId,
-                statHour = item.statHour.toInstant().truncatedTo(ChronoUnit.HOURS),
+                statHour = item.statHour.truncatedTo(ChronoUnit.HOURS),
                 viewCount = item.viewDelta,
                 likeCount = item.likeCreatedDelta - item.likeCanceledDelta,
                 orderAmount = item.orderAmountDelta,
