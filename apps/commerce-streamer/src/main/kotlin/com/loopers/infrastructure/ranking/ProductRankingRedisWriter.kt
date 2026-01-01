@@ -2,7 +2,6 @@ package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRankingWriter
 import com.loopers.domain.ranking.Score
-import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Repository
 import java.util.concurrent.TimeUnit
@@ -22,25 +21,6 @@ class ProductRankingRedisWriter(
     companion object {
         private val TTL_SECONDS = java.time.Duration.ofHours(2).seconds
         private const val MAX_BUCKET_SIZE = 100L
-    }
-
-    override fun incrementScores(bucketKey: String, deltas: Map<Long, Score>) {
-        if (deltas.isEmpty()) return
-
-        val keyBytes = bucketKey.toByteArray()
-        redisTemplate.executePipelined(
-            RedisCallback<Any> { connection ->
-                deltas.forEach { (productId, score) ->
-                    connection.zSetCommands().zIncrBy(
-                        keyBytes,
-                        score.value.toDouble(),
-                        productId.toString().toByteArray(),
-                    )
-                }
-                connection.keyCommands().expire(keyBytes, TTL_SECONDS)
-                null
-            },
-        )
     }
 
     override fun replaceAll(bucketKey: String, scores: Map<Long, Score>) {
@@ -63,21 +43,6 @@ class ProductRankingRedisWriter(
         zSetOps.add(bucketKey, tuples)
         // Keep only top 100: remove all except ranks 0~99 (highest scores)
         zSetOps.removeRange(bucketKey, 0, -(MAX_BUCKET_SIZE + 1))
-        redisTemplate.expire(bucketKey, TTL_SECONDS, TimeUnit.SECONDS)
-    }
-
-    override fun createBucket(bucketKey: String, scores: Map<Long, Score>) {
-        if (scores.isEmpty()) return
-
-        val zSetOps = redisTemplate.opsForZSet()
-        val tuples = scores.map { (productId, score) ->
-            org.springframework.data.redis.core.DefaultTypedTuple(
-                productId.toString(),
-                score.value.toDouble(),
-            )
-        }.toSet()
-
-        zSetOps.add(bucketKey, tuples)
         redisTemplate.expire(bucketKey, TTL_SECONDS, TimeUnit.SECONDS)
     }
 }
