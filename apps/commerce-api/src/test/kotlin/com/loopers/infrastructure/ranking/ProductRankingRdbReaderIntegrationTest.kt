@@ -3,6 +3,7 @@ package com.loopers.infrastructure.ranking
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingQuery
 import com.loopers.utils.DatabaseCleanUp
+import com.loopers.utils.RedisCleanUp
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -22,6 +23,7 @@ class ProductRankingRdbReaderIntegrationTest @Autowired constructor(
     private val weeklyJpaRepository: MvProductRankWeeklyJpaRepository,
     private val monthlyJpaRepository: MvProductRankMonthlyJpaRepository,
     private val databaseCleanUp: DatabaseCleanUp,
+    private val redisCleanUp: RedisCleanUp,
 ) {
 
     // KST 2025-01-15 14:00:00 = UTC 2025-01-15 05:00:00
@@ -31,6 +33,7 @@ class ProductRankingRdbReaderIntegrationTest @Autowired constructor(
     @AfterEach
     fun tearDown() {
         databaseCleanUp.truncateAllTables()
+        redisCleanUp.truncateAll()
     }
 
     @DisplayName("findTopRankings() - WEEKLY")
