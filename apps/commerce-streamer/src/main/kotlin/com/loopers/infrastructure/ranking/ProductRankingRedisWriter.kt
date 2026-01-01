@@ -1,17 +1,23 @@
 package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRankingWriter
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.Score
+import org.springframework.data.redis.core.DefaultTypedTuple
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Repository
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 /**
  * ProductRankingRedisWriter - Redis ZSET 쓰기 구현
  *
- * - incrementScores: Pipeline + ZINCRBY로 배치 점수 증분 (TTL 자동 설정)
- * - replaceAll: DEL + ZADD로 전체 교체
- * - createBucket: ZADD로 새 버킷 생성
+ * - replaceAll: Staging key + RENAME으로 원자적 버킷 전환 (FR-4, AC-8)
+ *
+ * Atomic Transition Pattern (BR-4):
+ * 1. 새 데이터를 staging key ({bucketKey}:staging)에 작성
+ * 2. Redis RENAME으로 staging key를 active key로 원자적 교체
+ * 3. 클라이언트는 전환 중에도 항상 완전한 데이터를 조회
  */
 @Repository
 class ProductRankingRedisWriter(
@@ -19,30 +25,76 @@ class ProductRankingRedisWriter(
 ) : ProductRankingWriter {
 
     companion object {
-        private val TTL_SECONDS = java.time.Duration.ofHours(2).seconds
+        private val HOURLY_TTL_SECONDS = Duration.ofHours(2).seconds
+        private val DAILY_TTL_SECONDS = Duration.ofHours(48).seconds
         private const val MAX_BUCKET_SIZE = 100L
+        private const val STAGING_SUFFIX = ":staging"
     }
 
+    /**
+     * 전체 점수 교체 (Atomic Transition)
+     *
+     * Staging key + RENAME 패턴으로 원자적 버킷 전환 구현:
+     * 1. staging key 클리어 (이전 실패한 시도가 있을 수 있음)
+     * 2. staging key에 새 데이터 작성
+     * 3. RENAME으로 staging -> active 원자적 교체
+     * 4. period에 따른 TTL 설정 (HOURLY=2시간, DAILY=48시간)
+     *
+     * @param bucketKey Redis 키 (format: ranking:products:{period}:{date})
+     * @param scores 상품ID -> 점수 맵
+     */
     override fun replaceAll(bucketKey: String, scores: Map<Long, Score>) {
         if (scores.isEmpty()) {
             redisTemplate.delete(bucketKey)
             return
         }
 
-        // Delete first, then add all scores and set TTL
-        redisTemplate.delete(bucketKey)
-
+        val stagingKey = "$bucketKey$STAGING_SUFFIX"
         val zSetOps = redisTemplate.opsForZSet()
-        val tuples = scores.map { (productId, score) ->
-            org.springframework.data.redis.core.DefaultTypedTuple(
-                productId.toString(),
-                score.value.toDouble(),
-            )
-        }.toSet()
 
-        zSetOps.add(bucketKey, tuples)
+        // 1. Staging key 클리어 (이전 실패한 시도가 있을 경우 대비)
+        redisTemplate.delete(stagingKey)
+
+        // 2. Staging key에 새 데이터 작성
+        val tuples = scores.map { (productId, score) ->
+            DefaultTypedTuple(productId.toString(), score.value.toDouble())
+        }.toSet()
+        zSetOps.add(stagingKey, tuples)
+
         // Keep only top 100: remove all except ranks 0~99 (highest scores)
-        zSetOps.removeRange(bucketKey, 0, -(MAX_BUCKET_SIZE + 1))
-        redisTemplate.expire(bucketKey, TTL_SECONDS, TimeUnit.SECONDS)
+        zSetOps.removeRange(stagingKey, 0, -(MAX_BUCKET_SIZE + 1))
+
+        // 3. RENAME으로 staging -> active 원자적 교체
+        redisTemplate.rename(stagingKey, bucketKey)
+
+        // 4. Period에 따른 TTL 설정
+        val ttlSeconds = determineTtl(bucketKey)
+        redisTemplate.expire(bucketKey, ttlSeconds, TimeUnit.SECONDS)
+    }
+
+    /**
+     * bucket key에서 period를 추출하여 TTL 결정
+     *
+     * Key format: ranking:products:{period}:{date}
+     * - ranking:products:hourly:yyyyMMddHH -> 2시간 TTL
+     * - ranking:products:daily:yyyyMMdd -> 48시간 TTL
+     */
+    private fun determineTtl(bucketKey: String): Long {
+        return try {
+            val parts = bucketKey.split(":")
+            if (parts.size >= 3) {
+                val periodKey = parts[2] // "hourly" or "daily"
+                when (RankingPeriod.fromKey(periodKey)) {
+                    RankingPeriod.HOURLY -> HOURLY_TTL_SECONDS
+                    RankingPeriod.DAILY -> DAILY_TTL_SECONDS
+                }
+            } else {
+                // Fallback to hourly TTL for legacy key format
+                HOURLY_TTL_SECONDS
+            }
+        } catch (e: IllegalArgumentException) {
+            // Unknown period key, fallback to hourly TTL
+            HOURLY_TTL_SECONDS
+        }
     }
 }
