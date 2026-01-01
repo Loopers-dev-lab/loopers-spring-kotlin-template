@@ -1,5 +1,6 @@
 package com.loopers.domain.ranking
 
+import com.loopers.infrastructure.ranking.ProductDailyMetricJpaRepository
 import com.loopers.infrastructure.ranking.ProductHourlyMetricJpaRepository
 import com.loopers.infrastructure.ranking.RankingWeightJpaRepository
 import com.loopers.utils.DatabaseCleanUp
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
@@ -23,6 +25,7 @@ import java.time.temporal.ChronoUnit
 class RankingAggregationServiceIntegrationTest @Autowired constructor(
     private val rankingAggregationService: RankingAggregationService,
     private val productHourlyMetricJpaRepository: ProductHourlyMetricJpaRepository,
+    private val productDailyMetricJpaRepository: ProductDailyMetricJpaRepository,
     private val rankingWeightJpaRepository: RankingWeightJpaRepository,
     private val redisTemplate: RedisTemplate<String, String>,
     private val databaseCleanUp: DatabaseCleanUp,
@@ -291,6 +294,171 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             // then
             val bucketKey = RankingKeyGenerator.currentBucketKey()
             assertThat(redisTemplate.hasKey(bucketKey)).isFalse()
+        }
+    }
+
+    @DisplayName("rollupHourlyToDaily 통합 테스트")
+    @Nested
+    inner class RollupHourlyToDailyIntegration {
+
+        @DisplayName("시간별 메트릭을 일별 메트릭으로 집계한다")
+        @Test
+        fun `aggregates hourly metrics to daily metrics`() {
+            // given - 특정 날짜의 여러 시간대에 시간별 메트릭 저장
+            val targetDate = LocalDate.now(seoulZone)
+            val hour00 = targetDate.atStartOfDay(seoulZone)
+            val hour12 = hour00.plusHours(12)
+
+            val metric1 = ProductHourlyMetric.create(
+                statHour = hour00,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 10,
+                orderAmount = BigDecimal("1000.00"),
+            )
+            val metric2 = ProductHourlyMetric.create(
+                statHour = hour12,
+                productId = 1L,
+                viewCount = 50,
+                likeCount = 5,
+                orderAmount = BigDecimal("500.00"),
+            )
+            productHourlyMetricJpaRepository.saveAll(listOf(metric1, metric2))
+
+            // when
+            rankingAggregationService.rollupHourlyToDaily(targetDate)
+
+            // then
+            val dailyMetrics = productDailyMetricJpaRepository.findAllByStatDate(targetDate)
+            assertThat(dailyMetrics).hasSize(1)
+            assertThat(dailyMetrics[0].productId).isEqualTo(1L)
+            assertThat(dailyMetrics[0].viewCount).isEqualTo(150L) // 100 + 50
+            assertThat(dailyMetrics[0].likeCount).isEqualTo(15L) // 10 + 5
+            assertThat(dailyMetrics[0].orderAmount).isEqualByComparingTo(BigDecimal("1500.00")) // 1000 + 500
+        }
+
+        @DisplayName("여러 상품의 시간별 메트릭을 각각 일별로 집계한다")
+        @Test
+        fun `aggregates multiple products hourly metrics to daily`() {
+            // given
+            val targetDate = LocalDate.now(seoulZone)
+            val hour00 = targetDate.atStartOfDay(seoulZone)
+
+            val metric1 = ProductHourlyMetric.create(
+                statHour = hour00,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 10,
+                orderAmount = BigDecimal("1000.00"),
+            )
+            val metric2 = ProductHourlyMetric.create(
+                statHour = hour00,
+                productId = 2L,
+                viewCount = 200,
+                likeCount = 20,
+                orderAmount = BigDecimal("2000.00"),
+            )
+            productHourlyMetricJpaRepository.saveAll(listOf(metric1, metric2))
+
+            // when
+            rankingAggregationService.rollupHourlyToDaily(targetDate)
+
+            // then
+            val dailyMetrics = productDailyMetricJpaRepository.findAllByStatDate(targetDate)
+            assertThat(dailyMetrics).hasSize(2)
+            assertThat(dailyMetrics.map { it.productId }).containsExactlyInAnyOrder(1L, 2L)
+        }
+
+        @DisplayName("시간별 메트릭이 없으면 일별 메트릭을 생성하지 않는다")
+        @Test
+        fun `does not create daily metrics when no hourly metrics exist`() {
+            // given - no hourly metrics for target date
+            val targetDate = LocalDate.now(seoulZone)
+
+            // when
+            rankingAggregationService.rollupHourlyToDaily(targetDate)
+
+            // then
+            val dailyMetrics = productDailyMetricJpaRepository.findAllByStatDate(targetDate)
+            assertThat(dailyMetrics).isEmpty()
+        }
+    }
+
+    @DisplayName("calculateDailyRankings 통합 테스트")
+    @Nested
+    inner class CalculateDailyRankingsIntegration {
+
+        @DisplayName("일별 메트릭을 기반으로 Redis에 일별 랭킹 점수를 저장한다")
+        @Test
+        fun `saves daily rankings to Redis with correct scores`() {
+            // given - 일별 메트릭 저장
+            val targetDate = LocalDate.now(seoulZone)
+            val dailyMetric = ProductDailyMetric.create(
+                statDate = targetDate,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 50,
+                orderAmount = BigDecimal("1000.00"),
+            )
+            productDailyMetricJpaRepository.save(dailyMetric)
+
+            // when
+            rankingAggregationService.calculateDailyRankings(targetDate)
+
+            // then
+            val dailyBucketKey = RankingKeyGenerator.dailyBucketKey(targetDate)
+            val score = zSetOps.score(dailyBucketKey, "1")
+            assertThat(score).isNotNull
+
+            // Score = 100 * 0.10 + 50 * 0.20 + 1000 * 0.60 = 10 + 10 + 600 = 620
+            assertThat(score).isEqualTo(620.0)
+        }
+
+        @DisplayName("여러 상품의 일별 랭킹 점수를 계산한다")
+        @Test
+        fun `calculates daily rankings for multiple products`() {
+            // given
+            val targetDate = LocalDate.now(seoulZone)
+
+            val dailyMetric1 = ProductDailyMetric.create(
+                statDate = targetDate,
+                productId = 1L,
+                viewCount = 100,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+            val dailyMetric2 = ProductDailyMetric.create(
+                statDate = targetDate,
+                productId = 2L,
+                viewCount = 200,
+                likeCount = 0,
+                orderAmount = BigDecimal.ZERO,
+            )
+            productDailyMetricJpaRepository.saveAll(listOf(dailyMetric1, dailyMetric2))
+
+            // when
+            rankingAggregationService.calculateDailyRankings(targetDate)
+
+            // then
+            val dailyBucketKey = RankingKeyGenerator.dailyBucketKey(targetDate)
+            // Product 1: 100 * 0.10 = 10.0
+            assertThat(zSetOps.score(dailyBucketKey, "1")).isEqualTo(10.0)
+            // Product 2: 200 * 0.10 = 20.0
+            assertThat(zSetOps.score(dailyBucketKey, "2")).isEqualTo(20.0)
+        }
+
+        @DisplayName("일별 메트릭이 없으면 Redis를 업데이트하지 않는다")
+        @Test
+        fun `does not update Redis when no daily metrics exist`() {
+            // given - no daily metrics for target date
+            val targetDate = LocalDate.now(seoulZone)
+
+            // when
+            rankingAggregationService.calculateDailyRankings(targetDate)
+
+            // then
+            val dailyBucketKey = RankingKeyGenerator.dailyBucketKey(targetDate)
+            assertThat(redisTemplate.hasKey(dailyBucketKey)).isFalse()
         }
     }
 }
