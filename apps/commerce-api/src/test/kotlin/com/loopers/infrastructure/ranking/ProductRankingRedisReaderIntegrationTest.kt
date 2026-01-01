@@ -1,6 +1,5 @@
 package com.loopers.infrastructure.ranking
 
-import com.loopers.domain.ranking.ProductRankingReader
 import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingQuery
@@ -19,7 +18,7 @@ import java.time.Instant
 @SpringBootTest
 @DisplayName("ProductRankingRedisReader 통합 테스트")
 class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
-    private val productRankingReader: ProductRankingReader,
+    private val productRankingRedisReader: ProductRankingRedisReader,
     private val rankingKeyGenerator: RankingKeyGenerator,
     private val redisTemplate: RedisTemplate<String, String>,
     private val redisCleanUp: RedisCleanUp,
@@ -56,7 +55,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = productRankingReader.findTopRankings(query)
+            val result = productRankingRedisReader.findTopRankings(query)
 
             // then - limit + 1 = 4개까지 조회 시도하나 데이터가 3개뿐
             assertThat(result).hasSize(3)
@@ -90,7 +89,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = productRankingReader.findTopRankings(query)
+            val result = productRankingRedisReader.findTopRankings(query)
 
             // then - limit + 1 = 4
             assertThat(result).hasSize(4)
@@ -108,7 +107,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = productRankingReader.findTopRankings(query)
+            val result = productRankingRedisReader.findTopRankings(query)
 
             // then
             assertThat(result).isEmpty()
@@ -133,7 +132,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = productRankingReader.findTopRankings(query)
+            val result = productRankingRedisReader.findTopRankings(query)
 
             // then - offset 2부터 limit + 1 = 3개 조회
             assertThat(result).hasSize(3)
@@ -167,7 +166,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val rank = productRankingReader.findRankByProductId(query, 102L)
+            val rank = productRankingRedisReader.findRankByProductId(query, 102L)
 
             // then
             assertThat(rank).isEqualTo(1)
@@ -190,7 +189,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val rank = productRankingReader.findRankByProductId(query, 103L)
+            val rank = productRankingRedisReader.findRankByProductId(query, 103L)
 
             // then
             assertThat(rank).isEqualTo(2)
@@ -212,7 +211,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val rank = productRankingReader.findRankByProductId(query, 999L)
+            val rank = productRankingRedisReader.findRankByProductId(query, 999L)
 
             // then
             assertThat(rank).isNull()
@@ -230,7 +229,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val rank = productRankingReader.findRankByProductId(query, 101L)
+            val rank = productRankingRedisReader.findRankByProductId(query, 101L)
 
             // then
             assertThat(rank).isNull()
@@ -256,7 +255,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = productRankingReader.exists(query)
+            val result = productRankingRedisReader.exists(query)
 
             // then
             assertThat(result).isTrue()
@@ -274,7 +273,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
             )
 
             // when
-            val result = productRankingReader.exists(query)
+            val result = productRankingRedisReader.exists(query)
 
             // then
             assertThat(result).isFalse()

@@ -5,10 +5,19 @@ import com.loopers.domain.ranking.ProductRankingReader
 import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingQuery
 import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.stereotype.Repository
+import org.springframework.stereotype.Component
 import java.math.BigDecimal
 
-@Repository
+/**
+ * Redis 기반 랭킹 조회 구현체
+ *
+ * HOURLY/DAILY 랭킹 조회를 위한 구현체입니다.
+ * Redis ZSET에서 실시간 랭킹 데이터를 조회합니다.
+ *
+ * Note: 이 클래스는 @Component로 등록되며, CompositeProductRankingReader가
+ * ProductRankingReader 인터페이스의 단일 @Repository 빈으로 동작합니다.
+ */
+@Component
 class ProductRankingRedisReader(
     private val redisTemplate: RedisTemplate<String, String>,
     private val rankingKeyGenerator: RankingKeyGenerator,
