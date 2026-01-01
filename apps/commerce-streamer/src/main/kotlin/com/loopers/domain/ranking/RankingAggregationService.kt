@@ -2,9 +2,9 @@ package com.loopers.domain.ranking
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
 /**
@@ -22,11 +22,11 @@ class RankingAggregationService(
     private val rankingWriter: ProductRankingWriter,
     private val rankingWeightRepository: RankingWeightRepository,
     private val scoreCalculator: RankingScoreCalculator,
-    private val rankingKeyGenerator: RankingKeyGenerator,
 ) {
     companion object {
         private val DECAY_FACTOR = java.math.BigDecimal("0.1")
         private val CURRENT_WEIGHT = java.math.BigDecimal("0.9")
+        private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -65,10 +65,12 @@ class RankingAggregationService(
      * 4. Redis에 replaceAll로 업데이트
      *
      * 이전 버킷에만 있는 상품도 포함 (cold start prevention)
+     *
+     * @param period 랭킹 기간 (HOURLY, DAILY)
+     * @param dateTime 버킷 기준 시간
      */
-    fun calculateAndUpdateScores() {
-        val now = Instant.now()
-        val currentHour = now.truncatedTo(ChronoUnit.HOURS)
+    fun calculateAndUpdateScores(period: RankingPeriod, dateTime: ZonedDateTime) {
+        val currentHour = dateTime.toInstant().truncatedTo(ChronoUnit.HOURS)
         val previousHour = currentHour.minus(1, ChronoUnit.HOURS)
 
         // DB에서 현재/이전 버킷 조회
@@ -111,8 +113,7 @@ class RankingAggregationService(
         }
 
         // Redis에 업데이트
-        val bucketKey = rankingKeyGenerator.currentBucketKey()
-        rankingWriter.replaceAll(bucketKey, finalScores)
+        rankingWriter.replaceAll(period, dateTime, finalScores)
 
         logger.info(
             "Calculated and updated scores for {} products (current: {}, previous: {})",
@@ -131,7 +132,7 @@ class RankingAggregationService(
      *
      * @param date 롤업 대상 날짜 (기본값: 오늘)
      */
-    fun rollupHourlyToDaily(date: LocalDate = LocalDate.now(ZoneId.of("Asia/Seoul"))) {
+    fun rollupHourlyToDaily(date: LocalDate = LocalDate.now(SEOUL_ZONE)) {
         val hourlyMetrics = metricRepository.findAllByDate(date)
 
         if (hourlyMetrics.isEmpty()) {
@@ -171,7 +172,7 @@ class RankingAggregationService(
      *
      * @param date 랭킹 계산 대상 날짜 (기본값: 오늘)
      */
-    fun calculateDailyRankings(date: LocalDate = LocalDate.now(ZoneId.of("Asia/Seoul"))) {
+    fun calculateDailyRankings(date: LocalDate = LocalDate.now(SEOUL_ZONE)) {
         val dailyMetrics = dailyMetricRepository.findAllByStatDate(date)
 
         if (dailyMetrics.isEmpty()) {
@@ -189,8 +190,8 @@ class RankingAggregationService(
         }
 
         // Redis에 일별 버킷으로 저장
-        val dailyBucketKey = rankingKeyGenerator.dailyBucketKey(date)
-        rankingWriter.replaceAll(dailyBucketKey, scores)
+        val dateTime = date.atStartOfDay(SEOUL_ZONE)
+        rankingWriter.replaceAll(RankingPeriod.DAILY, dateTime, scores)
 
         logger.info(
             "Calculated and updated daily rankings for {} products on date: {}",

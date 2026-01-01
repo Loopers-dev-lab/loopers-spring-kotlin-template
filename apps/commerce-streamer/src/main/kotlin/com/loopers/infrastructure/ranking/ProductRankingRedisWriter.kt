@@ -1,12 +1,14 @@
 package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRankingWriter
+import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.Score
 import org.springframework.data.redis.core.DefaultTypedTuple
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Repository
 import java.time.Duration
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
 /**
@@ -22,6 +24,7 @@ import java.util.concurrent.TimeUnit
 @Repository
 class ProductRankingRedisWriter(
     private val redisTemplate: RedisTemplate<String, String>,
+    private val rankingKeyGenerator: RankingKeyGenerator,
 ) : ProductRankingWriter {
 
     companion object {
@@ -40,10 +43,13 @@ class ProductRankingRedisWriter(
      * 3. RENAME으로 staging -> active 원자적 교체
      * 4. period에 따른 TTL 설정 (HOURLY=2시간, DAILY=48시간)
      *
-     * @param bucketKey Redis 키 (format: ranking:products:{period}:{date})
+     * @param period 랭킹 기간 (HOURLY, DAILY)
+     * @param dateTime 버킷 기준 시간
      * @param scores 상품ID -> 점수 맵
      */
-    override fun replaceAll(bucketKey: String, scores: Map<Long, Score>) {
+    override fun replaceAll(period: RankingPeriod, dateTime: ZonedDateTime, scores: Map<Long, Score>) {
+        val bucketKey = rankingKeyGenerator.bucketKey(period, dateTime)
+
         if (scores.isEmpty()) {
             redisTemplate.delete(bucketKey)
             return
@@ -68,33 +74,20 @@ class ProductRankingRedisWriter(
         redisTemplate.rename(stagingKey, bucketKey)
 
         // 4. Period에 따른 TTL 설정
-        val ttlSeconds = determineTtl(bucketKey)
+        val ttlSeconds = determineTtl(period)
         redisTemplate.expire(bucketKey, ttlSeconds, TimeUnit.SECONDS)
     }
 
     /**
-     * bucket key에서 period를 추출하여 TTL 결정
+     * period에 따른 TTL 결정
      *
-     * Key format: ranking:products:{period}:{date}
-     * - ranking:products:hourly:yyyyMMddHH -> 2시간 TTL
-     * - ranking:products:daily:yyyyMMdd -> 48시간 TTL
+     * - HOURLY -> 2시간 TTL
+     * - DAILY -> 48시간 TTL
      */
-    private fun determineTtl(bucketKey: String): Long {
-        return try {
-            val parts = bucketKey.split(":")
-            if (parts.size >= 3) {
-                val periodKey = parts[2] // "hourly" or "daily"
-                when (RankingPeriod.fromKey(periodKey)) {
-                    RankingPeriod.HOURLY -> HOURLY_TTL_SECONDS
-                    RankingPeriod.DAILY -> DAILY_TTL_SECONDS
-                }
-            } else {
-                // Fallback to hourly TTL for legacy key format
-                HOURLY_TTL_SECONDS
-            }
-        } catch (e: IllegalArgumentException) {
-            // Unknown period key, fallback to hourly TTL
-            HOURLY_TTL_SECONDS
+    private fun determineTtl(period: RankingPeriod): Long {
+        return when (period) {
+            RankingPeriod.HOURLY -> HOURLY_TTL_SECONDS
+            RankingPeriod.DAILY -> DAILY_TTL_SECONDS
         }
     }
 }

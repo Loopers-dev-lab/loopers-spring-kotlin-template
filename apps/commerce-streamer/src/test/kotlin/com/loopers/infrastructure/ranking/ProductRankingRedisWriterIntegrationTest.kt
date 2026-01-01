@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRankingWriter
+import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.Score
 import com.loopers.utils.RedisCleanUp
 import org.assertj.core.api.Assertions.assertThat
@@ -11,7 +12,11 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
+
+private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
 
 @SpringBootTest
 @DisplayName("ProductRankingRedisWriter 통합 테스트")
@@ -22,9 +27,14 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
 ) {
 
     private val zSetOps = redisTemplate.opsForZSet()
+
+    // Test dateTime values
+    private val testHourlyDateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, SEOUL_ZONE)
+    private val testDailyDateTime = ZonedDateTime.of(2025, 1, 15, 0, 0, 0, 0, SEOUL_ZONE)
+
+    // Expected bucket keys based on the dateTime values
     private val testHourlyBucketKey = "ranking:products:hourly:2025011514"
     private val testDailyBucketKey = "ranking:products:daily:20250115"
-    private val testLegacyBucketKey = "ranking:products:2025011514"
 
     @AfterEach
     fun tearDown() {
@@ -48,7 +58,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             )
 
             // when
-            productRankingWriter.replaceAll(testHourlyBucketKey, newScores)
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, newScores)
 
             // then - old entries should be removed
             val score101: Double? = zSetOps.score(testHourlyBucketKey, "101")
@@ -69,7 +79,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             assertThat(redisTemplate.hasKey(testHourlyBucketKey)).isTrue()
 
             // when
-            productRankingWriter.replaceAll(testHourlyBucketKey, emptyMap())
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, emptyMap())
 
             // then
             assertThat(redisTemplate.hasKey(testHourlyBucketKey)).isFalse()
@@ -84,7 +94,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             }
 
             // when
-            productRankingWriter.replaceAll(testHourlyBucketKey, scores)
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, scores)
 
             // then - 버킷에는 100개만 존재해야 함
             val bucketSize = zSetOps.size(testHourlyBucketKey)
@@ -121,7 +131,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             )
 
             // when
-            productRankingWriter.replaceAll(testHourlyBucketKey, scores)
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, scores)
 
             // then - staging key should not exist after RENAME
             assertThat(redisTemplate.hasKey(stagingKey)).isFalse()
@@ -145,7 +155,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             )
 
             // when
-            productRankingWriter.replaceAll(testHourlyBucketKey, newScores)
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, newScores)
 
             // then - 기존 데이터는 완전히 제거됨
             val score1: Double? = zSetOps.score(testHourlyBucketKey, "1")
@@ -174,7 +184,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             val newScores = mapOf(101L to Score.of(100.0))
 
             // when
-            productRankingWriter.replaceAll(testHourlyBucketKey, newScores)
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, newScores)
 
             // then - staging key 정리 후 RENAME 완료
             assertThat(redisTemplate.hasKey(stagingKey)).isFalse()
@@ -196,7 +206,7 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             val scores = mapOf(101L to Score.of(100.0))
 
             // when
-            productRankingWriter.replaceAll(testHourlyBucketKey, scores)
+            productRankingWriter.replaceAll(RankingPeriod.HOURLY, testHourlyDateTime, scores)
 
             // then - HOURLY TTL은 2시간(7200초)
             val ttl = redisTemplate.getExpire(testHourlyBucketKey, TimeUnit.SECONDS)
@@ -211,27 +221,12 @@ class ProductRankingRedisWriterIntegrationTest @Autowired constructor(
             val scores = mapOf(101L to Score.of(100.0))
 
             // when
-            productRankingWriter.replaceAll(testDailyBucketKey, scores)
+            productRankingWriter.replaceAll(RankingPeriod.DAILY, testDailyDateTime, scores)
 
             // then - DAILY TTL은 48시간(172800초)
             val ttl = redisTemplate.getExpire(testDailyBucketKey, TimeUnit.SECONDS)
             assertThat(ttl).isGreaterThan(172700L)
             assertThat(ttl).isLessThanOrEqualTo(172800L)
-        }
-
-        @DisplayName("레거시 키 포맷은 2시간 TTL이 설정된다 (fallback)")
-        @Test
-        fun `sets 2 hour TTL for legacy key format as fallback`() {
-            // given
-            val scores = mapOf(101L to Score.of(100.0))
-
-            // when
-            productRankingWriter.replaceAll(testLegacyBucketKey, scores)
-
-            // then - 레거시 포맷은 2시간 TTL (fallback)
-            val ttl = redisTemplate.getExpire(testLegacyBucketKey, TimeUnit.SECONDS)
-            assertThat(ttl).isGreaterThan(7100L)
-            assertThat(ttl).isLessThanOrEqualTo(7200L)
         }
     }
 }

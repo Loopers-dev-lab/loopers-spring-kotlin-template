@@ -1,8 +1,6 @@
 package com.loopers.domain.ranking
 
 import org.springframework.stereotype.Component
-import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -87,81 +85,11 @@ class RankingKeyGenerator {
         }
     }
 
-    // ============================================
-    // Backward compatibility methods (deprecated)
-    // ============================================
-
-    /**
-     * @deprecated Use bucketKey(RankingPeriod.HOURLY, dateTime) instead
-     */
-    fun bucketKey(instant: Instant): String {
-        val truncated = instant.truncatedTo(ChronoUnit.HOURS)
-        return "$LEGACY_PREFIX:${LEGACY_FORMATTER.format(truncated)}"
-    }
-
-    /**
-     * @deprecated Use currentBucketKey(RankingPeriod.HOURLY) instead
-     */
-    fun currentBucketKey(): String = bucketKey(Instant.now())
-
-    /**
-     * @deprecated Use previousBucketKey(bucketKey) instead
-     */
-    fun previousBucketKey(): String {
-        val previousHour = Instant.now().minus(1, ChronoUnit.HOURS)
-        return bucketKey(previousHour)
-    }
-
-    /**
-     * Previous bucket key from given instant (1 hour before)
-     * @param instant Time reference
-     * @return Format: "ranking:products:yyyyMMddHH" for previous hour
-     * @deprecated Use previousBucketKey(bucketKey) instead
-     */
-    fun previousBucketKey(instant: Instant): String {
-        val truncated = instant.truncatedTo(ChronoUnit.HOURS)
-        val previousHour = truncated.minus(1, ChronoUnit.HOURS)
-        return "$LEGACY_PREFIX:${LEGACY_FORMATTER.format(previousHour)}"
-    }
-
-    /**
-     * Next bucket key from given instant (1 hour after)
-     * @param instant Time reference
-     * @return Format: "ranking:products:yyyyMMddHH" for next hour
-     */
-    fun nextBucketKey(instant: Instant): String {
-        val truncated = instant.truncatedTo(ChronoUnit.HOURS)
-        val nextHour = truncated.plus(1, ChronoUnit.HOURS)
-        return "$LEGACY_PREFIX:${LEGACY_FORMATTER.format(nextHour)}"
-    }
-
-    /**
-     * Next bucket key based on current time
-     * @return Format: "ranking:products:yyyyMMddHH" for next hour
-     */
-    fun nextBucketKey(): String = nextBucketKey(Instant.now())
-
-    /**
-     * @deprecated Use bucketKey(RankingPeriod.DAILY, dateTime) instead
-     */
-    fun dailyBucketKey(date: LocalDate): String {
-        val instant = date.atStartOfDay(SEOUL_ZONE).toInstant()
-        return "$DAILY_PREFIX:${DAILY_FORMATTER.format(instant)}"
-    }
-
-    /**
-     * @deprecated Use currentBucketKey(RankingPeriod.DAILY) instead
-     */
-    fun currentDailyBucketKey(): String = dailyBucketKey(LocalDate.now(SEOUL_ZONE))
-
     companion object {
         private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
 
         private const val HOURLY_PREFIX = "ranking:products:hourly"
         private const val DAILY_PREFIX = "ranking:products:daily"
-
-        // Legacy prefix without period indicator (for backward compatibility)
-        private const val LEGACY_PREFIX = "ranking:products"
 
         private val HOURLY_FORMATTER = DateTimeFormatter
             .ofPattern("yyyyMMddHH")
@@ -169,11 +97,6 @@ class RankingKeyGenerator {
 
         private val DAILY_FORMATTER = DateTimeFormatter
             .ofPattern("yyyyMMdd")
-            .withZone(SEOUL_ZONE)
-
-        // Legacy formatter (for backward compatibility)
-        private val LEGACY_FORMATTER = DateTimeFormatter
-            .ofPattern("yyyyMMddHH")
             .withZone(SEOUL_ZONE)
     }
 }

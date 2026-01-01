@@ -20,6 +20,8 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
+private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
+
 @SpringBootTest
 @DisplayName("RankingAggregationService 통합 테스트")
 class RankingAggregationServiceIntegrationTest @Autowired constructor(
@@ -164,9 +166,9 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         @Test
         fun `saves scores to Redis based on current bucket metrics`() {
             // given - 현재 시간 버킷에 메트릭 저장
-            val currentHour = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
             val metric = ProductHourlyMetric.create(
-                statHour = currentHour,
+                statHour = now,
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 50,
@@ -175,10 +177,10 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             productHourlyMetricJpaRepository.save(metric)
 
             // when
-            rankingAggregationService.calculateAndUpdateScores()
+            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
 
             // then
-            val bucketKey = rankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
             val score = zSetOps.score(bucketKey, "1")
             assertThat(score).isNotNull
 
@@ -190,12 +192,12 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         @Test
         fun `applies decay formula - previous 0_1 plus current 0_9`() {
             // given
-            val currentHour = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
-            val previousHour = currentHour.minusHours(1)
+            val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val previousHour = now.minusHours(1)
 
             // Current bucket: 100 views -> 100 * 0.10 = 10 points
             val currentMetric = ProductHourlyMetric.create(
-                statHour = currentHour,
+                statHour = now,
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 0,
@@ -214,10 +216,10 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             productHourlyMetricJpaRepository.saveAll(listOf(currentMetric, previousMetric))
 
             // when
-            rankingAggregationService.calculateAndUpdateScores()
+            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
 
             // then
-            val bucketKey = rankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
             val score = zSetOps.score(bucketKey, "1")
 
             // Expected: 20 * 0.1 + 10 * 0.9 = 2 + 9 = 11
@@ -228,7 +230,8 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         @Test
         fun `includes products only in previous bucket`() {
             // given
-            val previousHour = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS).minusHours(1)
+            val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val previousHour = now.minusHours(1)
 
             // Only in previous bucket: 100 views -> 100 * 0.10 = 10 points
             val previousMetric = ProductHourlyMetric.create(
@@ -241,10 +244,10 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             productHourlyMetricJpaRepository.save(previousMetric)
 
             // when
-            rankingAggregationService.calculateAndUpdateScores()
+            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
 
             // then
-            val bucketKey = rankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
             val score = zSetOps.score(bucketKey, "99")
 
             // Expected: 10 * 0.1 + 0 * 0.9 = 1.0
@@ -255,17 +258,17 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         @Test
         fun `calculates scores for multiple products`() {
             // given
-            val currentHour = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
+            val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
 
             val metric1 = ProductHourlyMetric.create(
-                statHour = currentHour,
+                statHour = now,
                 productId = 1L,
                 viewCount = 100,
                 likeCount = 0,
                 orderAmount = BigDecimal.ZERO,
             )
             val metric2 = ProductHourlyMetric.create(
-                statHour = currentHour,
+                statHour = now,
                 productId = 2L,
                 viewCount = 200,
                 likeCount = 0,
@@ -274,10 +277,10 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             productHourlyMetricJpaRepository.saveAll(listOf(metric1, metric2))
 
             // when
-            rankingAggregationService.calculateAndUpdateScores()
+            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
 
             // then
-            val bucketKey = rankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
             // Product 1: 100 * 0.10 * 0.9 = 9.0
             assertThat(zSetOps.score(bucketKey, "1")).isEqualTo(9.0)
             // Product 2: 200 * 0.10 * 0.9 = 18.0
@@ -288,12 +291,13 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
         @Test
         fun `does not update Redis when no metrics exist`() {
             // given - no metrics in DB
+            val now = ZonedDateTime.now(seoulZone).truncatedTo(ChronoUnit.HOURS)
 
             // when
-            rankingAggregationService.calculateAndUpdateScores()
+            rankingAggregationService.calculateAndUpdateScores(RankingPeriod.HOURLY, now)
 
             // then
-            val bucketKey = rankingKeyGenerator.currentBucketKey()
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, now)
             assertThat(redisTemplate.hasKey(bucketKey)).isFalse()
         }
     }
@@ -407,7 +411,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(targetDate)
 
             // then
-            val dailyBucketKey = rankingKeyGenerator.dailyBucketKey(targetDate)
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE))
             val score = zSetOps.score(dailyBucketKey, "1")
             assertThat(score).isNotNull
 
@@ -441,7 +445,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(targetDate)
 
             // then
-            val dailyBucketKey = rankingKeyGenerator.dailyBucketKey(targetDate)
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE))
             // Product 1: 100 * 0.10 = 10.0
             assertThat(zSetOps.score(dailyBucketKey, "1")).isEqualTo(10.0)
             // Product 2: 200 * 0.10 = 20.0
@@ -458,7 +462,7 @@ class RankingAggregationServiceIntegrationTest @Autowired constructor(
             rankingAggregationService.calculateDailyRankings(targetDate)
 
             // then
-            val dailyBucketKey = rankingKeyGenerator.dailyBucketKey(targetDate)
+            val dailyBucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.DAILY, targetDate.atStartOfDay(SEOUL_ZONE))
             assertThat(redisTemplate.hasKey(dailyBucketKey)).isFalse()
         }
     }

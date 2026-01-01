@@ -1,5 +1,7 @@
 package com.loopers.domain.ranking
 
+import java.time.ZonedDateTime
+
 /**
  * ProductRankingWriter - Redis ZSET 쓰기를 위한 Port 인터페이스
  *
@@ -14,8 +16,9 @@ interface ProductRankingWriter {
      *
      * 가중치 변경 시 전체 점수 재계산에 사용
      *
-     * @param bucketKey Redis 키
+     * @param period 랭킹 기간 (HOURLY, DAILY)
+     * @param dateTime 버킷 기준 시간
      * @param scores 상품ID -> 점수 맵
      */
-    fun replaceAll(bucketKey: String, scores: Map<Long, Score>)
+    fun replaceAll(period: RankingPeriod, dateTime: ZonedDateTime, scores: Map<Long, Score>)
 }
