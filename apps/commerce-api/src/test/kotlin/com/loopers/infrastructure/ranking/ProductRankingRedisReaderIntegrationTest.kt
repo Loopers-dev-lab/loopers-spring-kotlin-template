@@ -15,8 +15,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
 import java.math.BigDecimal
 import java.time.Instant
-import java.time.ZoneId
-import java.time.ZonedDateTime
 
 @SpringBootTest
 @DisplayName("ProductRankingRedisReader 통합 테스트")
@@ -28,9 +26,9 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
 ) {
 
     private val zSetOps = redisTemplate.opsForZSet()
-    private val seoulZone = ZoneId.of("Asia/Seoul")
-    private val testZonedDateTime = ZonedDateTime.of(2025, 1, 15, 14, 0, 0, 0, seoulZone)
-    private val testDateTime: Instant = testZonedDateTime.toInstant()
+
+    // KST 2025-01-15 14:00:00 = UTC 2025-01-15 05:00:00
+    private val testDateTime: Instant = Instant.parse("2025-01-15T05:00:00Z")
 
     @AfterEach
     fun tearDown() {
@@ -45,7 +43,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
         @Test
         fun `returns top N rankings using RankingQuery`() {
             // given
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testZonedDateTime)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testDateTime)
             zSetOps.add(bucketKey, "101", 100.0)
             zSetOps.add(bucketKey, "102", 300.0)
             zSetOps.add(bucketKey, "103", 200.0)
@@ -79,7 +77,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
         @Test
         fun `returns limit plus one items for hasNext check`() {
             // given
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testZonedDateTime)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testDateTime)
             for (i in 1..10) {
                 zSetOps.add(bucketKey, i.toString(), (100 - i).toDouble())
             }
@@ -120,7 +118,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
         @Test
         fun `returns paginated rankings with offset`() {
             // given
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testZonedDateTime)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testDateTime)
             zSetOps.add(bucketKey, "101", 500.0)
             zSetOps.add(bucketKey, "102", 400.0)
             zSetOps.add(bucketKey, "103", 300.0)
@@ -156,7 +154,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
         @Test
         fun `returns 1-based rank for specific product`() {
             // given
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testZonedDateTime)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testDateTime)
             zSetOps.add(bucketKey, "101", 100.0)
             zSetOps.add(bucketKey, "102", 300.0)
             zSetOps.add(bucketKey, "103", 200.0)
@@ -179,7 +177,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
         @Test
         fun `returns rank 2 for second highest score product`() {
             // given
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testZonedDateTime)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testDateTime)
             zSetOps.add(bucketKey, "101", 100.0)
             zSetOps.add(bucketKey, "102", 300.0)
             zSetOps.add(bucketKey, "103", 200.0)
@@ -202,7 +200,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
         @Test
         fun `returns null for non-existent product`() {
             // given
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testZonedDateTime)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testDateTime)
             zSetOps.add(bucketKey, "101", 100.0)
             zSetOps.add(bucketKey, "102", 200.0)
 
@@ -247,7 +245,7 @@ class ProductRankingRedisReaderIntegrationTest @Autowired constructor(
         @Test
         fun `returns true when bucket key exists`() {
             // given
-            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testZonedDateTime)
+            val bucketKey = rankingKeyGenerator.bucketKey(RankingPeriod.HOURLY, testDateTime)
             zSetOps.add(bucketKey, "101", 100.0)
 
             val query = RankingQuery(

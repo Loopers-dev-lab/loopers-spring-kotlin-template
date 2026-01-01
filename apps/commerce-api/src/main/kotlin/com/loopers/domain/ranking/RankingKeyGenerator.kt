@@ -1,21 +1,27 @@
 package com.loopers.domain.ranking
 
 import org.springframework.stereotype.Component
+import java.time.Clock
+import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 @Component
-class RankingKeyGenerator {
+class RankingKeyGenerator(
+    private val clock: Clock,
+) {
 
     /**
-     * Generates bucket key from ZonedDateTime and period
+     * Generates bucket key from Instant and period
      * - Hourly: ranking:products:hourly:yyyyMMddHH
      * - Daily: ranking:products:daily:yyyyMMdd
+     *
+     * Internally converts to Seoul timezone for key formatting (spec#8.2 - Redis keys remain KST-based)
      */
-    fun bucketKey(period: RankingPeriod, dateTime: ZonedDateTime): String {
-        val seoulDateTime = dateTime.withZoneSameInstant(SEOUL_ZONE)
+    fun bucketKey(period: RankingPeriod, instant: Instant): String {
+        val seoulDateTime = instant.atZone(SEOUL_ZONE)
         return when (period) {
             RankingPeriod.HOURLY -> {
                 val truncated = seoulDateTime.truncatedTo(ChronoUnit.HOURS)
@@ -43,8 +49,7 @@ class RankingKeyGenerator {
      * Current bucket key for the given period
      */
     fun currentBucketKey(period: RankingPeriod): String {
-        val now = ZonedDateTime.now(SEOUL_ZONE)
-        return bucketKey(period, now)
+        return bucketKey(period, clock.instant())
     }
 
     /**
@@ -60,8 +65,7 @@ class RankingKeyGenerator {
         val period = RankingPeriod.fromKey(periodKey)
         val dateTime = parseDateTime(period, date)
         val previousInstant = period.subtractOne(dateTime.toInstant())
-        val previousDateTime = previousInstant.atZone(SEOUL_ZONE)
-        return bucketKey(period, previousDateTime)
+        return bucketKey(period, previousInstant)
     }
 
     private fun parseDateTime(period: RankingPeriod, date: String): ZonedDateTime {
