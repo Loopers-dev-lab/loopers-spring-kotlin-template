@@ -1,10 +1,13 @@
 package com.loopers.interfaces.api.ranking
 
+import com.loopers.application.ranking.RankingInfo
 import com.loopers.interfaces.api.ApiResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 
 /**
  * Ranking API V1 명세
@@ -15,17 +18,26 @@ import org.springframework.data.domain.Page
 interface RankingV1ApiSpec {
 
     @Operation(
-        summary = "일간 랭킹 조회",
-        description = "특정 날짜의 상품 랭킹을 페이지 단위로 조회합니다. 상품 정보가 함께 반환되며, 페이지 크기는 최대 100개로 제한됩니다."
+        summary = "기간별 랭킹 조회",
+        description = "일간/주간/월간 상품 랭킹을 조회합니다. daily(Redis), weekly/monthly(DB MV)"
     )
     fun getRankings(
-        @Parameter(description = "날짜 (yyyyMMdd 형식), 미입력 시 오늘 날짜", example = "20251223")
+        @Parameter(
+            description = "랭킹 기간 (daily, weekly, monthly)",
+            example = "daily",
+            schema = Schema(allowableValues = ["daily", "weekly", "monthly"], defaultValue = "daily")
+        )
+        period: String,
+
+        @Parameter(
+            description = "날짜 (daily: yyyyMMdd, weekly: yyyy-Www, monthly: yyyy-MM)",
+            example = "20251231"
+        )
         date: String?,
 
-        @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
-        page: Int,
+        @Parameter(hidden = true)
+        pageable: Pageable
+    ): ApiResponse<Page<RankingInfo>>
 
-        @Parameter(description = "페이지 크기 (최대 100)", example = "20")
-        size: Int
-    ): ApiResponse<Page<RankingV1Dto.RankingResponse>>
+
 }

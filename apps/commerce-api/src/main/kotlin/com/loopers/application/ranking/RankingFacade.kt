@@ -3,6 +3,8 @@ package com.loopers.application.ranking
 import com.loopers.application.product.ProductInfo
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.ranking.RankingService
+import com.loopers.infrastructure.ranking.ProductRankMonthlyRepository
+import com.loopers.infrastructure.ranking.ProductRankWeeklyRepository
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
@@ -28,7 +30,9 @@ import kotlin.collections.mapIndexedNotNull
 @Component
 class RankingFacade(
     private val rankingService: RankingService,
-    private val productService: ProductService
+    private val productService: ProductService,
+    private val productRankWeeklyRepository: ProductRankWeeklyRepository,
+    private val productRankMonthlyRepository: ProductRankMonthlyRepository,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
@@ -109,6 +113,67 @@ class RankingFacade(
             rank = rank + 1,  // 0-based → 1-based
             score = score
         )
+    }
+
+    fun getWeeklyRankings(yearWeek: String, pageable: Pageable): Page<RankingInfo> {
+        val allRankings = productRankWeeklyRepository.findByYearWeekOrderByRankPositionAsc(yearWeek)
+
+        // 페이징 처리
+        val start = pageable.offset.toInt()
+        val end = minOf(start + pageable.pageSize, allRankings.size)
+
+        if (start >= allRankings.size) {
+            return PageImpl(emptyList(), pageable, allRankings.size.toLong())
+        }
+
+        val pageContent = allRankings.subList(start, end)
+
+        // 상품 정보 조회
+        val productIds = pageContent.map { it.productId }
+        val products = productService.getProductsByIds(productIds)
+            .associateBy { it.id }
+
+        // 랭킹 정보 생성
+        val rankings = pageContent.mapNotNull { mv ->
+            products[mv.productId]?.let { product ->
+                RankingInfo(
+                    product = ProductInfo.from(product),
+                    rank = mv.rankPosition,
+                    score = mv.score
+                )
+            }
+        }
+
+        return PageImpl(rankings, pageable, allRankings.size.toLong())
+    }
+
+    fun getMonthlyRankings(yearMonth: String, pageable: Pageable): Page<RankingInfo> {
+        val allRankings = productRankMonthlyRepository.findByPeriodOrderByRankPositionAsc(yearMonth)
+
+        val start = pageable.offset.toInt()
+        val end = minOf(start + pageable.pageSize, allRankings.size)
+
+        if (start >= allRankings.size) {
+            return PageImpl(emptyList(), pageable, allRankings.size.toLong())
+        }
+
+        val pageContent = allRankings.subList(start, end)
+
+        val productIds = pageContent.map { it.productId }
+        val products = productService.getProductsByIds(productIds)
+            .associateBy { it.id }
+
+        val rankings = pageContent.mapNotNull { mv ->
+            products[mv.productId]?.let { product ->
+                RankingInfo(
+                    product = ProductInfo.from(product),
+                    rank = mv.rankPosition,
+                    score = mv.score
+                )
+            }
+        }
+
+        return PageImpl(rankings, pageable, allRankings.size.toLong())
     }
 }
 
