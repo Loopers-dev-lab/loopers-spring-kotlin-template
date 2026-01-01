@@ -18,6 +18,7 @@ class MySqlTestContainersConfig {
                     "--collation-server=utf8mb4_general_ci",
                     "--skip-character-set-client-handshake",
                 )
+                withInitScript("db/init-batch-tables.sql")
                 start()
             }
 
