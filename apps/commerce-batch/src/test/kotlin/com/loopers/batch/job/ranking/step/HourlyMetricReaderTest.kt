@@ -2,7 +2,6 @@ package com.loopers.batch.job.ranking.step
 
 import com.loopers.batch.job.ranking.WeeklyRankingJobConfig
 import com.loopers.domain.ranking.ProductHourlyMetric
-import com.loopers.testcontainers.MySqlTestContainersConfig
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -13,7 +12,6 @@ import org.springframework.batch.test.MetaDataInstanceFactory
 import org.springframework.batch.test.context.SpringBatchTest
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.TestPropertySource
@@ -26,7 +24,6 @@ import javax.sql.DataSource
 
 @SpringBootTest
 @SpringBatchTest
-@Import(MySqlTestContainersConfig::class)
 @ActiveProfiles("test")
 @TestPropertySource(properties = ["spring.batch.job.name=${WeeklyRankingJobConfig.JOB_NAME}"])
 @DisplayName("HourlyMetricReader")

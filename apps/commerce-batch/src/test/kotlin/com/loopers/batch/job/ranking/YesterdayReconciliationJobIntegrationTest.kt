@@ -1,6 +1,5 @@
 package com.loopers.batch.job.ranking
 
-import com.loopers.testcontainers.MySqlTestContainersConfig
 import com.loopers.utils.DatabaseCleanUp
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -14,7 +13,6 @@ import org.springframework.batch.test.context.SpringBatchTest
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.TestPropertySource
@@ -27,7 +25,6 @@ import java.time.ZoneId
 
 @SpringBootTest
 @SpringBatchTest
-@Import(MySqlTestContainersConfig::class)
 @ActiveProfiles("test")
 @TestPropertySource(properties = ["spring.batch.job.name=${YesterdayReconciliationJobConfig.JOB_NAME}"])
 @DisplayName("YesterdayReconciliationJob Integration")
