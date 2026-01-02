@@ -58,6 +58,8 @@ class RankingPersistenceTasklet(
         val deletedCount = when (periodType) {
             RankingPeriodType.WEEKLY -> productPeriodRankingRepository.deleteWeeklyByBaseDate(baseDate)
             RankingPeriodType.MONTHLY -> productPeriodRankingRepository.deleteMonthlyByBaseDate(baseDate)
+            RankingPeriodType.HOURLY, RankingPeriodType.DAILY ->
+                throw UnsupportedOperationException("$periodType does not support RDB persistence")
         }
         log.info("기존 {} 랭킹 {} 개 삭제 완료 - baseDate: {}", periodType, deletedCount, baseDate)
 
@@ -65,6 +67,8 @@ class RankingPersistenceTasklet(
         val savedCount = when (periodType) {
             RankingPeriodType.WEEKLY -> saveWeeklyRankings(topRankings)
             RankingPeriodType.MONTHLY -> saveMonthlyRankings(topRankings)
+            RankingPeriodType.HOURLY, RankingPeriodType.DAILY ->
+                throw UnsupportedOperationException("$periodType does not support RDB persistence")
         }
         log.info("새로운 {} 랭킹 {} 개 저장 완료 - baseDate: {}", periodType, savedCount, baseDate)
 
