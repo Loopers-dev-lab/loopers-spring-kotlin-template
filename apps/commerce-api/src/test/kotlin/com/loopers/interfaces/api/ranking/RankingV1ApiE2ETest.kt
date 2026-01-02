@@ -8,10 +8,14 @@ import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingWeight
 import com.loopers.domain.ranking.RankingWeightRepository
+import com.loopers.infrastructure.ranking.MvProductRankMonthly
+import com.loopers.infrastructure.ranking.MvProductRankMonthlyJpaRepository
+import com.loopers.infrastructure.ranking.MvProductRankWeekly
+import com.loopers.infrastructure.ranking.MvProductRankWeeklyJpaRepository
+import com.loopers.infrastructure.ranking.RankingKeyGenerator
 import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
@@ -34,6 +38,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import java.math.BigDecimal
+import java.time.LocalDate
+import java.time.ZoneId
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RankingV1ApiE2ETest @Autowired constructor(
@@ -47,7 +53,13 @@ class RankingV1ApiE2ETest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
     private val rankingKeyGenerator: RankingKeyGenerator,
+    private val weeklyJpaRepository: MvProductRankWeeklyJpaRepository,
+    private val monthlyJpaRepository: MvProductRankMonthlyJpaRepository,
 ) {
+
+    companion object {
+        private val SEOUL_ZONE = ZoneId.of("Asia/Seoul")
+    }
 
     @AfterEach
     fun tearDown() {
@@ -173,6 +185,90 @@ class RankingV1ApiE2ETest @Autowired constructor(
                 { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
                 { assertThat(response.body?.data?.rankings).hasSize(1) },
                 { assertThat(response.body?.data?.rankings?.get(0)?.productId).isEqualTo(product1.id) },
+            )
+        }
+
+        @DisplayName("period=weekly 조회 시 주간 랭킹을 반환한다")
+        @Test
+        fun returnWeeklyRankings_whenPeriodIsWeekly() {
+            // given
+            val brand = createBrand()
+            val product1 = createProduct(brand = brand, name = "상품1")
+            val product2 = createProduct(brand = brand, name = "상품2")
+
+            // Save weekly ranking data directly to database
+            saveWeeklyRanking(product2.id, rank = 1, score = 100.0)
+            saveWeeklyRanking(product1.id, rank = 2, score = 50.0)
+
+            // when
+            val response = getRankings(period = "weekly")
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.rankings).hasSize(2) },
+                { assertThat(response.body?.data?.rankings?.get(0)?.rank).isEqualTo(1) },
+                { assertThat(response.body?.data?.rankings?.get(0)?.productId).isEqualTo(product2.id) },
+                { assertThat(response.body?.data?.rankings?.get(1)?.rank).isEqualTo(2) },
+                { assertThat(response.body?.data?.rankings?.get(1)?.productId).isEqualTo(product1.id) },
+            )
+        }
+
+        @DisplayName("period=monthly 조회 시 월간 랭킹을 반환한다")
+        @Test
+        fun returnMonthlyRankings_whenPeriodIsMonthly() {
+            // given
+            val brand = createBrand()
+            val product1 = createProduct(brand = brand, name = "상품1")
+            val product2 = createProduct(brand = brand, name = "상품2")
+            val product3 = createProduct(brand = brand, name = "상품3")
+
+            // Save monthly ranking data directly to database
+            saveMonthlyRanking(product3.id, rank = 1, score = 150.0)
+            saveMonthlyRanking(product1.id, rank = 2, score = 100.0)
+            saveMonthlyRanking(product2.id, rank = 3, score = 50.0)
+
+            // when
+            val response = getRankings(period = "monthly")
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.rankings).hasSize(3) },
+                { assertThat(response.body?.data?.rankings?.get(0)?.rank).isEqualTo(1) },
+                { assertThat(response.body?.data?.rankings?.get(0)?.productId).isEqualTo(product3.id) },
+                { assertThat(response.body?.data?.rankings?.get(1)?.rank).isEqualTo(2) },
+                { assertThat(response.body?.data?.rankings?.get(1)?.productId).isEqualTo(product1.id) },
+                { assertThat(response.body?.data?.rankings?.get(2)?.rank).isEqualTo(3) },
+                { assertThat(response.body?.data?.rankings?.get(2)?.productId).isEqualTo(product2.id) },
+            )
+        }
+
+        @DisplayName("weekly 랭킹이 없으면 빈 목록을 반환한다")
+        @Test
+        fun returnEmptyList_whenNoWeeklyRankingsExist() {
+            // when
+            val response = getRankings(period = "weekly")
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.rankings).isEmpty() },
+                { assertThat(response.body?.data?.hasNext).isFalse() },
+            )
+        }
+
+        @DisplayName("monthly 랭킹이 없으면 빈 목록을 반환한다")
+        @Test
+        fun returnEmptyList_whenNoMonthlyRankingsExist() {
+            // when
+            val response = getRankings(period = "monthly")
+
+            // then
+            assertAll(
+                { assertThat(response.statusCode).isEqualTo(HttpStatus.OK) },
+                { assertThat(response.body?.data?.rankings).isEmpty() },
+                { assertThat(response.body?.data?.hasNext).isFalse() },
             )
         }
     }
@@ -359,6 +455,38 @@ class RankingV1ApiE2ETest @Autowired constructor(
             HttpMethod.PUT,
             HttpEntity(request, headers),
             object : ParameterizedTypeReference<ApiResponse<RankingV1Response.UpdateWeight>>() {},
+        )
+    }
+
+    private fun saveWeeklyRanking(
+        productId: Long,
+        rank: Int,
+        score: Double,
+        baseDate: LocalDate = LocalDate.now(SEOUL_ZONE),
+    ): MvProductRankWeekly {
+        return weeklyJpaRepository.save(
+            MvProductRankWeekly(
+                baseDate = baseDate,
+                rank = rank,
+                productId = productId,
+                score = BigDecimal.valueOf(score),
+            ),
+        )
+    }
+
+    private fun saveMonthlyRanking(
+        productId: Long,
+        rank: Int,
+        score: Double,
+        baseDate: LocalDate = LocalDate.now(SEOUL_ZONE),
+    ): MvProductRankMonthly {
+        return monthlyJpaRepository.save(
+            MvProductRankMonthly(
+                baseDate = baseDate,
+                rank = rank,
+                productId = productId,
+                score = BigDecimal.valueOf(score),
+            ),
         )
     }
 }

@@ -1,5 +1,6 @@
 package com.loopers.application.ranking
 
+import com.loopers.cache.CacheTemplate
 import com.loopers.domain.product.Brand
 import com.loopers.domain.product.BrandRepository
 import com.loopers.domain.product.Product
@@ -8,10 +9,14 @@ import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingWeight
 import com.loopers.domain.ranking.RankingWeightRepository
+import com.loopers.infrastructure.ranking.MvProductRankMonthly
+import com.loopers.infrastructure.ranking.MvProductRankMonthlyJpaRepository
+import com.loopers.infrastructure.ranking.MvProductRankWeekly
+import com.loopers.infrastructure.ranking.MvProductRankWeeklyJpaRepository
+import com.loopers.infrastructure.ranking.RankingKeyGenerator
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
@@ -24,6 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.RedisTemplate
 import java.math.BigDecimal
+import java.time.LocalDate
 
 @SpringBootTest
 class RankingFacadeIntegrationTest @Autowired constructor(
@@ -37,6 +43,9 @@ class RankingFacadeIntegrationTest @Autowired constructor(
     private val databaseCleanUp: DatabaseCleanUp,
     private val redisCleanUp: RedisCleanUp,
     private val rankingKeyGenerator: RankingKeyGenerator,
+    private val cacheTemplate: CacheTemplate,
+    private val weeklyJpaRepository: MvProductRankWeeklyJpaRepository,
+    private val monthlyJpaRepository: MvProductRankMonthlyJpaRepository,
 ) {
     @AfterEach
     fun tearDown() {
@@ -214,6 +223,183 @@ class RankingFacadeIntegrationTest @Autowired constructor(
             // then
             assertThat(result.rankings).hasSize(1)
             assertThat(result.rankings[0].productId).isEqualTo(product1.id)
+        }
+    }
+
+    @DisplayName("Cache-Aside 통합 테스트")
+    @Nested
+    inner class CacheAsideIntegration {
+
+        @DisplayName("WEEKLY 랭킹 첫 조회 시 캐시에 저장된다")
+        @Test
+        fun `WEEKLY first call stores in cache`() {
+            // given
+            val product1 = createProduct(name = "상품1", stockQuantity = 50)
+            val product2 = createProduct(name = "상품2", stockQuantity = 30)
+
+            val baseDate = LocalDate.now()
+            weeklyJpaRepository.save(
+                MvProductRankWeekly(
+                    productId = product1.id,
+                    baseDate = baseDate,
+                    rank = 1,
+                    score = BigDecimal("100.00"),
+                ),
+            )
+            weeklyJpaRepository.save(
+                MvProductRankWeekly(
+                    productId = product2.id,
+                    baseDate = baseDate,
+                    rank = 2,
+                    score = BigDecimal("90.00"),
+                ),
+            )
+
+            val dateStr = baseDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"))
+            val criteria = RankingCriteria.FindRankings(
+                period = "weekly",
+                date = dateStr,
+                page = 0,
+                size = 10,
+            )
+
+            // when - First call
+            val result1 = rankingFacade.findRankings(criteria)
+
+            // then
+            assertThat(result1.rankings).hasSize(2)
+            assertThat(result1.rankings[0].productId).isEqualTo(product1.id)
+            assertThat(result1.rankings[1].productId).isEqualTo(product2.id)
+
+            // Verify cache was stored
+            val cacheKey = RankingCacheKeys.RankingList(
+                period = RankingPeriod.WEEKLY,
+                baseDate = baseDate,
+                offset = 0,
+                limit = 10,
+            )
+            val cachedKey = "ranking-cache:v1:weekly:$baseDate:0:10"
+            val cachedValue = redisTemplate.opsForValue().get(cachedKey)
+            assertThat(cachedValue).isNotNull()
+        }
+
+        @DisplayName("WEEKLY 랭킹 두 번째 조회 시 캐시에서 반환한다")
+        @Test
+        fun `WEEKLY second call returns from cache`() {
+            // given
+            val product1 = createProduct(name = "상품1", stockQuantity = 50)
+            val product2 = createProduct(name = "상품2", stockQuantity = 30)
+
+            val baseDate = LocalDate.now()
+            weeklyJpaRepository.save(
+                MvProductRankWeekly(
+                    productId = product1.id,
+                    baseDate = baseDate,
+                    rank = 1,
+                    score = BigDecimal("100.00"),
+                ),
+            )
+            weeklyJpaRepository.save(
+                MvProductRankWeekly(
+                    productId = product2.id,
+                    baseDate = baseDate,
+                    rank = 2,
+                    score = BigDecimal("90.00"),
+                ),
+            )
+
+            val dateStr = baseDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"))
+            val criteria = RankingCriteria.FindRankings(
+                period = "weekly",
+                date = dateStr,
+                page = 0,
+                size = 10,
+            )
+
+            // First call - populates cache
+            rankingFacade.findRankings(criteria)
+
+            // Delete from DB to verify cache is used
+            weeklyJpaRepository.deleteAll()
+
+            // when - Second call (should use cache)
+            val result2 = rankingFacade.findRankings(criteria)
+
+            // then - Should still return data from cache
+            assertThat(result2.rankings).hasSize(2)
+            assertThat(result2.rankings[0].productId).isEqualTo(product1.id)
+            assertThat(result2.rankings[1].productId).isEqualTo(product2.id)
+        }
+
+        @DisplayName("MONTHLY 랭킹 첫 조회 시 캐시에 저장된다")
+        @Test
+        fun `MONTHLY first call stores in cache`() {
+            // given
+            val product1 = createProduct(name = "상품1", stockQuantity = 50)
+            val product2 = createProduct(name = "상품2", stockQuantity = 30)
+
+            val baseDate = LocalDate.now()
+            monthlyJpaRepository.save(
+                MvProductRankMonthly(
+                    productId = product1.id,
+                    baseDate = baseDate,
+                    rank = 1,
+                    score = BigDecimal("100.00"),
+                ),
+            )
+            monthlyJpaRepository.save(
+                MvProductRankMonthly(
+                    productId = product2.id,
+                    baseDate = baseDate,
+                    rank = 2,
+                    score = BigDecimal("90.00"),
+                ),
+            )
+
+            val dateStr = baseDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"))
+            val criteria = RankingCriteria.FindRankings(
+                period = "monthly",
+                date = dateStr,
+                page = 0,
+                size = 10,
+            )
+
+            // when - First call
+            val result1 = rankingFacade.findRankings(criteria)
+
+            // then
+            assertThat(result1.rankings).hasSize(2)
+            assertThat(result1.rankings[0].productId).isEqualTo(product1.id)
+            assertThat(result1.rankings[1].productId).isEqualTo(product2.id)
+
+            // Verify cache was stored
+            val cachedKey = "ranking-cache:v1:monthly:$baseDate:0:10"
+            val cachedValue = redisTemplate.opsForValue().get(cachedKey)
+            assertThat(cachedValue).isNotNull()
+        }
+
+        @DisplayName("HOURLY 랭킹은 캐시를 사용하지 않는다")
+        @Test
+        fun `HOURLY does not use cache`() {
+            // given
+            val product1 = createProduct(name = "상품1", stockQuantity = 50)
+
+            val bucketKey = rankingKeyGenerator.currentBucketKey(RankingPeriod.HOURLY)
+            redisTemplate.opsForZSet().add(bucketKey, product1.id.toString(), 100.0)
+
+            val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
+                date = null,
+                page = 0,
+                size = 10,
+            )
+
+            // when
+            rankingFacade.findRankings(criteria)
+
+            // then - No ranking-cache keys should be created
+            val keys = redisTemplate.keys("ranking-cache:*")
+            assertThat(keys).isEmpty()
         }
     }
 

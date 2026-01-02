@@ -1,5 +1,7 @@
 package com.loopers.application.ranking
 
+import com.fasterxml.jackson.core.type.TypeReference
+import com.loopers.cache.CacheTemplate
 import com.loopers.domain.product.ProductSaleStatus
 import com.loopers.domain.product.ProductService
 import com.loopers.domain.product.ProductView
@@ -16,12 +18,17 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 
 class RankingFacadeTest {
 
     private val rankingService: RankingService = mockk()
     private val productService: ProductService = mockk()
-    private val rankingFacade = RankingFacade(rankingService, productService)
+    private val cacheTemplate: CacheTemplate = mockk(relaxed = true)
+    private val clock: Clock = Clock.fixed(Instant.parse("2026-01-02T10:00:00Z"), ZoneId.of("Asia/Seoul"))
+    private val rankingFacade = RankingFacade(rankingService, productService, cacheTemplate, clock)
 
     @DisplayName("findRankings 테스트")
     @Nested
@@ -244,6 +251,208 @@ class RankingFacadeTest {
                     },
                 )
             }
+        }
+    }
+
+    @DisplayName("Cache-Aside 테스트")
+    @Nested
+    inner class CacheAsideTests {
+
+        @DisplayName("HOURLY 조회 시 캐시를 사용하지 않는다")
+        @Test
+        fun `HOURLY bypasses cache`() {
+            // given
+            val criteria = RankingCriteria.FindRankings(
+                period = "hourly",
+                date = "2026010214",
+                page = 0,
+                size = 10,
+            )
+
+            every { rankingService.findRankings(any<RankingCommand.FindRankings>()) } returns emptyList()
+
+            // when
+            rankingFacade.findRankings(criteria)
+
+            // then
+            verify(exactly = 0) { cacheTemplate.get(any(), any<TypeReference<CachedRankingV1>>()) }
+            verify { rankingService.findRankings(any<RankingCommand.FindRankings>()) }
+        }
+
+        @DisplayName("DAILY 조회 시 캐시를 사용하지 않는다")
+        @Test
+        fun `DAILY bypasses cache`() {
+            // given
+            val criteria = RankingCriteria.FindRankings(
+                period = "daily",
+                date = "20260102",
+                page = 0,
+                size = 10,
+            )
+
+            every { rankingService.findRankings(any<RankingCommand.FindRankings>()) } returns emptyList()
+
+            // when
+            rankingFacade.findRankings(criteria)
+
+            // then
+            verify(exactly = 0) { cacheTemplate.get(any(), any<TypeReference<CachedRankingV1>>()) }
+            verify { rankingService.findRankings(any<RankingCommand.FindRankings>()) }
+        }
+
+        @DisplayName("WEEKLY 캐시 히트 시 캐시된 데이터를 반환한다")
+        @Test
+        fun `WEEKLY cache hit returns cached data`() {
+            // given
+            val criteria = RankingCriteria.FindRankings(
+                period = "weekly",
+                date = "20260102",
+                page = 0,
+                size = 10,
+            )
+            val cachedRankings = CachedRankingV1(
+                rankings = listOf(
+                    CachedRankingV1.Entry(productId = 1L, rank = 1, score = BigDecimal("100.00")),
+                    CachedRankingV1.Entry(productId = 2L, rank = 2, score = BigDecimal("90.00")),
+                ),
+            )
+            val productViews = listOf(
+                createProductView(productId = 1L, productName = "상품1"),
+                createProductView(productId = 2L, productName = "상품2"),
+            )
+
+            every { cacheTemplate.get(any<RankingCacheKeys.RankingList>(), any<TypeReference<CachedRankingV1>>()) } returns cachedRankings
+            every { productService.findAllProductViewByIds(listOf(1L, 2L)) } returns productViews
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then
+            verify(exactly = 0) { rankingService.findRankings(any<RankingCommand.FindRankings>()) }
+            assertThat(result.rankings).hasSize(2)
+            assertThat(result.rankings[0].productId).isEqualTo(1L)
+            assertThat(result.rankings[1].productId).isEqualTo(2L)
+        }
+
+        @DisplayName("WEEKLY 캐시 미스 시 서비스 호출 후 캐시에 저장한다")
+        @Test
+        fun `WEEKLY cache miss calls service and stores result`() {
+            // given
+            val criteria = RankingCriteria.FindRankings(
+                period = "weekly",
+                date = "20260102",
+                page = 0,
+                size = 10,
+            )
+            val rankings = listOf(
+                ProductRanking(productId = 1L, rank = 1, score = BigDecimal("100.00")),
+                ProductRanking(productId = 2L, rank = 2, score = BigDecimal("90.00")),
+            )
+            val productViews = listOf(
+                createProductView(productId = 1L, productName = "상품1"),
+                createProductView(productId = 2L, productName = "상품2"),
+            )
+
+            every { cacheTemplate.get(any<RankingCacheKeys.RankingList>(), any<TypeReference<CachedRankingV1>>()) } returns null
+            every { rankingService.findRankings(any<RankingCommand.FindRankings>()) } returns rankings
+            every { productService.findAllProductViewByIds(listOf(1L, 2L)) } returns productViews
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then
+            verify { rankingService.findRankings(any<RankingCommand.FindRankings>()) }
+            verify { cacheTemplate.put(any<RankingCacheKeys.RankingList>(), any<CachedRankingV1>()) }
+            assertThat(result.rankings).hasSize(2)
+        }
+
+        @DisplayName("MONTHLY 캐시 히트 시 캐시된 데이터를 반환한다")
+        @Test
+        fun `MONTHLY cache hit returns cached data`() {
+            // given
+            val criteria = RankingCriteria.FindRankings(
+                period = "monthly",
+                date = "20260102",
+                page = 0,
+                size = 10,
+            )
+            val cachedRankings = CachedRankingV1(
+                rankings = listOf(
+                    CachedRankingV1.Entry(productId = 1L, rank = 1, score = BigDecimal("100.00")),
+                    CachedRankingV1.Entry(productId = 2L, rank = 2, score = BigDecimal("90.00")),
+                ),
+            )
+            val productViews = listOf(
+                createProductView(productId = 1L, productName = "상품1"),
+                createProductView(productId = 2L, productName = "상품2"),
+            )
+
+            every { cacheTemplate.get(any<RankingCacheKeys.RankingList>(), any<TypeReference<CachedRankingV1>>()) } returns cachedRankings
+            every { productService.findAllProductViewByIds(listOf(1L, 2L)) } returns productViews
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then
+            verify(exactly = 0) { rankingService.findRankings(any<RankingCommand.FindRankings>()) }
+            assertThat(result.rankings).hasSize(2)
+            assertThat(result.rankings[0].productId).isEqualTo(1L)
+            assertThat(result.rankings[1].productId).isEqualTo(2L)
+        }
+
+        @DisplayName("MONTHLY 캐시 미스 시 서비스 호출 후 캐시에 저장한다")
+        @Test
+        fun `MONTHLY cache miss calls service and stores result`() {
+            // given
+            val criteria = RankingCriteria.FindRankings(
+                period = "monthly",
+                date = "20260102",
+                page = 0,
+                size = 10,
+            )
+            val rankings = listOf(
+                ProductRanking(productId = 1L, rank = 1, score = BigDecimal("100.00")),
+                ProductRanking(productId = 2L, rank = 2, score = BigDecimal("90.00")),
+            )
+            val productViews = listOf(
+                createProductView(productId = 1L, productName = "상품1"),
+                createProductView(productId = 2L, productName = "상품2"),
+            )
+
+            every { cacheTemplate.get(any<RankingCacheKeys.RankingList>(), any<TypeReference<CachedRankingV1>>()) } returns null
+            every { rankingService.findRankings(any<RankingCommand.FindRankings>()) } returns rankings
+            every { productService.findAllProductViewByIds(listOf(1L, 2L)) } returns productViews
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then
+            verify { rankingService.findRankings(any<RankingCommand.FindRankings>()) }
+            verify { cacheTemplate.put(any<RankingCacheKeys.RankingList>(), any<CachedRankingV1>()) }
+            assertThat(result.rankings).hasSize(2)
+        }
+
+        @DisplayName("WEEKLY 캐시 미스 시 빈 결과도 캐시에 저장하지 않는다")
+        @Test
+        fun `WEEKLY cache miss with empty result does not store in cache`() {
+            // given
+            val criteria = RankingCriteria.FindRankings(
+                period = "weekly",
+                date = "20260102",
+                page = 0,
+                size = 10,
+            )
+
+            every { cacheTemplate.get(any<RankingCacheKeys.RankingList>(), any<TypeReference<CachedRankingV1>>()) } returns null
+            every { rankingService.findRankings(any<RankingCommand.FindRankings>()) } returns emptyList()
+
+            // when
+            val result = rankingFacade.findRankings(criteria)
+
+            // then
+            verify { rankingService.findRankings(any<RankingCommand.FindRankings>()) }
+            verify(exactly = 0) { cacheTemplate.put(any<RankingCacheKeys.RankingList>(), any<CachedRankingV1>()) }
+            assertThat(result.rankings).isEmpty()
         }
     }
 

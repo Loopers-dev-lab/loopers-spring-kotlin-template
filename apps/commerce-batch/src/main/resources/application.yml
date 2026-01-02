@@ -14,8 +14,13 @@ spring:
   batch:
     job:
       name: ${job.name:NONE}
+      enabled: false
     jdbc:
       initialize-schema: never
+
+scheduler:
+  ranking:
+    enabled: true
 
 management:
   health:
