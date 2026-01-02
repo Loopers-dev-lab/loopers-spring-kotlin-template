@@ -111,7 +111,7 @@ class WeeklyRankingJobConfig(
     fun weeklyRankingWriter(): ItemWriter<ProductRankWeekly> {
         return ItemWriter { items ->
             productRankWeeklyRepository.saveAll(items)
-            log.info("주간 랭킹 ${items.size()}개 저장 완료")
+            log.info("주간 랭킹 ${items.size}개 저장 완료")
         }
     }
 

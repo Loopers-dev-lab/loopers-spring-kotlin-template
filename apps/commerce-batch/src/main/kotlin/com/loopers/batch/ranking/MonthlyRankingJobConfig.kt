@@ -110,7 +110,7 @@ class MonthlyRankingJobConfig(
     fun monthlyRankingWriter(): ItemWriter<ProductRankMonthly> {
         return ItemWriter { items ->
             productRankMonthlyRepository.saveAll(items)
-            log.info("월간 랭킹 ${items.size()}개 저장 완료")
+            log.info("월간 랭킹 ${items.size}개 저장 완료")
         }
     }
 
