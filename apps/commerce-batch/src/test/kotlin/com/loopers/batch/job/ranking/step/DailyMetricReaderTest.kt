@@ -1,6 +1,6 @@
 package com.loopers.batch.job.ranking.step
 
-import com.loopers.batch.job.ranking.WeeklyRankingJobConfig
+import com.loopers.batch.job.ranking.DailyRankingJobConfig
 import com.loopers.domain.ranking.ProductDailyMetric
 import com.loopers.testcontainers.MySqlTestContainersConfig
 import com.loopers.utils.DatabaseCleanUp
@@ -26,7 +26,7 @@ import javax.sql.DataSource
 @SpringBatchTest
 @Import(MySqlTestContainersConfig::class)
 @ActiveProfiles("test")
-@TestPropertySource(properties = ["spring.batch.job.name=${WeeklyRankingJobConfig.JOB_NAME}"])
+@TestPropertySource(properties = ["spring.batch.job.name=${DailyRankingJobConfig.JOB_NAME}"])
 @DisplayName("DailyMetricReader")
 class DailyMetricReaderTest @Autowired constructor(
     private val dataSource: DataSource,
