@@ -55,7 +55,7 @@ class TodayDailyRollupJobConfig(
         private const val STEP_DAILY_ROLLUP = "todayDailyRollupStep"
         private const val CHUNK_SIZE = 1000
         private const val RETRY_LIMIT = 1
-        private const val SKIP_LIMIT = 100
+        private const val SKIP_LIMIT = 10
     }
 
     @Bean(JOB_NAME)

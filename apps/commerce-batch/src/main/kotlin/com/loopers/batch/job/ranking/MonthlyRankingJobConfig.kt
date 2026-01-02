@@ -113,7 +113,7 @@ class MonthlyRankingJobConfig(
             .retry(Exception::class.java)
             .retryLimit(1)
             .skip(Exception::class.java)
-            .skipLimit(Int.MAX_VALUE)
+            .skipLimit(10)
             .listener(stepMonitorListener)
             .listener(chunkListener)
             .listener(skipLoggingListener)
