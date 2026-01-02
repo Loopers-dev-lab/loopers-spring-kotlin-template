@@ -28,14 +28,19 @@ object DateUtils {
      * ISO Week의 월요일~일요일 날짜 리스트
      *
      * 예: "2025-W52" → [2025-12-22(월), ..., 2025-12-28(일)]
+     *
+     * ISO 8601 표준: 1월 4일은 항상 해당 연도의 W01에 속함
+     * Edge case 처리: 2023-01-01은 ISO 2022-W52에 속하므로 anchor date 사용
      */
     fun getWeekDates(yearWeek: String): List<LocalDate> {
         val (year, week) = yearWeek.split("-W").let {
             it[0].toInt() to it[1].toInt()
         }
 
-        val firstDayOfYear = LocalDate.of(year, 1, 1)
-        val monday = firstDayOfYear
+        // Jan 4 is always in week 1 of the week-based year (ISO 8601)
+        val anchorDate = LocalDate.of(year, 1, 4)
+        val monday = anchorDate
+            .with(WeekFields.ISO.weekBasedYear(), year.toLong())
             .with(WeekFields.ISO.weekOfWeekBasedYear(), week.toLong())
             .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
