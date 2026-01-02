@@ -297,8 +297,8 @@ ERROR [WeeklyRankingJob] Ranking batch job failed - baseDate=2025-01-02, failedS
 
 | 실패 시나리오 | 대응 방안 | 복구 방법 |
 |--------------|----------|----------|
-| Step 1: Redis ZINCRBY 실패 | Chunk 재시도 3회 후 Job FAILED | 수동 재실행 (재시작 시 이어서 처리) |
-| Step 1: DB 조회 실패 | Chunk 재시도 3회 후 Job FAILED | DB 상태 확인 후 수동 재실행 |
+| Step 1: Redis ZINCRBY 실패 | Chunk 재시도 1회 후 Job FAILED | 수동 재실행 (재시작 시 이어서 처리) |
+| Step 1: DB 조회 실패 | Chunk 재시도 1회 후 Job FAILED | DB 상태 확인 후 수동 재실행 |
 | Step 2: Redis ZREVRANGE 실패 | Job FAILED | Redis 상태 확인 후 수동 재실행 |
 | Step 2: DB 저장 실패 | 트랜잭션 롤백, Job FAILED | DB 상태 확인 후 수동 재실행 |
 | Step 2: 임시 키 삭제 실패 | 무시, Job 성공 | TTL 24시간 자동 만료 |
