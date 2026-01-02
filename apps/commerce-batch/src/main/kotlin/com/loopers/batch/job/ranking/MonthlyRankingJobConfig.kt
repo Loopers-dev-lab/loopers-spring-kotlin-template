@@ -7,6 +7,7 @@ import com.loopers.batch.job.ranking.step.ScoreCalculationProcessor
 import com.loopers.batch.job.ranking.step.ScoreEntry
 import com.loopers.batch.listener.ChunkListener
 import com.loopers.batch.listener.JobListener
+import com.loopers.batch.listener.SkipLoggingListener
 import com.loopers.batch.listener.StepMonitorListener
 import com.loopers.domain.ranking.ProductDailyMetric
 import com.loopers.domain.ranking.ProductPeriodRankingRepository
@@ -14,7 +15,6 @@ import org.springframework.batch.core.Job
 import org.springframework.batch.core.Step
 import org.springframework.batch.core.configuration.annotation.JobScope
 import org.springframework.batch.core.job.builder.JobBuilder
-import org.springframework.batch.core.launch.support.RunIdIncrementer
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.core.step.builder.StepBuilder
 import org.springframework.beans.factory.annotation.Value
@@ -43,6 +43,7 @@ class MonthlyRankingJobConfig(
     private val jobListener: JobListener,
     private val stepMonitorListener: StepMonitorListener,
     private val chunkListener: ChunkListener,
+    private val skipLoggingListener: SkipLoggingListener,
     private val dataSource: DataSource,
     private val redisTemplate: RedisTemplate<String, String>,
     private val productPeriodRankingRepository: ProductPeriodRankingRepository,
@@ -57,7 +58,6 @@ class MonthlyRankingJobConfig(
     @Bean(JOB_NAME)
     fun monthlyRankingJob(): Job {
         return JobBuilder(JOB_NAME, jobRepository)
-            .incrementer(RunIdIncrementer())
             .start(monthlyMetricAggregationStep(null))
             .next(monthlyRankingPersistenceStep(null))
             .listener(jobListener)
@@ -89,8 +89,14 @@ class MonthlyRankingJobConfig(
             .reader(reader)
             .processor(ScoreCalculationProcessor())
             .writer(writer)
+            .faultTolerant()
+            .retry(Exception::class.java)
+            .retryLimit(1)
+            .skip(Exception::class.java)
+            .skipLimit(Int.MAX_VALUE)
             .listener(stepMonitorListener)
             .listener(chunkListener)
+            .listener(skipLoggingListener)
             .build()
     }
 
