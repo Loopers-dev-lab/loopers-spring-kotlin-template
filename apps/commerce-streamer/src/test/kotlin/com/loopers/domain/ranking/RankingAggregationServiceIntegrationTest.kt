@@ -2,6 +2,7 @@ package com.loopers.domain.ranking
 
 import com.loopers.infrastructure.ranking.ProductDailyMetricJpaRepository
 import com.loopers.infrastructure.ranking.ProductHourlyMetricJpaRepository
+import com.loopers.infrastructure.ranking.RankingKeyGenerator
 import com.loopers.infrastructure.ranking.RankingWeightJpaRepository
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp

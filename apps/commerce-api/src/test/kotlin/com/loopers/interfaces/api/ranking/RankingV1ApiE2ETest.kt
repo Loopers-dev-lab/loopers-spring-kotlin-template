@@ -8,7 +8,6 @@ import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingWeight
 import com.loopers.domain.ranking.RankingWeightRepository
@@ -16,12 +15,11 @@ import com.loopers.infrastructure.ranking.MvProductRankMonthly
 import com.loopers.infrastructure.ranking.MvProductRankMonthlyJpaRepository
 import com.loopers.infrastructure.ranking.MvProductRankWeekly
 import com.loopers.infrastructure.ranking.MvProductRankWeeklyJpaRepository
+import com.loopers.infrastructure.ranking.RankingKeyGenerator
 import com.loopers.interfaces.api.ApiResponse
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
-import java.time.LocalDate
-import java.time.ZoneId
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -40,6 +38,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import java.math.BigDecimal
+import java.time.LocalDate
+import java.time.ZoneId
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RankingV1ApiE2ETest @Autowired constructor(

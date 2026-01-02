@@ -8,10 +8,10 @@ import com.loopers.domain.product.ProductStatistic
 import com.loopers.domain.product.ProductStatisticRepository
 import com.loopers.domain.product.Stock
 import com.loopers.domain.product.StockRepository
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingWeight
 import com.loopers.domain.ranking.RankingWeightRepository
+import com.loopers.infrastructure.ranking.RankingKeyGenerator
 import com.loopers.support.values.Money
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
