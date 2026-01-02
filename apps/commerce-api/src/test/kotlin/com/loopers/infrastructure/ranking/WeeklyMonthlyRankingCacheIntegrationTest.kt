@@ -1,6 +1,5 @@
 package com.loopers.infrastructure.ranking
 
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingQuery
 import com.loopers.utils.DatabaseCleanUp

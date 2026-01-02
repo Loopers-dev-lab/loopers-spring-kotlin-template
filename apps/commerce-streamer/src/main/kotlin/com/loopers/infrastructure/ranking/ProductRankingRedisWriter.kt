@@ -1,7 +1,6 @@
 package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRankingWriter
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.Score
 import org.springframework.data.redis.core.DefaultTypedTuple

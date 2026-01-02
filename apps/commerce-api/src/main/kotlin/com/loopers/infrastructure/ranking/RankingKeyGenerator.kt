@@ -1,5 +1,6 @@
-package com.loopers.domain.ranking
+package com.loopers.infrastructure.ranking
 
+import com.loopers.domain.ranking.RankingPeriod
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.Instant
@@ -29,12 +30,15 @@ class RankingKeyGenerator(
                 val truncated = seoulDateTime.truncatedTo(ChronoUnit.HOURS)
                 "$HOURLY_PREFIX:${HOURLY_FORMATTER.format(truncated)}"
             }
+
             RankingPeriod.DAILY -> {
                 "$DAILY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
             }
+
             RankingPeriod.WEEKLY -> {
                 "$WEEKLY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
             }
+
             RankingPeriod.MONTHLY -> {
                 "$MONTHLY_PREFIX:${DAILY_FORMATTER.format(seoulDateTime)}"
             }
@@ -74,7 +78,7 @@ class RankingKeyGenerator(
         require(parts.size == 4) { "Invalid bucket key format: $bucketKey" }
         val periodKey = parts[2] // "hourly" or "daily"
         val date = parts[3] // date portion
-        val period = RankingPeriod.fromKey(periodKey)
+        val period = RankingPeriod.Companion.fromKey(periodKey)
         val dateTime = parseDateTime(period, date)
         val previousInstant = period.subtractOne(dateTime.toInstant())
         return bucketKey(period, previousInstant)
@@ -91,6 +95,7 @@ class RankingKeyGenerator(
                 val hour = date.substring(8, 10).toInt()
                 ZonedDateTime.of(year, month, day, hour, 0, 0, 0, SEOUL_ZONE)
             }
+
             RankingPeriod.DAILY, RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
                 // Parse yyyyMMdd format (same format for daily, weekly, and monthly)
                 require(date.length == 8) { "Invalid ${period.key} date format: $date (expected yyyyMMdd)" }

@@ -2,7 +2,6 @@ package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRanking
 import com.loopers.domain.ranking.ProductRankingReader
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingPeriod
 import com.loopers.domain.ranking.RankingQuery
 import org.springframework.data.domain.PageRequest
@@ -78,9 +77,11 @@ class ProductRankingRdbReader(
             RankingPeriod.WEEKLY -> {
                 weeklyJpaRepository.findByBaseDateAndProductId(baseDate, productId)?.rank
             }
+
             RankingPeriod.MONTHLY -> {
                 monthlyJpaRepository.findByBaseDateAndProductId(baseDate, productId)?.rank
             }
+
             else -> {
                 throw IllegalArgumentException("ProductRankingRdbReader does not support period: ${query.period}")
             }
@@ -151,11 +152,13 @@ class ProductRankingRdbReader(
                     .drop(offset)
                     .map { toProductRanking(it.productId, it.rank, it.score) }
             }
+
             RankingPeriod.MONTHLY -> {
                 monthlyJpaRepository.findByBaseDateOrderByRankAsc(baseDate, pageable)
                     .drop(offset)
                     .map { toProductRanking(it.productId, it.rank, it.score) }
             }
+
             else -> {
                 throw IllegalArgumentException("ProductRankingRdbReader does not support period: ${query.period}")
             }

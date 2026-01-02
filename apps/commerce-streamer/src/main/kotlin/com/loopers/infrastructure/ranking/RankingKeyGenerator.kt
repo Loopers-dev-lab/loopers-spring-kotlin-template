@@ -1,5 +1,6 @@
-package com.loopers.domain.ranking
+package com.loopers.infrastructure.ranking
 
+import com.loopers.domain.ranking.RankingPeriod
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.Instant

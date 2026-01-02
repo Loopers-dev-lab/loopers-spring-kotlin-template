@@ -4,6 +4,7 @@ import com.loopers.infrastructure.ranking.MvProductRankMonthly
 import com.loopers.infrastructure.ranking.MvProductRankMonthlyJpaRepository
 import com.loopers.infrastructure.ranking.MvProductRankWeekly
 import com.loopers.infrastructure.ranking.MvProductRankWeeklyJpaRepository
+import com.loopers.infrastructure.ranking.RankingKeyGenerator
 import com.loopers.utils.DatabaseCleanUp
 import com.loopers.utils.RedisCleanUp
 import org.assertj.core.api.Assertions.assertThat

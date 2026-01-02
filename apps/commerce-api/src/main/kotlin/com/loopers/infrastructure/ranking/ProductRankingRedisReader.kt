@@ -2,7 +2,6 @@ package com.loopers.infrastructure.ranking
 
 import com.loopers.domain.ranking.ProductRanking
 import com.loopers.domain.ranking.ProductRankingReader
-import com.loopers.domain.ranking.RankingKeyGenerator
 import com.loopers.domain.ranking.RankingQuery
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Component
