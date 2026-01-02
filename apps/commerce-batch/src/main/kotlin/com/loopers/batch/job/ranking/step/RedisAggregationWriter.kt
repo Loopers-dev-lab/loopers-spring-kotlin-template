@@ -2,6 +2,8 @@ package com.loopers.batch.job.ranking.step
 
 import com.loopers.batch.job.ranking.RankingPeriodType
 import org.springframework.batch.item.Chunk
+import org.springframework.batch.item.ExecutionContext
+import org.springframework.batch.item.ItemStream
 import org.springframework.batch.item.ItemWriter
 import org.springframework.data.redis.core.RedisTemplate
 import java.time.LocalDate
@@ -19,16 +21,33 @@ class RedisAggregationWriter(
     private val redisTemplate: RedisTemplate<String, String>,
     private val baseDate: LocalDate,
     private val periodType: RankingPeriodType,
-) : ItemWriter<ScoreEntry> {
+) : ItemWriter<ScoreEntry>, ItemStream {
 
     companion object {
         private const val STAGING_SUFFIX = ":staging"
         private const val TTL_HOURS = 24L
         private val DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd")
+        private const val WRITE_COUNT_KEY = "redisAggregationWriter.write.count"
     }
+
+    private var writeCount: Int = 0
 
     private val stagingKey: String by lazy {
         "${periodType.redisPrefix}:${DATE_FORMATTER.format(baseDate)}$STAGING_SUFFIX"
+    }
+
+    override fun open(executionContext: ExecutionContext) {
+        if (executionContext.containsKey(WRITE_COUNT_KEY)) {
+            writeCount = executionContext.getInt(WRITE_COUNT_KEY)
+        }
+    }
+
+    override fun update(executionContext: ExecutionContext) {
+        executionContext.putInt(WRITE_COUNT_KEY, writeCount)
+    }
+
+    override fun close() {
+        // no-op
     }
 
     override fun write(chunk: Chunk<out ScoreEntry>) {
@@ -47,5 +66,7 @@ class RedisAggregationWriter(
         if (redisTemplate.getExpire(stagingKey) == -1L) {
             redisTemplate.expire(stagingKey, TTL_HOURS, TimeUnit.HOURS)
         }
+
+        writeCount += chunk.items.size
     }
 }
