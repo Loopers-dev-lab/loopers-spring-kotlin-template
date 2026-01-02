@@ -114,7 +114,7 @@
 
 | 파라미터 | 타입 | 필수 | 설명 |
 |---------|------|------|------|
-| `period` | String | Y | 배치 타입 (hourly/daily/weekly/monthly) |
+| `period` | String | Y | 배치 타입 (weekly/monthly). 실시간(hourly)/일간(daily) 랭킹은 Redis에만 저장되므로 수동 실행 대상이 아님 |
 
 **요청 바디**:
 
@@ -176,7 +176,7 @@
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `jobName` | String | 실행된 Job 이름 (HourlyRankingJob, DailyRankingJob, WeeklyRankingJob, MonthlyRankingJob) |
+| `jobName` | String | 실행된 Job 이름 (weeklyRankingJob, monthlyRankingJob) |
 | `baseDate` | String | 집계 기준일 |
 | `status` | String | 실행 결과 (COMPLETED/FAILED) |
 | `startTime` | String | 시작 시간 (ISO 8601) |
@@ -198,7 +198,7 @@
 
 | 상황 | HTTP 상태 | 에러 코드 | 메시지 |
 |------|----------|----------|--------|
-| 유효하지 않은 period 값 | 400 | INVALID_PERIOD | 유효하지 않은 기간 타입입니다: {period} |
+| 유효하지 않은 period 값 (weekly/monthly 외) | 400 | INVALID_PERIOD | 유효하지 않은 기간 타입입니다: {period} |
 | 유효하지 않은 date 형식 | 400 | INVALID_DATE_FORMAT | 날짜 형식이 올바르지 않습니다 |
 | 동일 배치 실행 중 | 409 | JOB_ALREADY_RUNNING | 해당 배치가 이미 실행 중입니다 |
 

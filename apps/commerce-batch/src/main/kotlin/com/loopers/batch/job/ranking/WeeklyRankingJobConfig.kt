@@ -17,11 +17,14 @@ import org.springframework.batch.core.configuration.annotation.JobScope
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.core.step.builder.StepBuilder
+import org.springframework.batch.item.support.SynchronizedItemStreamReader
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.task.TaskExecutor
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.transaction.PlatformTransactionManager
 import java.time.LocalDate
 import javax.sql.DataSource
@@ -51,6 +54,17 @@ class WeeklyRankingJobConfig(
         private const val STEP_METRIC_AGGREGATION = "weeklyMetricAggregationStep"
         private const val STEP_RANKING_PERSISTENCE = "weeklyRankingPersistenceStep"
         private const val CHUNK_SIZE = 1000
+        private const val THREAD_POOL_SIZE = 4
+    }
+
+    @Bean("weeklyRankingTaskExecutor")
+    fun weeklyRankingTaskExecutor(): TaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.corePoolSize = THREAD_POOL_SIZE
+        executor.maxPoolSize = THREAD_POOL_SIZE
+        executor.setThreadNamePrefix("weekly-ranking-")
+        executor.initialize()
+        return executor
     }
 
     @Bean(JOB_NAME)
@@ -76,6 +90,11 @@ class WeeklyRankingJobConfig(
             windowDays = periodType.windowDays,
         )
 
+        // JdbcPagingItemReader는 thread-safe하지 않으므로 SynchronizedItemStreamReader로 감싸서 사용
+        val synchronizedReader = SynchronizedItemStreamReader<ProductDailyMetric>().apply {
+            setDelegate(reader)
+        }
+
         val writer = RedisAggregationWriter(
             redisTemplate = redisTemplate,
             baseDate = baseDate,
@@ -84,9 +103,10 @@ class WeeklyRankingJobConfig(
 
         return StepBuilder(STEP_METRIC_AGGREGATION, jobRepository)
             .chunk<ProductDailyMetric, ScoreEntry>(CHUNK_SIZE, transactionManager)
-            .reader(reader)
+            .reader(synchronizedReader)
             .processor(ScoreCalculationProcessor())
             .writer(writer)
+            .taskExecutor(weeklyRankingTaskExecutor())
             .faultTolerant()
             .retry(Exception::class.java)
             .retryLimit(1)

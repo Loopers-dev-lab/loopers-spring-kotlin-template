@@ -101,7 +101,7 @@
 
 **1. commerce-batch (배치 처리 시스템)**
 
-모든 랭킹 관련 배치 Job을 담당한다. HourlyRankingJob은 30분마다 실행되어 시간별 랭킹을 계산하고 Redis에 저장한다. DailyRankingJob은 12시간마다 실행되어 시간별 메트릭을 일간으로 롤업하고 일간 랭킹을 Redis에 저장한다. WeeklyRankingJob과 MonthlyRankingJob은 하루에 한 번 실행되어 일간 메트릭을 집계하고 RDB에 저장한다. 관리자용 REST API를 제공하여 배치 수동 실행 및 재집계를 지원한다.
+모든 랭킹 관련 배치 Job을 담당한다. HourlyRankingJob은 30분마다 실행되어 시간별 랭킹을 계산하고 Redis에 저장한다. TodayDailyRollupJob은 6시간마다(01:00, 07:00, 13:00, 19:00) 실행되어 시간별 메트릭을 일간으로 롤업한다. YesterdayReconciliationJob은 매일 04:00에 실행되어 전일 데이터를 정합성 검증 및 보정한다. DailyRankingJob은 12시간마다(01:00, 13:00) 실행되어 일간 랭킹을 Redis에 저장한다. WeeklyRankingJob과 MonthlyRankingJob은 하루에 한 번(02:00) 실행되어 일간 메트릭을 집계하고 RDB에 저장한다. 관리자용 REST API를 제공하여 주간/월간 배치 수동 실행 및 재집계를 지원한다(시간별/일간 랭킹은 Redis 전용이므로 수동 실행 대상 아님).
 
 **2. commerce-streamer (이벤트 처리 시스템)**
 
