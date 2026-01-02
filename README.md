@@ -21,6 +21,38 @@ docker-compose -f ./docker/infra-compose.yml up
 docker-compose -f ./docker/monitoring-compose.yml up
 ```
 
+## Port Configuration
+각 애플리케이션은 포트 충돌을 방지하기 위해 다음과 같이 포트를 할당합니다.
+
+### Application Ports
+| Application | Port | Description |
+|------------|------|-------------|
+| commerce-api | 8080 | REST API Server |
+| pg-simulator | 8082 | Payment Gateway Simulator |
+| commerce-streamer | 8083 | Kafka Event Streaming |
+| commerce-batch | 8085 | Spring Batch Jobs |
+
+### Management Ports (Actuator)
+| Application | Port | Description |
+|------------|------|-------------|
+| All Applications | 8081 | Actuator / Prometheus Metrics |
+| pg-simulator | 8083 | PG Actuator |
+| commerce-streamer | 8084 | Streamer Actuator |
+
+### Infrastructure (Docker)
+| Service | Port | Description |
+|---------|------|-------------|
+| MySQL | 3306 | Database |
+| Redis | 6379 | Cache / Ranking Store |
+| Kafka | 9092 | Message Broker |
+| Zookeeper | 2181 | Kafka Coordinator |
+| Grafana | 3000 | Monitoring Dashboard |
+| Prometheus | 9090 | Metrics Collector |
+
+**자세한 내용**: [포트 설정 가이드](.codeguide/round10/PORT_CONFIGURATION.md)
+
+---
+
 ## About Multi-Module Project
 본 프로젝트는 멀티 모듈 프로젝트로 구성되어 있습니다. 각 모듈의 위계 및 역할을 분명히 하고, 아래와 같은 규칙을 적용합니다.
 
@@ -31,11 +63,16 @@ docker-compose -f ./docker/monitoring-compose.yml up
 ```
 Root
 ├── apps ( spring-applications )
-│   └── 📦 commerce-api
+│   ├── 📦 commerce-api
+│   ├── 📦 commerce-batch
+│   ├── 📦 commerce-streamer
+│   └── 📦 pg-simulator
 ├── modules ( reusable-configurations )
 │   ├── 📦 jpa
-│   └── 📦 redis
+│   ├── 📦 redis
+│   └── 📦 kafka
 └── supports ( add-ons )
     ├── 📦 monitoring
-    └── 📦 logging
+    ├── 📦 logging
+    └── 📦 jackson
 ```
