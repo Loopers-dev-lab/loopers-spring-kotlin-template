@@ -4,6 +4,7 @@ include(
     ":apps:commerce-api",
     ":apps:commerce-streamer",
     ":apps:pg-simulator",
+    ":apps:commerce-batch",
     ":modules:event",
     ":modules:jpa",
     ":modules:redis",
@@ -40,3 +41,5 @@ pluginManagement {
         }
     }
 }
+
+include("apps:commerce-batch")
