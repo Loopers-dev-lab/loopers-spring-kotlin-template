@@ -46,8 +46,21 @@ class WeeklyRankingJobConfig(
             .reader(weeklyRankingReader(""))
             .processor(weeklyRankingProcessor())
             .writer(weeklyRankingWriter())
+            .listener(weeklyDataCleanupListener())
             .listener(stepMonitorListener)
             .build()
+    }
+
+    @Bean
+    @StepScope
+    fun weeklyDataCleanupListener(): org.springframework.batch.core.StepExecutionListener {
+        return object : org.springframework.batch.core.StepExecutionListener {
+            override fun beforeStep(stepExecution: org.springframework.batch.core.StepExecution) {
+                val yearWeek = stepExecution.jobParameters.getString("yearWeek") ?: return
+                val deletedCount = productRankWeeklyRepository.deleteByYearWeek(yearWeek)
+                log.info("기존 주간 랭킹 데이터 삭제: $yearWeek (${deletedCount}건)")
+            }
+        }
     }
 
     @Bean
@@ -57,11 +70,7 @@ class WeeklyRankingJobConfig(
     ): ItemReader<WeeklyScoreData> {
         log.info("===== 주간 랭킹 배치 시작: $yearWeek =====")
 
-        // 1. 기존 데이터 삭제 (멱등성 보장)
-        productRankWeeklyRepository.deleteByYearWeek(yearWeek)
-        log.info("기존 주간 랭킹 데이터 삭제: $yearWeek")
-
-        // 2. Redis에서 7일치 데이터 집계 및 TOP 100 선택
+        // Redis에서 7일치 데이터 집계 및 TOP 100 선택
         val weeklyScores = aggregateWeeklyScores(yearWeek)
             .sortedByDescending { it.second }
             .take(100)
@@ -71,7 +80,7 @@ class WeeklyRankingJobConfig(
 
         log.info("주간 집계 완료: ${weeklyScores.size}개 상품")
 
-        // 3. Iterator 기반 ItemReader
+        // Iterator 기반 ItemReader
         val iterator = weeklyScores.iterator()
         return ItemReader {
             if (iterator.hasNext()) iterator.next() else null

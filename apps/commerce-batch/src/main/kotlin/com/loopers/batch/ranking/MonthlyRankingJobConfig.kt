@@ -45,8 +45,21 @@ class MonthlyRankingJobConfig(
             .reader(monthlyRankingReader(""))
             .processor(monthlyRankingProcessor())
             .writer(monthlyRankingWriter())
+            .listener(monthlyDataCleanupListener())
             .listener(stepMonitorListener)
             .build()
+    }
+
+    @Bean
+    @StepScope
+    fun monthlyDataCleanupListener(): org.springframework.batch.core.StepExecutionListener {
+        return object : org.springframework.batch.core.StepExecutionListener {
+            override fun beforeStep(stepExecution: org.springframework.batch.core.StepExecution) {
+                val yearMonth = stepExecution.jobParameters.getString("yearMonth") ?: return
+                val deletedCount = productRankMonthlyRepository.deleteByPeriod(yearMonth)
+                log.info("기존 월간 랭킹 데이터 삭제: $yearMonth (${deletedCount}건)")
+            }
+        }
     }
 
     @Bean
@@ -56,11 +69,7 @@ class MonthlyRankingJobConfig(
     ): ItemReader<MonthlyScoreData> {
         log.info("===== 월간 랭킹 배치 시작: $yearMonth =====")
 
-        // 1. 기존 데이터 삭제 (멱등성 보장)
-        val deletedCount = productRankMonthlyRepository.deleteByPeriod(yearMonth)
-        log.info("기존 월간 랭킹 데이터 삭제: $yearMonth (${deletedCount}건)")
-
-        // 2. Redis에서 30일치 데이터 집계 및 TOP 100 선택
+        // Redis에서 30일치 데이터 집계 및 TOP 100 선택
         val monthlyScores = aggregateMonthlyScores(yearMonth)
             .sortedByDescending { it.second }
             .take(100)
@@ -70,7 +79,7 @@ class MonthlyRankingJobConfig(
 
         log.info("월간 집계 완료: ${monthlyScores.size}개 상품")
 
-        // 3. Iterator 기반 ItemReader
+        // Iterator 기반 ItemReader
         val iterator = monthlyScores.iterator()
         return ItemReader {
             if (iterator.hasNext()) iterator.next() else null
