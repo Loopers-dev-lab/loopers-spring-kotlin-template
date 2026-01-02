@@ -56,7 +56,7 @@ class SkipLoggingListenerTest {
     @DisplayName("onSkipInProcess 메서드는")
     inner class OnSkipInProcessTest {
 
-        @DisplayName("[SKIP-PROCESS] 형식으로 productId, statDate, error를 로깅한다")
+        @DisplayName("[SKIP-PROCESS] 형식으로 item, error를 로깅한다")
         @Test
         fun shouldLogSkipProcessError() {
             // arrange
@@ -75,8 +75,7 @@ class SkipLoggingListenerTest {
             // assert
             val logEvent = logAppender.list.first()
             assertThat(logEvent.formattedMessage).contains("[SKIP-PROCESS]")
-            assertThat(logEvent.formattedMessage).contains("productId=12345")
-            assertThat(logEvent.formattedMessage).contains("statDate=2025-01-15")
+            assertThat(logEvent.formattedMessage).contains("item=")
             assertThat(logEvent.formattedMessage).contains("error=Score calculation overflow")
         }
     }
@@ -85,7 +84,7 @@ class SkipLoggingListenerTest {
     @DisplayName("onSkipInWrite 메서드는")
     inner class OnSkipInWriteTest {
 
-        @DisplayName("[SKIP-WRITE] 형식으로 productId, score, error를 로깅한다")
+        @DisplayName("[SKIP-WRITE] 형식으로 item, error를 로깅한다")
         @Test
         fun shouldLogSkipWriteError() {
             // arrange
@@ -101,8 +100,7 @@ class SkipLoggingListenerTest {
             // assert
             val logEvent = logAppender.list.first()
             assertThat(logEvent.formattedMessage).contains("[SKIP-WRITE]")
-            assertThat(logEvent.formattedMessage).contains("productId=67890")
-            assertThat(logEvent.formattedMessage).contains("score=1234.56")
+            assertThat(logEvent.formattedMessage).contains("item=")
             assertThat(logEvent.formattedMessage).contains("error=Redis connection timeout")
         }
     }
