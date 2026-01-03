@@ -14,6 +14,6 @@ class ExampleV1Controller(private val exampleFacade: ExampleFacade) : ExampleV1A
     override fun getExample(
         @PathVariable(value = "exampleId") exampleId: Long,
     ): ApiResponse<ExampleV1Dto.ExampleResponse> = exampleFacade.getExample(exampleId)
-            .let { ExampleV1Dto.ExampleResponse.from(it) }
-            .let { ApiResponse.success(it) }
+        .let { ExampleV1Dto.ExampleResponse.from(it) }
+        .let { ApiResponse.success(it) }
 }

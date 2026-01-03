@@ -7,6 +7,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
@@ -22,6 +23,10 @@ class StockConcurrencyTest @Autowired constructor(
     private val stockService: StockService,
     private val testFixtures: TestFixtures,
 ) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(StockConcurrencyTest::class.java)
+    }
+
     private var productId by Delegates.notNull<Long>()
 
     @BeforeEach
@@ -59,7 +64,7 @@ class StockConcurrencyTest @Autowired constructor(
                     stockService.decreaseStock(productId, quantityPerOrder)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("재고 차감 실패: ${e.message}")
+                    logger.warn("재고 차감 실패: ${e.message}", e)
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
@@ -146,7 +151,7 @@ class StockConcurrencyTest @Autowired constructor(
                         decreaseCount.incrementAndGet()
                     }
                 } catch (e: Exception) {
-                    println("재고 작업 실패 (index=$index): ${e.message}")
+                    logger.warn("재고 작업 실패 (index=$index): ${e.message}", e)
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()

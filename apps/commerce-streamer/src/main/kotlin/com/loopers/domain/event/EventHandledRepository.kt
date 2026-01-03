@@ -1,6 +1,6 @@
 package com.loopers.domain.event
 
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -9,5 +9,5 @@ import java.util.UUID
 interface EventHandledRepository {
     fun save(eventHandled: EventHandled): EventHandled
     fun existsByEventId(eventId: UUID): Boolean
-    fun deleteHandledEventsBefore(handledBefore: ZonedDateTime): Int
+    fun deleteHandledEventsBefore(handledBefore: LocalDateTime): Int
 }

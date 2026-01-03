@@ -29,7 +29,9 @@ class OrderEventHandler(
     private val dataPlatformClient: DataPlatformClient,
     private val outboxEventPublisher: OutboxEventPublisher,
 ) {
-    private val logger = LoggerFactory.getLogger(OrderEventHandler::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(OrderEventHandler::class.java)
+    }
 
     /**
      * 주문 생성 후 쿠폰 사용 처리

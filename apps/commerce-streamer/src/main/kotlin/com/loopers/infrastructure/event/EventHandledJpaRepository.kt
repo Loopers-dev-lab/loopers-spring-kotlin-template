@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 interface EventHandledJpaRepository : JpaRepository<EventHandled, Long> {
 
@@ -24,5 +24,5 @@ interface EventHandledJpaRepository : JpaRepository<EventHandled, Long> {
         WHERE e.handledAt < :handledBefore
         """,
     )
-    fun deleteByHandledAtBefore(@Param("handledBefore") handledBefore: ZonedDateTime): Int
+    fun deleteByHandledAtBefore(@Param("handledBefore") handledBefore: LocalDateTime): Int
 }

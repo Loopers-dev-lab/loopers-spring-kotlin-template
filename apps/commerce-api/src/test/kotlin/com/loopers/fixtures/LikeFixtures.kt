@@ -1,7 +1,7 @@
 package com.loopers.fixtures
 
 import com.loopers.domain.like.Like
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 /**
  * Like 엔티티를 위한 테스트 픽스처 함수
@@ -17,9 +17,9 @@ fun createTestLike(
     id: Long,
     userId: Long,
     productId: Long,
-    createdAt: ZonedDateTime = ZonedDateTime.now(),
-    updatedAt: ZonedDateTime = ZonedDateTime.now(),
+    createdAt: LocalDateTime = LocalDateTime.now(),
+    updatedAt: LocalDateTime = LocalDateTime.now(),
 ): Like = Like(
-        userId = userId,
-        productId = productId,
-    ).withId(id, createdAt, updatedAt)
+    userId = userId,
+    productId = productId,
+).withId(id, createdAt, updatedAt)

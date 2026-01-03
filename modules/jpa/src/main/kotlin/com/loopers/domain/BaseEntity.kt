@@ -7,7 +7,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.MappedSuperclass
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 /**
  * 생성/수정/삭제 정보를 자동으로 관리해준다.
@@ -25,15 +25,15 @@ abstract class BaseEntity {
     val id: Long = 0
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    lateinit var createdAt: ZonedDateTime
+    lateinit var createdAt: LocalDateTime
         protected set
 
     @Column(name = "updated_at", nullable = false)
-    lateinit var updatedAt: ZonedDateTime
+    lateinit var updatedAt: LocalDateTime
         protected set
 
     @Column(name = "deleted_at")
-    var deletedAt: ZonedDateTime? = null
+    var deletedAt: LocalDateTime? = null
         protected set
 
     /**
@@ -47,7 +47,7 @@ abstract class BaseEntity {
     private fun prePersist() {
         guard()
 
-        val now = ZonedDateTime.now()
+        val now = LocalDateTime.now()
         createdAt = now
         updatedAt = now
     }
@@ -56,7 +56,7 @@ abstract class BaseEntity {
     private fun preUpdate() {
         guard()
 
-        val now = ZonedDateTime.now()
+        val now = LocalDateTime.now()
         updatedAt = now
     }
 
@@ -64,7 +64,7 @@ abstract class BaseEntity {
      * delete 연산은 멱등하게 동작할 수 있도록 한다. (삭제된 엔티티를 다시 삭제해도 동일한 결과가 나오도록)
      */
     fun delete() {
-        deletedAt ?: run { deletedAt = ZonedDateTime.now() }
+        deletedAt ?: run { deletedAt = LocalDateTime.now() }
     }
 
     /**

@@ -25,7 +25,9 @@ class OutboxEventProcessor(
     private val outboxEventRepository: OutboxEventRepository,
     private val kafkaProducerService: KafkaProducerService,
 ) {
-    private val logger = LoggerFactory.getLogger(OutboxEventProcessor::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(OutboxEventProcessor::class.java)
+    }
 
     @Value("\${kafka.outbox.relay.max-retry-count:3}")
     private var maxRetryCount: Int = 3
@@ -41,7 +43,7 @@ class OutboxEventProcessor(
             if (!event.canRetry(maxRetryCount)) {
                 logger.warn(
                     "Outbox 이벤트 최대 재시도 횟수 초과: " +
-                        "eventId=${event.id}, retryCount=${event.retryCount}",
+                            "eventId=${event.id}, retryCount=${event.retryCount}",
                 )
                 // 최대 재시도 횟수 초과 시 FAILED 상태로 설정 및 저장
                 event.markAsFailed("최대 재시도 횟수 초과", maxRetryCount)
@@ -68,7 +70,7 @@ class OutboxEventProcessor(
 
             logger.debug(
                 "Outbox 이벤트 발행 성공: eventId=${event.id}, " +
-                    "eventType=${event.eventType}, topic=${event.topic}",
+                        "eventType=${event.eventType}, topic=${event.topic}",
             )
 
             true
@@ -85,8 +87,8 @@ class OutboxEventProcessor(
 
             logger.error(
                 "Outbox 이벤트 발행 실패: eventId=${event.id}, " +
-                    "eventType=${event.eventType}, retryCount=${event.retryCount}, " +
-                    "status=${event.status}",
+                        "eventType=${event.eventType}, retryCount=${event.retryCount}, " +
+                        "status=${event.status}",
                 e,
             )
 

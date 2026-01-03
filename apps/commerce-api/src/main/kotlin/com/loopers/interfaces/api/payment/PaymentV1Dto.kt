@@ -13,11 +13,11 @@ object PaymentV1Dto {
     data class PaymentResponse(val paymentId: Long, val transactionKey: String, val status: String, val amount: Long) {
         companion object {
             fun from(info: PaymentInfo): PaymentResponse = PaymentResponse(
-                    paymentId = info.paymentId,
-                    transactionKey = info.transactionKey,
-                    status = info.status,
-                    amount = info.amount,
-                )
+                paymentId = info.paymentId,
+                transactionKey = info.transactionKey,
+                status = info.status,
+                amount = info.amount,
+            )
         }
     }
 
@@ -29,11 +29,11 @@ object PaymentV1Dto {
             } catch (e: IllegalArgumentException) {
                 throw CoreException(
                     ErrorType.BAD_REQUEST,
-                    "유효하지 않은 결제 상태입니다: $status. 허용된 값: ${TransactionStatusDto.values().joinToString()}",
+                    "유효하지 않은 결제 상태입니다: $status. 허용된 값: ${TransactionStatusDto.entries.joinToString()}",
                 )
             }
 
-            return com.loopers.application.payment.PaymentCallbackRequest(
+            return PaymentCallbackRequest(
                 transactionKey = transactionKey,
                 status = transactionStatus,
                 reason = reason,
@@ -55,17 +55,17 @@ object PaymentV1Dto {
     ) {
         companion object {
             fun from(info: PaymentDetailInfo): PaymentDetailResponse = PaymentDetailResponse(
-                    paymentId = info.paymentId,
-                    userId = info.userId,
-                    orderId = info.orderId,
-                    transactionKey = info.transactionKey,
-                    paymentMethod = info.paymentMethod,
-                    amount = info.amount,
-                    status = info.status,
-                    failureReason = info.failureReason,
-                    cardType = info.cardType,
-                    cardNo = info.cardNo,
-                )
+                paymentId = info.paymentId,
+                userId = info.userId,
+                orderId = info.orderId,
+                transactionKey = info.transactionKey,
+                paymentMethod = info.paymentMethod,
+                amount = info.amount,
+                status = info.status,
+                failureReason = info.failureReason,
+                cardType = info.cardType,
+                cardNo = info.cardNo,
+            )
         }
     }
 }

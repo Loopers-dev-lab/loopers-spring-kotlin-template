@@ -12,7 +12,9 @@ import org.springframework.stereotype.Component
  */
 @Component
 class DataPlatformClientImpl : DataPlatformClient {
-    private val logger = LoggerFactory.getLogger(DataPlatformClientImpl::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(DataPlatformClientImpl::class.java)
+    }
 
     override fun sendOrderCreated(event: OrderCreatedEvent) {
         logger.debug(

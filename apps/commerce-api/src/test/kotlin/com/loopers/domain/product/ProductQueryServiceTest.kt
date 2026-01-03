@@ -1,6 +1,5 @@
 package com.loopers.domain.product
 
-import tools.jackson.core.type.TypeReference
 import com.loopers.fixtures.createTestBrand
 import com.loopers.fixtures.createTestProduct
 import com.loopers.support.error.CoreException
@@ -12,6 +11,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import tools.jackson.core.type.TypeReference
 import java.math.BigDecimal
 
 class ProductQueryServiceTest {

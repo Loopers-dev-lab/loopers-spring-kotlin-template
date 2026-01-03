@@ -10,19 +10,32 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 
 @DisplayName("RankingService 단위 테스트")
 class RankingServiceTest {
 
     private lateinit var rankingRepository: RankingRepository
     private lateinit var productRepository: ProductRepository
+    private lateinit var productRankWeeklyRepository: ProductRankWeeklyRepository
+    private lateinit var productRankMonthlyRepository: ProductRankMonthlyRepository
     private lateinit var rankingService: RankingService
 
     @BeforeEach
     fun setUp() {
         rankingRepository = mockk()
         productRepository = mockk()
-        rankingService = RankingService(rankingRepository, productRepository)
+        productRankWeeklyRepository = mockk()
+        productRankMonthlyRepository = mockk()
+        rankingService = RankingService(
+            rankingRepository,
+            productRepository,
+            productRankWeeklyRepository,
+            productRankMonthlyRepository,
+        )
     }
 
     @Test
@@ -183,5 +196,214 @@ class RankingServiceTest {
         assertThat(productMap.keys).containsExactlyInAnyOrder(100L, 101L, 102L)
 
         verify(exactly = 1) { productRepository.findAllById(productIds) }
+    }
+
+    @Test
+    @DisplayName("주간 Top-N 랭킹 조회 성공")
+    fun `should get weekly top N rankings successfully`() {
+        // given
+        val window = TimeWindow.WEEKLY
+        val timestamp = "2025W01"
+        val page = 1
+        val size = 20
+
+        val weeklyRankings = listOf(
+            mockk<ProductRankWeekly> {
+                every { productId } returns 100L
+                every { score } returns 10.0
+                every { rank } returns 1
+            },
+            mockk<ProductRankWeekly> {
+                every { productId } returns 101L
+                every { score } returns 8.5
+                every { rank } returns 2
+            },
+            mockk<ProductRankWeekly> {
+                every { productId } returns 102L
+                every { score } returns 7.2
+                every { rank } returns 3
+            },
+        )
+
+        val pageResult = PageImpl(weeklyRankings, PageRequest.of(0, size), 3)
+        every { productRankWeeklyRepository.findByYearWeekOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
+
+        // when
+        val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
+
+        // then
+        assertThat(result).hasSize(3)
+        assertThat(result[0].productId).isEqualTo(100L)
+        assertThat(result[0].rank).isEqualTo(1)
+        assertThat(result[0].score.value).isEqualTo(10.0)
+        assertThat(totalCount).isEqualTo(3)
+
+        verify(exactly = 1) { productRankWeeklyRepository.findByYearWeekOrderByRankAsc(timestamp, PageRequest.of(0, size)) }
+    }
+
+    @Test
+    @DisplayName("월간 Top-N 랭킹 조회 성공")
+    fun `should get monthly top N rankings successfully`() {
+        // given
+        val window = TimeWindow.MONTHLY
+        val timestamp = "202501"
+        val page = 1
+        val size = 20
+
+        val monthlyRankings = listOf(
+            mockk<ProductRankMonthly> {
+                every { productId } returns 200L
+                every { score } returns 15.0
+                every { rank } returns 1
+            },
+            mockk<ProductRankMonthly> {
+                every { productId } returns 201L
+                every { score } returns 12.5
+                every { rank } returns 2
+            },
+        )
+
+        val pageResult = PageImpl(monthlyRankings, PageRequest.of(0, size), 2)
+        every { productRankMonthlyRepository.findByYearMonthOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
+
+        // when
+        val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
+
+        // then
+        assertThat(result).hasSize(2)
+        assertThat(result[0].productId).isEqualTo(200L)
+        assertThat(result[0].rank).isEqualTo(1)
+        assertThat(result[0].score.value).isEqualTo(15.0)
+        assertThat(totalCount).isEqualTo(2)
+
+        verify(exactly = 1) { productRankMonthlyRepository.findByYearMonthOrderByRankAsc(timestamp, PageRequest.of(0, size)) }
+    }
+
+    @Test
+    @DisplayName("주간 랭킹 조회 - 잘못된 형식")
+    fun `should throw exception for invalid weekly format`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.WEEKLY, "202501", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 주간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 잘못된 형식")
+    fun `should throw exception for invalid monthly format`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.MONTHLY, "2025W01", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 월간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("주간 랭킹 조회 - 경계값: 유효한 주차 53")
+    fun `should accept valid week number 53`() {
+        // given
+        val window = TimeWindow.WEEKLY
+        val timestamp = "2020W53" // 2020년은 53주가 존재하는 해
+        val page = 1
+        val size = 20
+
+        val pageResult = PageImpl(emptyList<ProductRankWeekly>(), PageRequest.of(0, size), 0)
+        every { productRankWeeklyRepository.findByYearWeekOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
+
+        // when
+        val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
+
+        // then
+        assertThat(result).isEmpty()
+        assertThat(totalCount).isEqualTo(0)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "2025W00, 잘못된 주간 형식입니다",
+        "2025W54, 잘못된 주간 형식입니다",
+        "2025WAA, 잘못된 주간 형식입니다",
+    )
+    @DisplayName("주간 랭킹 조회 - 잘못된 주차 형식")
+    fun `should throw exception for invalid week format`(timestamp: String, expectedMessage: String) {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.WEEKLY, timestamp, 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining(expectedMessage)
+    }
+
+    @Test
+    @DisplayName("주간 랭킹 조회 - 경계값: 숫자가 아닌 주차")
+    fun `should throw exception for non-numeric week`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.WEEKLY, "2025WAA", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 주간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 잘못된 월 00")
+    fun `should throw exception for invalid month 00`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.MONTHLY, "202500", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 월간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 잘못된 월 13")
+    fun `should throw exception for invalid month 13`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.MONTHLY, "202513", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 월간 형식입니다")
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 유효한 월 01")
+    fun `should accept valid month 01`() {
+        // given
+        val window = TimeWindow.MONTHLY
+        val timestamp = "202501"
+        val page = 1
+        val size = 20
+
+        val pageResult = PageImpl(emptyList<ProductRankMonthly>(), PageRequest.of(0, size), 0)
+        every { productRankMonthlyRepository.findByYearMonthOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
+
+        // when
+        val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
+
+        // then
+        assertThat(result).isEmpty()
+        assertThat(totalCount).isEqualTo(0)
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 유효한 월 12")
+    fun `should accept valid month 12`() {
+        // given
+        val window = TimeWindow.MONTHLY
+        val timestamp = "202512"
+        val page = 1
+        val size = 20
+
+        val pageResult = PageImpl(emptyList<ProductRankMonthly>(), PageRequest.of(0, size), 0)
+        every { productRankMonthlyRepository.findByYearMonthOrderByRankAsc(timestamp, PageRequest.of(0, size)) } returns pageResult
+
+        // when
+        val (result, totalCount) = rankingService.getTopN(window, timestamp, page, size)
+
+        // then
+        assertThat(result).isEmpty()
+        assertThat(totalCount).isEqualTo(0)
+    }
+
+    @Test
+    @DisplayName("월간 랭킹 조회 - 경계값: 숫자가 아닌 월")
+    fun `should throw exception for non-numeric month`() {
+        assertThatThrownBy {
+            rankingService.getTopN(TimeWindow.MONTHLY, "2025AA", 1, 20)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("잘못된 월간 형식입니다")
     }
 }

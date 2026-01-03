@@ -11,24 +11,9 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.jpa.repository.QueryHints
 import org.springframework.data.repository.query.Param
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 interface OutboxEventJpaRepository : JpaRepository<OutboxEvent, Long> {
-
-    /**
-     * PENDING 상태의 이벤트를 생성 시각 순으로 조회
-     */
-    @Query(
-        """
-        SELECT e FROM OutboxEvent e
-        WHERE e.status = :status
-        ORDER BY e.createdAt ASC
-        """,
-    )
-    fun findByStatusOrderByCreatedAtAsc(
-        @Param("status") status: OutboxEventStatus,
-        pageable: Pageable,
-    ): List<OutboxEvent>
 
     /**
      * PENDING 상태의 이벤트를 비관적 락과 SKIP LOCKED로 조회
@@ -65,7 +50,7 @@ interface OutboxEventJpaRepository : JpaRepository<OutboxEvent, Long> {
     )
     fun findByStatusAndCreatedAtBefore(
         @Param("status") status: OutboxEventStatus,
-        @Param("createdBefore") createdBefore: ZonedDateTime,
+        @Param("createdBefore") createdBefore: LocalDateTime,
     ): List<OutboxEvent>
 
     /**
@@ -81,6 +66,6 @@ interface OutboxEventJpaRepository : JpaRepository<OutboxEvent, Long> {
     )
     fun deleteByStatusAndPublishedAtBefore(
         @Param("status") status: OutboxEventStatus,
-        @Param("publishedBefore") publishedBefore: ZonedDateTime,
+        @Param("publishedBefore") publishedBefore: LocalDateTime,
     ): Int
 }

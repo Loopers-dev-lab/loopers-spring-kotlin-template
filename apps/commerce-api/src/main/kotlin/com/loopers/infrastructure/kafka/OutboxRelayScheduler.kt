@@ -26,7 +26,9 @@ class OutboxRelayScheduler(
     private val outboxEventRepository: OutboxEventRepository,
     private val outboxEventProcessor: OutboxEventProcessor,
 ) {
-    private val logger = LoggerFactory.getLogger(OutboxRelayScheduler::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(OutboxRelayScheduler::class.java)
+    }
 
     @Value("\${kafka.outbox.relay.batch-size:100}")
     private var batchSize: Int = 100
@@ -64,7 +66,7 @@ class OutboxRelayScheduler(
 
             logger.info(
                 "Outbox Relay 완료: 성공=$successCount, 실패=$failCount, " +
-                    "총=${pendingEvents.size}",
+                        "총=${pendingEvents.size}",
             )
         } catch (e: Exception) {
             logger.error("Outbox Relay 실행 중 오류 발생", e)
@@ -79,7 +81,7 @@ class OutboxRelayScheduler(
     @Transactional
     fun cleanupOldPublishedEvents() {
         try {
-            val sevenDaysAgo = java.time.ZonedDateTime.now().minusDays(7)
+            val sevenDaysAgo = java.time.LocalDateTime.now().minusDays(7)
             val deletedCount = outboxEventRepository.deletePublishedEventsBefore(sevenDaysAgo)
 
             if (deletedCount > 0) {

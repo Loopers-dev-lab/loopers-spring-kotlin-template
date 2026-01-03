@@ -5,7 +5,7 @@ import com.loopers.domain.product.Currency
 import com.loopers.domain.product.Price
 import com.loopers.domain.product.Product
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 /**
  * Product 엔티티를 위한 테스트 픽스처 함수
@@ -23,8 +23,8 @@ fun createTestProduct(
     name: String = "테스트 상품",
     price: BigDecimal = BigDecimal("100000"),
     brand: Brand,
-    createdAt: ZonedDateTime = ZonedDateTime.now(),
-    updatedAt: ZonedDateTime = ZonedDateTime.now(),
+    createdAt: LocalDateTime = LocalDateTime.now(),
+    updatedAt: LocalDateTime = LocalDateTime.now(),
 ): Product {
     val product = Product(
         name = name,

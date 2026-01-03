@@ -14,7 +14,9 @@ import org.springframework.stereotype.Component
  */
 @Component
 class UserActionEventHandler(private val analyticsClient: AnalyticsClient) {
-    private val logger = LoggerFactory.getLogger(UserActionEventHandler::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(UserActionEventHandler::class.java)
+    }
 
     /**
      * 유저 행동 로깅

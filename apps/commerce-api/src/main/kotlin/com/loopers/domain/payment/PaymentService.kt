@@ -24,7 +24,9 @@ class PaymentService(
     private val eventPublisher: ApplicationEventPublisher,
     @param:Value("\${pg.callback-url:http://localhost:8080}") private val callbackBaseUrl: String,
 ) {
-    private val logger = LoggerFactory.getLogger(PaymentService::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(PaymentService::class.java)
+    }
 
     @Transactional
     fun createPayment(
@@ -57,10 +59,10 @@ class PaymentService(
         val cardType = try {
             CardTypeDto.valueOf(payment.cardType)
         } catch (e: IllegalArgumentException) {
-            logger.warn("유효하지 않은 카드 타입: ${payment.cardType}, 허용된 값: ${CardTypeDto.values().joinToString()}")
+            logger.warn("유효하지 않은 카드 타입: ${payment.cardType}, 허용된 값: ${CardTypeDto.entries.joinToString()}")
             throw CoreException(
                 ErrorType.BAD_REQUEST,
-                "유효하지 않은 카드 타입입니다: ${payment.cardType}. 허용된 값: ${CardTypeDto.values().joinToString()}",
+                "유효하지 않은 카드 타입입니다: ${payment.cardType}. 허용된 값: ${CardTypeDto.entries.joinToString()}",
             )
         }
 
@@ -216,7 +218,8 @@ class PaymentService(
         }
     }
 
-    fun getPaymentByTransactionKey(transactionKey: String): Payment = paymentRepository.findByTransactionKey(transactionKey)
+    fun getPaymentByTransactionKey(transactionKey: String): Payment =
+        paymentRepository.findByTransactionKey(transactionKey)
             ?: throw CoreException(ErrorType.NOT_FOUND, "거래 키에 해당하는 결제를 찾을 수 없습니다.")
 
     fun getPaymentsByOrderId(orderId: Long): List<Payment> = paymentRepository.findByOrderId(orderId)

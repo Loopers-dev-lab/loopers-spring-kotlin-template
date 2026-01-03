@@ -40,6 +40,9 @@ spring:
   config:
     activate:
       on-profile: local, test
+  batch:
+    jdbc:
+      initialize-schema: always
 
 ---
 spring:
@@ -57,7 +60,7 @@ spring:
 spring:
   config:
     activate:
-      on-profile: prd
+      on-profile: prod
 
 springdoc:
   api-docs:

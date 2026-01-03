@@ -36,7 +36,9 @@ class OrderFacade(
     private val paymentFacade: PaymentFacade,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
-    private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(OrderFacade::class.java)
+    }
 
     @Transactional
     fun createOrder(userId: Long, request: OrderCreateRequest): OrderCreateInfo {
@@ -47,9 +49,12 @@ class OrderFacade(
         val discountAmount = calculateCouponDiscount(userId, request.couponId, totalMoney)
         val finalAmount = totalMoney - discountAmount
 
-        val paymentMethod = PaymentMethod.valueOf(request.paymentMethod)
-
         // 결제 방식에 따라 처리 순서 다름
+        val paymentMethod = try {
+            PaymentMethod.valueOf(request.paymentMethod)
+        } catch (e: IllegalArgumentException) {
+            throw CoreException(ErrorType.BAD_REQUEST, "지원하지 않는 결제 방식입니다: ${request.paymentMethod}")
+        }
         when (paymentMethod) {
             PaymentMethod.POINT -> {
                 // 포인트 결제: 포인트 검증 → 주문 생성 → 재고 차감 → 포인트 차감

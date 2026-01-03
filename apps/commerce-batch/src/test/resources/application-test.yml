@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: commerce-batch-test
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: create  # Let Hibernate create all tables from JPA entities
+    properties:
+      hibernate:
+        format_sql: true
+  batch:
+    jdbc:
+      initialize-schema: always  # Spring Batch tables auto-created
+  flyway:
+    enabled: false  # Disable Flyway - use Hibernate instead
+  kafka:
+    # Kafka 설정 (통합 테스트용 - Testcontainers 또는 로컬 Kafka 사용)
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
+    consumer:
+      group-id: commerce-batch-test-consumer-group
+      enable-auto-commit: false
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# Kafka Topic 설정
+kafka:
+  topics:
+    catalog-events: test-catalog-events
+    order-events: test-order-events
+    catalog-events-dlq: test-catalog-events-dlq
+    order-events-dlq: test-order-events-dlq

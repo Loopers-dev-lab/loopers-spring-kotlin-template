@@ -7,6 +7,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
@@ -23,6 +24,10 @@ class PointConcurrencyTest @Autowired constructor(
     private val pointService: PointService,
     private val testFixtures: TestFixtures,
 ) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(PointConcurrencyTest::class.java)
+    }
+
     private var userId by Delegates.notNull<Long>()
 
     @BeforeEach
@@ -58,7 +63,7 @@ class PointConcurrencyTest @Autowired constructor(
                     pointService.deductPoint(userId, deductAmount)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("포인트 차감 실패: ${e.message}")
+                    logger.warn("포인트 차감 실패: ${e.message}")
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
@@ -140,7 +145,7 @@ class PointConcurrencyTest @Autowired constructor(
                         deductCount.incrementAndGet()
                     }
                 } catch (e: Exception) {
-                    println("포인트 작업 실패 (index=$index): ${e.message}")
+                    logger.warn("포인트 작업 실패 (index=$index): ${e.message}")
                 } finally {
                     latch.countDown()
                 }

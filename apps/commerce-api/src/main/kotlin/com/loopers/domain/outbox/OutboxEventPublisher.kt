@@ -11,7 +11,9 @@ import tools.jackson.databind.json.JsonMapper
  */
 @Service
 class OutboxEventPublisher(private val outboxEventRepository: OutboxEventRepository, private val jsonMapper: JsonMapper) {
-    private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(OutboxEventPublisher::class.java)
+    }
 
     /**
      * 이벤트를 Outbox 테이블에 저장

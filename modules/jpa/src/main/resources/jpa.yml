@@ -7,9 +7,14 @@ spring:
       ddl-auto: none
     properties:
       hibernate:
+        format_sql: true
         default_batch_fetch_size: 100
         timezone.default_storage: NORMALIZE_UTC
         jdbc.time_zone: UTC
+  batch:
+    jdbc:
+      initialize-schema: never  # prod default
+      table-prefix: BATCH_
 
 datasource:
   mysql-jpa:
@@ -38,6 +43,11 @@ spring:
     show-sql: true
     hibernate:
       ddl-auto: create
+  batch:
+    jdbc:
+      initialize-schema: always  # local: auto-create batch tables
+    job:
+      enabled: false  # Disable auto-running jobs (use scheduler instead)
 
 datasource:
   mysql-jpa:
@@ -54,10 +64,18 @@ spring:
     show-sql: true
     hibernate:
       ddl-auto: create
+  batch:
+    jdbc:
+      initialize-schema: always  # test: auto-create batch tables
+    job:
+      enabled: false  # Disable auto-running jobs during tests
 
 datasource:
   mysql-jpa:
     main:
+      jdbc-url: jdbc:mysql://localhost:3306/loopers
+      username: application
+      password: application
       maximum-pool-size: 10
       minimum-idle: 5
 
@@ -86,7 +104,7 @@ datasource:
       password: application
 
 ---
-spring.config.activate.on-profile: prd
+spring.config.activate.on-profile: prod
 
 datasource:
   mysql-jpa:

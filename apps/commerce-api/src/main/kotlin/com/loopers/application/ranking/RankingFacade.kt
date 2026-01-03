@@ -1,24 +1,34 @@
 package com.loopers.application.ranking
 
+import com.loopers.domain.ranking.ProductRankMonthly
+import com.loopers.domain.ranking.ProductRankWeekly
+import com.loopers.domain.ranking.RankingKey
 import com.loopers.domain.ranking.RankingService
 import com.loopers.domain.ranking.TimeWindow
 import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.time.YearMonth
+import java.time.ZoneId
 
 @Component
 class RankingFacade(private val rankingService: RankingService) {
+    companion object {
+        private val ZONE = ZoneId.of("Asia/Seoul")
+    }
+
     fun getRankingPage(
         window: TimeWindow,
         date: String?,
         page: Int,
         size: Int,
     ): RankingPageInfo {
-        // 날짜 파라미터가 없으면 현재 날짜/시간 사용
+        // 날짜 파라미터가 없으면 현재 날짜/시간 사용 (Asia/Seoul 기준)
         val timestamp = date ?: when (window) {
-            TimeWindow.DAILY -> LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
-            TimeWindow.HOURLY -> LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHH"))
+            TimeWindow.DAILY -> RankingKey.dateToString(LocalDate.now(ZONE))
+            TimeWindow.HOURLY -> RankingKey.dateTimeToString(LocalDateTime.now(ZONE))
+            TimeWindow.WEEKLY -> ProductRankWeekly.yearWeekToString(LocalDate.now(ZONE))
+            TimeWindow.MONTHLY -> ProductRankMonthly.yearMonthToString(YearMonth.now(ZONE))
         }
 
         // 랭킹 조회

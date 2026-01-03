@@ -3,7 +3,7 @@ package com.loopers.application.order
 import com.loopers.domain.order.Order
 import com.loopers.domain.order.OrderItem
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 data class OrderDetailInfo(
     val orderId: Long,
@@ -12,7 +12,7 @@ data class OrderDetailInfo(
     val currency: String,
     val status: String,
     val items: List<OrderItemInfo>,
-    val orderedAt: ZonedDateTime,
+    val orderedAt: LocalDateTime,
 ) {
     companion object {
         fun from(order: Order): OrderDetailInfo {

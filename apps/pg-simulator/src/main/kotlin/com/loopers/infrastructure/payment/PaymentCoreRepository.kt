@@ -26,5 +26,5 @@ class PaymentCoreRepository(private val paymentJpaRepository: PaymentJpaReposito
         userId,
         orderId,
     )
-            .sortedByDescending { it.updatedAt }
+        .sortedByDescending { it.updatedAt }
 }

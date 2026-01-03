@@ -15,7 +15,9 @@ import java.time.LocalDate
  */
 @Component
 class RankingScheduler(private val rankingRepository: RankingRepository) {
-    private val logger = LoggerFactory.getLogger(RankingScheduler::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(RankingScheduler::class.java)
+    }
 
     /**
      * 일간 랭킹 콜드 스타트 방지
@@ -41,7 +43,7 @@ class RankingScheduler(private val rankingRepository: RankingRepository) {
             if (todayCount == 0L) {
                 logger.warn(
                     "일간 랭킹 콜드 스타트 방지: 오늘 랭킹 데이터가 없어 복사하지 않음 - " +
-                        "today=$today, count=0",
+                            "today=$today, count=0",
                 )
                 return
             }
@@ -55,7 +57,7 @@ class RankingScheduler(private val rankingRepository: RankingRepository) {
 
             logger.info(
                 "일간 랭킹 콜드 스타트 방지 완료: " +
-                    "source=$today, target=$tomorrow, weight=$carryOverWeight, count=$todayCount",
+                        "source=$today, target=$tomorrow, weight=$carryOverWeight, count=$todayCount",
             )
         } catch (e: Exception) {
             logger.error("일간 랭킹 콜드 스타트 방지 실패", e)
@@ -85,7 +87,7 @@ class RankingScheduler(private val rankingRepository: RankingRepository) {
             if (currentCount == 0L) {
                 logger.warn(
                     "시간별 랭킹 콜드 스타트 방지: 현재 시간 랭킹 데이터가 없어 복사하지 않음 - " +
-                        "currentHour=$currentHour, count=0",
+                            "currentHour=$currentHour, count=0",
                 )
                 return
             }
@@ -99,7 +101,7 @@ class RankingScheduler(private val rankingRepository: RankingRepository) {
 
             logger.info(
                 "시간별 랭킹 콜드 스타트 방지 완료: " +
-                    "source=$currentHour, target=$nextHour, weight=$carryOverWeight, count=$currentCount",
+                        "source=$currentHour, target=$nextHour, weight=$carryOverWeight, count=$currentCount",
             )
         } catch (e: Exception) {
             logger.error("시간별 랭킹 콜드 스타트 방지 실패", e)

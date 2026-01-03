@@ -30,6 +30,6 @@ class ProductV1Controller(private val productFacade: ProductFacade) : ProductV1A
     override fun getProductDetail(
         @PathVariable(value = "productId") productId: Long,
     ): ApiResponse<ProductV1Dto.ProductDetailResponse> = productFacade.getProductDetail(productId)
-            .let { ProductV1Dto.ProductDetailResponse.from(it) }
-            .let { ApiResponse.success(it) }
+        .let { ProductV1Dto.ProductDetailResponse.from(it) }
+        .let { ApiResponse.success(it) }
 }

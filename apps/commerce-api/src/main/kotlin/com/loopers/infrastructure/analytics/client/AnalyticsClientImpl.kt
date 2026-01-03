@@ -11,7 +11,9 @@ import org.springframework.stereotype.Component
  */
 @Component
 class AnalyticsClientImpl : AnalyticsClient {
-    private val logger = LoggerFactory.getLogger(AnalyticsClientImpl::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(AnalyticsClientImpl::class.java)
+    }
 
     override fun sendUserAction(event: UserActionEvent) {
         logger.debug("분석 시스템 전송 (Mock): ${event.actionType} - userId=${event.userId}")

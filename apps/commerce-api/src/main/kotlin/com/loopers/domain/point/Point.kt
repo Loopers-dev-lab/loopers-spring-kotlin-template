@@ -13,7 +13,7 @@ import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 @Entity
 @Table(name = "points")
@@ -33,23 +33,23 @@ class Point(
         protected set
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    lateinit var createdAt: ZonedDateTime
+    lateinit var createdAt: LocalDateTime
         protected set
 
     @Column(name = "updated_at", nullable = false)
-    lateinit var updatedAt: ZonedDateTime
+    lateinit var updatedAt: LocalDateTime
         protected set
 
     @PrePersist
     private fun prePersist() {
-        val now = ZonedDateTime.now()
+        val now = LocalDateTime.now()
         createdAt = now
         updatedAt = now
     }
 
     @PreUpdate
     private fun preUpdate() {
-        updatedAt = ZonedDateTime.now()
+        updatedAt = LocalDateTime.now()
     }
 
     fun charge(amount: Money) {

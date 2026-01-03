@@ -8,6 +8,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
@@ -26,6 +27,10 @@ class LikeConcurrencyTest @Autowired constructor(
     private val likeQueryService: LikeQueryService,
     private val testFixtures: TestFixtures,
 ) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(LikeConcurrencyTest::class.java)
+    }
+
     private var productId by Delegates.notNull<Long>()
     private val userIds = mutableListOf<Long>()
 
@@ -61,7 +66,7 @@ class LikeConcurrencyTest @Autowired constructor(
                     likeService.addLike(userId, productId)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("좋아요 실패 (userId=$userId): ${e.message}")
+                    logger.warn("좋아요 실패 (userId=$userId): ${e.message}")
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
@@ -102,7 +107,7 @@ class LikeConcurrencyTest @Autowired constructor(
                     // UniqueConstraint 위반은 멱등성 보장의 일부 (이미 존재함을 의미)
                     duplicateCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("좋아요 실패 (예상치 못한 예외): ${e.message}")
+                    logger.warn("좋아요 실패 (예상치 못한 예외): ${e.message}")
                 } finally {
                     latch.countDown()
                 }
@@ -114,7 +119,7 @@ class LikeConcurrencyTest @Autowired constructor(
 
         // then: 성공 + 중복 = 전체 요청 수 (멱등성 보장)
         assertThat(successCount.get() + duplicateCount.get()).isEqualTo(numberOfThreads)
-        println("Success: ${successCount.get()}, Duplicate: ${duplicateCount.get()}")
+        logger.info("Success: ${successCount.get()}, Duplicate: ${duplicateCount.get()}")
 
         // 실제로는 한 번만 좋아요가 등록되어야 함
         val likeCount = likeQueryService.countByProductId(productId)
@@ -142,7 +147,7 @@ class LikeConcurrencyTest @Autowired constructor(
                     // UniqueConstraint 위반은 멱등성 보장의 일부
                     duplicateCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("좋아요 실패 (예상치 못한 예외): ${e.message}")
+                    logger.warn("좋아요 실패 (예상치 못한 예외): ${e.message}")
                 } finally {
                     latch.countDown()
                 }
@@ -154,7 +159,7 @@ class LikeConcurrencyTest @Autowired constructor(
 
         // then: 멱등성에 의해 모두 성공적으로 처리됨 (성공 또는 중복)
         assertThat(successCount.get() + duplicateCount.get()).isEqualTo(numberOfThreads)
-        println("Success: ${successCount.get()}, Duplicate: ${duplicateCount.get()}")
+        logger.info("Success: ${successCount.get()}, Duplicate: ${duplicateCount.get()}")
 
         // 실제로는 한 번만 좋아요가 등록되어야 함
         val likeCount = likeQueryService.countByProductId(productId)

@@ -97,11 +97,11 @@ class OutboxEventTest {
     }
 
     private fun createOutboxEvent(): OutboxEvent = OutboxEvent.create(
-            eventType = "LikeAddedEvent",
-            topic = "catalog-events",
-            partitionKey = "100",
-            payload = """{"userId":1,"productId":100}""",
-            aggregateType = "Product",
-            aggregateId = 100L,
-        )
+        eventType = "LikeAddedEvent",
+        topic = "catalog-events",
+        partitionKey = "100",
+        payload = """{"userId":1,"productId":100}""",
+        aggregateType = "Product",
+        aggregateId = 100L,
+    )
 }

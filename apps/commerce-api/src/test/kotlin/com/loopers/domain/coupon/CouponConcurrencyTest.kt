@@ -5,6 +5,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
@@ -22,6 +23,10 @@ class CouponConcurrencyTest @Autowired constructor(
     private val userCouponRepository: UserCouponRepository,
     private val testFixtures: TestFixtures,
 ) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(CouponConcurrencyTest::class.java)
+    }
+
     private var userId by Delegates.notNull<Long>()
     private lateinit var coupon: Coupon
     private lateinit var userCoupon: UserCoupon
@@ -68,7 +73,7 @@ class CouponConcurrencyTest @Autowired constructor(
                     couponService.useUserCoupon(userId, userCoupon.id)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("쿠폰 사용 실패: ${e.message}")
+                    logger.warn("쿠폰 사용 실패: ${e.message}")
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()
@@ -120,7 +125,7 @@ class CouponConcurrencyTest @Autowired constructor(
                     couponService.useUserCoupon(uid, uc.id)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    println("쿠폰 사용 실패 (userId=$uid): ${e.message}")
+                    logger.warn("쿠폰 사용 실패 (userId=$uid): ${e.message}")
                     failureCount.incrementAndGet()
                 } finally {
                     latch.countDown()

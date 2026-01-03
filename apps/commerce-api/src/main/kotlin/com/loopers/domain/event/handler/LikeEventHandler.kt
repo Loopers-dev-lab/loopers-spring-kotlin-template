@@ -25,7 +25,9 @@ class LikeEventHandler(
     private val eventPublisher: ApplicationEventPublisher,
     private val outboxEventPublisher: OutboxEventPublisher,
 ) {
-    private val logger = LoggerFactory.getLogger(LikeEventHandler::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(LikeEventHandler::class.java)
+    }
 
     /**
      * 좋아요 추가 후 집계 처리

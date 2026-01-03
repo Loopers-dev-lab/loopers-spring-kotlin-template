@@ -7,7 +7,9 @@ import org.springframework.stereotype.Component
 
 @Component
 class PaymentStatusScheduler(private val paymentService: PaymentService) {
-    private val logger = LoggerFactory.getLogger(PaymentStatusScheduler::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(PaymentStatusScheduler::class.java)
+    }
 
     /**
      * 10분 이상 PENDING 상태인 결제 건들을 확인하고 타임아웃 처리합니다.

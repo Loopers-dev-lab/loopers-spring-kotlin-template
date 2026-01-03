@@ -5,7 +5,7 @@ import com.loopers.application.order.OrderDetailInfo
 import com.loopers.application.order.OrderItemInfo
 import com.loopers.application.order.OrderListInfo
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 import com.loopers.application.order.OrderCreateRequest as AppOrderCreateRequest
 import com.loopers.application.order.OrderItemRequest as AppOrderItemRequest
 
@@ -48,7 +48,7 @@ class OrderV1Dto {
         val totalAmount: BigDecimal,
         val currency: String,
         val status: String,
-        val orderedAt: ZonedDateTime,
+        val orderedAt: LocalDateTime,
     ) {
         companion object {
             fun from(
@@ -70,7 +70,7 @@ class OrderV1Dto {
         val currency: String,
         val status: String,
         val items: List<OrderItemResponse>,
-        val orderedAt: ZonedDateTime,
+        val orderedAt: LocalDateTime,
     ) {
         companion object {
             fun from(

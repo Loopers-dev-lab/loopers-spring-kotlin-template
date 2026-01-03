@@ -9,6 +9,7 @@ import com.loopers.domain.user.User
 import com.loopers.domain.user.UserRepository
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
@@ -26,32 +27,36 @@ class ProductDataGenerator @Autowired constructor(
     private val userRepository: UserRepository,
     private val likeRepository: LikeRepository,
 ) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(ProductDataGenerator::class.java)
+    }
+
     @Test
     @Transactional
     fun `10만개 상품 데이터 생성`() {
-        println("=== 데이터 생성 시작 ===")
+        logger.info("=== 데이터 생성 시작 ===")
 
         // 1. 브랜드 생성 (100개)
         val brands = createBrands(100)
-        println("브랜드 ${brands.size}개 생성 완료")
+        logger.info("브랜드 ${brands.size}개 생성 완료")
 
         // 2. 유저 생성 (1000명)
         val users = createUsers(1000)
-        println("유저 ${users.size}명 생성 완료")
+        logger.info("유저 ${users.size}명 생성 완료")
 
         // 3. 상품 생성 (10만개)
         val products = createProducts(100_000, brands)
-        println("상품 ${products.size}개 생성 완료")
+        logger.info("상품 ${products.size}개 생성 완료")
 
         // 4. 재고 생성
         createStocks(products)
-        println("재고 ${products.size}개 생성 완료")
+        logger.info("재고 ${products.size}개 생성 완료")
 
         // 5. 좋아요 데이터 생성 (랜덤)
         createLikes(users, products)
-        println("좋아요 데이터 생성 완료")
+        logger.info("좋아요 데이터 생성 완료")
 
-        println("=== 데이터 생성 완료 ===")
+        logger.info("=== 데이터 생성 완료 ===")
     }
 
     private fun createBrands(count: Int): List<Brand> {
@@ -100,7 +105,7 @@ class ProductDataGenerator @Autowired constructor(
             // 배치 저장
             if (i % batchSize == 0) {
                 productRepository.saveAll(products.takeLast(batchSize))
-                println("상품 $i 개 저장 완료...")
+                logger.info("상품 $i 개 저장 완료...")
             }
         }
 
@@ -126,7 +131,7 @@ class ProductDataGenerator @Autowired constructor(
 
             if ((index + 1) % batchSize == 0) {
                 stockRepository.saveAll(stocks.takeLast(batchSize))
-                println("재고 ${index + 1} 개 저장 완료...")
+                logger.info("재고 ${index + 1} 개 저장 완료...")
             }
         }
 
@@ -161,7 +166,7 @@ class ProductDataGenerator @Autowired constructor(
                 if (count % batchSize == 0) {
                     likeRepository.saveAll(likes.takeLast(batchSize))
                     // Product의 likeCount도 업데이트
-                    println("좋아요 $count 개 저장 완료...")
+                    logger.info("좋아요 $count 개 저장 완료...")
                 }
             }
         }
@@ -172,14 +177,14 @@ class ProductDataGenerator @Autowired constructor(
             likeRepository.saveAll(likes.takeLast(remaining))
         }
 
-        println("총 좋아요 $count 개 생성 완료")
+        logger.info("총 좋아요 $count 개 생성 완료")
 
         // 각 상품의 likeCount 업데이트
         updateProductLikeCounts(products)
     }
 
     private fun updateProductLikeCounts(products: List<Product>) {
-        println("상품별 좋아요 수 업데이트 시작...")
+        logger.info("상품별 좋아요 수 업데이트 시작...")
         val batchSize = 1000
 
         products.forEachIndexed { index, product ->
@@ -187,10 +192,10 @@ class ProductDataGenerator @Autowired constructor(
             product.setLikeCount(likeCount)
 
             if ((index + 1) % batchSize == 0) {
-                println("상품 좋아요 수 ${index + 1} 개 업데이트 완료...")
+                logger.info("상품 좋아요 수 ${index + 1} 개 업데이트 완료...")
             }
         }
 
-        println("상품별 좋아요 수 업데이트 완료")
+        logger.info("상품별 좋아요 수 업데이트 완료")
     }
 }

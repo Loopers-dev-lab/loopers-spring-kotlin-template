@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.context.ApplicationEventPublisher
 import java.math.BigDecimal
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 class OrderEventHandlerTest {
     private val couponService = mockk<CouponService>()
@@ -53,7 +53,7 @@ class OrderEventHandlerTest {
                 amount = 10000L,
                 couponId = 200L,
                 items = emptyList(),
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             justRun { couponService.useUserCoupon(100L, 200L) }
@@ -75,7 +75,7 @@ class OrderEventHandlerTest {
                 amount = 10000L,
                 couponId = null,
                 items = emptyList(),
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             // when
@@ -95,7 +95,7 @@ class OrderEventHandlerTest {
                 amount = 10000L,
                 couponId = 200L,
                 items = emptyList(),
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             every { couponService.useUserCoupon(any(), any()) } throws RuntimeException("쿠폰 서비스 오류")
@@ -116,7 +116,7 @@ class OrderEventHandlerTest {
                 amount = 10000L,
                 couponId = null,
                 items = emptyList(),
-                createdAt = ZonedDateTime.now(),
+                createdAt = LocalDateTime.now(),
             )
 
             every { dataPlatformClient.sendOrderCreated(any()) } throws RuntimeException("전송 실패")
@@ -154,7 +154,7 @@ class OrderEventHandlerTest {
                 userId = 100L,
                 amount = 10000L,
                 transactionKey = "txn_123456",
-                completedAt = ZonedDateTime.now(),
+                completedAt = LocalDateTime.now(),
             )
 
             every { orderRepository.findById(1L) } returns order
@@ -179,7 +179,7 @@ class OrderEventHandlerTest {
                 userId = 100L,
                 amount = 10000L,
                 transactionKey = "txn_123456",
-                completedAt = ZonedDateTime.now(),
+                completedAt = LocalDateTime.now(),
             )
 
             every { orderRepository.findById(999L) } returns null
@@ -218,7 +218,7 @@ class OrderEventHandlerTest {
                 userId = 100L,
                 amount = 10000L,
                 reason = "카드 한도 초과",
-                failedAt = ZonedDateTime.now(),
+                failedAt = LocalDateTime.now(),
             )
 
             every { orderRepository.findById(1L) } returns order
@@ -240,7 +240,7 @@ class OrderEventHandlerTest {
                 userId = 100L,
                 amount = 10000L,
                 reason = "카드 한도 초과",
-                failedAt = ZonedDateTime.now(),
+                failedAt = LocalDateTime.now(),
             )
 
             every { orderRepository.findById(999L) } returns null

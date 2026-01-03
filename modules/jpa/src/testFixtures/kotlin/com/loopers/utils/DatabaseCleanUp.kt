@@ -24,7 +24,16 @@ class DatabaseCleanUp(@PersistenceContext private val entityManager: EntityManag
         entityManager.flush()
         entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate()
         tableNames.forEach { table ->
-            entityManager.createNativeQuery("TRUNCATE TABLE `$table`").executeUpdate()
+            // Check if table exists before truncating
+            val tableExists = entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :tableName",
+            )
+                .setParameter("tableName", table)
+                .singleResult as Number
+
+            if (tableExists.toInt() > 0) {
+                entityManager.createNativeQuery("TRUNCATE TABLE `$table`").executeUpdate()
+            }
         }
         entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate()
     }
