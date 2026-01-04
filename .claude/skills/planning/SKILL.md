@@ -1,13 +1,31 @@
 ---
 name: planning
-description: This skill should be used when the user asks to "create a plan", "plan the implementation", "design milestones", "break down into tasks", or needs to transform requirements into executable implementation steps. Provides methodology for creating self-contained, executable milestones.
+description: Use when creating implementation plans, designing milestones, breaking down tasks, or transforming requirements into executable steps. Triggers include "plan", "마일스톤", "계획", "break down".
 ---
 
 # Planning Skill
 
-Methodology for creating implementation plans with executable, self-contained milestones.
+Create implementation plans with executable, self-contained milestones.
 
-A good plan makes implementation almost mechanical - the implementer just follows the map. A vague plan leads to confusion and rework.
+> A good plan makes implementation mechanical. A vague plan leads to rework.
+
+## Quick Reference
+
+| Action | Risk | When to Use |
+|--------|------|-------------|
+| `Create` | 🟢 Low | New file |
+| `Add` | 🟢 Low | New method/field, no existing code affected |
+| `Modify[signature]` | 🟠 High | Change params/return type → update ALL callers |
+| `Modify[logic]` | 🟡 Medium | Change implementation, same signature |
+| `Modify[field]` | 🟡 Medium | Add/remove/change fields |
+| `Delete` | 🔴 Critical | Remove file/method → verify no usages |
+
+## When NOT to Use
+
+- Single-file bug fix with obvious solution → Just fix it
+- One-line change → No plan needed
+- Pure refactoring within one file → Too granular for planning
+- Research/exploration tasks → Use research skill instead
 
 ---
 
@@ -208,3 +226,26 @@ For full checklist, see `references/workflow.md#phase-4`
 | `references/workflow.md` | When following planning process step-by-step |
 | `templates/plan-template.md` | When writing final plan.md output |
 | `examples/point-system-plan.md` | For reference on good plan structure |
+
+---
+
+## Common Mistakes
+
+| Mistake | Why It's Wrong | Fix |
+|---------|----------------|-----|
+| Splitting interface + impl across milestones | `NoUniqueBeanDefinitionException` at runtime | Same milestone for both |
+| Changing signature without updating callers | Compilation failure | Include ALL callers in same milestone |
+| Schema change separate from entity change | `SchemaManagementException` | Same milestone |
+| Multiple responsibilities per milestone | Unclear scope, hard to verify | One responsibility = one reason to change |
+| Assuming implementation details not in spec | Over-engineering, wrong decisions | Describe WHAT, let implementer decide HOW |
+| Missing spec requirement in milestones | Incomplete implementation | Use Spec Requirement Mapping table |
+| Not including test updates with logic changes | Tests fail after milestone | Update tests verifying changed behavior |
+
+## Red Flags - STOP and Reconsider
+
+| Red Flag | Reality |
+|----------|---------|
+| "This is a small change, skip planning" | Small changes compound. Plan anyway if cross-file. |
+| "I'll fix the callers in next milestone" | Next milestone inherits broken state. Fix now. |
+| "Tests can be updated separately" | Green state violation. Include in same milestone. |
+| "The spec doesn't say, so I'll decide" | Not your decision. Flag as Clarification. |

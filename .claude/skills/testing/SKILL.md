@@ -1,12 +1,22 @@
 ---
 name: testing
-description: This skill should be used when "writing tests", "generating test skeletons", "deciding mock strategies", "learning test patterns", "understanding test conventions", "understanding test levels", "learning testing best practices", "테스트 작성", "테스트 패턴 파악", "테스트 패턴 이해", "테스트 컨벤션 이해", or "테스트 베스트 프랙티스 학습". Provides test case extraction, level-specific patterns (Unit, Integration, Concurrency, Adapter, E2E), BDD structure, factory method conventions, and quality guidelines following Classical TDD (state verification only, no mocks).
-version: 1.1.0
+description: Use when writing tests, generating test skeletons, deciding mock strategies, learning test patterns, or understanding test levels. Triggers include "테스트 작성", "테스트 패턴", "mock 전략", "test skeleton".
 ---
 
 # Testing Skill
 
-Test writing standards, test case extraction rules, and quality guidelines for Classical TDD workflow.
+Test writing standards and quality guidelines following Classical TDD (state verification only).
+
+## Quick Reference
+
+| Test Level | File Pattern | When to Use | External Deps |
+|------------|--------------|-------------|---------------|
+| Unit | `*Test.kt` | Domain logic, value objects, pure functions | None |
+| Integration | `*IntegrationTest.kt` | Service + Repository, transactions | Real DB |
+| Concurrency | `*ConcurrencyTest.kt` | Locking, race conditions | Real DB |
+| Adapter | `*AdapterTest.kt` | External API clients, queries | WireMock, Testcontainers |
+| E2E | `*E2ETest.kt` | Full API flow, auth | Full stack |
+| Batch | `*BatchTest.kt` | Spring Batch jobs | Real DB |
 
 ## Core Philosophy
 
@@ -41,7 +51,7 @@ verifyNoInteractions(mock)
 
 ## Test Level Overview
 
-For level classification criteria, decision flow, and file naming conventions, see @references/test-level-guide.md
+For level classification criteria, decision flow, and file naming conventions, see `references/test-level-guide.md`
 
 ## BDD Structure
 
@@ -165,21 +175,34 @@ Load references based on the current task. Each file provides detailed patterns 
 
 ### When determining test level
 
-- @references/test-level-guide.md - Level classification criteria and decision flow
+- `references/test-level-guide.md` - Level classification criteria and decision flow
 
 ### When generating test skeletons
 
-- @references/test-generation.md - Spec to test skeleton process, quality checklist
+- `references/test-generation.md` - Spec to test skeleton process, quality checklist
 
 ### When writing tests by level
 
-- @references/unit-test.md - Unit test patterns (state change, validation, ParameterizedTest, domain events)
-- @references/integration-test.md - Integration patterns (rollback, Spring Event, Kafka Consumer)
-- @references/concurrency-test.md - Concurrency patterns (thread pool, locking, idempotency)
-- @references/adapter-test.md - Adapter patterns (WireMock, Circuit Breaker, Retry, complex queries)
-- @references/e2e-test.md - E2E patterns (HTTP status codes, auth failures, API contract)
-- @references/batch-test.md - Spring Batch patterns (Processor unit test, Step/Job integration test)
+- `references/unit-test.md` - Unit test patterns (state change, validation, ParameterizedTest, domain events)
+- `references/integration-test.md` - Integration patterns (rollback, Spring Event, Kafka Consumer)
+- `references/concurrency-test.md` - Concurrency patterns (thread pool, locking, idempotency)
+- `references/adapter-test.md` - Adapter patterns (WireMock, Circuit Breaker, Retry, complex queries)
+- `references/e2e-test.md` - E2E patterns (HTTP status codes, auth failures, API contract)
+- `references/batch-test.md` - Spring Batch patterns (Processor unit test, Step/Job integration test)
 
 ### When deciding external dependencies strategy
 
-- @references/external-dependencies.md - External dependencies by test level (Real DB, WireMock, Testcontainers)
+- `references/external-dependencies.md` - External dependencies by test level (Real DB, WireMock, Testcontainers)
+
+---
+
+## Common Mistakes
+
+| Mistake | Why It's Wrong | Fix |
+|---------|----------------|-----|
+| `verify(mock).save(any())` | Interaction verification, not state | Assert on returned/persisted state |
+| Shared mutable state between tests | Test pollution, flaky results | Create fresh fixtures per test |
+| Testing implementation details | Breaks on refactor | Test observable behavior only |
+| Magic numbers in assertions | Unclear what's being tested | Use named variables: `initialBalance - deductAmount` |
+| Multiple behaviors per test | Hard to diagnose failures | One logical assertion per test |
+| Missing `@AfterEach` cleanup | DB pollution across tests | Clean up created entities |
