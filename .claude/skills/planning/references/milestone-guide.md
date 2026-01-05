@@ -68,7 +68,7 @@ What to create, modify, or delete. Each item needs:
 2. **File path**: Exact path from project root
 3. **Description**: What to do
 4. **Spec reference**: Which requirement this fulfills
-5. **Pattern reference**: Existing code to follow (optional but recommended)
+5. **Pattern reference**: Existing code to follow (REQUIRED for Modify actions, recommended for Create/Add)
 
 ```markdown
 ### TODO

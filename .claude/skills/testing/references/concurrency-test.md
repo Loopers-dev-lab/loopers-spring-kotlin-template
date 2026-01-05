@@ -276,6 +276,26 @@ val finalState = repository.findById(id)!!
 assertThat(finalState.field).isEqualTo(expectedValue)
 ```
 
+## Timeout Handling
+
+Always set timeouts to prevent hanging tests:
+
+```kotlin
+// Option 1: Latch timeout
+val completed = latch.await(30, TimeUnit.SECONDS)
+assertThat(completed).isTrue()  // Fail if threads hung
+
+// Option 2: Executor timeout
+executorService.shutdown()
+val terminated = executorService.awaitTermination(30, TimeUnit.SECONDS)
+assertThat(terminated).isTrue()
+
+// Option 3: JUnit timeout (entire test)
+@Test
+@Timeout(60)  // Fail after 60 seconds
+fun `concurrent test with timeout`() { ... }
+```
+
 ## Debugging Tips
 
 1. **Use `e.printStackTrace()`** in catch blocks during development
@@ -283,6 +303,7 @@ assertThat(finalState.field).isEqualTo(expectedValue)
 3. **Add small delays** if you need to control timing
 4. **Check database locks** - some DBs have different locking behaviors
 5. **Run multiple times** - flaky tests may pass sometimes
+6. **Set timeouts** - prevent tests from hanging indefinitely
 
 ## Quality Checklist
 

@@ -6,15 +6,15 @@ Batch tests verify that **Spring Batch pipeline components are correctly wired t
 
 Spring Batch components (Reader/Processor/Writer) are **infrastructure layer**, not domain layer.
 
-- **Business logic belongs in Domain Services**, not in Processor
-- Domain Services are already tested via Unit Tests
+- **Business logic belongs in Domain model**, not in Processor
+- Domain models are already tested via Unit Tests
 - Batch tests verify **"does the pipeline work end-to-end?"**, not business logic
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Spring Batch (Infrastructure)                          │
 │  Reader → Processor → Writer                            │
-│           (calls domain service)                        │
+│           (calls domain model)                        │
 └─────────────────┬───────────────────────────────────────┘
                   │
                   ▼
@@ -25,14 +25,14 @@ Spring Batch components (Reader/Processor/Writer) are **infrastructure layer**, 
 
 ## What to Test
 
-| Component | Test? | Reason |
-|-----------|-------|--------|
-| Reader (JdbcCursorItemReader, etc.) | ❌ | Framework component, query tested elsewhere |
-| Processor with business logic inside | ❌ | Anti-pattern. Move logic to Domain Service |
-| Processor calling Domain Service | ❌ | Domain Service already unit tested |
-| Writer (JdbcBatchItemWriter, etc.) | ❌ | Framework component |
-| **Step end-to-end** | ✅ | Verify pipeline wiring works |
-| **Job with conditional flow** | ✅ | Only if Decider or complex branching exists |
+| Component                            | Test? | Reason                                      |
+|--------------------------------------|-------|---------------------------------------------|
+| Reader (JdbcCursorItemReader, etc.)  | ❌     | Framework component, query tested elsewhere |
+| Processor with business logic inside | ❌     | Anti-pattern. Move logic to Domain Model    |
+| Processor calling Domain Model       | ❌     | Domain Model already unit tested            |
+| Writer (JdbcBatchItemWriter, etc.)   | ❌     | Framework component                         |
+| **Step end-to-end**                  | ✅     | Verify pipeline wiring works                |
+| **Job with conditional flow**        | ✅     | Only if Decider or complex branching exists |
 
 ## Step Integration Test (Primary Pattern)
 
@@ -124,7 +124,7 @@ fun `job fails when input file is missing`() {
 
 ## When to Write Unit Tests for Batch Components
 
-Only in rare cases where Processor/Listener contains **logic that cannot be extracted to Domain Service**:
+Only in rare cases where Processor/Listener contains **logic that cannot be extracted to Domain Model**:
 
 ```kotlin
 // Rare case: Listener with batch-specific logic
@@ -159,7 +159,7 @@ class SettlementProcessorTest {
     fun `calculates fee correctly`() {
         val processor = SettlementProcessor()
         val result = processor.process(order)
-        assertThat(result.fee).isEqualTo(300)  // This should be in Domain Service test!
+        assertThat(result.fee).isEqualTo(300)  // This should be in Domain Model test!
     }
 }
 ```
@@ -189,7 +189,7 @@ fun tearDown() {
 ## Summary
 
 1. **Don't test Reader/Processor/Writer individually** - they're infrastructure
-2. **Business logic belongs in Domain Services** - test those with Unit Tests
+2. **Business logic belongs in Domain Models** - test those with Unit Tests
 3. **Step Integration Test is the primary pattern** - verify pipeline wiring
 4. **Job Integration Test only for branching** - Decider, conditional flows
 5. **Clean up batch metadata** - `jobRepositoryTestUtils.removeJobExecutions()`
