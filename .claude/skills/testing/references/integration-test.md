@@ -100,6 +100,101 @@ correctly after event publication, and whether timing works as expected based on
 **Message-based Integration** verifies Kafka Consumer behavior. It confirms whether messages are processed correctly
 after receipt, whether failures are sent to DLT, and whether idempotency is guaranteed for duplicate messages.
 
+## WireMock for External APIs
+
+When testing services that call external APIs (payment gateway, notification, etc.):
+
+```kotlin
+@SpringBootTest
+@AutoConfigureWireMock(port = 0)
+@TestPropertySource(properties = ["payment.pg.base-url=http://localhost:\${wiremock.server.port}"])
+class PaymentServiceIntegrationTest {
+
+    @AfterEach
+    fun tearDown() {
+        WireMock.reset()
+    }
+
+    @Test
+    @DisplayName("PG사 결제 성공 시 COMPLETED 상태가 반환된다")
+    fun `returns COMPLETED when PG payment succeeds`() {
+        // given
+        stubFor(post(urlEqualTo("/v1/payments"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withBody("""{"transactionId": "tx_123", "status": "SUCCESS"}""")))
+
+        // when
+        val result = paymentService.requestPayment(paymentRequest)
+
+        // then
+        assertThat(result.status).isEqualTo(PaymentStatus.COMPLETED)
+        assertThat(result.transactionId).isEqualTo("tx_123")
+    }
+
+    @Test
+    @DisplayName("PG사 타임아웃 시 PENDING 상태가 반환된다")
+    fun `returns PENDING when PG times out`() {
+        // given
+        stubFor(post(urlEqualTo("/v1/payments"))
+            .willReturn(aResponse()
+                .withFixedDelay(5000)))  // Simulate timeout
+
+        // when
+        val result = paymentService.requestPayment(paymentRequest)
+
+        // then
+        assertThat(result.status).isEqualTo(PaymentStatus.PENDING)
+    }
+}
+```
+
+**Key patterns**:
+- Use `@AutoConfigureWireMock(port = 0)` for random port
+- Override base URL with `@TestPropertySource`
+- Always `WireMock.reset()` in `@AfterEach`
+- Verify **state result**, not that the API was called
+
+---
+
+## Comprehensive Rollback Verification
+
+When testing transaction rollback, verify **ALL affected resources**:
+
+```kotlin
+@Test
+@DisplayName("중간 단계 실패 시 모든 변경사항이 롤백된다")
+fun `rolls back ALL changes when intermediate step fails`() {
+    // given - setup ALL resources with known initial state
+    val initialStock = 100
+    val initialBalance = Money.krw(50000)
+    val product = createProduct(stockQuantity = initialStock)
+    createPointAccount(userId, initialBalance)
+    val coupon = createIssuedCoupon(userId)  // Not used yet
+
+    // when - trigger failure in step 3 (coupon)
+    val criteria = placeOrderCriteria(
+        usePoint = Money.krw(10000),
+        issuedCouponId = expiredCouponId,  // Will fail
+    )
+    assertThrows<CoreException> { orderFacade.placeOrder(criteria) }
+
+    // then - verify ALL resources unchanged (not just the failing one)
+    assertThat(stockRepository.findByProductId(product.id)!!.quantity)
+        .isEqualTo(initialStock)  // Stock not changed
+    assertThat(pointAccountRepository.findByUserId(userId)!!.balance)
+        .isEqualTo(initialBalance)  // Point not changed
+    assertThat(issuedCouponRepository.findById(coupon.id)!!.isUsed)
+        .isFalse()  // Coupon not used
+    assertThat(orderRepository.findByUserId(userId))
+        .isEmpty()  // No order created
+}
+```
+
+**Rule**: For every rollback test, verify **every resource** that could have been modified, not just the one that caused the failure.
+
+---
+
 ## Best Practice Examples
 
 ### Orchestration Success

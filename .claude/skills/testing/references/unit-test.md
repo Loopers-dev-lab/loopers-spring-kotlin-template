@@ -37,6 +37,136 @@ fun `throws INSUFFICIENT_BALANCE when balance is insufficient`()
 | Calculations | Normal calculation, zero handling, min/max values, rounding/precision |
 | Policy/Strategy | supports() returning true/false, calculate/apply() logic |
 
+---
+
+## State Machine Testing Pattern
+
+For entities with status transitions (Order, Coupon, etc.):
+
+```kotlin
+@DisplayName("주문 상태 전이 테스트")
+@Nested
+inner class StatusTransitions {
+
+    @DisplayName("confirm() - PLACED → CONFIRMED")
+    @Nested
+    inner class Confirm {
+
+        @DisplayName("PLACED 상태에서 확정하면 CONFIRMED로 변경된다")
+        @Test
+        fun `changes to CONFIRMED when PLACED`() {
+            // given
+            val order = createOrderWithStatus(OrderStatus.PLACED)
+
+            // when
+            order.confirm()
+
+            // then
+            assertThat(order.status).isEqualTo(OrderStatus.CONFIRMED)
+        }
+
+        @DisplayName("PLACED가 아닌 상태에서 확정하면 예외가 발생한다")
+        @ParameterizedTest(name = "{0} 상태에서 confirm() 호출 시 예외")
+        @EnumSource(value = OrderStatus::class, names = ["PLACED"], mode = EnumSource.Mode.EXCLUDE)
+        fun `throws when not PLACED`(invalidStatus: OrderStatus) {
+            // given
+            val order = createOrderWithStatus(invalidStatus)
+
+            // when & then
+            assertThatThrownBy { order.confirm() }
+                .isInstanceOf(IllegalArgumentException::class.java)
+        }
+    }
+
+    @DisplayName("cancel() - PLACED/CONFIRMED → CANCELLED")
+    @Nested
+    inner class Cancel {
+
+        @DisplayName("PLACED 또는 CONFIRMED 상태에서 취소하면 CANCELLED로 변경된다")
+        @ParameterizedTest(name = "{0} 상태에서 cancel() 호출")
+        @EnumSource(value = OrderStatus::class, names = ["PLACED", "CONFIRMED"])
+        fun `changes to CANCELLED when PLACED or CONFIRMED`(validStatus: OrderStatus) {
+            // given
+            val order = createOrderWithStatus(validStatus)
+
+            // when
+            order.cancel()
+
+            // then
+            assertThat(order.status).isEqualTo(OrderStatus.CANCELLED)
+        }
+    }
+}
+```
+
+**Key patterns**:
+- Use `@EnumSource(mode = EXCLUDE)` for forbidden transitions
+- Use `@EnumSource(names = [...])` for multiple valid source states
+- Name test with transition: `cancel() - PLACED/CONFIRMED → CANCELLED`
+
+---
+
+## Testing Entities with Private Constructors
+
+When domain entities have private constructors, use **test-only factory or reflection**:
+
+```kotlin
+// Option 1: Internal test factory (preferred)
+// In domain class:
+class Order private constructor(...) {
+    companion object {
+        fun create(...): Order = ...
+
+        // For testing only - internal visibility
+        internal fun forTest(
+            id: Long = 0L,
+            status: OrderStatus = OrderStatus.PLACED,
+            ...
+        ): Order = Order(id, ..., status, ...)
+    }
+}
+
+// In test:
+private fun createOrderWithStatus(status: OrderStatus): Order =
+    Order.forTest(status = status)
+
+// Option 2: Reflection helper (when modifying production code is not possible)
+private fun createOrderWithStatus(status: OrderStatus): Order {
+    val order = Order.create(userId = 1L, items = listOf(createOrderItem()))
+    val statusField = Order::class.java.getDeclaredField("status")
+    statusField.isAccessible = true
+    statusField.set(order, status)
+    return order
+}
+```
+
+**Rule**: Prefer `internal fun forTest()` in companion object over reflection.
+
+---
+
+## Exception Type Conventions
+
+This project uses two exception patterns:
+
+| Source | Exception Type | Verification Pattern |
+|--------|---------------|---------------------|
+| Domain invariant | `require()` → `IllegalArgumentException` | `assertThatThrownBy { }.isInstanceOf(IllegalArgumentException::class.java)` |
+| Business rule | `CoreException(ErrorType.X)` | `assertThat(exception.errorType).isEqualTo(ErrorType.X)` |
+
+```kotlin
+// For require() - just verify exception class
+assertThatThrownBy { order.confirm() }
+    .isInstanceOf(IllegalArgumentException::class.java)
+
+// For CoreException - verify type and optionally message
+val exception = assertThrows<CoreException> { point.deduct(excess) }
+assertThat(exception.errorType).isEqualTo(ErrorType.BAD_REQUEST)
+```
+
+**Note**: Don't verify exact message for `require()` - messages are implementation details.
+
+---
+
 ## Best Practice Examples
 
 ### Basic State Change

@@ -1,12 +1,22 @@
 ---
 name: testing
-description: This skill should be used when "writing tests", "generating test skeletons", "deciding mock strategies", "learning test patterns", "understanding test conventions", "understanding test levels", "learning testing best practices", "테스트 작성", "테스트 패턴 파악", "테스트 패턴 이해", "테스트 컨벤션 이해", or "테스트 베스트 프랙티스 학습". Provides test case extraction, level-specific patterns (Unit, Integration, Concurrency, Adapter, E2E), BDD structure, factory method conventions, and quality guidelines following Classical TDD (state verification only, no mocks).
-version: 1.1.0
+description: Use when writing tests, generating test skeletons, deciding mock strategies, learning test patterns, or understanding test levels. Triggers include "테스트 작성", "테스트 패턴", "mock 전략", "test skeleton".
 ---
 
 # Testing Skill
 
-Test writing standards, test case extraction rules, and quality guidelines for Classical TDD workflow.
+Test writing standards and quality guidelines following Classical TDD (state verification only).
+
+## Quick Reference
+
+| Test Level  | File Pattern          | When to Use                                 | External Deps            |
+|-------------|-----------------------|---------------------------------------------|--------------------------|
+| Unit        | `*Test.kt`            | Domain logic, value objects, pure functions | None                     |
+| Integration | `*IntegrationTest.kt` | Service + Repository, transactions          | Real DB                  |
+| Concurrency | `*ConcurrencyTest.kt` | Locking, race conditions                    | Real DB                  |
+| Adapter     | `*AdapterTest.kt`     | External API clients, queries               | WireMock, Testcontainers |
+| E2E         | `*E2ETest.kt`         | Full API flow, auth                         | Full stack               |
+| Batch       | `*BatchTest.kt`       | Spring Batch jobs                           | Real DB                  |
 
 ## Core Philosophy
 
@@ -16,6 +26,88 @@ Tests serve three purposes: verify correctness, document behavior, and enable sa
 - **Tests Enable Fearless Refactoring**: With good tests, you can safely change implementation. But this only works if
   tests verify behavior, not implementation.
 - **Tests Reveal Design Problems**: If a test is hard to write, that's feedback about your design.
+
+---
+
+## The Iron Law
+
+```
+VERIFY STATE, NEVER INTERACTIONS.
+NO EXCEPTIONS. NO NEGOTIATIONS.
+```
+
+This applies to ALL tests:
+
+- Not "except for simple utilities"
+- Not "except when state verification is hard"
+- Not "except when the team already uses verify()"
+- Not "just this once"
+
+**Violating the letter of this rule IS violating the spirit.**
+
+---
+
+## 🚨 Red Flags - STOP If You Think These
+
+These thoughts mean you're rationalizing. STOP and reconsider:
+
+| Thought                                  | Reality                                                              |
+|------------------------------------------|----------------------------------------------------------------------|
+| "This is too simple for BDD structure"   | Simple code deserves consistent structure. Lower cost = less excuse. |
+| "verify() is fine for external services" | Use WireMock/Adapter test. If impossible, it's design feedback.      |
+| "The team already uses this pattern"     | Check the actual codebase. Existing tests follow Classical TDD.      |
+| "State verification is impossible here"  | Redesign to return verifiable result. "Hard to test" = "bad design". |
+| "I'll refactor to proper pattern later"  | Later never comes. Do it right now.                                  |
+| "This is just a utility class"           | Utilities need BDD too. Consistency > convenience.                   |
+| "It's overkill for this case"            | Rules exist precisely for these "exception" moments.                 |
+| "Factory method is boilerplate"          | 5 minutes now saves hours of confusion later.                        |
+| "Time pressure - need to ship fast"      | Fast + wrong = slower than slow + right.                             |
+
+**All of these mean: Follow the rules anyway.**
+
+---
+
+## Rationalization Table
+
+Common excuses and why they're wrong:
+
+| Excuse                                       | Why It's Wrong                               | What To Do Instead               |
+|----------------------------------------------|----------------------------------------------|----------------------------------|
+| "verify() is the only way to test this"      | WireMock, Testcontainers exist. Or redesign. | Use Adapter test pattern         |
+| "BDD structure is overhead for simple tests" | Consistency trumps perceived efficiency      | Apply same structure everywhere  |
+| "Factory methods are boilerplate"            | They're investment, not cost                 | Create factory with all defaults |
+| "DRY - share setup between tests"            | Test isolation > code reuse                  | Fresh fixtures per test          |
+| "The user insisted on verify()"              | Project rules > user preference              | Educate on Classical TDD         |
+| "Other projects use Mockito verify()"        | This project's rules apply here              | Follow this project's standards  |
+| "I'll fix the structure later"               | Technical debt compounds                     | Do it correctly now              |
+| "It's urgent, no time for proper tests"      | Bad tests are worse than no tests            | Take time to do it right         |
+
+---
+
+## Decision Flow: When Rules Feel Burdensome
+
+```dot
+digraph rule_check {
+    "Rule feels unnecessary?" [shape=diamond];
+    "Is this a real technical limitation?" [shape=diamond];
+    "STOP - You're rationalizing" [shape=box, style=filled, fillcolor="#ffcccc"];
+    "Consult references for the pattern" [shape=box];
+    "Can you redesign to enable state verification?" [shape=diamond];
+    "Follow the rule anyway" [shape=box, style=filled, fillcolor="#ccffcc"];
+    "Document limitation, propose design change" [shape=box];
+
+    "Rule feels unnecessary?" -> "Is this a real technical limitation?" [label="yes"];
+    "Rule feels unnecessary?" -> "STOP - You're rationalizing" [label="no, just inconvenient"];
+    "Is this a real technical limitation?" -> "Can you redesign to enable state verification?" [label="maybe"];
+    "Is this a real technical limitation?" -> "STOP - You're rationalizing" [label="not really"];
+    "Can you redesign to enable state verification?" -> "Follow the rule anyway" [label="yes"];
+    "Can you redesign to enable state verification?" -> "Document limitation, propose design change" [label="truly impossible"];
+    "STOP - You're rationalizing" -> "Consult references for the pattern";
+    "Consult references for the pattern" -> "Follow the rule anyway";
+}
+```
+
+---
 
 ## CRITICAL: State/Result Verification ONLY (Classical TDD)
 
@@ -41,7 +133,7 @@ verifyNoInteractions(mock)
 
 ## Test Level Overview
 
-For level classification criteria, decision flow, and file naming conventions, see @references/test-level-guide.md
+For level classification criteria, decision flow, and file naming conventions, see `references/test-level-guide.md`
 
 ## BDD Structure
 
@@ -154,7 +246,7 @@ assertThat(point.balance).isEqualTo(initialBalance - deductAmount)
 
 - **Scheduler** - `@Scheduled` methods that only invoke service methods
     - Scheduler's responsibility is only "when to call", not "what to do"
-    - Test the invoked service method instead (Unit or Integration Test)
+    - Test the invoked service method instead (Integration Test)
     - Cron expression correctness is Spring Framework's responsibility
 
 ---
@@ -165,21 +257,34 @@ Load references based on the current task. Each file provides detailed patterns 
 
 ### When determining test level
 
-- @references/test-level-guide.md - Level classification criteria and decision flow
+- `references/test-level-guide.md` - Level classification criteria and decision flow
 
 ### When generating test skeletons
 
-- @references/test-generation.md - Spec to test skeleton process, quality checklist
+- `references/test-generation.md` - Spec to test skeleton process, quality checklist
 
 ### When writing tests by level
 
-- @references/unit-test.md - Unit test patterns (state change, validation, ParameterizedTest, domain events)
-- @references/integration-test.md - Integration patterns (rollback, Spring Event, Kafka Consumer)
-- @references/concurrency-test.md - Concurrency patterns (thread pool, locking, idempotency)
-- @references/adapter-test.md - Adapter patterns (WireMock, Circuit Breaker, Retry, complex queries)
-- @references/e2e-test.md - E2E patterns (HTTP status codes, auth failures, API contract)
-- @references/batch-test.md - Spring Batch patterns (Processor unit test, Step/Job integration test)
+- `references/unit-test.md` - Unit test patterns (state change, validation, ParameterizedTest, domain events)
+- `references/integration-test.md` - Integration patterns (rollback, Spring Event, Kafka Consumer)
+- `references/concurrency-test.md` - Concurrency patterns (thread pool, locking, idempotency)
+- `references/adapter-test.md` - Adapter patterns (WireMock, Circuit Breaker, Retry, complex queries)
+- `references/e2e-test.md` - E2E patterns (HTTP status codes, auth failures, API contract)
+- `references/batch-test.md` - Spring Batch patterns (Processor unit test, Step/Job integration test)
 
 ### When deciding external dependencies strategy
 
-- @references/external-dependencies.md - External dependencies by test level (Real DB, WireMock, Testcontainers)
+- `references/external-dependencies.md` - External dependencies by test level (Real DB, WireMock, Testcontainers)
+
+---
+
+## Common Mistakes
+
+| Mistake                            | Why It's Wrong                      | Fix                                                  |
+|------------------------------------|-------------------------------------|------------------------------------------------------|
+| `verify(mock).save(any())`         | Interaction verification, not state | Assert on returned/persisted state                   |
+| Shared mutable state between tests | Test pollution, flaky results       | Create fresh fixtures per test                       |
+| Testing implementation details     | Breaks on refactor                  | Test observable behavior only                        |
+| Magic numbers in assertions        | Unclear what's being tested         | Use named variables: `initialBalance - deductAmount` |
+| Multiple behaviors per test        | Hard to diagnose failures           | One logical assertion per test                       |
+| Missing `@AfterEach` cleanup       | DB pollution across tests           | Clean up created entities                            |

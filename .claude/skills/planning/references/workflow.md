@@ -77,6 +77,19 @@ For each gap identified:
 - Locking strategy
 - These are NOT clarifications
 
+### Decision Boundary Reference
+
+| Decision Type | Who Decides | Example |
+|--------------|-------------|---------|
+| Library choice | Implementer | "Use Kotlin coroutines vs RxJava" |
+| Algorithm | Implementer | "Binary search vs linear search" |
+| Error message text | Implementer | "Invalid input" wording |
+| Validation **rules** | Spec author (Clarification) | "What counts as valid?" |
+| State transitions | Spec author (Clarification) | "Can X go to Y state?" |
+| Business logic | Spec author (Clarification) | "What happens when...?" |
+
+**Red Flag**: If you're deciding WHAT should happen (not HOW), it's a business decision. Surface it in Clarifications.
+
 ### Step 2.2: Note Blocking Dependencies
 
 For each clarification:
