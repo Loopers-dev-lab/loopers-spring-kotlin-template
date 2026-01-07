@@ -1,197 +1,133 @@
 #!/bin/bash
 #
-# Agent Council - Collect opinions from multiple AI Agents
+# Agent Council (job mode default)
 #
-# Usage: council.sh "question or prompt"
-#        council.sh --stdin  (read from stdin)
+# Subcommands:
+#   council.sh start [options] "question"     # returns JOB_DIR immediately
+#   council.sh status [--json|--text|--checklist] JOB_DIR # poll progress
+#   council.sh wait [--cursor CURSOR] [--bucket auto|N] [--interval-ms N] [--timeout-ms N] JOB_DIR
+#   council.sh results [--json] JOB_DIR       # print collected outputs
+#   council.sh stop JOB_DIR                   # best-effort stop running members
+#   council.sh clean JOB_DIR                  # remove job directory
 #
-# LLM Council (Karpathy) concept:
-# - Stage 1: Send same question to each Agent
-# - Stage 2: Collect and output responses
-# - Stage 3: Claude synthesizes as Chairman (handled externally)
+# One-shot:
+#   council.sh "question"
+#   (in a real terminal: starts a job, waits for completion, prints results, cleans up)
+#   (in host-agent tool UIs: returns a single `wait` JSON payload immediately; host drives progress + results)
+#
+# Stdin mode:
+#   council.sh --stdin
+#   council.sh start --stdin
 #
 
 set -e
 
-# Get script directory and find config
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-CONFIG_FILE="$SKILL_DIR/council.config.yaml"
+JOB_SCRIPT="$SCRIPT_DIR/council-job.sh"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
-NC='\033[0m' # No Color
+usage() {
+  cat <<EOF
+Agent Council
 
-# Color name to code mapping
-get_color_code() {
-    case "$1" in
-        RED) echo "$RED" ;;
-        GREEN) echo "$GREEN" ;;
-        BLUE) echo "$BLUE" ;;
-        YELLOW) echo "$YELLOW" ;;
-        CYAN) echo "$CYAN" ;;
-        MAGENTA) echo "$MAGENTA" ;;
-        *) echo "$NC" ;;
-    esac
+Default mode is job-based parallel execution (pollable).
+
+Usage:
+  $(basename "$0") start [options] "question"
+  $(basename "$0") start --stdin
+  $(basename "$0") status [--json|--text|--checklist] <jobDir>
+  $(basename "$0") wait [--cursor CURSOR] [--bucket auto|N] [--interval-ms N] [--timeout-ms N] <jobDir>
+  $(basename "$0") results [--json] <jobDir>
+  $(basename "$0") stop <jobDir>
+  $(basename "$0") clean <jobDir>
+
+One-shot:
+  $(basename "$0") "question"
+  $(basename "$0") --stdin
+EOF
 }
 
-# Check arguments
-if [ "$1" = "--stdin" ]; then
-    PROMPT=$(cat)
-elif [ -z "$1" ]; then
-    echo -e "${RED}Error: Please provide a prompt${NC}"
-    echo "Usage: $0 \"question or prompt\""
-    echo "       $0 --stdin  (read from stdin)"
-    exit 1
-else
-    PROMPT="$1"
+if [ $# -eq 0 ]; then
+  usage
+  exit 1
 fi
 
-# Bug fix: removed duplicate PROMPT="$1" line
+case "$1" in
+  -h|--help|help)
+    usage
+    exit 0
+    ;;
+esac
 
-TEMP_DIR=$(mktemp -d)
-PROMPT_FILE="$TEMP_DIR/prompt.txt"
-echo "$PROMPT" > "$PROMPT_FILE"
-
-# Parse YAML config (simple parser for our structure - macOS compatible)
-parse_members() {
-    if [ ! -f "$CONFIG_FILE" ]; then
-        echo -e "${YELLOW}Warning: Config file not found at $CONFIG_FILE${NC}" >&2
-        echo -e "${YELLOW}Using default configuration (codex, gemini)${NC}" >&2
-        echo "codex|codex exec|🤖|BLUE"
-        echo "gemini|gemini|💎|GREEN"
-        return
-    fi
-
-    # Extract members using awk (macOS/BSD compatible)
-    awk '
-    /^  members:/ { in_members=1; next }
-    /^  [a-z]/ && in_members { in_members=0 }
-    in_members && /- name:/ {
-        name=$3
-        gsub(/"/, "", name)
-    }
-    in_members && /command:/ {
-        cmd = $0
-        sub(/.*command: *"?/, "", cmd)
-        sub(/".*$/, "", cmd)
-    }
-    in_members && /emoji:/ {
-        emoji = $2
-        gsub(/"/, "", emoji)
-    }
-    in_members && /color:/ {
-        color = $2
-        gsub(/"/, "", color)
-        if (name && cmd) {
-            print name "|" cmd "|" emoji "|" color
-            name=""; cmd=""; emoji=""; color=""
-        }
-    }
-    ' "$CONFIG_FILE"
-}
-
-# Display truncated prompt (first 100 chars)
-PROMPT_PREVIEW="${PROMPT:0:100}"
-if [ ${#PROMPT} -gt 100 ]; then
-    PROMPT_PREVIEW="${PROMPT_PREVIEW}..."
+if ! command -v node >/dev/null 2>&1; then
+  echo "Error: Node.js is required to run Agent Council." >&2
+  echo "Claude Code plugins cannot bundle or auto-install Node." >&2
+  echo "" >&2
+  echo "macOS (Homebrew): brew install node" >&2
+  echo "Or download from: https://nodejs.org/" >&2
+  exit 127
 fi
 
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}🏛️  Agent Council - Gathering Opinions${NC}"
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-echo -e "${YELLOW}📝 Question:${NC} $PROMPT_PREVIEW"
-echo ""
+case "$1" in
+  start|status|wait|results|stop|clean)
+    exec "$JOB_SCRIPT" "$@"
+    ;;
+esac
 
-# Function to call an agent
-call_agent() {
-    local name="$1"
-    local command="$2"
-    local output_file="$TEMP_DIR/${name}.txt"
-    local color_code="$3"
+in_host_agent_context() {
+  if [ -n "${CODEX_CACHE_FILE:-}" ]; then
+    return 0
+  fi
 
-    echo -e "${color_code}[$name]${NC} Thinking..." >&2
+  case "$SCRIPT_DIR" in
+    */.codex/skills/*|*/.claude/skills/*)
+      # Tool-call environments typically do not provide a real TTY on stdout/stderr.
+      if [ ! -t 1 ] && [ ! -t 2 ]; then
+        return 0
+      fi
+      ;;
+  esac
 
-    # Extract the base command (first word)
-    local base_cmd=$(echo "$command" | awk '{print $1}')
-
-    if command -v "$base_cmd" &> /dev/null; then
-        # Handle different CLI tools
-        case "$base_cmd" in
-            codex)
-                # codex exec requires prompt as argument, use temp file for long prompts
-                codex exec "$(cat "$PROMPT_FILE")" > "$output_file" 2>&1 || echo "Error calling $name" > "$output_file"
-                ;;
-            gemini)
-                # gemini can read from stdin with -p flag or pipe
-                cat "$PROMPT_FILE" | gemini > "$output_file" 2>&1 || echo "Error calling $name" > "$output_file"
-                ;;
-            *)
-                # Generic: try passing prompt as argument
-                eval "$command \"\$(cat \"\$PROMPT_FILE\")\"" > "$output_file" 2>&1 || echo "Error calling $name" > "$output_file"
-                ;;
-        esac
-    else
-        echo "$name CLI not installed (command: $base_cmd)" > "$output_file"
-    fi
-
-    echo -e "${GREEN}[$name]${NC} Done" >&2
+  return 1
 }
 
-# Stage 1: Collect members and call in parallel
-echo -e "${YELLOW}Stage 1: Collecting opinions from council members...${NC}"
-echo ""
+JOB_DIR="$("$JOB_SCRIPT" start "$@")"
 
-# Read members and start parallel calls
-declare -a PIDS
-declare -a MEMBERS
+# Host agents (Codex CLI / Claude Code) cannot update native TODO/plan UIs while a long-running
+# command is executing. If we're in a host agent context, return immediately with a single `wait`
+# JSON payload (includes `.ui.codex.update_plan.plan` / `.ui.claude.todo_write.todos`) and let the
+# host agent drive progress updates with repeated short `wait` calls + native UI updates.
+if in_host_agent_context; then
+  exec "$JOB_SCRIPT" wait "$JOB_DIR"
+fi
 
-while IFS='|' read -r name cmd emoji color; do
-    [ -z "$name" ] && continue
-    MEMBERS+=("$name|$emoji|$color")
-    color_code=$(get_color_code "$color")
-    call_agent "$name" "$cmd" "$color_code" &
-    PIDS+=($!)
-done < <(parse_members)
+echo "council: started ${JOB_DIR}" >&2
 
-# Wait for all agents
-for pid in "${PIDS[@]}"; do
-    wait "$pid" 2>/dev/null || true
+cleanup_on_signal() {
+  if [ -n "${JOB_DIR:-}" ] && [ -d "$JOB_DIR" ]; then
+    "$JOB_SCRIPT" stop "$JOB_DIR" >/dev/null 2>&1 || true
+    "$JOB_SCRIPT" clean "$JOB_DIR" >/dev/null 2>&1 || true
+  fi
+  exit 130
+}
+
+trap cleanup_on_signal INT TERM
+
+while true; do
+  WAIT_JSON="$("$JOB_SCRIPT" wait "$JOB_DIR")"
+  OVERALL="$(printf '%s' "$WAIT_JSON" | node -e '
+const fs=require("fs");
+const d=JSON.parse(fs.readFileSync(0,"utf8"));
+process.stdout.write(String(d.overallState||""));
+')"
+
+  "$JOB_SCRIPT" status --text "$JOB_DIR" >&2
+
+  if [ "$OVERALL" = "done" ]; then
+    break
+  fi
 done
 
-echo ""
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}Stage 2: Council Opinions${NC}"
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
+trap - INT TERM
 
-# Display each member's response
-for member_info in "${MEMBERS[@]}"; do
-    IFS='|' read -r name emoji color <<< "$member_info"
-    color_code=$(get_color_code "$color")
-    output_file="$TEMP_DIR/${name}.txt"
-
-    echo -e "${color_code}┌─────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${color_code}│ ${emoji} ${name}${NC}"
-    echo -e "${color_code}└─────────────────────────────────────────────────────────┘${NC}"
-
-    if [ -f "$output_file" ]; then
-        cat "$output_file"
-    else
-        echo "No response"
-    fi
-    echo ""
-done
-
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}Stage 3: Claude (Chairman) will synthesize above opinions${NC}"
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-# Cleanup
-rm -rf "$TEMP_DIR"
+"$JOB_SCRIPT" results "$JOB_DIR"
+"$JOB_SCRIPT" clean "$JOB_DIR" >/dev/null
