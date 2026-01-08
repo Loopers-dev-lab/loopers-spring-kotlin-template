@@ -293,5 +293,87 @@ class RankingCommandTest {
             // then
             assertThat(query.offset).isEqualTo(0L)
         }
+
+        @DisplayName("WEEKLY date 20260101은 2026-01-01T00:00 Asia/Seoul에 해당하는 Instant로 파싱된다")
+        @Test
+        fun `toQuery with WEEKLY date parses to correct Instant`() {
+            // given
+            val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.WEEKLY,
+                date = "20260101",
+                page = 0,
+                size = 20,
+            )
+
+            // when
+            val query = command.toQuery(clock)
+
+            // then
+            assertThat(query.dateTime).isEqualTo(
+                ZonedDateTime.of(2026, 1, 1, 0, 0, 0, 0, seoulZone).toInstant(),
+            )
+            assertThat(query.period).isEqualTo(RankingPeriod.WEEKLY)
+        }
+
+        @DisplayName("MONTHLY date 20260101은 2026-01-01T00:00 Asia/Seoul에 해당하는 Instant로 파싱된다")
+        @Test
+        fun `toQuery with MONTHLY date parses to correct Instant`() {
+            // given
+            val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.MONTHLY,
+                date = "20260101",
+                page = 0,
+                size = 20,
+            )
+
+            // when
+            val query = command.toQuery(clock)
+
+            // then
+            assertThat(query.dateTime).isEqualTo(
+                ZonedDateTime.of(2026, 1, 1, 0, 0, 0, 0, seoulZone).toInstant(),
+            )
+            assertThat(query.period).isEqualTo(RankingPeriod.MONTHLY)
+        }
+
+        @DisplayName("WEEKLY date format이 yyyyMMdd가 아니면 IllegalArgumentException을 던진다")
+        @Test
+        fun `toQuery with invalid WEEKLY date format throws IllegalArgumentException`() {
+            // given
+            val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
+            // 10 chars instead of 8
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.WEEKLY,
+                date = "2026010112",
+                page = 0,
+                size = 20,
+            )
+
+            // when & then
+            assertThrows<IllegalArgumentException> {
+                command.toQuery(clock)
+            }
+        }
+
+        @DisplayName("MONTHLY date format이 yyyyMMdd가 아니면 IllegalArgumentException을 던진다")
+        @Test
+        fun `toQuery with invalid MONTHLY date format throws IllegalArgumentException`() {
+            // given
+            val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
+            // 6 chars instead of 8
+            val command = RankingCommand.FindRankings(
+                period = RankingPeriod.MONTHLY,
+                date = "202601",
+                page = 0,
+                size = 20,
+            )
+
+            // when & then
+            assertThrows<IllegalArgumentException> {
+                command.toQuery(clock)
+            }
+        }
     }
 }

@@ -14,6 +14,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-batch")
     testImplementation("org.springframework.batch:spring-batch-test")
 
+    // web
+    implementation("org.springframework.boot:spring-boot-starter-web")
+
     // querydsl
     kapt("com.querydsl:querydsl-apt::jakarta")
 

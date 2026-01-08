@@ -92,6 +92,84 @@ class RankingPeriodTest {
             assertThat(result).isEqualTo(RankingPeriod.DAILY)
         }
 
+        @DisplayName("weekly가 주어지면 WEEKLY를 반환한다")
+        @Test
+        fun `returns WEEKLY when value is weekly`() {
+            // given
+            val value = "weekly"
+
+            // when
+            val result = RankingPeriod.fromString(value)
+
+            // then
+            assertThat(result).isEqualTo(RankingPeriod.WEEKLY)
+        }
+
+        @DisplayName("WEEKLY가 주어지면 WEEKLY를 반환한다 (대소문자 무시)")
+        @Test
+        fun `returns WEEKLY when value is WEEKLY ignoring case`() {
+            // given
+            val value = "WEEKLY"
+
+            // when
+            val result = RankingPeriod.fromString(value)
+
+            // then
+            assertThat(result).isEqualTo(RankingPeriod.WEEKLY)
+        }
+
+        @DisplayName("Weekly가 주어지면 WEEKLY를 반환한다 (혼합 대소문자)")
+        @Test
+        fun `returns WEEKLY when value is Weekly with mixed case`() {
+            // given
+            val value = "Weekly"
+
+            // when
+            val result = RankingPeriod.fromString(value)
+
+            // then
+            assertThat(result).isEqualTo(RankingPeriod.WEEKLY)
+        }
+
+        @DisplayName("monthly가 주어지면 MONTHLY를 반환한다")
+        @Test
+        fun `returns MONTHLY when value is monthly`() {
+            // given
+            val value = "monthly"
+
+            // when
+            val result = RankingPeriod.fromString(value)
+
+            // then
+            assertThat(result).isEqualTo(RankingPeriod.MONTHLY)
+        }
+
+        @DisplayName("MONTHLY가 주어지면 MONTHLY를 반환한다 (대소문자 무시)")
+        @Test
+        fun `returns MONTHLY when value is MONTHLY ignoring case`() {
+            // given
+            val value = "MONTHLY"
+
+            // when
+            val result = RankingPeriod.fromString(value)
+
+            // then
+            assertThat(result).isEqualTo(RankingPeriod.MONTHLY)
+        }
+
+        @DisplayName("Monthly가 주어지면 MONTHLY를 반환한다 (혼합 대소문자)")
+        @Test
+        fun `returns MONTHLY when value is Monthly with mixed case`() {
+            // given
+            val value = "Monthly"
+
+            // when
+            val result = RankingPeriod.fromString(value)
+
+            // then
+            assertThat(result).isEqualTo(RankingPeriod.MONTHLY)
+        }
+
         @DisplayName("알 수 없는 값이 주어지면 기본값으로 HOURLY를 반환한다")
         @Test
         fun `returns HOURLY as default for unknown value`() {
@@ -147,6 +225,32 @@ class RankingPeriodTest {
 
             // then
             assertThat(key).isEqualTo("daily")
+        }
+
+        @DisplayName("WEEKLY의 key는 weekly이다")
+        @Test
+        fun `WEEKLY key is weekly`() {
+            // given
+            val period = RankingPeriod.WEEKLY
+
+            // when
+            val key = period.key
+
+            // then
+            assertThat(key).isEqualTo("weekly")
+        }
+
+        @DisplayName("MONTHLY의 key는 monthly이다")
+        @Test
+        fun `MONTHLY key is monthly`() {
+            // given
+            val period = RankingPeriod.MONTHLY
+
+            // when
+            val key = period.key
+
+            // then
+            assertThat(key).isEqualTo("monthly")
         }
     }
 
@@ -244,6 +348,84 @@ class RankingPeriodTest {
             // then
             assertThat(result).isEqualTo(Instant.parse("2024-01-15T13:30:00.123456789Z"))
         }
+
+        @DisplayName("WEEKLY는 7일을 뺀다")
+        @Test
+        fun `WEEKLY subtracts seven days`() {
+            // given
+            val instant = Instant.parse("2024-01-15T10:30:00Z")
+
+            // when
+            val result = RankingPeriod.WEEKLY.subtractOne(instant)
+
+            // then
+            assertThat(result).isEqualTo(Instant.parse("2024-01-08T10:30:00Z"))
+        }
+
+        @DisplayName("WEEKLY로 월을 넘어가면 전달로 이동한다")
+        @Test
+        fun `WEEKLY crossing month goes to previous month`() {
+            // given
+            val instant = Instant.parse("2024-02-03T10:30:00Z")
+
+            // when
+            val result = RankingPeriod.WEEKLY.subtractOne(instant)
+
+            // then
+            assertThat(result).isEqualTo(Instant.parse("2024-01-27T10:30:00Z"))
+        }
+
+        @DisplayName("WEEKLY: 연도 경계에서 이전 연도로 넘어간다")
+        @Test
+        fun `WEEKLY crosses year boundary to previous year`() {
+            // given
+            val instant = Instant.parse("2025-01-03T00:00:00Z")
+
+            // when
+            val result = RankingPeriod.WEEKLY.subtractOne(instant)
+
+            // then
+            assertThat(result).isEqualTo(Instant.parse("2024-12-27T00:00:00Z"))
+        }
+
+        @DisplayName("MONTHLY는 30일을 뺀다")
+        @Test
+        fun `MONTHLY subtracts thirty days`() {
+            // given
+            val instant = Instant.parse("2024-03-15T10:30:00Z")
+
+            // when
+            val result = RankingPeriod.MONTHLY.subtractOne(instant)
+
+            // then
+            assertThat(result).isEqualTo(Instant.parse("2024-02-14T10:30:00Z"))
+        }
+
+        @DisplayName("MONTHLY로 월을 넘어가면 전달로 이동한다")
+        @Test
+        fun `MONTHLY crossing month goes to previous month`() {
+            // given
+            val instant = Instant.parse("2024-02-15T10:30:00Z")
+
+            // when
+            val result = RankingPeriod.MONTHLY.subtractOne(instant)
+
+            // then
+            assertThat(result).isEqualTo(Instant.parse("2024-01-16T10:30:00Z"))
+        }
+
+        @DisplayName("MONTHLY: 연도 경계에서 이전 연도로 넘어간다")
+        @Test
+        fun `MONTHLY crosses year boundary to previous year`() {
+            // given
+            val instant = Instant.parse("2025-01-15T00:00:00Z")
+
+            // when
+            val result = RankingPeriod.MONTHLY.subtractOne(instant)
+
+            // then
+            assertThat(result).isEqualTo(Instant.parse("2024-12-16T00:00:00Z"))
+        }
     }
 
     @DisplayName("fromKey 메서드 테스트")
@@ -274,6 +456,32 @@ class RankingPeriodTest {
 
             // then
             assertThat(result).isEqualTo(RankingPeriod.DAILY)
+        }
+
+        @DisplayName("weekly가 주어지면 WEEKLY를 반환한다")
+        @Test
+        fun `returns WEEKLY when key is weekly`() {
+            // given
+            val key = "weekly"
+
+            // when
+            val result = RankingPeriod.fromKey(key)
+
+            // then
+            assertThat(result).isEqualTo(RankingPeriod.WEEKLY)
+        }
+
+        @DisplayName("monthly가 주어지면 MONTHLY를 반환한다")
+        @Test
+        fun `returns MONTHLY when key is monthly`() {
+            // given
+            val key = "monthly"
+
+            // when
+            val result = RankingPeriod.fromKey(key)
+
+            // then
+            assertThat(result).isEqualTo(RankingPeriod.MONTHLY)
         }
 
         @DisplayName("알 수 없는 key가 주어지면 예외를 던진다")

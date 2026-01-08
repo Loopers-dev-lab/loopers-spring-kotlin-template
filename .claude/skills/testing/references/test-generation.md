@@ -6,9 +6,44 @@ This document describes how to extract and generate test cases from spec documen
 
 Test case extraction answers: "What test cases are needed to verify this milestone?"
 
-The output is test skeletons - empty test methods with clear names that describe expected behavior. Implementer fills in actual test code later.
+The output is test skeletons - empty test methods with clear names that describe expected behavior. Implementer fills in
+actual test code later.
 
 This enables true TDD: red tests exist before any implementation.
+
+---
+
+## MUST: Decompose Spec Criteria by Class Responsibility
+
+### The Rule
+
+```
+SPEC ACCEPTANCE CRITERIA ≠ TEST CASES
+
+Decompose each acceptance criterion by class responsibility.
+Place each piece at the appropriate test level.
+```
+
+### 🚨 Red Flags
+
+| Thought                                      | Reality                                                                        |
+|----------------------------------------------|--------------------------------------------------------------------------------|
+| "Spec says X, so test X in this class"       | Ask: Is X this class's responsibility?                                         |
+| "One acceptance criterion = one test case"   | Decompose by class responsibility first                                        |
+| "Facade test should verify all outcomes"     | Facade verifies orchestration; individual outcomes belong to their owning class |
+
+### Decomposition Example
+
+**Spec**: "When placing an order, points are deducted, stock decreases, and order is created"
+
+| Responsibility          | Class             | Test Level  | What to Verify                            |
+|-------------------------|-------------------|-------------|-------------------------------------------|
+| Point deduction logic   | Point (domain)    | Unit        | `deduct()` calculates correctly           |
+| Stock decrease logic    | Stock (domain)    | Unit        | `decrease()` calculates correctly         |
+| Orchestration success   | OrderFacade       | Integration | Scenario completes, DB reflects final state |
+| Transaction rollback    | OrderFacade/Service | Integration | All resources restored on failure         |
+
+**Rule**: Domain logic correctness → Unit Test. Scenario outcome in DB → Integration Test.
 
 ---
 
@@ -23,21 +58,8 @@ Is this a TDD workflow (tests before implementation)?
 └── No  → Document the gap, ask for clarification
 ```
 
-**Key principle**: In TDD, tests are written BEFORE code exists. Generate skeletons for ALL spec requirements, even if implementation doesn't exist yet.
-
----
-
-## Exception Type Mapping
-
-Spec documents may use domain-specific names. Map to actual codebase patterns:
-
-| Spec Describes | Actual Implementation Pattern |
-|----------------|------------------------------|
-| `CouponNotFoundException` | `CoreException(ErrorType.NOT_FOUND)` |
-| `DuplicateCouponException` | `CoreException(ErrorType.CONFLICT)` |
-| `InvalidAmountException` | `CoreException(ErrorType.BAD_REQUEST)` |
-
-**Rule**: Check existing tests for exception patterns before generating skeletons.
+**Key principle**: In TDD, tests are written BEFORE code exists. Generate skeletons for ALL spec requirements, even if
+implementation doesn't exist yet.
 
 ---
 
@@ -82,16 +104,28 @@ class CouponServiceIntegrationTest {
     @DisplayName("issueCoupon")
     inner class IssueCoupon {
         // ✅ Success cases grouped
-        @Test fun `assigns coupon when valid code`() { ... }
-        @Test fun `assigns coupon when user has other coupons`() { ... }
+        @Test
+        fun `assigns coupon when valid code`() {
+            ...
+        }
+        @Test
+        fun `assigns coupon when user has other coupons`() {
+            ...
+        }
     }
 
     @Nested
     @DisplayName("issueCoupon - 실패")
     inner class IssueCouponFailure {
         // ✅ Failure cases grouped
-        @Test fun `throws NOT_FOUND when coupon not exists`() { ... }
-        @Test fun `throws CONFLICT when already issued`() { ... }
+        @Test
+        fun `throws NOT_FOUND when coupon not exists`() {
+            ...
+        }
+        @Test
+        fun `throws CONFLICT when already issued`() {
+            ...
+        }
     }
 }
 ```
@@ -99,8 +133,12 @@ class CouponServiceIntegrationTest {
 **Alternative**: If failure types are distinct and numerous, separate by error type:
 
 ```kotlin
-@Nested @DisplayName("issueCoupon - NOT_FOUND") inner class IssueCouponNotFound { ... }
-@Nested @DisplayName("issueCoupon - CONFLICT") inner class IssueCouponConflict { ... }
+@Nested
+@DisplayName("issueCoupon - NOT_FOUND")
+inner class IssueCouponNotFound { ... }
+@Nested
+@DisplayName("issueCoupon - CONFLICT")
+inner class IssueCouponConflict { ... }
 ```
 
 ---
@@ -109,14 +147,15 @@ class CouponServiceIntegrationTest {
 
 Pattern: `[verb phrase] when [condition]`
 
-| Pattern | Example |
-|---------|---------|
-| Success | `assigns coupon when valid code` |
-| Exception | `throws NOT_FOUND when coupon not exists` |
-| State change | `decreases balance when deduct valid amount` |
-| Boolean result | `returns true when user has permission` |
+| Pattern        | Example                                      |
+|----------------|----------------------------------------------|
+| Success        | `assigns coupon when valid code`             |
+| Exception      | `throws NOT_FOUND when coupon not exists`    |
+| State change   | `decreases balance when deduct valid amount` |
+| Boolean result | `returns true when user has permission`      |
 
 **Not allowed**:
+
 - ❌ `testIssueCoupon` (no condition)
 - ❌ `couponIssuedSuccessfully` (no "when")
 - ❌ `should assign coupon` (avoid "should")
@@ -127,14 +166,15 @@ Pattern: `[verb phrase] when [condition]`
 
 When to create new test file vs extend existing:
 
-| Situation | Action |
-|-----------|--------|
-| New method on existing class | Add @Nested to existing test file |
-| Existing file > 500 lines | Consider splitting by method |
-| New class | New test file |
+| Situation                              | Action                                     |
+|----------------------------------------|--------------------------------------------|
+| New method on existing class           | Add @Nested to existing test file          |
+| Existing file > 500 lines              | Consider splitting by method               |
+| New class                              | New test file                              |
 | Focused test (concurrency, edge cases) | Separate test file with descriptive suffix |
 
 **File naming examples**:
+
 - `CouponServiceIntegrationTest.kt` - Main integration tests
 - `CouponServiceConcurrencyTest.kt` - Concurrency-specific tests
 - `CouponIssueLimitIntegrationTest.kt` - Feature-focused tests
@@ -178,7 +218,8 @@ fun `throws CONFLICT when already issued`() {
 
 ## One Behavior Per Test
 
-Each test case must verify **one behavior**. If you're tempted to write multiple unrelated "Then" conditions, split into separate tests.
+Each test case must verify **one behavior**. If you're tempted to write multiple unrelated "Then" conditions, split into
+separate tests.
 
 ```kotlin
 // ❌ Bad: Two unrelated behaviors in one test
@@ -210,9 +251,9 @@ When milestone indicates changes to existing functionality:
 1. Read the updated spec section
 2. Read existing test file for the affected scope
 3. Compare each existing test case against updated spec:
-   - Spec unchanged for this case → Keep the case
-   - Spec changed affecting this case → Rewrite with updated Given/When/Then
-   - Case no longer valid per spec → Remove from output
+    - Spec unchanged for this case → Keep the case
+    - Spec changed affecting this case → Rewrite with updated Given/When/Then
+    - Case no longer valid per spec → Remove from output
 4. Identify new cases required by updated spec → Add new skeletons
 
 All cases in output use identical skeleton format with `fail("Not implemented")`.
@@ -232,10 +273,10 @@ The critical job is **deciding what to test** based on spec-to-test comparison.
 
 ## Forbidden "Then" Patterns
 
-| ❌ FORBIDDEN | ✅ ALLOWED |
-|-------------|-----------|
-| `repository.save() is called` | `Balance is 700` |
-| `service.method() is invoked` | `Order status is PLACED` |
-| `verify(mock).method()` | `Exception is thrown` |
-| `no interaction with X` | `No order exists for userId` |
-| `called N times` | `Response status is 201` |
+| ❌ FORBIDDEN                   | ✅ ALLOWED                    |
+|-------------------------------|------------------------------|
+| `repository.save() is called` | `Balance is 700`             |
+| `service.method() is invoked` | `Order status is PLACED`     |
+| `verify(mock).method()`       | `Exception is thrown`        |
+| `no interaction with X`       | `No order exists for userId` |
+| `called N times`              | `Response status is 201`     |

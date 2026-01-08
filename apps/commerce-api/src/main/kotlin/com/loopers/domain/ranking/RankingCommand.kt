@@ -57,5 +57,12 @@ private fun parseDateTime(period: RankingPeriod, date: String): java.time.Instan
             val day = date.substring(6, 8).toInt()
             ZonedDateTime.of(year, month, day, 0, 0, 0, 0, SEOUL_ZONE).toInstant()
         }
+        RankingPeriod.WEEKLY, RankingPeriod.MONTHLY -> {
+            require(date.length == 8) { "Invalid ${period.name.lowercase()} date format: $date (expected yyyyMMdd)" }
+            val year = date.substring(0, 4).toInt()
+            val month = date.substring(4, 6).toInt()
+            val day = date.substring(6, 8).toInt()
+            ZonedDateTime.of(year, month, day, 0, 0, 0, 0, SEOUL_ZONE).toInstant()
+        }
     }
 }

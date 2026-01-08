@@ -1,5 +1,6 @@
 package com.loopers.domain.ranking
 
+import com.loopers.infrastructure.ranking.RankingKeyGenerator
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -44,6 +45,32 @@ class RankingKeyGeneratorTest {
 
             // then
             assertThat(key).isEqualTo("ranking:products:daily:20250126")
+        }
+
+        @DisplayName("WEEKLY period에서 ranking:products:weekly:yyyyMMdd 형식의 키를 생성한다")
+        @Test
+        fun `generates weekly key format`() {
+            // given - KST 2025-01-26 14:30:00 (UTC 05:30:00)
+            val instant = Instant.parse("2025-01-26T05:30:00Z")
+
+            // when
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.WEEKLY, instant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:weekly:20250126")
+        }
+
+        @DisplayName("MONTHLY period에서 ranking:products:monthly:yyyyMMdd 형식의 키를 생성한다")
+        @Test
+        fun `generates monthly key format`() {
+            // given - KST 2025-01-26 14:30:00 (UTC 05:30:00)
+            val instant = Instant.parse("2025-01-26T05:30:00Z")
+
+            // when
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.MONTHLY, instant)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:monthly:20250126")
         }
 
         @DisplayName("UTC Instant를 Asia/Seoul 타임존으로 변환하여 키를 생성한다")
@@ -116,6 +143,32 @@ class RankingKeyGeneratorTest {
             // then
             assertThat(key).isEqualTo("ranking:products:daily:20250126")
         }
+
+        @DisplayName("WEEKLY period와 8자리 날짜 문자열로 키를 생성한다")
+        @Test
+        fun `generates weekly key from date string`() {
+            // given
+            val dateString = "20250126"
+
+            // when
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.WEEKLY, dateString)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:weekly:20250126")
+        }
+
+        @DisplayName("MONTHLY period와 8자리 날짜 문자열로 키를 생성한다")
+        @Test
+        fun `generates monthly key from date string`() {
+            // given
+            val dateString = "20250126"
+
+            // when
+            val key = rankingKeyGenerator.bucketKey(RankingPeriod.MONTHLY, dateString)
+
+            // then
+            assertThat(key).isEqualTo("ranking:products:monthly:20250126")
+        }
     }
 
     @DisplayName("currentBucketKey(period) 메서드 테스트")
@@ -144,6 +197,30 @@ class RankingKeyGeneratorTest {
 
             // then - KST 2025-01-26
             assertThat(key).isEqualTo("ranking:products:daily:20250126")
+        }
+
+        @DisplayName("WEEKLY period에서 Clock 기준으로 ranking:products:weekly: prefix를 가진 키를 생성한다")
+        @Test
+        fun `generates weekly key with clock`() {
+            // given - fixedClock is set to 2025-01-26T05:30:00Z (KST 14:30)
+
+            // when
+            val key = rankingKeyGenerator.currentBucketKey(RankingPeriod.WEEKLY)
+
+            // then - KST 2025-01-26
+            assertThat(key).isEqualTo("ranking:products:weekly:20250126")
+        }
+
+        @DisplayName("MONTHLY period에서 Clock 기준으로 ranking:products:monthly: prefix를 가진 키를 생성한다")
+        @Test
+        fun `generates monthly key with clock`() {
+            // given - fixedClock is set to 2025-01-26T05:30:00Z (KST 14:30)
+
+            // when
+            val key = rankingKeyGenerator.currentBucketKey(RankingPeriod.MONTHLY)
+
+            // then - KST 2025-01-26
+            assertThat(key).isEqualTo("ranking:products:monthly:20250126")
         }
     }
 
@@ -175,6 +252,32 @@ class RankingKeyGeneratorTest {
 
             // then
             assertThat(previousKey).isEqualTo("ranking:products:daily:20250125")
+        }
+
+        @DisplayName("weekly 버킷 키에서 7일 전의 버킷 키를 반환한다")
+        @Test
+        fun `returns previous week bucket key`() {
+            // given
+            val bucketKey = "ranking:products:weekly:20250126"
+
+            // when
+            val previousKey = rankingKeyGenerator.previousBucketKey(bucketKey)
+
+            // then - 7 days before 2025-01-26 is 2025-01-19
+            assertThat(previousKey).isEqualTo("ranking:products:weekly:20250119")
+        }
+
+        @DisplayName("monthly 버킷 키에서 30일 전의 버킷 키를 반환한다")
+        @Test
+        fun `returns previous month bucket key`() {
+            // given
+            val bucketKey = "ranking:products:monthly:20250126"
+
+            // when
+            val previousKey = rankingKeyGenerator.previousBucketKey(bucketKey)
+
+            // then - 30 days before 2025-01-26 is 2024-12-27
+            assertThat(previousKey).isEqualTo("ranking:products:monthly:20241227")
         }
 
         @DisplayName("자정 경계에서 이전 날로 올바르게 전환한다")
