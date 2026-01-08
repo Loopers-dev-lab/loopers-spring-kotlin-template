@@ -72,6 +72,44 @@ class OrderIntegrationTest {
 
 **What NOT to verify**: Internal calculated fields, intermediate states, cache behavior
 
+### Contrast with Unit Test
+
+| Aspect   | Unit Test                                   | Integration Test                               |
+|----------|---------------------------------------------|------------------------------------------------|
+| Question | Is the calculation/logic correct?           | Did the scenario complete successfully?        |
+| Verifies | `Point.deduct(300)` returns correct balance | DB reflects expected balance after scenario    |
+| Scope    | Single domain object logic                  | Multiple components collaborating              |
+
+**Example**: Point balance after order placement
+
+```kotlin
+// Unit Test (unit-test.md) - Tests calculation logic
+@Test
+fun `deduct decreases balance correctly`() {
+    val point = createPoint(balance = 1000L)
+    point.deduct(300L)
+    assertThat(point.balance).isEqualTo(700L)  // Calculation correctness
+}
+
+// Integration Test - Tests scenario outcome in DB
+@Test
+fun `places order with point usage`() {
+    val initialBalance = 1000L
+    createPoint(userId, balance = initialBalance)
+
+    orderFacade.placeOrder(usePoint = 300L)
+
+    // Scenario outcome: DB state reflects the change
+    val point = pointRepository.findByUserId(userId)!!
+    assertThat(point.balance).isEqualTo(700L)  // DB state after scenario
+}
+```
+
+**Both tests assert `700L`, but they verify different things:**
+
+- Unit: The `deduct()` method's arithmetic is correct
+- Integration: The business scenario successfully persisted the result
+
 ## Extraction Patterns
 
 | Pattern                    | Description                                                       |

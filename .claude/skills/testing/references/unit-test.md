@@ -1,6 +1,7 @@
 # Unit Test
 
-Unit tests verify that **individual domain objects implement business rules correctly**. This level requires the most thorough coverage.
+Unit tests verify that **individual domain objects implement business rules correctly**. This level requires the most
+thorough coverage.
 
 ## Naming Convention Examples
 
@@ -28,14 +29,26 @@ fun `throws INSUFFICIENT_BALANCE when balance is insufficient`()
 - All dependencies are real domain objects (no mocks in Classical TDD)
 - Tests a single class or closely related classes
 
+## Verification Scope
+
+Unit tests verify **domain logic correctness**:
+
+- Calculation accuracy (e.g., `1000 - 300 = 700`)
+- State transition rules (e.g., `PLACED → CONFIRMED` allowed, `CANCELLED → CONFIRMED` forbidden)
+- Validation rules (e.g., negative amount throws exception)
+- Domain invariants (e.g., balance cannot be negative)
+
+**Contrast with Integration Test**: Integration tests verify that scenarios complete successfully and DB reflects the
+final state. They don't re-verify calculation correctness—that's Unit Test's job.
+
 ## Extraction Patterns
 
-| Pattern | Description |
-|---------|-------------|
+| Pattern           | Description                                                               |
+|-------------------|---------------------------------------------------------------------------|
 | Entity/VO Methods | Normal operation, each validation failure, state changes, boundary values |
-| State Transitions | Each allowed transition, each forbidden transition |
-| Calculations | Normal calculation, zero handling, min/max values, rounding/precision |
-| Policy/Strategy | supports() returning true/false, calculate/apply() logic |
+| State Transitions | Each allowed transition, each forbidden transition                        |
+| Calculations      | Normal calculation, zero handling, min/max values, rounding/precision     |
+| Policy/Strategy   | supports() returning true/false, calculate/apply() logic                  |
 
 ---
 
@@ -100,6 +113,7 @@ inner class StatusTransitions {
 ```
 
 **Key patterns**:
+
 - Use `@EnumSource(mode = EXCLUDE)` for forbidden transitions
 - Use `@EnumSource(names = [...])` for multiple valid source states
 - Name test with transition: `cancel() - PLACED/CONFIRMED → CANCELLED`
@@ -148,10 +162,10 @@ private fun createOrderWithStatus(status: OrderStatus): Order {
 
 This project uses two exception patterns:
 
-| Source | Exception Type | Verification Pattern |
-|--------|---------------|---------------------|
+| Source           | Exception Type                           | Verification Pattern                                                        |
+|------------------|------------------------------------------|-----------------------------------------------------------------------------|
 | Domain invariant | `require()` → `IllegalArgumentException` | `assertThatThrownBy { }.isInstanceOf(IllegalArgumentException::class.java)` |
-| Business rule | `CoreException(ErrorType.X)` | `assertThat(exception.errorType).isEqualTo(ErrorType.X)` |
+| Business rule    | `CoreException(ErrorType.X)`             | `assertThat(exception.errorType).isEqualTo(ErrorType.X)`                    |
 
 ```kotlin
 // For require() - just verify exception class
